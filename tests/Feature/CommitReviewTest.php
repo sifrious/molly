@@ -51,6 +51,29 @@ it('only sends staged PHP changes while excluding environment and dependency fil
         && count($request['state']['review']['citations']) === 3);
 });
 
+it('reviews PHP changes introduced by a merge against its first parent', function () {
+    expect(Process::path($this->commitWorkspace)->run(['git', 'checkout', '-qb', 'feature'])->successful())->toBeTrue();
+    File::put($this->commitWorkspace.'/app/Merged.php', "<?php return 'merged';   \n");
+    foreach ([['git', 'add', '.'], ['git', 'commit', '-qm', 'Add the feature'], ['git', 'checkout', '-qb', 'integration', 'HEAD~1']] as $command) {
+        expect(Process::path($this->commitWorkspace)->run($command)->successful())->toBeTrue();
+    }
+    File::put($this->commitWorkspace.'/app/Existing.php', "<?php return 'already present';\n");
+    foreach ([['git', 'add', '.'], ['git', 'commit', '-qm', 'Add existing behavior'], ['git', 'merge', '--no-ff', 'feature', '-m', 'Merge the feature']] as $command) {
+        expect(Process::path($this->commitWorkspace)->run($command)->successful())->toBeTrue();
+    }
+    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
+    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(['model' => 'jev-latest', 'answers' => ['next_action' => ['type' => 'choice', 'choice' => 'continue', 'confidence' => .95, 'probabilities' => ['continue' => .9, 'retry' => .04, 'stop' => .01, 'needs_review' => .05]]]])]);
+
+    $report = app(ReviewCommit::class)->handle($this->commitWorkspace);
+
+    expect($report['evaluation']['status'])->toBe('evaluated')
+        ->and($report['diff_check']['status'])->toBe('failed')
+        ->and($report['diff_check']['output'])->toContain('app/Merged.php', 'trailing whitespace');
+    Http::assertSent(fn ($request) => str_contains($request['state']['review']['diff'], "return 'merged';")
+        && ! str_contains($request['state']['review']['diff'], 'already present')
+        && $request['state']['verification']['diff_check'] === 'failed');
+});
+
 it('keeps whitespace failure visible even when semantic evaluation is disabled', function () {
     File::put($this->commitWorkspace.'/app/Flag.php', "<?php return true;   \n");
     Process::path($this->commitWorkspace)->run(['git', 'add', 'app/Flag.php']);
