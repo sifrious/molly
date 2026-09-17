@@ -43,17 +43,19 @@ Open `http://127.0.0.1:8000/molly`. You should see the task list. An empty list 
 
 ## Create and start a task
 
-Choose **Create task**. Enter a prompt, the workspace directory, one allowed file path per line, and the required Pest test path. Include that test path in the allowed files. You can also provide a GitHub issue URL; the imported issue replaces the prompt.
+Choose **Create task**. Enter a prompt, an optional task nickname, the workspace directory, the required Pest test path, and any other files Molly may change, one path per line. Selecting the test also permits test edits, so you do not need to list the test again. Leave the other-files field empty for a task that only changes the test. You can also provide a GitHub issue URL; the imported issue replaces the prompt.
 
 Saving creates a pending task. Choose **Start task** to queue execution. A queued request does not count as a run until the worker starts the attempt. Use **Refresh task** to see the recorded attempts, then open a run to read its evidence.
 
 The task list shows the latest 100 saved tasks. A task page shows the original prompt, selected files, status, and attempt history. Failed or stopped tasks can be retried within the configured attempt limit. Pending or active tasks can be stopped. Read [task controls](tasks.md) for the exact retry and stop behavior.
 
+Use the task page's nickname form to name or rename a task. The nickname also works in CLI commands such as `php artisan molly:task health-check`. Task page URLs keep the UUID, so renaming leaves existing links valid. See [nickname rules](tasks.md#name-a-task).
+
 ## Read the run
 
 The run page starts with Tarpit, Clever, and Pest results. Follow the section links to inspect findings, compare measurements, read test output, and check changed-file hashes. Branch identities and the complete JSON report remain available in expandable details.
 
-Livewire refreshes the run status and current phase when JavaScript is available. **Refresh all evidence** reloads the full saved report. Every core page renders complete HTML, and the create, import, start, retry, and stop forms work without JavaScript.
+Livewire refreshes the run status and current phase when JavaScript is available. **Refresh all evidence** reloads the full saved report. Every core page renders complete HTML, and the create, import, name, start, retry, and stop forms work without JavaScript.
 
 A completed run has passed the required checks. Review the workspace diff and test assertions before committing. A missing or skipped result does not become a passing check. See [verification and complexity evidence](verification.md).
 

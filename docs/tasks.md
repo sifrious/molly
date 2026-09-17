@@ -11,30 +11,61 @@ Complete the [first-run setup](getting-started.md) before starting a task. The [
 
 ## Create a task
 
-Describe one change, name the files Molly may edit, and select the Pest test file that must pass:
+Run the task form:
+
+```bash
+php artisan molly:create
+```
+
+Molly asks what to change, an optional task nickname, which Pest test should pass, and which other files may change. Enter workspace-relative paths and separate other files with commas. Selecting the test adds that test to the editable scope. Leave the other-files answer empty for a task that only changes the test.
+
+You can also provide the answers as arguments and options. Molly asks only for missing inputs. For scripts, supply the prompt and test, then add `--json --no-interaction`:
 
 ```bash
 php artisan molly:create \
-  'Add GET /ready returning JSON {"ready":true}. Test the status code and exact response.' \
+  'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
+  --name=ready-check \
   --file=routes/web.php \
-  --file=tests/Feature/ReadyTest.php \
-  --test=tests/Feature/ReadyTest.php
+  --test=tests/Feature/ReadyTest.php \
+  --json --no-interaction
 ```
 
-Creation validates the prompt and file scope, then saves a pending task. Molly does not call the model or edit the selected files during creation. Copy the task ID from the output to use in later commands. `TASK_ID` below is a placeholder for that ID.
+Creation validates the prompt, nickname, and file scope, then saves a pending task. Molly does not call the model or edit the selected files during creation. The examples below use the `ready-check` nickname. You can also use the task UUID printed by Molly.
 
-Omit the prompt to answer an interactive Laravel Prompts question. Scripts must supply the prompt and can add `--json --no-interaction`.
+`--json` and `--no-interaction` never ask questions. Missing required inputs return an error. Repeat `--file` for each additional file a script allows Molly to edit. Omit `--file` for a task that only changes the test.
 
-Choose files relative to the workspace under `app/`, `routes/`, `resources/`, or `tests/`. Paths cannot contain hidden segments, traversal, or symbolic links. Select regular files or paths for new files, not directories. Molly allows eight distinct files by default, with at most 65,536 bytes per file or replacement. The required `.php` test file must be under `tests/` and also appear in `--file`.
+Choose files relative to the workspace under `app/`, `routes/`, `resources/`, or `tests/`. Paths cannot contain hidden segments, traversal, or symbolic links. Select regular files or paths for new files, not directories. Molly allows eight distinct files by default, including the required test, with at most 65,536 bytes per file or replacement. The required `.php` test file must be under `tests/`. `--test` permits test edits without a duplicate `--file` option.
 
 The host application is the default workspace. Add `--workspace=../another-checkout` to work in another existing checkout. That checkout needs its own Pest installation. Task history and evidence still belong to the host application where you run Artisan.
+
+## Name a task
+
+A nickname gives a task a readable reference such as `ready-check`. Nicknames are optional and unique within the host application, including tasks for other workspaces. Molly trims surrounding spaces and stores nicknames in lowercase. Use 1 through 64 ASCII letters, digits, or hyphens, starting with a letter. UUID-shaped names are reserved.
+
+Set `--name` during creation or GitHub import. To name an existing task, use its UUID:
+
+```bash
+php artisan molly:name TASK_UUID ready-check
+```
+
+Replace `TASK_UUID` with the existing task's UUID. To rename a named task, use the current nickname. This example changes `previous-name` to `ready-check`:
+
+```bash
+php artisan molly:name previous-name ready-check
+```
+
+Renaming changes the nickname without replacing the task or its attempt history. Later commands use the new nickname or the unchanged UUID.
+
+The task, start, retry, stop, and name commands accept either a nickname or UUID. Run reports still use run IDs. After upgrading Molly, run `php artisan migrate` before using nicknames.
+
+You can omit the new name from `molly:name` to answer an interactive question. Scripts must provide the new name and can use `--json --no-interaction`.
 
 ## Start and inspect
 
 ```bash
 php artisan molly:tasks --limit=20
-php artisan molly:task TASK_ID
-php artisan molly:start TASK_ID
+php artisan molly:task ready-check
+php artisan molly:start ready-check
 ```
 
 `molly:start` accepts a pending task and runs in the current terminal. The command records a linked run before execution. A run completes only when the required tests, Tarpit review, and measurement checks pass. A passing model review cannot override a failed test.
@@ -54,8 +85,8 @@ The normal report shows test evidence, all seven Tarpit checks, unresolved findi
 Review the failed report and applied edits before retrying:
 
 ```bash
-php artisan molly:task TASK_ID
-php artisan molly:retry TASK_ID
+php artisan molly:task ready-check
+php artisan molly:retry ready-check
 ```
 
 Each retry creates a new run. Earlier reports remain in task history. The default limit is three attempts, including the first execution. Molly does not retry automatically. A retry of a pending, running, or completed task fails without changing that task.
@@ -69,8 +100,8 @@ Molly sends these diagnostics separately as `previous_attempt`. The retry does n
 Run the stop command in another terminal while a saved task is active:
 
 ```bash
-php artisan molly:stop TASK_ID
-php artisan molly:task TASK_ID
+php artisan molly:stop ready-check
+php artisan molly:task ready-check
 ```
 
 A pending task stops immediately. For an active task, Molly saves a stop request and checks the request between execution stages. Molly checks again after generation and before applying the proposed edits. Generation itself continues until the model request returns or times out.
@@ -87,8 +118,8 @@ GitHub import requires an installed, authenticated `gh` command with access to t
 
 ```bash
 php artisan molly:import https://github.com/OWNER/REPOSITORY/issues/NUMBER \
+  --name=issue-fix \
   --file=app/Example.php \
-  --file=tests/Feature/ExampleTest.php \
   --test=tests/Feature/ExampleTest.php
 ```
 

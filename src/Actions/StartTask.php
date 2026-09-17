@@ -15,10 +15,11 @@ class StartTask
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
     {
-        $task = Task::find($id);
+        $task = Task::findByReference($id);
         if ($task === null) {
             throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
         }
+        $id = $task->id;
 
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);

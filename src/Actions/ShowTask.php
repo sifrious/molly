@@ -8,6 +8,6 @@ class ShowTask
 {
     public function handle(string $id): ?Task
     {
-        return Task::with('runs')->find($id);
+        return Task::findByReference($id)?->load('runs');
     }
 }

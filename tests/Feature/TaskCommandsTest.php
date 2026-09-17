@@ -47,6 +47,7 @@ it('asks for a prompt before saving an interactive task', function (): void {
 
     $this->artisan('molly:create', ['--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php'])
         ->expectsQuestion('What should Molly work on?', 'Fix greeting')
+        ->expectsQuestion('Task nickname', '')
         ->expectsOutputToContain('php artisan molly:start task-prompted')
         ->assertSuccessful();
 });
@@ -167,7 +168,7 @@ it('prints action errors without extra JSON output', function (string $command, 
 
     expect($exit)->toBe(1)->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe($expected);
 })->with([
-    ['molly:create', CreateTask::class, ['prompt' => 'Fix greeting'], ['id' => null, 'status' => 'error', 'error' => 'The selected task cannot change state.']],
+    ['molly:create', CreateTask::class, ['prompt' => 'Fix greeting', '--test' => 'tests/GreetingTest.php'], ['id' => null, 'status' => 'error', 'error' => 'The selected task cannot change state.']],
     ['molly:stop', StopTask::class, ['task' => 'task-id'], ['id' => 'task-id', 'status' => 'error', 'error' => 'The selected task cannot change state.']],
     ['molly:tasks', ListTasks::class, [], ['tasks' => [], 'error' => 'The selected task cannot change state.']],
 ]);

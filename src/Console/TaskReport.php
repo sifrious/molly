@@ -12,7 +12,10 @@ class TaskReport
 {
     public function show(Task $task): void
     {
-        note('Task '.$task->id.' / '.$task->status);
+        note('Task '.$task->reference().' / '.$task->status);
+        if ($task->nickname !== null) {
+            note('Task ID: '.$task->id);
+        }
         note($task->prompt);
         note('Workspace: '.$task->workspace);
         note('Required test: '.$task->test_path);
@@ -22,7 +25,7 @@ class TaskReport
         }
         if ($task->relationLoaded('runs')) {
             if ($task->runs->isEmpty()) {
-                note('No runs yet. Start this task with php artisan molly:start '.$task->id.'.');
+                note('No runs yet. Start this task with php artisan molly:start '.$task->reference().'.');
             } else {
                 table(['Run', 'Status'], $task->runs->map(fn (Run $run): array => [$run->id, $run->status])->all());
                 note('Read a run report with php artisan molly:show RUN_ID.');

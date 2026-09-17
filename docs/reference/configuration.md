@@ -29,12 +29,12 @@ Restart an existing queue worker after configuration changes so the next web tas
 | `molly.test_timeout` | `120` | Pest timeout in seconds. `src/Actions/VerifyChanges.php` bounds the value to 1 through 3600. Parallel verification adds 10 seconds around that bound for startup and cleanup. |
 | `molly.parallel_checks` | `true` | Runs Pest and Tarpit review concurrently through `src/Actions/EvaluateChanges.php`. Requires `posix_setsid` and `posix_kill`. Set the boolean to `false` for serial execution in `src/Actions/RunTask.php`. No environment variable is assigned. |
 | `molly.max_attempts` | `3` | Maximum runs per saved task, including the first attempt. Must be an integer from 1 through 10. `src/Actions/StartTask.php` checks the limit before changing task state. |
-| `molly.max_files` | `8` | Maximum distinct files a task may select. `src/Workspace.php` checks the count. |
+| `molly.max_files` | `8` | Maximum distinct files a task may select, including the required test. `src/Workspace.php` checks the count. |
 | `molly.max_file_bytes` | `65536` | Maximum bytes per selected file or proposed replacement. `src/Workspace.php` checks both existing contents and replacements. |
 | `molly.ui.enabled` | `false` | Opts in to local web routes through `MOLLY_UI_ENABLED=true`. `src/Http/LocalUi.php` also requires a `local` or `testing` environment, loopback client, and loopback host. The same guard checks Livewire status requests. |
 | `molly.ui.prefix` | `molly` | Route prefix consumed by `routes/web.php`. The default task list is `/molly`. No environment variable is assigned. |
 
-The prompt limit is 8,192 bytes. Accepted writer paths remain under `app/`, `routes/`, `resources/`, and `tests/`; changing a size limit does not expand those directories. The selected Pest test must also appear in the file allowlist. See [task scope](../tasks.md#create-a-task).
+The prompt limit is 8,192 bytes. Accepted writer paths remain under `app/`, `routes/`, `resources/`, and `tests/`; changing a size limit does not expand those directories. Molly adds the selected Pest test to the file allowlist. You do not need to list the test again among the other files. See [task scope](../tasks.md#create-a-task).
 
 ## Ollama provider settings
 

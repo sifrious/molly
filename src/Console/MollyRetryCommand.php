@@ -11,7 +11,7 @@ use function Laravel\Prompts\note;
 
 class MollyRetryCommand extends Command
 {
-    protected $signature = 'molly:retry {task : Saved task ID} {--json : Print JSON only}';
+    protected $signature = 'molly:retry {task : Saved task name or ID} {--json : Print JSON only}';
 
     protected $description = 'Retry a saved task and report tests and complexity';
 

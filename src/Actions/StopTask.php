@@ -10,6 +10,9 @@ class StopTask
 {
     public function handle(string $id): Task
     {
+        $id = Task::findByReference($id)?->id
+            ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches that name or ID.');
+
         Task::whereKey($id)->where('status', 'pending')->update([
             'status' => 'stopped',
             'stop_requested_at' => now(),

@@ -16,32 +16,48 @@ For a complete example, follow [getting started](../getting-started.md). The [ta
 | Option | Meaning |
 | --- | --- |
 | `--workspace=PATH` | Existing checkout to edit. Defaults to the host application's base path. |
-| `--file=PATH` | One workspace-relative file Molly may change. Repeat for every selected file. Required. |
-| `--test=PATH` | Required Pest PHP test file under `tests/`. Must also appear in `--file`. |
+| `--file=PATH` | An additional workspace-relative file Molly may change. Repeat for each file. Optional for a task that only changes the required test. |
+| `--test=PATH` | Required Pest PHP test file under `tests/`. Also permits Molly to add or update that test; no duplicate `--file` option is needed. |
 | `--json` | Print the command's JSON result instead of a terminal report. |
+
+`molly:create` and `molly:import` also accept `--name=NAME` for an optional task nickname. `molly:run` creates a one-off run and has no nickname option.
 
 Paths under `app/`, `routes/`, `resources/`, and `tests/` are accepted. Hidden segments, traversal, symbolic links, directories, and special files are rejected. See [task scope](../tasks.md#create-a-task) for size and count limits.
 
-Every public Molly command accepts `--json`. Commands that render run reports also honor Artisan's `--verbose` option for full measurement details and branch metadata. Use `--no-interaction` in scripts. A prompt is required for `molly:run` and `molly:create` when `--json` or `--no-interaction` is present.
+Run `php artisan molly:create` without arguments to answer these questions in order:
+
+1. What should Molly work on?
+2. Task nickname
+3. Which Pest test should pass?
+4. Which other files may Molly change?
+
+Molly asks only for missing inputs. Leave the nickname empty to use the task UUID. Enter other files as a comma-separated list, or leave the answer empty for a task that only changes the test. These questions use Laravel Prompts. `molly:run` can ask for a missing prompt but still requires `--test`; `molly:import` requires its issue URL and `--test`.
+
+Every public Molly command accepts `--json`. Commands that render run reports also honor Artisan's `--verbose` option for full measurement details and branch metadata. Use `--no-interaction` in scripts. `--json` and `--no-interaction` never ask questions. Supply the prompt for `molly:run` and `molly:create`, the issue URL for `molly:import`, and `--test` for all three commands. Missing required inputs return an error.
 
 ## Molly commands
 
-The usage below shows Molly-specific arguments and options. Normal Artisan options such as `--help`, `--verbose`, and `--no-interaction` remain available.
+The usage below shows Molly-specific arguments and options. `TASK` accepts a nickname such as `health-check` or a task UUID. `RUN_ID` accepts a run UUID. Normal Artisan options such as `--help`, `--verbose`, and `--no-interaction` remain available.
 
 | Command | Usage | Result |
 | --- | --- | --- |
-| Run once | `php artisan molly:run [PROMPT] --file=PATH --test=PATH [--workspace=PATH] [--json]` | Executes a one-off run and saves its report. |
-| Create task | `php artisan molly:create [PROMPT] --file=PATH --test=PATH [--workspace=PATH] [--json]` | Saves a pending task without calling the model or editing selected files. |
-| Import issue | `php artisan molly:import ISSUE_URL --file=PATH --test=PATH [--workspace=PATH] [--json]` | Reads a GitHub issue through `gh api` and saves a pending task. |
+| Run once | `php artisan molly:run [PROMPT] --test=PATH [--file=PATH] [--workspace=PATH] [--json]` | Executes a one-off run and saves its report. |
+| Create task | `php artisan molly:create [PROMPT] [--name=NAME] [--test=PATH] [--file=PATH] [--workspace=PATH] [--json]` | Asks for missing inputs, then saves a pending task without calling the model or editing selected files. |
+| Import issue | `php artisan molly:import ISSUE_URL --test=PATH [--name=NAME] [--file=PATH] [--workspace=PATH] [--json]` | Reads a GitHub issue through `gh api` and saves a pending task. |
 | List tasks | `php artisan molly:tasks [--limit=20] [--json]` | Lists the newest saved tasks first. The limit must be an integer from 1 through 100. |
-| Read task | `php artisan molly:task TASK_ID [--json]` | Reads a saved task and its attempts, ordered oldest first. |
-| Start task | `php artisan molly:start TASK_ID [--json]` | Starts a pending task in the current process. |
-| Retry task | `php artisan molly:retry TASK_ID [--json]` | Creates a new attempt for a failed or stopped task within its attempt limit. |
-| Stop task | `php artisan molly:stop TASK_ID [--json]` | Stops a pending task or requests an active task to stop. Can settle an interrupted task after the locks are free. |
+| Read task | `php artisan molly:task TASK [--json]` | Reads a saved task and its attempts, ordered oldest first. |
+| Name task | `php artisan molly:name TASK [NAME] [--json]` | Sets or changes the nickname without replacing the task or its history. Asks for a missing name in interactive mode. |
+| Start task | `php artisan molly:start TASK [--json]` | Starts a pending task in the current process. |
+| Retry task | `php artisan molly:retry TASK [--json]` | Creates a new attempt for a failed or stopped task within its attempt limit. |
+| Stop task | `php artisan molly:stop TASK [--json]` | Stops a pending task or requests an active task to stop. Can settle an interrupted task after the locks are free. |
 | Read run | `php artisan molly:show RUN_ID [--json]` | Reads a saved run report without executing the model again. |
 | Check setup | `php artisan molly:doctor [--workspace=PATH] [--json]` | Checks database history, workspace Pest, provider settings, Ollama, installed model, measurements, and POSIX support when parallel checks are enabled. |
 
 `molly:import` requires an HTTPS `github.com` issue URL without a query or fragment. Import cannot execute a pull request or write back to GitHub. See [GitHub import](../tasks.md#import-a-github-issue) for size limits and saved source fields.
+
+Nicknames are unique across the host application. Molly trims surrounding spaces and stores lowercase names. A name must start with an ASCII letter and contain 1 through 64 ASCII letters, digits, or hyphens. UUID-shaped names are reserved. See [task nicknames](../tasks.md#name-a-task) for naming and renaming examples.
+
+`molly:name` requires `NAME` when `--json` or `--no-interaction` is set. Without those options, a missing name opens the question `What should this task be called?`.
 
 Doctor checks readiness for task execution. Doctor does not run the model, execute the required tests, or check the web queue reservation settings.
 
@@ -57,12 +73,13 @@ The public Molly commands return exit code `0` on the success conditions below a
 | `molly:create`, `molly:import` | `id`, `status`, `task` | Molly saved a pending task. |
 | `molly:tasks` | `tasks` | Molly read the list, including an empty list. |
 | `molly:task` | `id`, `status`, `task` | Molly found the task, regardless of its saved status. |
+| `molly:name` | `id`, `status`, `task` | Molly saved the nickname, regardless of the task's saved status. |
 | `molly:start`, `molly:retry` | `id`, `task_id`, `status`, `report` | The new run completed. |
 | `molly:stop` | `id`, `status`, `task` | Molly processed the stop request or read an already finished task. An active task may still be stopping. |
 | `molly:show` | `id`, `status`, `report` | Molly found the run, regardless of its saved status. |
 | `molly:doctor` | `ready`, `checks` | Every readiness check passed. |
 
-The `task` object includes the saved prompt, workspace, selected `paths`, `test_path`, status, source metadata, and timestamps. `molly:task` also includes the `runs` relationship. A run report's available fields depend on how far execution progressed. Read the `status` and failure details before assuming a report contains verification or review evidence.
+Successful JSON responses retain UUIDs in `id` and `task_id` when a command receives a nickname. The `task` object includes a nullable `nickname`, saved prompt, workspace, selected `paths`, `test_path`, status, source metadata, and timestamps. `molly:task` also includes the `runs` relationship. A run report's available fields depend on how far execution progressed. Read the `status` and failure details before assuming a report contains verification or review evidence.
 
 For example, the following command emits one JSON object and exits nonzero if the new run fails:
 
@@ -70,7 +87,6 @@ For example, the following command emits one JSON object and exits nonzero if th
 php artisan molly:run \
   'Add GET /health returning JSON {"status":"ok"} and test the exact response.' \
   --file=routes/web.php \
-  --file=tests/Feature/HealthTest.php \
   --test=tests/Feature/HealthTest.php \
   --json --no-interaction
 ```
@@ -89,7 +105,7 @@ Handled errors preserve these command-specific structures:
 | --- | --- |
 | `molly:run` | `id: null`, `status: "failed"`, and `report.error` when no run is returned. |
 | `molly:create`, `molly:import` | `id: null`, `status: "error"`, and `error`. |
-| `molly:task`, `molly:stop` | Requested `id`, `status: "error"`, and `error`. |
+| `molly:task`, `molly:stop`, `molly:name` | Requested task reference in `id`, `status: "error"`, and `error`. The reference may be a nickname or UUID. |
 | `molly:start`, `molly:retry` | `id: null`, requested `task_id`, `status: "error"`, and `report.error`. |
 | `molly:show` | Requested `id`, `status: "error"`, and `report.error`. |
 | `molly:tasks` | An empty `tasks` array and `error`. |

@@ -11,7 +11,7 @@ use function Laravel\Prompts\error;
 
 class MollyTaskCommand extends Command
 {
-    protected $signature = 'molly:task {task : Saved task ID} {--json : Print JSON only}';
+    protected $signature = 'molly:task {task : Saved task name or ID} {--json : Print JSON only}';
 
     protected $description = 'Read a saved task and its run history';
 

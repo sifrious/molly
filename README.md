@@ -12,6 +12,14 @@ Molly requires Laravel 13 and PHP 8.3 or later. The first-run guide covers Pest,
 
 [Install Molly and run your first task](docs/getting-started.md).
 
+After setup, create a task with:
+
+```bash
+php artisan molly:create
+```
+
+Molly asks what to change, an optional task nickname, which Pest test should pass, and which other files may change. Selecting the test also permits test edits. Creation saves the task without running the model. Start a named task with `php artisan molly:start health-check`, replacing `health-check` with your nickname.
+
 ## Documentation
 
 | You need | Read |

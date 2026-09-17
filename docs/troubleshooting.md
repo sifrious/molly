@@ -9,11 +9,11 @@ Start with the saved evidence. A failed run can contain applied edits, passing c
 
 ```bash
 php artisan molly:doctor --json
-php artisan molly:task TASK_ID --json
+php artisan molly:task health-check --json
 php artisan molly:show RUN_ID --verbose
 ```
 
-Replace `TASK_ID` and `RUN_ID` with the IDs from Molly's output. `molly:show` reads the saved report without running the model again. A successful lookup exits zero even when the saved run failed. `molly:start` and `molly:retry` exit zero only when the new run completes.
+Replace `health-check` with your task nickname or UUID, and `RUN_ID` with the run ID from Molly's output. `molly:show` reads the saved report without running the model again. A successful lookup exits zero even when the saved run failed. `molly:start` and `molly:retry` exit zero only when the new run completes.
 
 ## Doctor reports a failed check
 
@@ -21,7 +21,7 @@ Replace `TASK_ID` and `RUN_ID` with the IDs from Molly's output. `molly:show` re
 
 | Code | What to check |
 | --- | --- |
-| `migration_missing` | Run `php artisan migrate` in the host application after reviewing pending migrations. Molly needs both `molly_tasks` and `molly_runs`. |
+| `migration_missing` | Run `php artisan migrate` in the host application after reviewing pending migrations. Molly needs both `molly_tasks` and `molly_runs`, including the task nickname migration. |
 | `database_unavailable` | Check the application's database connection and credentials. Molly uses the host application's database configuration. |
 | `pest_missing` | Install Pest 4 in the selected workspace. `--workspace` must point to the project that contains `vendor/bin/pest`. |
 | `parallel_process_groups_unavailable` | Enable PHP's `posix_setsid` and `posix_kill`, or set `parallel_checks` to `false` in `config/molly.php`. |
@@ -83,7 +83,7 @@ A valid review includes checks A through G and consistent findings for selected 
 
 An accidental-complexity finding with `blocking` severity prevents completion. Warnings remain visible. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no valid review decision to accept.
 
-For a saved task, inspect the changes and use `molly:retry TASK_ID` when another attempt is justified. Retry preserves the original task and file scope. A narrower task may work better when the model cannot keep the review and proposed edits within the selected files.
+For a saved task, inspect the changes and use `molly:retry health-check` with your nickname or task UUID when another attempt is justified. Retry preserves the original task and file scope. A narrower task may work better when the model cannot keep the review and proposed edits within the selected files.
 
 ## A model call is slow or returns invalid changes
 
@@ -112,9 +112,9 @@ Both branches must pass and record results. A passing Pest branch cannot replace
 Read the task and latest run first. A recorded `running` status may outlive the process that wrote the status.
 
 ```bash
-php artisan molly:task TASK_ID
-php artisan molly:stop TASK_ID
-php artisan molly:task TASK_ID
+php artisan molly:task health-check
+php artisan molly:stop health-check
+php artisan molly:task health-check
 ```
 
 Stop saves a request for an active run. Molly checks stop requests between stages and before applying generated changes. Generation must finish before Molly can honor the request. Parallel checks receive cancellation; serial checks finish the active test or review before stopping.
@@ -128,6 +128,14 @@ Do not delete `.molly` lock files to force a retry. `WORKSPACE_BUSY` means Molly
 `molly:start` accepts pending tasks. `molly:retry` accepts failed or stopped tasks. A completed task cannot be retried.
 
 `ATTEMPT_LIMIT_REACHED` means the task used the configured total number of attempts. The default is three, including the first run. Inspect previous evidence before changing the task's scope or configuration. `molly.max_attempts` accepts integers from 1 through 10. Molly never retries automatically.
+
+## A task nickname is rejected or no longer resolves
+
+`TASK_NAME_INVALID` means the name does not meet Molly's rules. Start with an ASCII letter and use 1 through 64 ASCII letters, digits, or hyphens. UUID-shaped names are reserved. Molly trims surrounding spaces and stores names in lowercase.
+
+`TASK_NAME_TAKEN` means another task in the host application already uses the name. Choose another name. Renaming keeps the task's UUID and history, but the old nickname no longer identifies the task. Run `php artisan molly:tasks` to find the current nickname or UUID.
+
+If an upgraded installation reports a missing `nickname` column, run `php artisan migrate` in the host application after reviewing pending migrations.
 
 ## Workspace contents changed during execution
 
@@ -172,4 +180,4 @@ php artisan queue:work --tries=1 --timeout=3600
 
 If an existing worker loaded old configuration, stop and restart that worker. Review the current task state before submitting another request. Duplicate queue requests cannot execute the same task concurrently, but a rejected request can still appear as a failed queue job.
 
-CLI execution through `molly:start TASK_ID` does not require a queue worker.
+CLI execution through `molly:start health-check` does not require a queue worker. Use your task nickname or UUID.

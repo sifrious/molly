@@ -10,7 +10,7 @@ use function Laravel\Prompts\error;
 
 class MollyStopCommand extends Command
 {
-    protected $signature = 'molly:stop {task : Saved task ID} {--json : Print JSON only}';
+    protected $signature = 'molly:stop {task : Saved task name or ID} {--json : Print JSON only}';
 
     protected $description = 'Stop a pending task or request a stop at the next execution boundary';
 

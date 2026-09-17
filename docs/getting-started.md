@@ -56,7 +56,7 @@ php artisan migrate
 
 Composer installs Laravel AI, Laravel Prompts, free Flux, and Livewire with Molly. Clever commands are included in Molly. No separate Clever package is required.
 
-The publish command creates `config/molly.php` and `config/molly-complexity.php`. The migrations create task and run history in the application's configured database. Review any other pending application migrations before running `migrate` in an existing project.
+The publish command creates `config/molly.php` and `config/molly-complexity.php`. The migrations create task and run history in the application's configured database. When upgrading an existing Molly installation, run `php artisan migrate` to add task nicknames. Review any other pending application migrations before running `migrate` in an existing project.
 
 Add this entry to the application's `.gitignore`:
 
@@ -124,26 +124,33 @@ Run `php artisan config:clear` and `php artisan molly:doctor` again. Serial mode
 
 ## Create your first task
 
-Choose a small change whose result is easy to inspect. The example below adds a new `/molly-health` endpoint and a feature test. Use an endpoint and test filename that do not already exist in your application:
+Start the interactive task form:
 
 ```bash
-php artisan molly:create \
-  'Add GET /molly-health returning exactly {"status":"ok"}. Add one Pest feature test that calls $this->get("/molly-health") and asserts HTTP 200 and the exact JSON. Preserve existing routes.' \
-  --file=routes/web.php \
-  --file=tests/Feature/MollyHealthTest.php \
-  --test=tests/Feature/MollyHealthTest.php
+php artisan molly:create
 ```
 
-Each `--file` grants permission to change one workspace-relative file. The test file must appear in both `--file` and `--test`. A selected file may be new. Molly creates missing parent directories when applying valid edits.
+Molly asks for the task, an optional nickname, the required Pest test, and other files Molly may change. For a small first task, use these answers. Choose an endpoint, nickname, and test filename that do not already exist in your application:
 
-Creation saves a `pending` task and prints the task ID. Creation does not call the model or edit the selected files. Replace `TASK_ID` below with the printed ID:
+| Question | Example answer |
+| --- | --- |
+| What should Molly work on? | `Add GET /molly-health returning exactly {"status":"ok"}. Preserve existing routes.` |
+| Task nickname | `health-check` |
+| Which Pest test should pass? | `tests/Feature/MollyHealthTest.php` |
+| Which other files may Molly change? | `routes/web.php` |
+
+Selecting the test also permits Molly to add or update that test. Enter other file paths separated by commas. For a task that only changes the test, leave the other-files answer empty.
+
+Paths stay relative to the workspace. A selected file may be new. Molly creates missing parent directories when applying valid edits. Molly asks only for missing inputs, so you can also supply the task or paths as [command options](reference/commands.md#scope-and-output-options).
+
+Creation saves a `pending` task without calling the model or editing the selected files. Use the nickname to inspect and start the task:
 
 ```bash
-php artisan molly:task TASK_ID
-php artisan molly:start TASK_ID
+php artisan molly:task health-check
+php artisan molly:start health-check
 ```
 
-The start command runs in the foreground. No queue worker or web server is needed for CLI execution.
+The start command runs in the foreground. No queue worker or web server is needed for CLI execution. If you left the nickname empty, use the task UUID printed by Molly. UUIDs remain valid for named tasks too.
 
 ## Read the result
 
@@ -162,7 +169,7 @@ Check the evidence before accepting the edit:
 - Clever shows before and after measurements separately. Read any skipped probe and its reason. Smaller counts alone do not prove a simpler design.
 - In parallel mode, both `verification` and `review` branches must pass and record results.
 
-The run ID identifies one attempt. The task ID identifies the saved task and its attempt history. Replace `RUN_ID` with the run ID from the report:
+The run ID identifies one attempt. The task nickname or UUID identifies the saved task and its attempt history. Replace `RUN_ID` with the run ID from the report:
 
 ```bash
 php artisan molly:show RUN_ID --verbose
@@ -184,7 +191,7 @@ An attempt may fail because the generated code does not pass Pest, the review fi
 Read the failed report and the changed files. After resolving setup errors, you can ask Molly to retry the same task:
 
 ```bash
-php artisan molly:retry TASK_ID
+php artisan molly:retry health-check
 ```
 
 The retry receives a bounded excerpt of the previous failure evidence. Each retry creates a new run and preserves the earlier report. The default limit is three attempts total. Molly never retries automatically.

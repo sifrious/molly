@@ -101,6 +101,22 @@ class Workspace
         }
     }
 
+    /**
+     * @param  list<string>  $paths
+     * @return list<string>
+     */
+    public function taskPaths(array $paths, string $testPath): array
+    {
+        if (! array_is_list($paths) || count(array_filter($paths, is_string(...))) !== count($paths)) {
+            throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
+        }
+        if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
+            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/. Molly includes the test in the files it may change.');
+        }
+
+        return in_array($testPath, $paths, true) ? $paths : [...$paths, $testPath];
+    }
+
     /** @param list<string> $paths
      * @return array<string, ?string>
      */

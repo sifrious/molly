@@ -2,6 +2,7 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Database\UniqueConstraintViolationException;
 use JsonException;
 use RuntimeException;
 use Sifrious\Molly\Models\Task;
@@ -13,7 +14,7 @@ class CreateTask
      * @param  list<string>  $paths
      * @param  array<string, mixed>  $source
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = []): Task
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null): Task
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -21,13 +22,7 @@ class CreateTask
 
         $files = new Workspace($workspace);
 
-        if (! in_array($testPath, $paths, true) || ! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Include the required PHP test file in --file and select it with --test.');
-        }
-
-        if (! array_is_list($paths) || count(array_filter($paths, is_string(...))) !== count($paths)) {
-            throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
-        }
+        $paths = $files->taskPaths($paths, $testPath);
 
         $files->read($paths);
 
@@ -37,12 +32,19 @@ class CreateTask
             throw new RuntimeException('SOURCE_INVALID: Source metadata must contain valid JSON values.', 0, $exception);
         }
 
-        return Task::create([
-            'prompt' => $prompt,
-            'workspace' => $files->path,
-            'paths' => $paths,
-            'test_path' => $testPath,
-            'source' => $source === [] ? null : $source,
-        ]);
+        $nickname = $nickname === null || trim($nickname) === '' ? null : Task::validateNickname($nickname);
+
+        try {
+            return Task::create([
+                'nickname' => $nickname,
+                'prompt' => $prompt,
+                'workspace' => $files->path,
+                'paths' => $paths,
+                'test_path' => $testPath,
+                'source' => $source === [] ? null : $source,
+            ]);
+        } catch (UniqueConstraintViolationException $exception) {
+            throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
+        }
     }
 }

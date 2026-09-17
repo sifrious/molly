@@ -29,7 +29,7 @@ The host application's `molly_runs` table stores the report. Files under `storag
 
 ## Pest verification
 
-Molly runs the selected workspace's `vendor/bin/pest` against the single file named by `--test`. Molly does not run the application's complete test suite. Include the selected test in the allowed file list so the writer can add or update the required assertions.
+Molly runs the selected workspace's `vendor/bin/pest` against the required test file. Selecting the test through the task form or `--test` also permits the writer to add or update that test. You do not need to list the test again among the other files. Molly does not run the application's complete test suite.
 
 `src/Actions/VerifyChanges.php` records the process output and a unique JUnit report. Verification requires at least one executed test. Failures, errors, skipped or incomplete tests, risky tests, warnings, timeouts, and missing or invalid JUnit evidence prevent completion. An empty test file cannot pass verification.
 

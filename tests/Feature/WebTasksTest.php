@@ -59,14 +59,14 @@ it('renders labeled server forms and saves a task without execution', function (
 });
 
 it('returns validation feedback without saving invalid scope', function () {
-    $this->from('/molly/tasks/create')->post('/molly/tasks', ['prompt' => 'Hello', 'workspace' => $this->workspace, 'paths' => 'app/Hello.php', 'test_path' => 'tests/Hello.php'])
+    $this->from('/molly/tasks/create')->post('/molly/tasks', ['prompt' => 'Hello', 'workspace' => $this->workspace, 'paths' => 'app/Hello.php', 'test_path' => 'app/Hello.php'])
         ->assertRedirect('/molly/tasks/create')->assertSessionHasErrors('task');
     expect(Task::count())->toBe(0);
     $this->get('/molly/tasks/create')->assertSee('TEST_PATH_INVALID');
 });
 
 it('validates required form values', function () {
-    $this->post('/molly/tasks', [])->assertSessionHasErrors(['prompt', 'workspace', 'paths', 'test_path']);
+    $this->post('/molly/tasks', [])->assertSessionHasErrors(['prompt', 'workspace', 'test_path']);
     expect(Task::count())->toBe(0);
 });
 

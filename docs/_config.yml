@@ -45,6 +45,8 @@ navigation:
     pages:
       - title: Contributing
         url: /contributing.html
+      - title: Orb connection plan
+        url: /execution-targets.html
       - title: Publishing the docs
         url: /publishing.html
 exclude:

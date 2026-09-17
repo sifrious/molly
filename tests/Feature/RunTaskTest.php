@@ -53,7 +53,7 @@ function measureMollyFixture(): void
 
 function runMollyFixture(): Run
 {
-    return app(RunTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php');
+    return app(RunTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 }
 
 it('saves the active phase and completed measurements before requesting model changes', function () {
@@ -201,6 +201,6 @@ it('rejects invalid task input before creating a run', function (string $prompt,
     expect(Run::count())->toBe(0);
 })->with([
     'empty prompt' => ['', 'tests/GreetingTest.php'],
-    'test outside allowlist' => ['Return Hello.', 'tests/OtherTest.php'],
+    'missing test' => ['Return Hello.', ''],
     'application file as test' => ['Return Hello.', 'app/Greeting.php'],
 ]);

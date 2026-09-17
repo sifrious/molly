@@ -1,8 +1,14 @@
 @extends('molly::layout')
-@section('title', 'Task '.$task->id)
+@section('title', 'Task '.$task->reference())
 @section('content')
-<h1>Task</h1>
+<h1>{{ $task->nickname ?? 'Task' }}</h1>
 <dl><dt>Task ID</dt><dd>{{ $task->id }}</dd><dt>Status</dt><dd>{{ $task->status }}</dd><dt>Workspace</dt><dd>{{ $task->workspace }}</dd><dt>Required test</dt><dd>{{ $task->test_path }}</dd></dl>
+<form method="post" action="{{ route('molly.tasks.name', $task->id) }}">
+@csrf
+<label for="nickname">Nickname</label><input id="nickname" name="nickname" required maxlength="64" value="{{ old('nickname', $task->nickname) }}" aria-describedby="nickname-help">
+<p class="hint" id="nickname-help">Choose a unique name such as hello-endpoint to use in task commands. Use letters, digits, or hyphens, starting with a letter. Molly stores nicknames in lowercase.</p>
+<div class="actions"><flux:button type="submit" :loading="false">Save nickname</flux:button></div>
+</form>
 @if($task->stop_requested_at)<p>Stop requested at {{ $task->stop_requested_at }}.</p>@endif
 <h2>Prompt</h2><pre>{{ $task->prompt }}</pre>
 <h2>Selected files</h2><ul>@foreach($task->paths as $path)<li><code>{{ $path }}</code></li>@endforeach</ul>

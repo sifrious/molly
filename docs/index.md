@@ -28,6 +28,7 @@ Then choose the next guide for your work:
 - [Configuration and environment variables](reference/configuration.md)
 - [Glossary](reference/glossary.md)
 - [Contributing and recorded verification](contributing.md)
+- [Proposed Orb connections and execution targets](execution-targets.md)
 - [Documentation publishing plan](publishing.md)
 
 ## Current release scope
@@ -35,5 +36,7 @@ Then choose the next guide for your work:
 These pages describe the current `dev-main` build. No alpha release is tagged yet. The CLI and local web interface share application actions. Pest and Tarpit review can run in parallel after Molly applies the selected edits. Clever commands are included in Molly.
 
 Bloom integration, execution-target selection, tracked GitHub-to-Pest todos, approval controls, component previews, project journals, and TypeSafe evaluation are not implemented. The original alpha checklist still includes those capabilities. Their tutorials will follow working implementations.
+
+The [Orb plan](execution-targets.md) describes shared connection management and task lookup through the CLI, MCP, and local web interface. Orb discovery and those MCP tools are proposed, not available in the current build.
 
 Use a trusted, disposable checkout. The file allowlist limits the writer's proposals. Pest runs PHP with your local user's permissions, and Molly may edit the selected test file. Review the changed files and assertions before accepting a result.

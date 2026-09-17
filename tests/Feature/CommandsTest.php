@@ -19,13 +19,13 @@ it('requires a prompt for unattended execution and emits only JSON', function ()
         ]);
 });
 
-it('requires explicit files and a test before starting work', function (array $options, string $message): void {
+it('requires a test before starting work', function (array $options, string $message): void {
     $exit = Artisan::call('molly:run', ['prompt' => 'Fix the greeting', '--json' => true, ...$options]);
 
     expect($exit)->toBe(1)
         ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['report']['error'])->toBe($message);
 })->with([
-    [[], 'Use --file for each file Molly may change.'],
+    [[], 'Use --test to name the Pest test file that must pass.'],
     [['--file' => ['app/Greeting.php']], 'Use --test to name the Pest test file that must pass.'],
 ]);
 
@@ -327,3 +327,19 @@ it('does not present missing branch results as passing', function (array $report
     'missing status' => [['mode' => 'parallel', 'branches' => [['kind' => 'review']]], 'Not reported'],
     'missing result reference' => [['mode' => 'parallel', 'branches' => [['kind' => 'review', 'status' => 'running']]], 'No result reference recorded.'],
 ]);
+
+it('reports a missing nickname migration before creating tasks', function (): void {
+    Http::preventStrayRequests();
+    config()->set('molly.model', '');
+    $migration = require __DIR__.'/../../database/migrations/2026_09_17_051234_add_nickname_to_molly_tasks_table.php';
+    $migration->down();
+
+    try {
+        $exit = Artisan::call('molly:doctor', ['--json' => true]);
+        $report = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        expect($exit)->toBe(1)
+            ->and(array_column($report['checks'], 'code'))->toContain('migration_missing');
+    } finally {
+        $migration->up();
+    }
+});

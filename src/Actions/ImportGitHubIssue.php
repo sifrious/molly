@@ -13,7 +13,7 @@ class ImportGitHubIssue
     public function __construct(private CreateTask $createTask) {}
 
     /** @param list<string> $paths */
-    public function handle(string $issueUrl, string $workspace, array $paths, string $testPath): Task
+    public function handle(string $issueUrl, string $workspace, array $paths, string $testPath, ?string $nickname = null): Task
     {
         if (! preg_match('~\Ahttps://github\.com/([A-Za-z0-9][A-Za-z0-9-]*)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)\z~D', $issueUrl, $matches)
             || in_array($matches[2], ['.', '..'], true)
@@ -71,6 +71,6 @@ class ImportGitHubIssue
             'issue_updated_at' => $issue['updated_at'],
             'labels' => $labels,
             'linked_pr' => null,
-        ]);
+        ], ...($nickname === null ? [] : ['nickname' => $nickname]));
     }
 }

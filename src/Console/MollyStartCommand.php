@@ -11,7 +11,7 @@ use function Laravel\Prompts\note;
 
 class MollyStartCommand extends Command
 {
-    protected $signature = 'molly:start {task : Saved task ID} {--json : Print JSON only}';
+    protected $signature = 'molly:start {task : Saved task name or ID} {--json : Print JSON only}';
 
     protected $description = 'Start a saved task and report tests and complexity';
 

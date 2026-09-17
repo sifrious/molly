@@ -29,9 +29,7 @@ class RunTask
 
         $files = new Workspace($workspace);
 
-        if (! in_array($testPath, $paths, true) || ! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Include the required PHP test file in --file and select it with --test.');
-        }
+        $paths = $files->taskPaths($paths, $testPath);
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt): Run {
             $before = $files->read($paths);
