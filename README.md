@@ -185,21 +185,21 @@ Laravel AI owns the Ollama provider settings. `MOLLY_LOCAL_MODEL` selects the mo
 | `molly-complexity.enabled` | `null` | Enable in local and testing by default. `MOLLY_COMPLEXITY_ENABLED` may override outside production. Production always disables measurements. |
 | `molly-complexity.root` | `null` | Measure the host application unless a workspace root is supplied. |
 | `molly-complexity.report.path` | `null` | Write standalone reports to `storage/molly/complexity/report.json`. Task measurements use a unique path beneath the run's evidence directory. |
-| `molly-complexity.probes` | Four bundled probe classes | Select measurements to execute. An empty set cannot complete a task. |
-| `molly-complexity.owned_diff.paths` | `app`, `bootstrap`, `config`, `database`, `routes`, `resources/js` | Select directories for owned-code and history measurements. |
+| `molly-complexity.probes` | Four bundled probe classes | Select measurements for task runs and `clever:scan`. Individual commands run their named probe. An empty set cannot complete a task. |
+| `molly-complexity.owned_diff.paths` | `app`, `bootstrap`, `config`, `database`, `routes`, `resources/js` | Select directories for owned-code counts and hotspots. Lonely-files uses PHP files found in Git history. |
 | `molly-complexity.owned_diff.extensions` | `php`, `js`, `ts`, `jsx`, `tsx`, `vue`, `css`, `json` | Select source extensions for owned-code counts. |
 | `molly-complexity.welds.paths` | `app` | Select PHP directories for construction and static-call counts. |
 | `molly-complexity.welds.facades` | `[]` | Add facade names to the reported facade classification. |
 | `molly-complexity.welds.max_sites` | `200` | Limit reported call-site details. |
 | `molly-complexity.lonely.min_lines` | `30` | Exclude smaller files from the lonely-files list. |
 | `molly-complexity.lonely.limit` | `10` | Limit listed single-author files. |
-| `molly-complexity.churn.since` | `24 months ago` | Select the Git history window. |
+| `molly-complexity.churn.since` | `24 months ago` | Select the Git history window for hotspots. Lonely-files uses all available history. |
 | `molly-complexity.churn.limit` | `20` | Limit hotspot entries. |
 | `molly-complexity.exclude` | `[]` | Exclude additional directories from source enumeration. |
 
 `src/Complexity/Support/CleverConfig.php` consumes these settings. During a task scan, `src/Actions/MeasureComplexity.php` selects the workspace and evidence path, then restores the host settings. Standalone `clever:*` commands use the configured host root. No separate Clever package or Clever configuration file is required.
 
-If an application previously installed `maryperry/clever` only for Molly, remove that package after updating Molly to avoid duplicate `clever:*` commands. Move any custom `clever.*` settings to `molly-complexity.*`.
+If an application previously installed `maryperry/clever` only for Molly, remove that package after updating Molly to avoid duplicate `clever:*` commands. Move supported custom `clever.*` settings to the corresponding `molly-complexity.*` keys. Keep Molly's default probe list, or port custom probes to `Sifrious\Molly\Complexity\Probes\Probe`. Old `Clever\Clever\Probes\...` classes require the removed package. `clever.route.*` settings have no bundled equivalent.
 
 ## Limits of the demo
 
