@@ -6,7 +6,7 @@ Molly is a Laravel package in development. You can run a one-off prompt or save 
 
 ## Install in a local application
 
-Start in a trusted, disposable checkout of a Laravel 13 application with PHP 8.4 or later, the DOM extension, and Pest 4 installed. Keep the application's normal database configuration and use `APP_ENV=local`. Start Ollama before checking the environment.
+Start in a trusted, disposable checkout of a Laravel 13 application with PHP 8.3 or later, the DOM extension, and Pest 4 installed. Keep the application's normal database configuration and use `APP_ENV=local`. Start Ollama before checking the environment.
 
 If the application does not already use Pest, install Pest and its Laravel plugin:
 
