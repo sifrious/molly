@@ -28,7 +28,7 @@ class ReviewCommit
                 throw new RuntimeException('COMMIT_REF_INVALID: Git could not resolve that commit.');
             }
         }
-        $base = $staged ? ['git', 'diff', '--cached'] : ['git', 'show', '--format=', '--root', $revision];
+        $base = $staged ? ['git', 'diff', '--cached'] : ['git', 'show', '--format=', '--root', '--diff-merges=first-parent', $revision];
         $options = ['--no-ext-diff', '--no-textconv', '--no-renames', '--no-color'];
         $paths = ['--', '*.php', ':(exclude,glob)**/vendor/**', ':(exclude,glob)**/.env*', ':(exclude).env*'];
         $patch = Process::path($workspace)->timeout(15)->run([...$base, ...$options, '--unified=3', ...$paths]);
