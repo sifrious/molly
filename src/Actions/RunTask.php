@@ -8,6 +8,9 @@ use RuntimeException;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
+use Sifrious\Molly\Verification\CompletionGate;
+use Sifrious\Molly\Verification\VerificationState;
+use Sifrious\Molly\Verification\VerifierPolicy;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -19,6 +22,7 @@ class RunTask
         private ReviewChanges $review,
         private MeasureComplexity $measure,
         private EvaluateChanges $evaluate,
+        private CompletionGate $completion,
     ) {}
 
     /** @param list<string> $paths */
@@ -119,13 +123,30 @@ class RunTask
                 throw new RuntimeException('WORKSPACE_CHANGED: Files changed after implementation. Run verification again.');
             }
 
-            $completed = ($report['verification']['status'] ?? null) === 'passed'
-                && $this->review->passed($report['review'], $after)
-                && ($report['mode'] !== 'parallel' || $this->branchesPassed($report['branches']));
+            $checks = [
+                'pest' => [
+                    'state' => VerificationState::fromObserved($report['verification']['status'] ?? null),
+                    'policy' => $this->policy('pest'),
+                ],
+                'tarpit' => [
+                    'state' => $this->review->passed($report['review'], $after) ? VerificationState::Pass : VerificationState::Fail,
+                    'policy' => $this->policy('tarpit'),
+                ],
+            ];
+            if ($report['mode'] === 'parallel') {
+                $checks['parallel_join'] = [
+                    'state' => $this->branchesPassed($report['branches']) ? VerificationState::Pass : VerificationState::Fail,
+                    'policy' => $this->policy('parallel_join'),
+                ];
+            }
+
+            $decision = $this->completion->evaluate($checks);
+            $report['verification_outcomes'] = $decision['outcomes'];
+            $report['completion_blockers'] = $decision['blockers'];
 
             $this->checkpoint($shouldStop, null, 'Completing the run');
             $this->recordSnapshot($report, $workspace, $before, $after);
-            $run->update(['status' => $completed ? 'completed' : 'failed', 'report' => $report]);
+            $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
         } catch (Throwable $exception) {
             $report['error'] = $exception->getMessage();
             try {
@@ -170,6 +191,17 @@ class RunTask
         }
 
         return true;
+    }
+
+    private function policy(string $name): VerifierPolicy
+    {
+        $policy = VerifierPolicy::tryFrom((string) config('molly.verification.'.$name, 'required'));
+
+        if ($policy === null) {
+            throw new RuntimeException('VERIFICATION_POLICY_INVALID: Choose required or advisory for '.$name.'.');
+        }
+
+        return $policy;
     }
 
     private function checkpoint(?Closure $shouldStop, ?Closure $progress, string $message): void
