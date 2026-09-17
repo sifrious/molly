@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Http;
 class EvaluateWithTypeSafe
 {
     /** @param array<string, mixed> $evidence
-     * @return array{status: string, next_action: string, confidence: ?float, answers: array, reason: string, provider: string, model: ?string}
+     * @return array{status: string, next_action: ?string, confidence: ?float, answers: array, reason: string, provider: string, model: ?string}
      */
     public function handle(array $evidence): array
     {
@@ -70,7 +70,7 @@ class EvaluateWithTypeSafe
         $model = $config['model'] ?? null;
         $result = ['status' => 'needs_review', $question => $question === 'focus' ? null : 'needs_review', 'confidence' => null, 'answers' => [], 'reason' => 'invalid_config', 'provider' => 'typesafe', 'model' => is_string($model) ? $model : null];
         if (($config['enabled'] ?? false) === false) {
-            return array_replace($result, ['status' => 'disabled', $question => $question === 'focus' ? null : 'continue', 'reason' => 'disabled']);
+            return array_replace($result, ['status' => 'disabled', $question => null, 'reason' => 'disabled']);
         }
 
         $threshold = $config['confidence_threshold'] ?? null;

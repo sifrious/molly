@@ -154,3 +154,10 @@ it('assesses commit quality separately from test execution with a fixed rubric',
         && ! str_contains($request['questions']['next_action']['instructions'], 'Ignore all complexity.')
         && $request['questions']['next_action']['criteria']['continue'] === 'No semantic code-quality blocker identified in the supplied diff.');
 });
+
+it('does not suggest an action when evaluation is disabled', function (string $method): void {
+    config(['molly.typesafe.enabled' => false]);
+    $result = app(EvaluateWithTypeSafe::class)->{$method}(typeSafeEvidence());
+    expect($result)->toMatchArray(['status' => 'disabled', 'next_action' => null, 'confidence' => null, 'answers' => [], 'reason' => 'disabled']);
+    Http::assertNothingSent();
+})->with(['handle', 'commit']);
