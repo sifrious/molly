@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
+<phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true" failOnRisky="true" failOnPhpunitWarning="true">
     <testsuites>
         <testsuite name="Molly"><directory>tests</directory></testsuite>
     </testsuites>
+    <source>
+        <include><directory suffix=".php">src</directory></include>
+    </source>
+    <coverage includeUncoveredFiles="true"/>
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="DB_CONNECTION" value="sqlite"/>

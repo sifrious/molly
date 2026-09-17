@@ -1,0 +1,28 @@
+name: Mutation checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  local-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, mbstring, pdo_sqlite, xml, xmlwriter
+          coverage: xdebug
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Prove the local access tests detect mutations
+        env:
+          XDEBUG_MODE: coverage
+        run: vendor/bin/pest tests/Feature/LocalUiBoundaryTest.php --mutate --class='Sifrious\Molly\Http\LocalUi' --min=100 --no-cache --colors=never
