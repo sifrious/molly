@@ -30,7 +30,7 @@ class MollyReviewCommitCommand extends Command
                     ['PHP diff', $result['diff_bytes'].' bytes'],
                     ['Git whitespace check', $result['diff_check']['status']],
                     ['Jev evaluation', $result['evaluation']['status'].' / '.$result['evaluation']['reason']],
-                    ['Suggested action', $result['evaluation']['next_action']],
+                    ['Suggested action', $result['evaluation']['next_action'] ?? 'Not evaluated'],
                     ['Confidence', $result['evaluation']['confidence'] === null ? 'Unavailable' : (string) $result['evaluation']['confidence']],
                     ['Tests', 'Not run by this command'],
                 ]);
