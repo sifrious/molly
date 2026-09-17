@@ -19,12 +19,20 @@ class RunReport
         if (! empty($report['summary'])) {
             note($report['summary']);
         }
+        $this->showBranches($report, $verbose);
         table(['Required check', 'Result'], [
             ['Pest', $report['verification']['status'] ?? 'Not run'],
             ['Tarpit review', $report['review']['status'] ?? (isset($report['review']['checks']) ? 'See findings below' : 'Not run')],
             ['Clever before changes', $report['complexity_before']['status'] ?? 'Not run'],
             ['Clever after changes', $report['complexity_after']['status'] ?? 'Not run'],
         ]);
+        foreach (['verification' => 'Pest', 'review' => 'Tarpit review'] as $key => $label) {
+            foreach (['reason', 'error'] as $detail) {
+                if (! empty($report[$key][$detail])) {
+                    note($label.' / '.$this->describe($report[$key][$detail]));
+                }
+            }
+        }
         if (! empty($report['changes'])) {
             table(['Changed file', 'Status'], array_map(fn (array $change): array => [$change['path'], $change['status'] ?? 'changed'], $report['changes']));
         }
@@ -56,6 +64,57 @@ class RunReport
             'stopped' => 'Task stopped. Review any applied changes before retrying.',
             default => 'Task failed. Review the evidence before retrying.',
         });
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showBranches(array $report, bool $verbose): void
+    {
+        if (! isset($report['mode']) && ! array_key_exists('branches', $report)) {
+            return;
+        }
+
+        note('Execution mode: '.($report['mode'] ?? 'Not recorded'));
+        $branches = $report['branches'] ?? [];
+        if ($branches === []) {
+            note('No branch results recorded.');
+
+            return;
+        }
+
+        $rows = [];
+        foreach ($branches as $branch) {
+            $kind = $branch['kind'] ?? 'Unknown branch';
+            $model = ($branch['provider'] ?? 'Not recorded').' / '.($branch['model'] ?? 'Not recorded');
+            if ($kind === 'verification' && empty($branch['provider']) && empty($branch['model'])) {
+                $model = 'Pest';
+            }
+            $row = [$kind, $branch['status'] ?? 'Not reported', $branch['execution_target'] ?? 'Not recorded', $model];
+            if ($verbose) {
+                $row[] = $branch['started_at'] ?? 'Not recorded';
+                $row[] = $branch['finished_at'] ?? 'Not recorded';
+            }
+            $rows[] = $row;
+        }
+        table(['Branch', 'Status', 'Target', 'Provider / model', ...($verbose ? ['Started', 'Finished'] : [])], $rows);
+
+        foreach ($branches as $branch) {
+            $label = $branch['kind'] ?? 'Unknown branch';
+            foreach (['failure_classification', 'reason', 'error'] as $key) {
+                if (! empty($branch[$key])) {
+                    note($label.' / '.$this->describe($branch[$key]));
+                }
+            }
+            if (empty($branch['result_ref'])) {
+                note($label.' / No result reference recorded.');
+            }
+            if ($verbose) {
+                note($label.' branch ID: '.($branch['branch_id'] ?? 'Not recorded'));
+                note('Attempt ID: '.($branch['attempt_id'] ?? 'Not recorded'));
+                if (! empty($branch['result_ref'])) {
+                    note('Result: '.$branch['result_ref']);
+                }
+            }
+        }
     }
 
     /** @param array<string, mixed> $report */

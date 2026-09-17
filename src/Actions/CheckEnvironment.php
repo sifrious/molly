@@ -29,6 +29,13 @@ class CheckEnvironment
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
 
+        if (config('molly.parallel_checks', true) === true) {
+            $available = function_exists('posix_setsid') && function_exists('posix_kill');
+            $add('Parallel checks', $available, $available ? 'parallel_process_groups_ready' : 'parallel_process_groups_unavailable', $available
+                ? 'PHP provides the POSIX functions required to start and stop parallel checks.'
+                : 'Parallel checks require posix_setsid and posix_kill. Enable these PHP functions or set molly.parallel_checks to false to run checks serially.');
+        }
+
         $url = (string) config('ai.providers.ollama.url', '');
         $model = trim((string) config('molly.model', ''));
         $valid = false;

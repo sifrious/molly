@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Actions\VerifyChanges;
@@ -54,6 +55,26 @@ function runMollyFixture(): Run
 {
     return app(RunTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php');
 }
+
+it('saves the active phase and completed measurements before requesting model changes', function () {
+    measureMollyFixture();
+    $previous = ['run_id' => 'earlier-run', 'status' => 'failed', 'verification' => ['output' => 'Missing import.']];
+    $this->mock(GenerateChanges::class)->shouldReceive('handle')->once()
+        ->withArgs(function (string $prompt, array $files, string $test, array $evidence) use ($previous): bool {
+            $saved = Run::firstOrFail();
+            expect($saved->report['phase'])->toBe('Writing the selected files with Ollama')
+                ->and($saved->report['complexity_before']['status'])->toBe('skipped')
+                ->and($evidence)->toBe($previous);
+
+            return $prompt === 'Return Hello.' && $test === 'tests/GreetingTest.php';
+        })->andReturn(mollyProposalFixture());
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+
+    $run = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php', previousAttempt: $previous);
+
+    expect($run->status)->toBe('completed');
+});
 
 it('persists completion only after tests and the complete review pass', function () {
     ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();

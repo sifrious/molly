@@ -13,7 +13,9 @@
         "illuminate/support": "^13.0",
         "illuminate/validation": "^13.0",
         "laravel/ai": "^0.11.2",
-        "laravel/prompts": "^0.3.24"
+        "laravel/prompts": "^0.3.24",
+        "livewire/flux": "^2.20",
+        "livewire/livewire": "^4.4"
     },
     "require-dev": {
         "laravel/pint": "^1.30",

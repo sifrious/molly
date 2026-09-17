@@ -24,7 +24,7 @@ class StartTask
             $task = Task::findOrFail($id);
             $this->claim($task, $retry);
 
-            return $this->execute($task, $progress);
+            return $this->execute($task, $progress, $retry);
         });
     }
 
@@ -49,14 +49,18 @@ class StartTask
         }
     }
 
-    private function execute(Task $task, ?Closure $progress): Run
+    private function execute(Task $task, ?Closure $progress, bool $retry): Run
     {
         $id = $task->id;
         try {
+            $previousAttempt = $retry ? $this->previousAttempt($task) : null;
             $run = $this->runTask->handle(
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,
-                taskId: $id,
-                shouldStop: fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                ...[
+                    'taskId' => $id,
+                    'shouldStop' => fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                    ...($previousAttempt === null ? [] : ['previousAttempt' => $previousAttempt]),
+                ],
             );
             $finished = Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')
                 ->update(['status' => $run->status]);
@@ -71,5 +75,63 @@ class StartTask
             Task::whereKey($id)->where('status', 'running')->whereNotNull('stop_requested_at')->update(['status' => 'stopped']);
             throw $exception;
         }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function previousAttempt(Task $task): ?array
+    {
+        $run = $task->runs()->reorder()->latest()->orderByDesc('id')->first();
+        if ($run === null) {
+            return null;
+        }
+
+        $report = $run->report ?? [];
+        $evidence = ['run_id' => $run->id, 'status' => $run->status, 'verification' => [], 'review_findings' => []];
+        foreach (['status' => 32, 'reason' => 128, 'output' => 2048] as $key => $limit) {
+            if (is_string($report['verification'][$key] ?? null)) {
+                $evidence['verification'][$key] = $this->boundedText($report['verification'][$key], $limit);
+            }
+        }
+        foreach (['tests', 'assertions', 'failures', 'errors', 'skipped'] as $key) {
+            if (is_int($report['verification'][$key] ?? null)) {
+                $evidence['verification'][$key] = $report['verification'][$key];
+            }
+        }
+        $findings = collect($report['review']['findings'] ?? [])
+            ->sortByDesc(fn (array $finding): bool => ($finding['severity'] ?? null) === 'blocking');
+        foreach ($findings as $finding) {
+            if (! in_array($finding['path'] ?? null, $task->paths, true)) {
+                continue;
+            }
+            $summary = [];
+            foreach (['code' => 8, 'classification' => 24, 'severity' => 16, 'path' => 192, 'problem' => 384, 'recommendation' => 384] as $key => $limit) {
+                if (is_string($finding[$key] ?? null)) {
+                    $summary[$key] = $this->boundedText($finding[$key], $limit);
+                }
+            }
+            if (is_int($finding['line'] ?? null)) {
+                $summary['line'] = $finding['line'];
+            }
+            $evidence['review_findings'][] = $summary;
+            if (count($evidence['review_findings']) === 3) {
+                break;
+            }
+        }
+        if (is_string($report['error'] ?? null)) {
+            $evidence['error'] = $this->boundedText($report['error'], 512);
+        }
+
+        return $evidence;
+    }
+
+    private function boundedText(string $value, int $bytes): string
+    {
+        $value = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        $value = mb_strcut($value, 0, $bytes, 'UTF-8');
+        while (strlen(json_encode($value, JSON_THROW_ON_ERROR)) > $bytes) {
+            $value = mb_strcut($value, 0, intdiv(strlen($value), 2), 'UTF-8');
+        }
+
+        return $value;
     }
 }

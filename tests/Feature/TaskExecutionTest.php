@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Laravel\Ai\Prompts\AgentPrompt;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Actions\MeasureComplexity;
@@ -10,6 +12,7 @@ use Sifrious\Molly\Actions\ReviewChanges;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\Actions\StopTask;
 use Sifrious\Molly\Actions\VerifyChanges;
+use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 
@@ -35,7 +38,7 @@ function prepareTaskExecution(string $verification = 'passed'): void
         'summary' => 'Return Hello.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']],
     ]);
     test()->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => $verification, 'tests' => 1, 'assertions' => 1]);
-    test()->mock(ReviewChanges::class)->shouldReceive('handle')->once()->andReturn([
+    test()->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
         'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => [],
     ]);
 }
@@ -71,6 +74,50 @@ it('keeps failed run evidence when a later retry passes', function () {
         ->and($task->runs()->count())->toBe(2)
         ->and($old->fresh()->report)->toBe(['error' => 'First attempt failed.'])
         ->and($task->fresh()->status)->toBe('completed');
+});
+
+it('sends bounded diagnostics from the latest attempt while preserving task scope and history', function (): void {
+    Http::preventStrayRequests();
+    $task = savedExecutionTask();
+    $task->update(['status' => 'failed']);
+    Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => ['error' => 'Obsolete failure.'], 'created_at' => now()->subMinute()]);
+    $finding = ['code' => 'E', 'classification' => 'accidental', 'severity' => 'blocking', 'path' => 'app/Greeting.php', 'line' => 1, 'problem' => str_repeat('Needless wrapper. ', 100), 'recommendation' => 'Call the existing function.', 'source' => 'PRIVATE_SOURCE'];
+    $report = [
+        'verification' => ['status' => 'failed', 'tests' => 1, 'errors' => 1, 'output' => 'Call to undefined function get().'.str_repeat("\n\"😀", 3000), 'reason' => 'tests_failed', 'environment' => ['token' => 'SECRET_TOKEN']],
+        'review' => ['findings' => [['path' => 'outside.php', 'problem' => 'OUTSIDE_SCOPE'], ...array_fill(0, 3, [...$finding, 'severity' => 'warning', 'problem' => 'NONBLOCKING_FINDING']), ...array_fill(0, 5, $finding)]],
+        'error' => str_repeat('Prior attempt failed. ', 100),
+        'source' => 'PRIVATE_SOURCE', 'config' => ['token' => 'SECRET_TOKEN'],
+    ];
+    $old = Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => $report]);
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'ok', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
+        'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => [],
+    ]);
+    ChangeWriter::fake([['summary' => 'Return Hello.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']]]])->preventStrayPrompts();
+
+    $run = app(RetryTask::class)->handle($task->id);
+
+    expect($run->status)->toBe('completed')
+        ->and($old->fresh()->report)->toBe($report)
+        ->and($task->fresh()->prompt)->toBe('Return Hello.');
+    ChangeWriter::assertPrompted(function (AgentPrompt $prompt) use ($old): bool {
+        $payload = json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR);
+        $evidence = $payload['previous_attempt'];
+        $encoded = json_encode($evidence, JSON_THROW_ON_ERROR);
+        expect($payload['task'])->toBe('Return Hello.')
+            ->and(array_keys($payload['allowed_files']))->toBe(['app/Greeting.php', 'tests/GreetingTest.php'])
+            ->and($payload['required_test'])->toBe('tests/GreetingTest.php')
+            ->and($evidence['run_id'])->toBe($old->id)
+            ->and($evidence['verification'])->toMatchArray(['status' => 'failed', 'tests' => 1, 'errors' => 1, 'reason' => 'tests_failed'])
+            ->and($evidence['verification']['output'])->toStartWith('Call to undefined function get().')
+            ->and($evidence['review_findings'])->toHaveCount(3)
+            ->and($evidence['review_findings'][0]['recommendation'])->toBe('Call the existing function.')
+            ->and(strlen($encoded))->toBeLessThanOrEqual(8192)
+            ->and($encoded)->not->toContain('Obsolete failure.', 'SECRET_TOKEN', 'PRIVATE_SOURCE', 'OUTSIDE_SCOPE', 'NONBLOCKING_FINDING');
+
+        return true;
+    });
 });
 
 it('limits retries without starting another model call', function () {
@@ -111,7 +158,7 @@ it('keeps applied edits and test evidence when stopped during verification', fun
 
         return ['status' => 'passed', 'tests' => 1];
     });
-    $this->mock(ReviewChanges::class)->shouldNotReceive('handle');
+    $this->mock(ReviewChanges::class)->makePartial()->shouldNotReceive('handle');
 
     $run = app(StartTask::class)->handle($task->id);
 

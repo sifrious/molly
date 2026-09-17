@@ -25,7 +25,42 @@ class Workspace
 
     public function exclusively(Closure $callback): mixed
     {
-        return $this->withLock('run.lock', $callback);
+        return $this->withLock('run.lock', function () use ($callback): mixed {
+            $lease = $this->withLock('checks.lock', function (): string {
+                $lease = bin2hex(random_bytes(24));
+                $path = $this->leasePath();
+                if (file_put_contents($path, $lease, LOCK_EX) === false) {
+                    throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not write the workspace lease.');
+                }
+
+                return $lease;
+            });
+
+            return $callback($lease);
+        });
+    }
+
+    public function duringCheck(string $lease, Closure $callback): mixed
+    {
+        return $this->withLock('checks.lock', function () use ($lease, $callback): mixed {
+            $path = $this->leasePath();
+            if ($lease === '' || ! is_file($path) || ! hash_equals(file_get_contents($path), $lease)) {
+                throw new RuntimeException('WORKSPACE_LEASE_EXPIRED: The check belongs to an earlier workspace run.');
+            }
+
+            return $callback();
+        }, LOCK_SH);
+    }
+
+    private function leasePath(): string
+    {
+        $path = $this->path.'/.molly/checks.lease';
+        clearstatcache(true, $path);
+        if (is_link($path) || (file_exists($path) && ! is_file($path))) {
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lease requires a regular file.');
+        }
+
+        return $path;
     }
 
     public function exclusivelyForTask(string $taskId, Closure $callback): mixed
@@ -37,7 +72,7 @@ class Workspace
         return $this->withLock('task-'.strtolower($taskId).'.lock', $callback);
     }
 
-    private function withLock(string $filename, Closure $callback): mixed
+    private function withLock(string $filename, Closure $callback, int $mode = LOCK_EX): mixed
     {
         $directory = $this->path.'/.molly';
         $lockPath = $directory.'/'.$filename;
@@ -55,7 +90,7 @@ class Workspace
         }
 
         try {
-            if (! flock($lock, LOCK_EX | LOCK_NB)) {
+            if (! flock($lock, $mode | LOCK_NB)) {
                 throw new RuntimeException('WORKSPACE_BUSY: Another Molly run is using this project.');
             }
 

@@ -12,13 +12,14 @@ class GenerateChanges
 {
     /**
      * @param  array<string, string|null>  $files
+     * @param  array<string, mixed>|null  $previousAttempt
      * @return array{summary: string, files: list<array{path: string, content: string}>}
      */
-    public function handle(string $prompt, array $files, string $testPath): array
+    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null): array
     {
         LocalOllama::validate();
         $response = ChangeWriter::make()->prompt(
-            json_encode(['task' => $prompt, 'allowed_files' => $files, 'required_test' => $testPath], JSON_THROW_ON_ERROR),
+            json_encode(['task' => $prompt, 'allowed_files' => $files, 'required_test' => $testPath, ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt])], JSON_THROW_ON_ERROR),
             provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
         );
         $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];

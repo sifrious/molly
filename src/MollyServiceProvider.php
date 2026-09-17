@@ -3,12 +3,14 @@
 namespace Sifrious\Molly;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Complexity\Console\Commands\HotspotsCommand;
 use Sifrious\Molly\Complexity\Console\Commands\LonelyFilesCommand;
 use Sifrious\Molly\Complexity\Console\Commands\OwnedDiffCommand;
 use Sifrious\Molly\Complexity\Console\Commands\ScanCommand;
 use Sifrious\Molly\Complexity\Console\Commands\WeldsCommand;
+use Sifrious\Molly\Console\MollyCheckCommand;
 use Sifrious\Molly\Console\MollyCreateCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
@@ -19,6 +21,7 @@ use Sifrious\Molly\Console\MollyStartCommand;
 use Sifrious\Molly\Console\MollyStopCommand;
 use Sifrious\Molly\Console\MollyTaskCommand;
 use Sifrious\Molly\Console\MollyTasksCommand;
+use Sifrious\Molly\Livewire\RunStatus;
 
 class MollyServiceProvider extends ServiceProvider
 {
@@ -31,9 +34,14 @@ class MollyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'molly');
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        if ($this->app->bound('livewire.finder')) {
+            Livewire::component('molly-run-status', RunStatus::class);
+        }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
+            $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
                 MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {

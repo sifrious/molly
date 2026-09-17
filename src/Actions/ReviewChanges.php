@@ -28,6 +28,27 @@ class ReviewChanges
         return ['checks' => $result['checks'], 'findings' => $result['findings']];
     }
 
+    /** @param array<string, mixed> $review */
+    public function passed(array $review): bool
+    {
+        foreach (range('A', 'G') as $code) {
+            if (! in_array($review['checks'][$code]['status'] ?? null, ['clean', 'findings'], true)
+                || ! is_string($review['checks'][$code]['evidence'] ?? null) || trim($review['checks'][$code]['evidence']) === '') {
+                return false;
+            }
+        }
+        if (! isset($review['findings']) || ! is_array($review['findings'])) {
+            return false;
+        }
+        foreach ($review['findings'] as $finding) {
+            if (! is_array($finding) || ($finding['severity'] ?? null) === 'blocking') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** @param array<string, mixed> $result
      * @param  array<string, string>  $after
      */

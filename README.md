@@ -48,7 +48,9 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
-Resolve failed checks before running a task. Doctor checks task and run tables, the workspace Pest installation, local provider configuration, installed model, and bundled measurements. Measurements enable themselves in `local` and `testing` by default and stay disabled in production.
+Resolve failed checks before running a task. Doctor checks task and run tables, the workspace Pest installation, local provider configuration, installed model, bundled measurements, and the POSIX functions required for parallel checks. Measurements enable themselves in `local` and `testing` by default and stay disabled in production.
+
+Parallel checks require PHP's `posix_setsid` and `posix_kill` functions. Doctor reports a failed check if either function is unavailable. Enable those functions, or set `'parallel_checks' => false` in the published `config/molly.php` to run Pest and Tarpit review serially. Run `php artisan config:clear` and `php artisan molly:doctor` after changing that setting. Molly never silently falls back to serial execution.
 
 ## Run a task
 
@@ -104,9 +106,11 @@ php artisan molly:stop TASK_ID
 
 Retry accepts failed or stopped tasks. Each retry creates a new run and preserves earlier evidence. `molly.max_attempts` limits a task to three attempts by default, including the first run. Molly never retries automatically. Repeated starts cannot execute the same task concurrently. Rejected retries leave the existing task unchanged.
 
-Stop ends a pending task immediately. For an active run, stop saves a request that execution checks between stages and after generation, before applying the proposal. Stop does not interrupt an in-flight model request or Pest process. Applied edits remain available for review.
+The retry writer receives the latest attempt's test status, counts, reason, a bounded output excerpt, up to three review findings for allowed files with blocking findings first, and a bounded run error. `src/Actions/StartTask.php` selects these fields and keeps the encoded diagnostic input below 8192 bytes. `src/Actions/GenerateChanges.php` sends the diagnostics separately as `previous_attempt`. The writer treats diagnostic text as untrusted data to diagnose, preserves the original task and file scope, and must not weaken assertions to hide a failure. The retry does not send the full prior report, provider configuration, or source snapshots. First attempts and stopped tasks without a prior run omit these diagnostics.
 
-If a process exited before saving its final status, `molly:stop` can settle the interrupted task and running attempt once both task and workspace locks are free. Saved evidence remains available. A busy or invalid lock never counts as proof that a process stopped. These locks require runners to share the local filesystem. You can then retry within the attempt limit.
+Stop ends a pending task immediately. For an active run, stop saves a request that execution checks between stages and after generation, before applying the proposal. A stop request terminates active parallel check processes, including Pest child processes. Stop does not interrupt generation. With serial checks, stop waits for an active review or Pest process to finish. Applied edits remain available for review.
+
+If a process exited before saving its final status, `molly:stop` can settle the interrupted task and running attempt once the task, workspace, and active-check locks are free. Saved evidence remains available. A busy or invalid lock never counts as proof that a process stopped. These locks require runners to share the local filesystem. You can then retry within the attempt limit.
 
 All task commands accept `--json`. Create, import, show-task, and stop return `id`, `status`, and `task`. List returns `tasks`. Start and retry return `id`, `task_id`, `status`, and `report`; only completed runs exit zero. Successful lookups and stop requests exit zero regardless of the saved task status. Errors exit nonzero.
 
@@ -125,9 +129,52 @@ Import reads the issue through `gh api` and creates a pending task. Import does 
 
 Molly accepts HTTPS `github.com` issue URLs without query strings or fragments. Pull requests and mismatched response identities are rejected. Issues exceeding the 8192-byte prompt limit fail without truncation. Create a task with a smaller scope for a larger issue. GitHub-to-Pest todo generation is not implemented yet.
 
+## Use the local web interface
+
+Molly includes free Flux 2 and Livewire 4 dependencies. Composer installs both with the package. The interface uses Flux buttons and package CSS, so the host application does not need Flux Pro, a license key, or a Vite build.
+
+The interface is disabled by default. Add these settings to the host application's `.env`:
+
+```dotenv
+APP_ENV=local
+MOLLY_UI_ENABLED=true
+QUEUE_CONNECTION=database
+```
+
+The database queue needs Laravel's jobs and failed-jobs tables. Keep the host application's queue migrations and run `php artisan migrate` before starting a worker. In the host application's `config/queue.php`, set the database connection's `retry_after` to `3700` seconds. The reservation must exceed the job's 3600-second timeout, or another worker could reserve the same request while execution is still active.
+
+Clear cached configuration, then start a worker:
+
+```bash
+php artisan config:clear
+php artisan queue:work --tries=1 --timeout=3600
+```
+
+In a second terminal, start the local web server:
+
+```bash
+php artisan serve --host=127.0.0.1
+```
+
+Open `/molly` on that server. The task list shows the latest 100 saved tasks. Choose **Create task** to enter a prompt or import a GitHub issue, select the workspace and allowed files, and name the required Pest test. Saving a task does not execute code. The task page provides start, retry, and stop controls with links to recorded attempts.
+
+Start and retry queue a request through the host application's default connection. `src/Jobs/StartSavedTask.php` calls the same application actions as the CLI. The worker checks task state and attempt limits when the request executes. Queuing a request does not mean a run has started. Duplicate requests cannot execute the same task concurrently. Each job has one attempt; Molly does not automatically retry failed tasks. If no attempt appears, inspect the worker output and `php artisan queue:failed` before submitting another request.
+
+Database, Redis, Beanstalkd, and SQS connections are supported. Database, Redis, and Beanstalkd require `retry_after` above 3600 seconds. For SQS, configure the queue's visibility timeout above 3600 seconds in AWS. Molly cannot inspect that SQS setting. The web interface rejects synchronous, deferred, null, and failover connections so task execution cannot block the HTTP request. CLI execution remains available without a queue worker.
+
+Every core page renders complete HTML. Create, import, start, retry, and stop use CSRF-protected forms and redirects and work without JavaScript. Livewire refreshes the run status when JavaScript is available. Use **Refresh task** or **Refresh all evidence** to read the latest saved attempts and report. Run pages show Pest evidence, all seven Tarpit checks, unresolved findings, separate Clever measurements and their limitations, and branch outcomes when the report records them. Missing or skipped evidence never appears as a passing check.
+
+The interface only accepts `local` or `testing` environments, direct connections from `127.0.0.1` or `::1`, and a `localhost`, `127.0.0.1`, or `[::1]` host. Custom development domains and remote clients are rejected. The same guard runs on Livewire status requests. The interface has no login or approval controls and is intended for a trusted local machine. Do not expose the interface through a reverse proxy or tunnel.
+
 ## Read the result
 
-Molly measures complexity before editing. The writer receives the task, the selected files, and the required test path. Molly validates the proposed paths, applies the edits, runs Pest, requests a Tarpit review, and measures complexity again.
+Molly measures complexity before editing. The writer receives the task, the selected files, and the required test path. Molly validates the proposed paths and applies the edits. By default, Pest verification and Tarpit review then run concurrently in separate local processes. The reviewer receives the saved before-and-after file contents. Molly joins both results and measures complexity again.
+
+Both branches must return passing evidence before the run can complete. Reports retain each branch's ID, attempt ID, local execution target, provider and model when applicable, start and finish times, status, failure classification, and result file. A process finishing does not mean its check passed. `molly.parallel_checks=false` selects serial execution explicitly.
+
+Parallel branch deadlines use `molly.test_timeout` for Pest and `molly.timeout` for review. Molly bounds each deadline to 1 through 3600 seconds, then adds 10 seconds for process startup and cleanup. `src/Actions/EvaluateChanges.php` manages the child processes; the internal `molly:check` command in `src/Console/MollyCheckCommand.php` runs one check and writes its result. Child processes do not update task or run records.
+
+Active check processes hold shared locks on `.molly/checks.lock`. The `.molly/checks.lease` file identifies the owning run. These files prevent a retry from overlapping checks left active after the parent process exits. Delayed children from an earlier lease fail before running checks. `src/Workspace.php` owns this locking behavior. Input JSON files use `0600` permissions and are removed after the branches join. Result files remain with the run evidence.
 
 A completed task requires changed files, passing Pest evidence, a complete Tarpit review without blocking findings, and usable Clever reports. Molly also checks that the selected files still match the reviewed contents. Disabled measurements or a failed scan stops the run. A skipped Clever probe remains visibly skipped and does not count as a passed measurement, but a skipped probe alone does not block completion.
 
@@ -172,13 +219,16 @@ The `molly-config` publish tag copies `config/molly.php` and `config/molly-compl
 | `molly.model` | Required | Local Ollama model name from `MOLLY_LOCAL_MODEL`. `src/Agents/LocalOllama.php` validates the choice; `src/Actions/GenerateChanges.php` and `src/Actions/ReviewChanges.php` use the model. |
 | `molly.timeout` | `180` | Positive integer timeout in seconds for each model request. The writer and reviewer consume this value. |
 | `molly.test_timeout` | `120` | Pest process timeout in seconds, bounded to 1 through 3600 by `src/Actions/VerifyChanges.php`. |
+| `molly.parallel_checks` | `true` | Run Pest verification and Tarpit review concurrently through `src/Actions/EvaluateChanges.php`. Requires `posix_setsid` and `posix_kill`. Set to `false` for serial checks in `src/Actions/RunTask.php`. No environment variable is assigned. |
 | `molly.max_attempts` | `3` | Maximum runs per saved task, including the first attempt. Accepts integers 1 through 10. `src/Actions/StartTask.php` checks the limit before changing task state. |
+| `molly.ui.enabled` | `false` | Opt in to local web routes with `MOLLY_UI_ENABLED=true`. `src/Http/LocalUi.php` also requires a local or testing environment and a loopback client and host. The guard also checks Livewire status requests. |
+| `molly.ui.prefix` | `molly` | URL prefix consumed by `routes/web.php`. The default task list is `/molly`. Edit the published configuration to change the prefix; no environment variable is assigned. |
 | `molly.max_files` | `8` | Maximum selected file count, checked by `src/Workspace.php`. |
 | `molly.max_file_bytes` | `65536` | Maximum bytes in each selected file and proposed replacement, checked by `src/Workspace.php`. |
 | `ai.providers.ollama.driver` | `ollama` | Laravel AI provider driver. Molly requires `ollama`. |
 | `ai.providers.ollama.url` | `http://localhost:11434` | Local Ollama endpoint from `OLLAMA_URL`. Molly permits HTTP loopback addresses without credentials, a query, or an extra path. |
 
-Laravel AI owns the Ollama provider settings. `MOLLY_LOCAL_MODEL` selects the model. `MOLLY_COMPLEXITY_ENABLED` controls bundled measurements outside production. Edit the remaining settings in the published files.
+Laravel AI owns the Ollama provider settings. `MOLLY_LOCAL_MODEL` selects the model. `MOLLY_COMPLEXITY_ENABLED` controls bundled measurements outside production. `MOLLY_UI_ENABLED` opts in to the local web interface. The web dispatcher reads the host queue connection through `queue.default` and its driver and `retry_after` settings in `src/Http/TaskController.php`. Laravel maps `QUEUE_CONNECTION` to `queue.default` in the host configuration. Edit the remaining settings in the published files.
 
 | Complexity key | Default | Purpose |
 | --- | --- | --- |
@@ -207,7 +257,7 @@ Use a trusted, disposable checkout. The file allowlist confines writer proposals
 
 Failed verification or review leaves applied edits in place for inspection. Molly does not commit changes. An interrupted process can leave a run marked `running`; that state is uncertain and does not mean success. Saved tasks support explicit interruption settlement through `molly:stop`. One-off runs have no task controls. Automatic resume is not implemented.
 
-Runtime parallel branches, Bloom integration, GitHub-to-Pest todo generation, a web interface, approval controls, remote execution, and TypeSafe evaluation remain outside this build.
+Arbitrary task graphs, Bloom integration, GitHub-to-Pest todo generation, approval controls, remote execution, and TypeSafe evaluation remain outside this build.
 
 ## Terms
 
@@ -215,6 +265,8 @@ Runtime parallel branches, Bloom integration, GitHub-to-Pest todo generation, a 
 | --- | --- | --- |
 | Task | A saved prompt, selected files, source context, and lifecycle state | `src/Models/Task.php`, `src/Actions/CreateTask.php` |
 | Run | A persisted attempt with `running`, `completed`, `failed`, or `stopped` status and a report | `src/Models/Run.php` |
+| Queued execution request | A task ID and start-or-retry choice waiting for a host queue worker; a request does not count as a run until execution begins | `src/Jobs/StartSavedTask.php`, `src/Http/TaskController.php` |
+| Execution branch | One local Pest verification or Tarpit review process with its own result and failure metadata; a branch result is separate from run completion | `src/Actions/EvaluateChanges.php`, `src/Console/MollyCheckCommand.php` |
 | Workspace | The checkout containing selected files and the per-workspace lock | `src/Workspace.php` |
 | Verification | Pest execution and the JUnit evidence required for completion | `src/Actions/VerifyChanges.php` |
 | Tarpit review | The model's seven checks for complexity in the supplied files | `src/Agents/TarpitReviewer.php`, `src/Actions/ReviewChanges.php` |
@@ -228,11 +280,15 @@ vendor/bin/pest
 vendor/bin/pint --format agent
 ```
 
+`.github/workflows/tests.yml` runs Composer validation and the package tests on Ubuntu with PHP 8.3, 8.4, and 8.5. Each job resolves dependencies for its PHP version because the package does not commit `composer.lock`. CI installs DOM, SQLite, PCNTL, and POSIX extensions for the verification and process tests. The suite uses model and process fakes where needed and does not require Ollama or a queue worker.
+
 The package tests use Pest and Orchestra Testbench. Laravel AI fakes test model responses without requiring Ollama. A live demo requires an installed local model and a host application. Molly supplies the complexity commands.
 
 The first live check used PHP 8.4.23, Laravel 13.32.0, Laravel AI 0.11.2, and the local `gpt-oss:120b-code` model. Molly updated a named health route and its Pest test, then completed the workflow in 25 seconds. Pest passed one test with three assertions. The review returned all seven Tarpit checks without findings, and all four Clever probes returned results before and after the edit. This verifies a small CLI task. It does not establish reliability across larger tasks or other models.
 
 The saved-task workflow also passed a live run after removing the separate Clever package. Molly created and started a task, saved its completed run, and verified a readiness endpoint with one Pest test and three assertions. A real read-only GitHub import preserved issue identity and created a pending task. That import check did not execute the issue.
+
+The local web workflow passed a live create, queue, and retry check with the same model. The first attempt added a version endpoint but failed Pest because the generated test omitted an import. Molly kept the run failed despite a passing Tarpit review. The retry received the recorded test error, added the import, and completed in 30 seconds with one test and two assertions. Pest and review ran in separate overlapping processes. Both attempts remain in task history. Running reports also save the current execution phase before model calls and check transitions.
 
 ## Source credit
 

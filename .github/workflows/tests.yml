@@ -1,0 +1,43 @@
+name: Package tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-check-lock
+
+      - name: Install package and test dependencies
+        timeout-minutes: 8
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run package tests
+        timeout-minutes: 5
+        run: vendor/bin/pest --colors=never

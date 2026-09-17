@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Actions\CheckEnvironment;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Models\Run;
+use Symfony\Component\Process\Process;
 
 it('requires a prompt for unattended execution and emits only JSON', function (): void {
     $exit = Artisan::call('molly:run', ['--json' => true, '--no-interaction' => true]);
@@ -90,6 +91,53 @@ it('classifies an unreachable Ollama server', function (): void {
     Http::assertSentCount(1);
 });
 
+it('checks actual PHP process group capabilities only for parallel execution', function (string $disabled, bool $parallel): void {
+    $script = 'require '.var_export(dirname(__DIR__, 2).'/vendor/autoload.php', true).';'.<<<'PHP'
+$app = Orchestra\Testbench\Foundation\Application::create(options: ['extra' => ['dont-discover' => ['*']]]);
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
+$kernel->registerCommand(new Sifrious\Molly\Console\MollyDoctorCommand);
+Illuminate\Support\Facades\Http::preventStrayRequests();
+config(['molly.parallel_checks' => $argv[1] === 'parallel', 'molly.model' => '']);
+$kernel->call('molly:doctor', ['--json' => true, '--workspace' => getcwd()]);
+echo $kernel->output();
+PHP;
+    $process = new Process([PHP_BINARY, '-d', 'disable_functions='.$disabled, '-r', $script, $parallel ? 'parallel' : 'serial'], dirname(__DIR__, 2));
+
+    $process->mustRun();
+    $report = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+    $checks = array_column($report['checks'], null, 'name');
+
+    if ($parallel) {
+        expect($report['ready'])->toBeFalse()
+            ->and($checks['Parallel checks']['status'])->toBe('failed')
+            ->and($checks['Parallel checks']['code'])->toBe('parallel_process_groups_unavailable')
+            ->and($checks['Parallel checks']['message'])->toContain('posix_setsid', 'posix_kill', 'set molly.parallel_checks to false');
+    } else {
+        expect($checks)->not->toHaveKey('Parallel checks');
+    }
+})->with([
+    'missing session support' => ['posix_setsid', true],
+    'missing group signals' => ['posix_kill', true],
+    'serial without POSIX' => ['posix_setsid,posix_kill', false],
+]);
+
+it('reports available process group functions for parallel execution', function (): void {
+    if (! function_exists('posix_setsid') || ! function_exists('posix_kill')) {
+        $this->markTestSkipped('PHP does not provide the required POSIX functions.');
+    }
+    config(['molly.parallel_checks' => true, 'molly.model' => '']);
+    Http::preventStrayRequests();
+
+    $exit = Artisan::call('molly:doctor', ['--json' => true]);
+    $report = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and(array_column($report['checks'], null, 'name')['Parallel checks'])->toMatchArray([
+            'status' => 'passed', 'code' => 'parallel_process_groups_ready',
+        ]);
+});
+
 it('shows tests and complexity findings beside changed files', function (): void {
     $run = new Run;
     $run->forceFill(['id' => 'run-readable', 'status' => 'failed', 'report' => [
@@ -127,7 +175,12 @@ it('asks for a missing prompt before running an interactive task', function (): 
 });
 
 it('reads saved JSON reports without executing a new task', function (): void {
-    $report = ['summary' => 'Review is still needed.', 'complexity_after' => ['probes' => [['metrics' => ['files' => [['path' => 'app/Greeting.php']]]]]]];
+    $report = [
+        'summary' => 'Review is still needed.',
+        'mode' => 'parallel',
+        'branches' => [['branch_id' => 'saved-review', 'kind' => 'review', 'status' => 'cancelled', 'failure_classification' => 'branch_cancelled']],
+        'complexity_after' => ['probes' => [['metrics' => ['files' => [['path' => 'app/Greeting.php']]]]]],
+    ];
     $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/another-checkout', 'status' => 'failed', 'report' => $report]);
     $action = Mockery::mock(RunTask::class);
     $action->shouldNotReceive('handle');
@@ -203,9 +256,74 @@ it('compares compact measurements and keeps full caveats behind verbose output',
 it('keeps failed test output visible without verbose mode', function (): void {
     $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'failed', 'report' => [
         'verification' => ['status' => 'failed', 'tests' => 1, 'output' => 'The greeting assertion failed.'],
+        'review' => ['reason' => 'review_failed', 'error' => 'Ollama did not respond.'],
     ]]);
 
     $this->artisan('molly:show', ['run' => $run->id])
         ->expectsOutputToContain('The greeting assertion failed.')
+        ->expectsOutputToContain('review_failed')
+        ->expectsOutputToContain('Ollama did not respond.')
         ->assertSuccessful();
 });
+
+it('shows saved branch outcomes without changing the run status', function (string $status, ?string $failure): void {
+    $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'running', 'report' => [
+        'mode' => 'parallel',
+        'branches' => [
+            ['kind' => 'verification', 'status' => 'passed', 'execution_target' => 'local', 'provider' => null, 'model' => null, 'result_ref' => '/tmp/pest-result.json'],
+            ['kind' => 'review', 'status' => $status, 'execution_target' => 'local', 'provider' => 'ollama', 'model' => 'review-model', 'failure_classification' => $failure, 'result_ref' => '/tmp/review-result.json'],
+        ],
+    ]]);
+
+    $exit = Artisan::call('molly:show', ['run' => $run->id]);
+    $output = Artisan::output();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('Execution mode: parallel', 'verification', 'Pest', 'local', 'ollama / review-model', $status, 'Run is marked running.')
+        ->not->toContain('Task completed.', '/tmp/review-result.json');
+    if ($failure !== null) {
+        expect($output)->toContain($failure);
+    }
+    expect($run->fresh()->status)->toBe('running');
+})->with([
+    'passed review' => ['passed', null],
+    'failed review' => ['failed', 'REVIEW_BLOCKED'],
+    'timed out review' => ['timed_out', 'REVIEW_TIMEOUT'],
+    'cancelled review' => ['cancelled', 'STOP_REQUESTED'],
+]);
+
+it('shows branch identities timing and evidence in verbose reports', function (): void {
+    $report = ['mode' => 'serial', 'branches' => [[
+        'branch_id' => 'review-branch-1', 'attempt_id' => 'attempt-1', 'kind' => 'review',
+        'status' => 'failed', 'execution_target' => 'local', 'provider' => 'ollama', 'model' => 'review-model',
+        'started_at' => '2026-09-17T10:00:00Z', 'finished_at' => '2026-09-17T10:00:30Z',
+        'result_ref' => '/tmp/review-result.json', 'failure_classification' => 'REVIEW_BLOCKED',
+        'reason' => 'The review found unnecessary indirection.',
+    ]]];
+    $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'failed', 'report' => $report]);
+
+    $exit = Artisan::call('molly:show', ['run' => $run->id, '--verbose' => true]);
+
+    expect($exit)->toBe(0)
+        ->and(Artisan::output())->toContain(
+            'Execution mode: serial', 'review-branch-1', 'attempt-1',
+            '2026-09-17T10:00:00Z', '2026-09-17T10:00:30Z', '/tmp/review-result.json',
+            'The review found unnecessary indirection.',
+        );
+    expect($run->fresh()->report)->toBe($report);
+});
+
+it('does not present missing branch results as passing', function (array $report, string $message): void {
+    $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'running', 'report' => $report]);
+
+    $this->artisan('molly:show', ['run' => $run->id])
+        ->expectsOutputToContain($message)
+        ->doesntExpectOutputToContain('passed')
+        ->doesntExpectOutputToContain('Task completed.')
+        ->assertSuccessful();
+})->with([
+    'empty branches' => [['mode' => 'parallel', 'branches' => []], 'No branch results recorded.'],
+    'missing branches' => [['mode' => 'parallel'], 'No branch results recorded.'],
+    'missing status' => [['mode' => 'parallel', 'branches' => [['kind' => 'review']]], 'Not reported'],
+    'missing result reference' => [['mode' => 'parallel', 'branches' => [['kind' => 'review', 'status' => 'running']]], 'No result reference recorded.'],
+]);
