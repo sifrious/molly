@@ -178,6 +178,26 @@ commits. Local tasks do not require a TypeSafe key.
 Read [planning](docs/planning.md) and [agents and MCP](docs/agents.md) before
 enabling these paths.
 
+## Ask Molly about Laravel queues
+
+Molly can build a small local graph from its pinned Laravel queue guide and the
+framework source installed in your project:
+
+```bash
+php artisan molly:knowledge:index laravel
+php artisan molly:knowledge:query Queue
+```
+
+The query returns nearby concepts such as jobs, retries, middleware, and queue
+testing. Every node and relationship includes the documentation or source file
+that supports it. Results are limited by depth and size, so Molly does not put
+an entire manual into an agent request.
+
+This first slice covers queues only. The graph lives in
+`.molly/knowledge.sqlite`, stays local, and can be deleted and rebuilt. Read
+[local Laravel knowledge](docs/knowledge-graph.md) for query options, version
+rules, and the current scope.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md) installs Molly and walks through
@@ -188,6 +208,8 @@ enabling these paths.
   evidence.
 - [Agents and MCP](docs/agents.md) covers Amp, Ollama, MCP, and optional
   TypeSafe evaluation.
+- [Local Laravel knowledge](docs/knowledge-graph.md) covers the versioned queue
+  graph, provenance, and bounded queries.
 - [Local web interface](docs/web-interface.md) explains the browser setup.
 - [Troubleshooting](docs/troubleshooting.md) covers failed setup checks and
   task runs.
@@ -203,7 +225,8 @@ guides.
 
 The current `dev-main` build supports saved tasks, bounded retries, Amp and
 Ollama, parallel Pest and Tarpit checks, a local web interface, planning, MCP
-tools, optional TypeSafe evaluation, journals, and component hashes.
+tools, local Laravel queue knowledge, optional TypeSafe evaluation, journals,
+and component hashes.
 
 The following work is not finished:
 

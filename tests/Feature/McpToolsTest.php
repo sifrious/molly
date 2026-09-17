@@ -7,8 +7,10 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\IndexLaravelKnowledge;
 use Sifrious\Molly\Jobs\StartSavedTask;
 use Sifrious\Molly\Mcp\MollyGuide;
+use Sifrious\Molly\Mcp\MollyKnowledge;
 use Sifrious\Molly\Mcp\MollyPlan;
 use Sifrious\Molly\Mcp\MollyServer;
 use Sifrious\Molly\Mcp\MollyTask;
@@ -32,12 +34,24 @@ afterEach(function () {
 });
 
 it('publishes local MCP tools and reads offline citations', function () {
-    MollyServer::tools()->assertRegistered([MollyGuide::class, MollyPlan::class, MollyTask::class]);
+    MollyServer::tools()->assertRegistered([MollyGuide::class, MollyKnowledge::class, MollyPlan::class, MollyTask::class]);
     MollyServer::tool(MollyGuide::class, ['operation' => 'graph'])->assertOk()
         ->assertSee(['step:outcome', 'nativephp-mobile', 'sha256']);
     MollyServer::tool(MollyGuide::class, ['operation' => 'source', 'id' => 'laravel-queues'])->assertOk()
         ->assertSee(['Laravel 13 queues', 'Laravel queues provide', 'b94b890362111c44de223e09502c610a9d9f20d8']);
     MollyServer::tool(MollyGuide::class, ['operation' => 'source', 'id' => '../private'])->assertHasErrors()->assertSee('GUIDE_SOURCE_NOT_FOUND');
+});
+
+it('returns indexed Laravel knowledge with provenance', function () {
+    $database = sys_get_temp_dir().'/molly-mcp-knowledge-'.Str::uuid().'.sqlite';
+    config()->set('molly.knowledge.database', $database);
+    app(IndexLaravelKnowledge::class)->handle('13');
+
+    MollyServer::tool(MollyKnowledge::class, ['concept' => 'Queue', 'version' => '13', 'depth' => 3, 'limit' => 40])
+        ->assertOk()
+        ->assertSee(['Queue', 'Retry', 'ShouldQueue', 'sources', 'revision']);
+
+    File::delete($database);
 });
 
 it('requires a source ID through native MCP validation', function () {

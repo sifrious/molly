@@ -19,6 +19,7 @@ Then choose the next guide for your work:
 | --- | --- |
 | Save tasks, inspect attempts, retry a failure, or import an issue | [Manage tasks](tasks.md) |
 | Review a project before turning the plan into tasks | [Plan with cited guidance](planning.md) |
+| Look up connected Laravel queue concepts and source | [Use local Laravel knowledge](knowledge-graph.md) |
 | Connect Amp or choose a local model | [Agents and MCP](agents.md) |
 | Decide what to do after a failure | [Get next-step advice](task-advice.md) |
 | Find a task's latest or earlier Amp thread | [Task connections](connections.md) |
@@ -39,7 +40,7 @@ Then choose the next guide for your work:
 
 These pages describe the current `dev-main` build. No alpha release is tagged yet. The CLI and local web interface share application actions. Pest and Tarpit review can run in parallel after Molly applies the selected edits. Clever commands are included in Molly.
 
-The build includes guided planning, nicknames, Amp and Ollama execution, MCP tools, optional TypeSafe planning and commit review, and failed-task advice. [Component snapshots](component-snapshots.md) record selected source hashes. [Local journals](journal.md) export saved task and attempt evidence to Markdown.
+The build includes guided planning, nicknames, Amp and Ollama execution, MCP tools, optional TypeSafe planning and commit review, and failed-task advice. The [local Laravel knowledge graph](knowledge-graph.md) currently covers queues. [Component snapshots](component-snapshots.md) record selected source hashes. [Local journals](journal.md) export saved task and attempt evidence to Markdown.
 
 Bloom integration, remote execution-target selection, tracked GitHub-to-Pest todos, approval controls, visual component previews, and complete structured lifecycle event history remain unfinished. The original alpha checklist includes those capabilities.
 

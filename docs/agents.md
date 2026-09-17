@@ -83,6 +83,7 @@ The server uses the same application actions as the CLI and web interface:
 | Tool | Operations | Result |
 | --- | --- | --- |
 | `molly_guide` | `graph`, `source` | Reads the offline guide or one source passage with its citation, revision, and digest. `source` requires a source `id` from the graph. |
+| `molly_knowledge` | Read only | Queries a bounded, version-matched neighborhood from the local Laravel knowledge graph. Every node and relationship includes source provenance. |
 | `molly_plan` | `create`, `show`, `answer`, `suggest` | Saves or reads a plan, answers its current question, or records an optional Jev suggestion. `create` accepts `description` and optional `guided`; the other operations require `id`. `answer` also needs `step` and `answer`. |
 | `molly_task` | `list`, `show`, `create`, `from_plan`, `import_github`, `name`, `link_thread`, `advice`, `start`, `retry`, `stop`, `show_run` | Saves tasks and names, records thread links, reads evidence, returns advice, or requests task lifecycle changes. Creation and linking do not execute code. |
 | `molly_connections` | Read only | Accepts `task`, a nickname or UUID, and optional `stored`. Returns the same task-thread associations and Amp observation report as the CLI. `stored: true` skips Amp; the default is `false`. |
@@ -96,6 +97,8 @@ Task listing accepts `limit` from 1 through 100 and defaults to 20. Structured t
 `start` and `retry` queue requests through `src/Actions/QueueTask.php`. Configure a supported queue connection and run a host queue worker using the [web queue setup](web-interface.md#enable-the-interface). `queued: true` means that Molly dispatched a request. Read the task and run afterward to establish whether execution started or completed.
 
 `molly_connections` is marked read-only. A saved thread link remains a user assertion, and a connected Amp executor remains an unverified Orb identity. The tools do not connect or disconnect Orbs or select remote execution targets. The [execution target plan](execution-targets.md) describes that remaining work.
+
+`molly_knowledge` is also read-only. Run `php artisan molly:knowledge:index laravel` before using it. The first index covers Laravel queues, and the tool rejects a requested Laravel version that does not match the installed major version. Read [local Laravel knowledge](knowledge-graph.md) for the limits and stored provenance.
 
 ## Review a PHP commit
 

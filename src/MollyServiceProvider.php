@@ -19,6 +19,8 @@ use Sifrious\Molly\Console\MollyCreateCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
 use Sifrious\Molly\Console\MollyJournalCommand;
+use Sifrious\Molly\Console\MollyKnowledgeIndexCommand;
+use Sifrious\Molly\Console\MollyKnowledgeQueryCommand;
 use Sifrious\Molly\Console\MollyLinkThreadCommand;
 use Sifrious\Molly\Console\MollyNameCommand;
 use Sifrious\Molly\Console\MollyPlanCommand;
@@ -59,7 +61,8 @@ class MollyServiceProvider extends ServiceProvider
                 MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
-                MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class]);
+                MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
+                MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
             }
