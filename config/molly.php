@@ -9,6 +9,11 @@ return [
     'max_file_bytes' => 65536,
     'max_attempts' => 3,
     'parallel_checks' => true,
+    'verification' => [
+        'pest' => 'required',
+        'tarpit' => 'required',
+        'parallel_join' => 'required',
+    ],
     'knowledge' => [
         'database' => env('MOLLY_KNOWLEDGE_DATABASE', '.molly/knowledge.sqlite'),
     ],
