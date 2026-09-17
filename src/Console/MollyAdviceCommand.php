@@ -26,10 +26,10 @@ class MollyAdviceCommand extends Command
                 note('Task '.$advice['task_reference'].' / '.$advice['observed']['task_status']);
                 note($advice['reason']);
                 table(['Decision', 'Result'], [
-                    ['Recommended action', $advice['next_action']],
+                    ['Recommended action', ucfirst($advice['next_action'])],
                     ['Retry allowed', $advice['retry_allowed'] ? 'Yes' : 'No'],
                     ['Attempts used', $advice['observed']['attempt_count'].' / '.($advice['observed']['max_attempts'] ?? 'Invalid limit')],
-                    ['TypeSafe', $advice['provider']['status'].' / '.$advice['provider']['reason']],
+                    ['TypeSafe', ucfirst(str_replace('_', ' ', $advice['provider']['status']))],
                 ]);
                 if ($advice['confidence'] !== null) {
                     note('TypeSafe confidence: '.$advice['confidence'].'. Required threshold: '.($advice['provider']['threshold'] ?? 'Not configured').'.');

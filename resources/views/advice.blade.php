@@ -14,8 +14,8 @@
 </dl>
 @if($advice['command'])<p>When you are ready, run:</p><pre>{{ $advice['command'] }}</pre>@endif
 <h2>TypeSafe evaluation</h2>
-<p>{{ $advice['provider']['status'] === 'evaluated' ? 'TypeSafe returned a choice from the allowed options.' : 'Molly used deterministic guidance. No usable model recommendation was applied.' }}</p>
-<dl><dt>Provider status</dt><dd>{{ $advice['provider']['status'] }}</dd><dt>Reason</dt><dd>{{ $advice['provider']['reason'] }}</dd></dl>
+<p>{{ $advice['status'] === 'evaluated' ? 'TypeSafe returned a choice from the allowed options.' : 'Molly used saved task state and checks. No usable model recommendation was applied.' }}</p>
+<dl><dt>Provider status</dt><dd>{{ ucfirst(str_replace('_', ' ', $advice['provider']['status'])) }}</dd></dl>
 @if($advice['provider']['model'])<p>Model: {{ $advice['provider']['model'] }}</p>@endif
 @if($advice['confidence'] !== null)<p>Provider confidence: {{ $advice['confidence'] }}. This describes the returned choice distribution, not the probability that the advice is correct.</p>@endif
 <p>Advice does not start or retry work. The task must still pass Pest, Tarpit review, and the required measurement checks.</p>

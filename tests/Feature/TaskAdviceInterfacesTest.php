@@ -25,7 +25,8 @@ it('shares deterministic fallback advice across CLI MCP and the native web form'
     $expected = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
     $this->post('/molly/tasks/health/advice')->assertOk()->assertViewHas('advice', $expected)
-        ->assertSee('TypeSafe is disabled')->assertSee('Retry permitted')->assertSee('No usable model recommendation was applied.');
+        ->assertSee('TypeSafe is disabled')->assertSee('Retry permitted')->assertSee('No usable model recommendation was applied.')
+        ->assertSee('Molly used saved task state and checks.');
     MollyServer::tool(MollyTask::class, ['operation' => 'advice', 'id' => 'health'])->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json) => $json->where('advice', $expected));
     expect($this->run->fresh()->report['advice'])->toBe($expected)
@@ -68,6 +69,26 @@ it('rejects unknown tasks and invalid MCP advice requests', function () {
     MollyServer::tool(MollyTask::class, ['operation' => 'advice'])->assertHasErrors(['id']);
     MollyServer::tool(MollyTask::class, ['operation' => 'advice', 'id' => 'missing'])->assertHasErrors()->assertSee('TASK_NOT_FOUND');
     Http::assertNothingSent();
+});
+
+it('explains when changed evidence prevents applying a returned recommendation', function () {
+    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
+    Http::fake(['https://api.typesafe.ai/v1/systemone' => function () {
+        $this->run->update(['report' => ['verification' => ['status' => 'failed', 'tests' => 2, 'failures' => 2]]]);
+
+        return Http::response(['answers' => ['next_action' => [
+            'type' => 'choice', 'choice' => 'retry', 'confidence' => 0.95,
+            'probabilities' => ['continue' => 0.01, 'retry' => 0.95, 'stop' => 0.02, 'needs_review' => 0.02],
+        ]]]);
+    }]);
+
+    $this->post('/molly/tasks/health/advice')->assertOk()
+        ->assertSee('Saved evidence changed during the request')
+        ->assertSee('Molly used saved task state and checks.')
+        ->assertDontSee('TypeSafe returned a choice from the allowed options.');
+    Http::assertSentCount(1);
+    Queue::assertNothingPushed();
+    expect($this->run->fresh()->report['advice']['next_action'])->toBe('inspect');
 });
 
 it('rejects remote advice requests before contacting the provider', function () {
