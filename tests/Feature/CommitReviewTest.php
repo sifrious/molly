@@ -34,7 +34,7 @@ it('reviews committed PHP changes with citations and never claims tests ran', fu
 
 it('only sends staged PHP changes while excluding environment and dependency files', function () {
     File::put($this->commitWorkspace.'/app/Flag.php', '<?php return true;');
-    File::put($this->commitWorkspace.'/.env.php', '<?php $secret = "DO_NOT_SEND";');
+    File::put($this->commitWorkspace.'/.env.php', '<?php $privateValue = "DO_NOT_SEND";');
     File::ensureDirectoryExists($this->commitWorkspace.'/vendor/example');
     File::put($this->commitWorkspace.'/vendor/example/Private.php', '<?php // DO_NOT_SEND');
     File::put($this->commitWorkspace.'/note.txt', 'DO_NOT_SEND');

@@ -1,5 +1,8 @@
 # Molly
 
+[![Package tests](https://github.com/sifrious/molly/actions/workflows/tests.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/tests.yml)
+[![HOL Guard](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml)
+
 Molly is a development tool for Laravel. Give it one small coding task, tell it which files it may edit, and give it a Pest test that must pass.
 
 Molly asks an AI agent for the code change, then checks the result before it can complete the task.
@@ -73,6 +76,12 @@ Molly keeps the order simple:
 A model saying its own work is correct is never enough. Failed Pest evidence cannot be overridden by a passing model review.
 
 Molly does not commit your changes. Review the diff and run your broader test suite before committing.
+
+## Why a task retries
+
+Pest and Tarpit answer different questions. Pest checks the behavior named by the task. Tarpit checks the changed files for unnecessary complexity. Both are completion gates.
+
+If either gate fails, Molly keeps the task incomplete and records the evidence for the next attempt. A passing complexity review cannot override a failed test, and a passing test does not hide unresolved complexity findings.
 
 ## Common commands
 
@@ -154,5 +163,7 @@ Planned behavior is kept separate in [Execution targets](docs/execution-targets.
 Use Molly in a trusted development checkout. The file list limits what Molly may propose changing, but it is not a sandbox. Pest runs PHP with your local user's permissions.
 
 Review generated tests as carefully as generated application code.
+
+Molly's GitHub workflows run the HOL Guard scanner with read-only repository access. See [SECURITY.md](SECURITY.md) for supported versions and private reporting guidance.
 
 Molly is available under the [MIT license](LICENSE).
