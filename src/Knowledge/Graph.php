@@ -1,0 +1,389 @@
+<?php
+
+namespace Sifrious\Molly\Knowledge;
+
+use Illuminate\Support\Facades\File;
+use PDO;
+use RuntimeException;
+
+final class Graph
+{
+    private ?PDO $connection = null;
+
+    public function __construct(private ?string $database = null) {}
+
+    /**
+     * Replace one namespace and version with a complete snapshot.
+     *
+     * @param  list<GraphSource>  $sources
+     * @param  list<GraphNode>  $nodes
+     * @param  list<GraphEdge>  $edges
+     * @return array{sources: int, nodes: int, edges: int}
+     */
+    public function replace(string $namespace, string $version, array $sources, array $nodes, array $edges): array
+    {
+        $database = $this->connection();
+        $sourceIds = [];
+        $nodeIds = [];
+
+        foreach ($sources as $source) {
+            $this->assertScope($source->namespace, $source->version, $namespace, $version);
+            $sourceIds[$source->id()] = true;
+        }
+
+        foreach ($nodes as $node) {
+            $this->assertScope($node->namespace, $node->version, $namespace, $version);
+            $nodeIds[$node->id()] = true;
+            $this->assertSources($node->sourceIds, $sourceIds);
+        }
+
+        foreach ($edges as $edge) {
+            $this->assertScope($edge->namespace, $edge->version, $namespace, $version);
+            $this->assertSources($edge->sourceIds, $sourceIds);
+            if (! isset($nodeIds[$edge->from], $nodeIds[$edge->to])) {
+                throw new RuntimeException('KNOWLEDGE_EDGE_INVALID: Every edge must connect nodes in the same snapshot.');
+            }
+        }
+
+        $database->beginTransaction();
+
+        try {
+            foreach (['edges', 'nodes', 'sources'] as $table) {
+                $statement = $database->prepare("DELETE FROM {$table} WHERE namespace = :namespace AND version = :version");
+                $statement->execute(compact('namespace', 'version'));
+            }
+
+            $this->insertSources($database, $sources);
+            $this->insertNodes($database, $nodes);
+            $this->insertEdges($database, $edges);
+            $database->commit();
+        } catch (\Throwable $exception) {
+            $database->rollBack();
+            throw $exception;
+        }
+
+        return ['sources' => count($sources), 'nodes' => count($nodes), 'edges' => count($edges)];
+    }
+
+    public function query(GraphQuery $query): GraphResult
+    {
+        $database = $this->connection();
+        $seeds = $this->seedIds($database, $query);
+
+        if ($seeds === []) {
+            return new GraphResult($query->namespace, $query->version, $query->concept, [], [], false);
+        }
+
+        $visited = [];
+        $frontier = array_fill_keys($seeds, true);
+        $edgeRows = [];
+        $truncated = false;
+
+        for ($depth = 0; $depth <= $query->depth && $frontier !== []; $depth++) {
+            foreach (array_keys($frontier) as $id) {
+                if (! isset($visited[$id]) && count($visited) < $query->limit) {
+                    $visited[$id] = true;
+                } elseif (! isset($visited[$id])) {
+                    $truncated = true;
+                }
+            }
+
+            if ($depth === $query->depth) {
+                break;
+            }
+
+            if (count($visited) >= $query->limit) {
+                foreach ($this->edgesFor($database, $query, array_keys($frontier)) as $edge) {
+                    if (! isset($visited[$edge['from_node_id']]) || ! isset($visited[$edge['to_node_id']])) {
+                        $truncated = true;
+                        break;
+                    }
+                }
+
+                break;
+            }
+
+            $next = [];
+            foreach ($this->edgesFor($database, $query, array_keys($frontier)) as $edge) {
+                $edgeRows[$edge['id']] = $edge;
+                foreach ([$edge['from_node_id'], $edge['to_node_id']] as $nodeId) {
+                    if (! isset($visited[$nodeId])) {
+                        $next[$nodeId] = true;
+                    }
+                }
+            }
+            $frontier = $next;
+        }
+
+        $nodeRows = $this->nodesById($database, array_keys($visited));
+        $included = array_fill_keys(array_column($nodeRows, 'id'), true);
+        $edges = array_values(array_filter($edgeRows, fn (array $edge): bool => isset($included[$edge['from_node_id']], $included[$edge['to_node_id']])));
+        usort($edges, fn (array $left, array $right): int => [$left['relation'], $left['id']] <=> [$right['relation'], $right['id']]);
+
+        return new GraphResult(
+            $query->namespace,
+            $query->version,
+            $query->concept,
+            $this->withSources($database, 'node_sources', 'node_id', $nodeRows),
+            $this->withSources($database, 'edge_sources', 'edge_id', $edges, true),
+            $truncated,
+        );
+    }
+
+    /** @return array{sources: int, nodes: int, edges: int} */
+    public function counts(string $namespace, string $version): array
+    {
+        $counts = [];
+        foreach (['sources', 'nodes', 'edges'] as $table) {
+            $statement = $this->connection()->prepare("SELECT COUNT(*) FROM {$table} WHERE namespace = :namespace AND version = :version");
+            $statement->execute(compact('namespace', 'version'));
+            $counts[$table] = (int) $statement->fetchColumn();
+        }
+
+        return $counts;
+    }
+
+    public function path(): string
+    {
+        $path = $this->database ?? (string) config('molly.knowledge.database', '.molly/knowledge.sqlite');
+        if (trim($path) === '') {
+            throw new RuntimeException('KNOWLEDGE_DATABASE_INVALID: Configure a database path.');
+        }
+
+        return str_starts_with($path, '/') ? $path : base_path($path);
+    }
+
+    private function connection(): PDO
+    {
+        if ($this->connection instanceof PDO) {
+            return $this->connection;
+        }
+
+        File::ensureDirectoryExists(dirname($this->path()));
+        $this->connection = new PDO('sqlite:'.$this->path(), options: [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $this->connection->exec('PRAGMA foreign_keys = ON');
+        $this->connection->exec(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS sources (
+                id TEXT PRIMARY KEY, namespace TEXT NOT NULL, version TEXT NOT NULL,
+                type TEXT NOT NULL, source_key TEXT NOT NULL, title TEXT NOT NULL,
+                location TEXT, revision TEXT, digest TEXT, metadata TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS sources_scope_key ON sources(namespace, version, type, source_key);
+            CREATE TABLE IF NOT EXISTS nodes (
+                id TEXT PRIMARY KEY, namespace TEXT NOT NULL, version TEXT NOT NULL,
+                type TEXT NOT NULL, node_key TEXT NOT NULL, label TEXT NOT NULL, metadata TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS nodes_scope_key ON nodes(namespace, version, type, node_key);
+            CREATE INDEX IF NOT EXISTS nodes_label ON nodes(namespace, version, label);
+            CREATE TABLE IF NOT EXISTS edges (
+                id TEXT PRIMARY KEY, namespace TEXT NOT NULL, version TEXT NOT NULL,
+                relation TEXT NOT NULL, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL, metadata TEXT NOT NULL,
+                FOREIGN KEY(from_node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+                FOREIGN KEY(to_node_id) REFERENCES nodes(id) ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS edges_scope_key ON edges(namespace, version, relation, from_node_id, to_node_id);
+            CREATE TABLE IF NOT EXISTS node_sources (
+                node_id TEXT NOT NULL, source_id TEXT NOT NULL,
+                PRIMARY KEY(node_id, source_id),
+                FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+                FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS edge_sources (
+                edge_id TEXT NOT NULL, source_id TEXT NOT NULL,
+                PRIMARY KEY(edge_id, source_id),
+                FOREIGN KEY(edge_id) REFERENCES edges(id) ON DELETE CASCADE,
+                FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+            );
+            SQL);
+
+        return $this->connection;
+    }
+
+    /** @param  list<GraphSource>  $sources */
+    private function insertSources(PDO $database, array $sources): void
+    {
+        $statement = $database->prepare('INSERT INTO sources (id, namespace, version, type, source_key, title, location, revision, digest, metadata) VALUES (:id, :namespace, :version, :type, :source_key, :title, :location, :revision, :digest, :metadata)');
+        foreach ($sources as $source) {
+            $statement->execute([
+                'id' => $source->id(), 'namespace' => $source->namespace, 'version' => $source->version,
+                'type' => $source->type, 'source_key' => $source->key, 'title' => $source->title,
+                'location' => $source->location, 'revision' => $source->revision, 'digest' => $source->digest,
+                'metadata' => $this->json($source->metadata),
+            ]);
+        }
+    }
+
+    /** @param  list<GraphNode>  $nodes */
+    private function insertNodes(PDO $database, array $nodes): void
+    {
+        $node = $database->prepare('INSERT INTO nodes (id, namespace, version, type, node_key, label, metadata) VALUES (:id, :namespace, :version, :type, :node_key, :label, :metadata)');
+        $link = $database->prepare('INSERT INTO node_sources (node_id, source_id) VALUES (:node_id, :source_id)');
+        foreach ($nodes as $record) {
+            $node->execute([
+                'id' => $record->id(), 'namespace' => $record->namespace, 'version' => $record->version,
+                'type' => $record->type, 'node_key' => $record->key, 'label' => $record->label,
+                'metadata' => $this->json($record->metadata),
+            ]);
+            foreach (array_values(array_unique($record->sourceIds)) as $sourceId) {
+                $link->execute(['node_id' => $record->id(), 'source_id' => $sourceId]);
+            }
+        }
+    }
+
+    /** @param  list<GraphEdge>  $edges */
+    private function insertEdges(PDO $database, array $edges): void
+    {
+        $edge = $database->prepare('INSERT INTO edges (id, namespace, version, relation, from_node_id, to_node_id, metadata) VALUES (:id, :namespace, :version, :relation, :from, :to, :metadata)');
+        $link = $database->prepare('INSERT INTO edge_sources (edge_id, source_id) VALUES (:edge_id, :source_id)');
+        foreach ($edges as $record) {
+            $edge->execute([
+                'id' => $record->id(), 'namespace' => $record->namespace, 'version' => $record->version,
+                'relation' => $record->relation, 'from' => $record->from, 'to' => $record->to,
+                'metadata' => $this->json($record->metadata),
+            ]);
+            foreach (array_values(array_unique($record->sourceIds)) as $sourceId) {
+                $link->execute(['edge_id' => $record->id(), 'source_id' => $sourceId]);
+            }
+        }
+    }
+
+    /** @return list<string> */
+    private function seedIds(PDO $database, GraphQuery $query): array
+    {
+        $statement = $database->prepare('SELECT id FROM nodes WHERE namespace = :namespace AND version = :version AND (lower(node_key) = lower(:concept) OR lower(label) = lower(:concept)) ORDER BY type, node_key LIMIT 5');
+        $statement->execute(['namespace' => $query->namespace, 'version' => $query->version, 'concept' => $query->concept]);
+        $ids = $statement->fetchAll(PDO::FETCH_COLUMN);
+
+        if ($ids !== []) {
+            return $ids;
+        }
+
+        $statement = $database->prepare("SELECT id FROM nodes WHERE namespace = :namespace AND version = :version AND (lower(node_key) LIKE lower(:term) ESCAPE '\\' OR lower(label) LIKE lower(:term) ESCAPE '\\') ORDER BY type, node_key LIMIT 5");
+        $statement->execute([
+            'namespace' => $query->namespace,
+            'version' => $query->version,
+            'term' => '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query->concept).'%',
+        ]);
+
+        return $statement->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    /**
+     * @param  list<string>  $nodeIds
+     * @return list<array<string, mixed>>
+     */
+    private function edgesFor(PDO $database, GraphQuery $query, array $nodeIds): array
+    {
+        if ($nodeIds === []) {
+            return [];
+        }
+
+        $parameters = ['namespace' => $query->namespace, 'version' => $query->version];
+        $fromPlaceholders = $this->placeholders('from_node', $nodeIds, $parameters);
+        $toPlaceholders = $this->placeholders('to_node', $nodeIds, $parameters);
+        $relationSql = '';
+        if ($query->relations !== []) {
+            $relationSql = ' AND relation IN ('.$this->placeholders('relation', $query->relations, $parameters).')';
+        }
+        $statement = $database->prepare("SELECT * FROM edges WHERE namespace = :namespace AND version = :version AND (from_node_id IN ({$fromPlaceholders}) OR to_node_id IN ({$toPlaceholders})){$relationSql} ORDER BY relation, id");
+        $statement->execute($parameters);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return list<array<string, mixed>>
+     */
+    private function nodesById(PDO $database, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $parameters = [];
+        $statement = $database->prepare('SELECT * FROM nodes WHERE id IN ('.$this->placeholders('node', $ids, $parameters).') ORDER BY type, label, id');
+        $statement->execute($parameters);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $records
+     * @return list<array<string, mixed>>
+     */
+    private function withSources(PDO $database, string $pivot, string $foreignKey, array $records, bool $edge = false): array
+    {
+        $statement = $database->prepare("SELECT sources.* FROM sources JOIN {$pivot} ON {$pivot}.source_id = sources.id WHERE {$pivot}.{$foreignKey} = :id ORDER BY sources.type, sources.source_key");
+
+        return array_map(function (array $record) use ($statement, $edge): array {
+            $statement->execute(['id' => $record['id']]);
+            $sources = array_map(fn (array $source): array => [
+                'id' => $source['id'], 'namespace' => $source['namespace'], 'version' => $source['version'],
+                'type' => $source['type'], 'key' => $source['source_key'],
+                'title' => $source['title'], 'location' => $source['location'], 'revision' => $source['revision'],
+                'digest' => $source['digest'], 'metadata' => $this->decode($source['metadata']),
+            ], $statement->fetchAll());
+
+            return $edge ? [
+                'id' => $record['id'], 'relation' => $record['relation'], 'from' => $record['from_node_id'],
+                'to' => $record['to_node_id'], 'metadata' => $this->decode($record['metadata']), 'sources' => $sources,
+            ] : [
+                'id' => $record['id'], 'type' => $record['type'], 'key' => $record['node_key'],
+                'label' => $record['label'], 'metadata' => $this->decode($record['metadata']), 'sources' => $sources,
+            ];
+        }, $records);
+    }
+
+    /** @param  list<string>  $values
+     * @param  array<string, string>  $parameters
+     */
+    private function placeholders(string $prefix, array $values, array &$parameters): string
+    {
+        $placeholders = [];
+        foreach (array_values($values) as $index => $value) {
+            $name = $prefix.$index;
+            $placeholders[] = ':'.$name;
+            $parameters[$name] = $value;
+        }
+
+        return implode(', ', $placeholders);
+    }
+
+    /** @param  list<string>  $sourceIds
+     * @param  array<string, bool>  $available
+     */
+    private function assertSources(array $sourceIds, array $available): void
+    {
+        if ($sourceIds === []) {
+            throw new RuntimeException('KNOWLEDGE_PROVENANCE_REQUIRED: Every node and edge needs a source.');
+        }
+        foreach ($sourceIds as $sourceId) {
+            if (! isset($available[$sourceId])) {
+                throw new RuntimeException('KNOWLEDGE_SOURCE_INVALID: A node or edge refers to a source outside its snapshot.');
+            }
+        }
+    }
+
+    private function assertScope(string $actualNamespace, string $actualVersion, string $namespace, string $version): void
+    {
+        if ($actualNamespace !== $namespace || $actualVersion !== $version) {
+            throw new RuntimeException('KNOWLEDGE_SCOPE_INVALID: Snapshot records must use one namespace and version.');
+        }
+    }
+
+    /** @param  array<string, mixed>  $value */
+    private function json(array $value): string
+    {
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /** @return array<string, mixed> */
+    private function decode(string $value): array
+    {
+        return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+    }
+}

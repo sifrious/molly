@@ -37,6 +37,16 @@ Restart an existing queue worker after configuration changes so the next web tas
 
 The prompt limit is 8,192 bytes. Accepted writer paths remain under `app/`, `routes/`, `resources/`, and `tests/`; changing a size limit does not expand those directories. Molly adds the selected Pest test to the file allowlist. You do not need to list the test again among the other files. See [task scope](../tasks.md#create-a-task).
 
+## Knowledge graph settings
+
+| Key | Default | Meaning and consumer |
+| --- | --- | --- |
+| `molly.knowledge.database` | `.molly/knowledge.sqlite` | Local PDO SQLite file used by `src/Knowledge/Graph.php`. Set `MOLLY_KNOWLEDGE_DATABASE` to use another local path. Relative paths start at the host application's base path. |
+
+Keep `.molly/` out of version control. The knowledge database is disposable.
+Run `php artisan molly:knowledge:index laravel` to replace the installed Laravel
+version's snapshot. No hosted graph service is used.
+
 ## Ollama provider settings
 
 Laravel AI owns the Ollama provider configuration. Molly uses these settings when `molly.agent` is `ollama`, including when setup lists installed local models.

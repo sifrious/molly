@@ -9,6 +9,9 @@ return [
     'max_file_bytes' => 65536,
     'max_attempts' => 3,
     'parallel_checks' => true,
+    'knowledge' => [
+        'database' => env('MOLLY_KNOWLEDGE_DATABASE', '.molly/knowledge.sqlite'),
+    ],
     'typesafe' => [
         'enabled' => false,
         'api_key' => env('TYPESAFE_API_KEY'),

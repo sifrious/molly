@@ -44,6 +44,8 @@ The usage below shows Molly-specific arguments and options. `TASK` accepts a nic
 | Set up agent | `php artisan molly:setup [--agent=AGENT] [--model=NAME] [--no-login] [--json]` | Selects `amp` or `ollama`, updates Molly's environment settings, and configures the workspace MCP connection for Amp. Interactive mode can ask for missing choices. |
 | Open Amp chat | `php artisan molly:chat [--json]` | Opens Amp's terminal interface with Molly's stdio MCP connection. `--json` returns launch arguments without starting a session. |
 | Plan tasks | `php artisan molly:plan [DESCRIPTION] [--skip-review] [--resume=PLAN_ID] [--step=STEP] [--answer=TEXT] [--json]` | Creates or reads a plan and saves ordered review answers. Planning does not execute a task. |
+| Index Laravel knowledge | `php artisan molly:knowledge:index [laravel] [--laravel-version=MAJOR] [--json]` | Rebuilds the local graph for the installed Laravel version. The first slice indexes queues. |
+| Query Laravel knowledge | `php artisan molly:knowledge:query CONCEPT [--laravel-version=MAJOR] [--depth=2] [--limit=20] [--relation=NAME] [--json]` | Reads a bounded graph neighborhood with provenance. Repeat `--relation` to filter relationships. |
 | Review PHP commit | `php artisan molly:review-commit [REF] [--staged] [--workspace=PATH] [--json]` | Reads a PHP diff, checks whitespace, and optionally asks Jev for a semantic evaluation. Defaults to `HEAD`; never runs tests or commits changes. |
 | Run once | `php artisan molly:run [PROMPT] --test=PATH [--file=PATH] [--workspace=PATH] [--json]` | Executes a one-off run and saves its report. |
 | Create task | `php artisan molly:create [PROMPT] [--name=NAME] [--test=PATH] [--file=PATH] [--workspace=PATH] [--json]` | Asks for missing inputs, then saves a pending task without calling the model or editing selected files. |
@@ -73,6 +75,8 @@ Nicknames are unique across the host application. Molly trims surrounding spaces
 
 Doctor checks readiness for task execution. Doctor does not run the model, execute the required tests, or check the web queue reservation settings.
 
+`molly:knowledge:index` accepts only the `laravel` namespace in this release. `molly:knowledge:query` accepts depth 0 through 3 and a node limit from 1 through 40. Both commands reject a requested Laravel major version that differs from the installed version.
+
 `molly:setup` requires `--agent` in noninteractive mode. Ollama setup also requires an installed `--model`; Amp setup rejects that option. `--no-login` skips Amp's interactive login but still writes the workspace MCP connection. `--json` returns follow-up commands instead of running login. See [agent setup](../agents.md).
 
 `molly:chat` requires an interactive terminal unless `--json` is set. The command always opens Amp and does not change the selected task provider. `php artisan mcp:start molly` is the Laravel MCP stdio entry point registered in local and testing environments. The [MCP guide](../agents.md#mcp-tools) lists the exposed operations.
@@ -96,6 +100,8 @@ The public Molly commands return exit code `0` on the success conditions below a
 | `molly:setup` | `status`, `agent`, `model`, `next_commands` | Agent settings and any requested Amp MCP configuration were saved. `status` is `configured`; authentication is not implied. |
 | `molly:chat --json` | `command`, `workspace` | Molly returned the Amp launch arguments without starting a chat. |
 | `molly:plan` | `id`, `status`, `plan`, `next_step`, `sources` | Molly read or saved the plan. `status` can be `draft` or `ready`. |
+| `molly:knowledge:index` | `namespace`, `version`, `database`, `sources`, `nodes`, `edges` | Molly replaced the local snapshot for the installed Laravel version. |
+| `molly:knowledge:query` | `namespace`, `version`, `concept`, `nodes`, `edges`, `truncated` | Molly returned the requested bounded neighborhood. An empty node list is a successful query with no match. |
 | `molly:review-commit` | `scope`, `revision`, `diff_sha256`, `diff_bytes`, `file_scope`, `diff_check`, `tests`, `evaluation`, `citations` | The whitespace check passed and evaluation was disabled, not applicable, or evaluated as `continue`. Tests remain `not_run`. |
 | `molly:run` | `id`, `status`, `report` | The new run completed. |
 | `molly:create`, `molly:import` | `id`, `status`, `task` | Molly saved a pending task. |

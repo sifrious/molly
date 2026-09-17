@@ -118,6 +118,16 @@ jobs:
           php artisan molly:task smoke-test --json --no-interaction > "$RUNNER_TEMP/molly-found.json"
           php -r '$created = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); $found = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-found.json"), true, flags: JSON_THROW_ON_ERROR); if (($found["id"] ?? null) !== $created["id"] || ($found["status"] ?? null) !== "pending" || ($found["task"]["id"] ?? null) !== $created["id"]) { exit(1); } echo "Created and retrieved the pending task without executing a model.\n";'
 
+      - name: Index Laravel knowledge without Burdgen packages
+        timeout-minutes: 2
+        run: |
+          cd "$RUNNER_TEMP/molly-host"
+          composer show --format=json > "$RUNNER_TEMP/molly-packages.json"
+          php -r '$packages = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-packages.json"), true, flags: JSON_THROW_ON_ERROR)["installed"] ?? []; foreach ($packages as $package) { if (str_contains($package["name"] ?? "", "burdgen")) { exit(1); } }'
+          php artisan molly:knowledge:index laravel --laravel-version=13 --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-index.json"
+          php artisan molly:knowledge:query Queue --laravel-version=13 --depth=3 --limit=40 --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-query.json"
+          php -r '$result = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-knowledge-query.json"), true, flags: JSON_THROW_ON_ERROR); $labels = array_column($result["nodes"] ?? [], "label"); if (!in_array("Retry", $labels, true) || !in_array("ShouldQueue", $labels, true)) { exit(1); } foreach ([...($result["nodes"] ?? []), ...($result["edges"] ?? [])] as $record) { if (($record["sources"] ?? []) === []) { exit(1); } } echo "Indexed versioned Laravel queue knowledge with source provenance.\n";'
+
       - name: Keep the development package out of production installs
         run: |
           cd "$RUNNER_TEMP/molly-host"
@@ -143,6 +153,7 @@ jobs:
                   assert 'resources/planning/LARAVEL-LICENSE.md' in names
                   assert 'src/Complexity/LICENSE.md' in names
                   assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
-                  assert archive.stat().st_size <= 256 * 1024
-                  print(f'{filename}: {archive.stat().st_size} bytes')
+                  size = archive.stat().st_size
+                  print(f'{filename}: {size} bytes')
+                  assert size <= 272 * 1024
           PY
