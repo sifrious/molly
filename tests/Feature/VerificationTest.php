@@ -12,6 +12,16 @@ function mollyVerificationWorkspace(bool $realPest = false): string
 
     if ($realPest) {
         symlink(dirname(__DIR__, 2).'/vendor', $workspace.'/vendor');
+        file_put_contents($workspace.'/phpunit.xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php">
+    <testsuites>
+        <testsuite name="Workspace">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
+XML);
     } else {
         mkdir($workspace.'/vendor/bin', 0755, true);
         touch($workspace.'/vendor/bin/pest');
