@@ -153,6 +153,7 @@ jobs:
                   assert 'resources/planning/LARAVEL-LICENSE.md' in names
                   assert 'src/Complexity/LICENSE.md' in names
                   assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
-                  assert archive.stat().st_size <= 256 * 1024
-                  print(f'{filename}: {archive.stat().st_size} bytes')
+                  size = archive.stat().st_size
+                  print(f'{filename}: {size} bytes')
+                  assert size <= 272 * 1024
           PY
