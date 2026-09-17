@@ -48,7 +48,7 @@ class MollyRunCommand extends Command
             if ($json) {
                 $this->writeJson(['id' => $run->id, 'status' => $run->status, 'report' => $run->report]);
             } else {
-                $report->show($run);
+                $report->show($run, $this->output->isVerbose());
             }
 
             return $run->status === 'completed' ? self::SUCCESS : self::FAILURE;

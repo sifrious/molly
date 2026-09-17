@@ -11,7 +11,7 @@ use function Laravel\Prompts\table;
 
 class RunReport
 {
-    public function show(Run $run): void
+    public function show(Run $run, bool $verbose = false): void
     {
         $report = $run->report ?? [];
         note('Run '.$run->id.' / '.$run->status);
@@ -28,8 +28,14 @@ class RunReport
         if (! empty($report['changes'])) {
             table(['Changed file', 'Status'], array_map(fn (array $change): array => [$change['path'], $change['status'] ?? 'changed'], $report['changes']));
         }
-        if (! empty($report['verification']['output'])) {
-            note($report['verification']['output']);
+        $verification = $report['verification'] ?? [];
+        if (($verification['status'] ?? null) === 'passed') {
+            $tests = $verification['tests'] ?? 0;
+            $assertions = $verification['assertions'] ?? 0;
+            note($tests.($tests === 1 ? ' test passed, ' : ' tests passed, ').$assertions.($assertions === 1 ? ' assertion.' : ' assertions.'));
+        }
+        if (! empty($verification['output']) && (($verification['status'] ?? null) !== 'passed' || $verbose)) {
+            note($verification['output']);
         }
         foreach ($report['review']['checks'] ?? [] as $key => $check) {
             note('Tarpit '.$key.' / '.$check['status']);
@@ -40,7 +46,7 @@ class RunReport
             note($finding['problem']);
             note('Suggested change: '.$finding['recommendation']);
         }
-        $this->showMeasurements($report);
+        $this->showMeasurements($report, $verbose);
         if (! empty($report['error'])) {
             error($this->describe($report['error']));
         }
@@ -52,51 +58,89 @@ class RunReport
     }
 
     /** @param array<string, mixed> $report */
-    private function showMeasurements(array $report): void
+    private function showMeasurements(array $report, bool $verbose): void
     {
-        note('Standalone Clever commands use the host application root or clever.root. Configure that root to match the workspace before comparing results.');
-        foreach (['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label) {
+        $before = collect($report['complexity_before']['probes'] ?? [])->keyBy('key')->all();
+        $after = collect($report['complexity_after']['probes'] ?? [])->keyBy('key')->all();
+        if ($before !== [] || $after !== []) {
+            note('Clever measures code structure. Lower counts alone do not prove a simpler design.');
+            note('Standalone Clever commands use the host application root or clever.root. Match that root to the workspace.');
+        }
+        foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $key) {
+            $this->compareProbe($before[$key] ?? [], $after[$key] ?? [], $verbose);
+        }
+        foreach (['complexity_before' => 'Before', 'complexity_after' => 'After'] as $key => $label) {
             $measurement = $report[$key] ?? [];
             if (! empty($measurement['reason'])) {
                 note($label.': '.$measurement['reason']);
             }
-            foreach ($measurement['probes'] ?? [] as $probe) {
-                $this->showProbe($probe, $label);
-            }
             if (! empty($measurement['report'])) {
-                note('Full measurements: '.$measurement['report']);
+                note($label.' full measurements: '.$measurement['report']);
+            }
+        }
+        if (! $verbose && ($before !== [] || $after !== [])) {
+            note('Use -v to read Clever caveats and manual verification steps.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     */
+    private function compareProbe(array $before, array $after, bool $verbose): void
+    {
+        $probe = $after ?: $before;
+        note($probe['name'] ?? $probe['key']);
+        $rows = [['Status', $before['status'] ?? 'Not run', $after['status'] ?? 'Not run']];
+        $names = array_unique([...array_keys($before['metrics'] ?? []), ...array_keys($after['metrics'] ?? [])]);
+        foreach ($names as $name) {
+            $left = $before['metrics'][$name] ?? null;
+            $right = $after['metrics'][$name] ?? null;
+            if (is_int($left) || is_float($left) || is_bool($left) || is_int($right) || is_float($right) || is_bool($right)) {
+                $rows[] = [str_replace('_', ' ', $name), $this->metric($left), $this->metric($right)];
+            }
+        }
+        table(['Measurement', 'Before', 'After'], $rows);
+        $commands = ['c1' => 'clever:owned-diff', 'c2' => 'clever:welds', 'c3' => 'clever:lonely-files', 'c4' => 'clever:hotspots'];
+        if (isset($commands[$probe['key'] ?? ''])) {
+            note('Command: php artisan '.$commands[$probe['key']]);
+        }
+        foreach (['Before' => $before, 'After' => $after] as $label => $value) {
+            if (! empty($value['skip_reason'])) {
+                note($label.' skipped: '.$this->describe($value['skip_reason']));
+            }
+            if ($verbose && $value !== []) {
+                $this->showProbeDetails($value, $label);
             }
         }
     }
 
     /** @param array<string, mixed> $probe */
-    private function showProbe(array $probe, string $label): void
+    private function showProbeDetails(array $probe, string $label): void
     {
-        note($label.' / '.$probe['name'].' / '.$probe['status']);
-        note($probe['headline'] ?? '');
-        $commands = ['c1' => 'clever:owned-diff', 'c2' => 'clever:welds', 'c3' => 'clever:lonely-files', 'c4' => 'clever:hotspots'];
-        if (isset($commands[$probe['key'] ?? ''])) {
-            note('Command: php artisan '.$commands[$probe['key']]);
+        note($label.' / '.($probe['headline'] ?? $probe['status']));
+        if (! empty($probe['hand_verify'])) {
+            note('Verify by hand: '.$this->describe($probe['hand_verify']));
         }
-        foreach (['skip_reason' => 'Skipped', 'hand_verify' => 'Verify by hand'] as $key => $title) {
-            if (! empty($probe[$key])) {
-                note($title.': '.$this->describe($probe[$key]));
-            }
-        }
-        $metrics = [];
         foreach ($probe['metrics'] ?? [] as $name => $value) {
-            if (is_scalar($value) || $value === null) {
-                $metrics[] = [(string) $name, $this->describe($value)];
+            if (is_string($value)) {
+                note(str_replace('_', ' ', $name).': '.$value);
             }
-        }
-        if ($metrics !== []) {
-            table(['Measurement', 'Value'], $metrics);
         }
         foreach (['caveats', 'warnings', 'notes'] as $key) {
             foreach ($probe[$key] ?? [] as $detail) {
                 note($this->describe($detail));
             }
         }
+    }
+
+    private function metric(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'yes' : 'no';
+        }
+
+        return is_int($value) || is_float($value) ? (string) $value : 'Not measured';
     }
 
     private function describe(mixed $value): string

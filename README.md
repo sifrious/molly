@@ -115,7 +115,7 @@ Owned diff counts code, comment, and blank lines in configured application paths
 
 Clever's default owned paths omit `tests` and `resources/views`. Read each probe's scope, caveats, and skipped status before drawing conclusions. Molly does not combine the measurements into a score, and fewer lines alone do not prove a better design.
 
-The `molly_runs` database table stores the run and report. Evidence files live under `storage/molly/{run-id}` in the host application. Reports contain selected paths, content hashes, test output, review findings, and Clever results. Read a saved report with `php artisan molly:show RUN_ID`. Add `--json` for the stored report. This command does not run the model again. A successful lookup exits zero even when the saved run failed. An unknown ID exits nonzero.
+The `molly_runs` database table stores the run and report. Evidence files live under `storage/molly/{run-id}` in the host application. Reports contain selected paths, content hashes, test output, review findings, and Clever results. Read a saved report with `php artisan molly:show RUN_ID`. The terminal compares measurements before and after the edit. Add `--verbose` to show full Clever details and hand-verification commands, or `--json` for the stored report. `molly:run` also accepts `--verbose`. This command does not run the model again. A successful lookup exits zero even when the saved run failed. An unknown ID exits nonzero.
 
 ## Configuration
 
@@ -161,3 +161,5 @@ vendor/bin/pint --format agent
 ```
 
 The package tests use Pest and Orchestra Testbench. Laravel AI fakes test model responses without requiring Ollama. A live demo still requires an installed local model and a host application with Clever.
+
+The first live check used PHP 8.4.23, Laravel 13.32.0, Laravel AI 0.11.2, and the local `gpt-oss:120b-code` model. Molly updated a named health route and its Pest test, then completed the workflow in 25 seconds. Pest passed one test with three assertions. The review returned all seven Tarpit checks without findings, and all four Clever probes returned results before and after the edit. This verifies a small CLI task. It does not establish reliability across larger tasks or other models.

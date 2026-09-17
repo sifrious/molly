@@ -27,7 +27,7 @@ class MollyShowCommand extends Command
                 $this->line(json_encode(['id' => $run->id, 'status' => $run->status, 'report' => $run->report], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {
                 intro('Saved Molly run');
-                $report->show($run);
+                $report->show($run, $this->output->isVerbose());
             }
 
             return self::SUCCESS;

@@ -91,7 +91,7 @@ it('shows tests and complexity findings beside changed files', function (): void
     $run->forceFill(['id' => 'run-readable', 'status' => 'failed', 'report' => [
         'summary' => 'The greeting changed, but review found unnecessary indirection.',
         'changes' => [['path' => 'app/Greeting.php', 'status' => 'modified']],
-        'verification' => ['status' => 'passed', 'output' => '1 test passed.'],
+        'verification' => ['status' => 'passed', 'tests' => 1, 'assertions' => 2, 'output' => 'RAW_PEST_JSON'],
         'review' => ['checks' => ['A' => ['status' => 'findings', 'evidence' => 'One wrapper only forwards a call.']], 'findings' => [
             ['severity' => 'blocking', 'classification' => 'accidental', 'path' => 'app/Greeting.php', 'line' => 12, 'problem' => 'The wrapper adds no behavior.', 'recommendation' => 'Call the existing method directly.'],
         ]],
@@ -105,7 +105,8 @@ it('shows tests and complexity findings beside changed files', function (): void
         ->expectsOutputToContain('The wrapper adds no behavior.')
         ->expectsOutputToContain('app/Greeting.php:12')
         ->expectsOutputToContain('php artisan clever:owned-diff')
-        ->expectsOutputToContain('1 test passed.')
+        ->expectsOutputToContain('1 test passed, 2 assertions.')
+        ->doesntExpectOutputToContain('RAW_PEST_JSON')
         ->assertFailed();
 });
 
@@ -150,7 +151,7 @@ it('shows probe limitations and the workspace without dumping file arrays', func
         ]]],
     ]]);
 
-    $this->artisan('molly:show', ['run' => $run->id])
+    $this->artisan('molly:show', ['run' => $run->id, '--verbose' => true])
         ->expectsOutputToContain('Workspace: /tmp/another-checkout')
         ->expectsOutputToContain('The checkout has no Git commits.')
         ->expectsOutputToContain('Run git shortlog -s in the selected workspace.')
@@ -158,5 +159,49 @@ it('shows probe limitations and the workspace without dumping file arrays', func
         ->expectsOutputToContain('/tmp/evidence/clever.json')
         ->expectsOutputToContain('An interrupted run may still have this status.')
         ->doesntExpectOutputToContain('NESTED_DETAILS_NOT_FOR_TABLE')
+        ->assertSuccessful();
+});
+
+it('compares compact measurements and keeps full caveats behind verbose output', function (bool $verbose): void {
+    $probe = [
+        'name' => 'Owned diff', 'key' => 'c1', 'status' => 'ok', 'headline' => 'Probe headline.',
+        'metrics' => ['owned_lines' => 12, 'has_baseline' => true, 'files' => [['path' => 'NESTED_ROW']]],
+        'hand_verify' => 'Inspect the ownership baseline.', 'caveats' => ['LONG_SOURCE_CAVEAT'],
+    ];
+    $after = [...$probe, 'status' => 'skipped', 'skip_reason' => 'History is unavailable.', 'metrics' => ['owned_lines' => 8, 'has_baseline' => false]];
+    $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'completed', 'report' => [
+        'verification' => ['status' => 'passed', 'tests' => 2, 'assertions' => 3, 'output' => 'RAW_TEST_DETAILS'],
+        'review' => ['checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'Review evidence remains visible.'])],
+        'complexity_before' => ['status' => 'ok', 'probes' => [$probe], 'report' => '/tmp/before.json'],
+        'complexity_after' => ['status' => 'skipped', 'probes' => [$after], 'report' => '/tmp/after.json'],
+    ]]);
+
+    $command = $this->artisan('molly:show', ['run' => $run->id, ...($verbose ? ['--verbose' => true] : [])])
+        ->expectsOutputToContain('2 tests passed, 3 assertions.')
+        ->expectsOutputToContain($verbose ? 'has baseline' : 'owned lines')
+        ->expectsOutputToContain('After skipped: History is unavailable.')
+        ->expectsOutputToContain('/tmp/before.json')
+        ->expectsOutputToContain('/tmp/after.json')
+        ->expectsOutputToContain('Tarpit G / clean')
+        ->doesntExpectOutputToContain('NESTED_ROW');
+    if ($verbose) {
+        $command->expectsOutputToContain('LONG_SOURCE_CAVEAT')
+            ->expectsOutputToContain('Inspect the ownership baseline.')
+            ->expectsOutputToContain('RAW_TEST_DETAILS');
+    } else {
+        $command->doesntExpectOutputToContain('LONG_SOURCE_CAVEAT')
+            ->doesntExpectOutputToContain('Inspect the ownership baseline.')
+            ->doesntExpectOutputToContain('RAW_TEST_DETAILS');
+    }
+    $command->assertSuccessful();
+})->with([false, true]);
+
+it('keeps failed test output visible without verbose mode', function (): void {
+    $run = Run::create(['prompt' => 'Fix greeting', 'workspace' => '/tmp/workspace', 'status' => 'failed', 'report' => [
+        'verification' => ['status' => 'failed', 'tests' => 1, 'output' => 'The greeting assertion failed.'],
+    ]]);
+
+    $this->artisan('molly:show', ['run' => $run->id])
+        ->expectsOutputToContain('The greeting assertion failed.')
         ->assertSuccessful();
 });
