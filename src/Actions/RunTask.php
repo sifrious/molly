@@ -8,9 +8,6 @@ use RuntimeException;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
-use Sifrious\Molly\Verification\CompletionGate;
-use Sifrious\Molly\Verification\VerificationState;
-use Sifrious\Molly\Verification\VerifierPolicy;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -22,7 +19,7 @@ class RunTask
         private ReviewChanges $review,
         private MeasureComplexity $measure,
         private EvaluateChanges $evaluate,
-        private CompletionGate $completion,
+        private DecideRunCompletion $decideCompletion,
     ) {}
 
     /** @param list<string> $paths */
@@ -33,7 +30,6 @@ class RunTask
         }
 
         $files = new Workspace($workspace);
-
         $paths = $files->taskPaths($paths, $testPath);
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt): Run {
@@ -44,7 +40,8 @@ class RunTask
                 'workspace' => $files->path,
                 'status' => 'running',
                 'report' => [
-                    'scope' => $paths, 'provider' => config('molly.agent', 'ollama'),
+                    'scope' => $paths,
+                    'provider' => config('molly.agent', 'ollama'),
                     'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
                     'snapshots' => [
                         'task_creation' => $taskId === null ? null : Task::find($taskId)?->context_snapshot,
@@ -80,6 +77,7 @@ class RunTask
             $proposal = $previousAttempt === null
                 ? $this->generate->handle($run->prompt, $before, $testPath)
                 : $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt);
+
             $this->checkpoint($shouldStop, $recordProgress, 'Applying the proposed changes');
             $workspace->apply($proposal['files'], $before);
             $after = $workspace->read(array_keys($before));
@@ -94,6 +92,7 @@ class RunTask
             if (! is_bool(config('molly.parallel_checks', true))) {
                 throw new RuntimeException('PARALLEL_CONFIG_INVALID: Set molly.parallel_checks to true or false.');
             }
+
             if (config('molly.parallel_checks', true)) {
                 $this->checkpoint($shouldStop, $recordProgress, 'Running Pest and Tarpit review in parallel');
                 $report['mode'] = 'parallel';
@@ -123,24 +122,7 @@ class RunTask
                 throw new RuntimeException('WORKSPACE_CHANGED: Files changed after implementation. Run verification again.');
             }
 
-            $checks = [
-                'pest' => [
-                    'state' => VerificationState::fromObserved($report['verification']['status'] ?? null),
-                    'policy' => $this->policy('pest'),
-                ],
-                'tarpit' => [
-                    'state' => $this->review->passed($report['review'], $after) ? VerificationState::Pass : VerificationState::Fail,
-                    'policy' => $this->policy('tarpit'),
-                ],
-            ];
-            if ($report['mode'] === 'parallel') {
-                $checks['parallel_join'] = [
-                    'state' => $this->branchesPassed($report['branches']) ? VerificationState::Pass : VerificationState::Fail,
-                    'policy' => $this->policy('parallel_join'),
-                ];
-            }
-
-            $decision = $this->completion->evaluate($checks);
+            $decision = $this->decideCompletion->handle($report, $after);
             $report['verification_outcomes'] = $decision['outcomes'];
             $report['completion_blockers'] = $decision['blockers'];
 
@@ -173,35 +155,6 @@ class RunTask
     {
         $report['snapshots']['after'] = $workspace->snapshot($contents);
         $report['components'] = ['status' => 'compared', 'changes' => $workspace->componentChanges($report['changes'] ?? [], $before)];
-    }
-
-    /** @param list<array<string, mixed>> $branches */
-    private function branchesPassed(array $branches): bool
-    {
-        $kinds = array_column($branches, 'kind');
-        sort($kinds);
-        if (count($branches) !== 2 || $kinds !== ['review', 'verification']) {
-            return false;
-        }
-
-        foreach ($branches as $branch) {
-            if (($branch['status'] ?? null) !== 'passed' || empty($branch['result_ref']) || empty($branch['finished_at'])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function policy(string $name): VerifierPolicy
-    {
-        $policy = VerifierPolicy::tryFrom((string) config('molly.verification.'.$name, 'required'));
-
-        if ($policy === null) {
-            throw new RuntimeException('VERIFICATION_POLICY_INVALID: Choose required or advisory for '.$name.'.');
-        }
-
-        return $policy;
     }
 
     private function checkpoint(?Closure $shouldStop, ?Closure $progress, string $message): void
