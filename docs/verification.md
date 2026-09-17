@@ -27,6 +27,14 @@ Replace `RUN_ID` with the ID from a completed or failed execution. Reading a rep
 
 The host application's `molly_runs` table stores the report. Files under `storage/molly/{run-id}` hold supporting test and measurement evidence. Reports include selected paths, content hashes, test output, review findings, Clever results, and branch metadata when available. `src/Console/RunReport.php` renders the terminal report.
 
+## Component source snapshots
+
+Saving a task records the selected paths and their SHA-256 hashes. Each run retains that original context and captures its own before and after state. Reading the report later does not refresh these snapshots.
+
+The report classifies recognized Blade and Livewire source paths as added, removed, modified, or unchanged. It uses the observed file changes, not model prose. The comparison covers selected files only. A source change does not establish a visual change.
+
+Molly does not include a preview renderer. Snapshots show `Preview: unavailable` with the reason. Missing historical snapshots and failed captures remain explicit. They never count as unchanged evidence. See [component snapshots](component-snapshots.md) for supported paths, report fields, and limits.
+
 ## Pest verification
 
 Molly runs the selected workspace's `vendor/bin/pest` against the required test file. Selecting the test through the task form or `--test` also permits the writer to add or update that test. You do not need to list the test again among the other files. Molly does not run the application's complete test suite.

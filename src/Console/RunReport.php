@@ -36,6 +36,7 @@ class RunReport
         if (! empty($report['changes'])) {
             table(['Changed file', 'Status'], array_map(fn (array $change): array => [$change['path'], $change['status'] ?? 'changed'], $report['changes']));
         }
+        $this->showSnapshots($report, $verbose);
         $verification = $report['verification'] ?? [];
         if (($verification['status'] ?? null) === 'passed') {
             $tests = $verification['tests'] ?? 0;
@@ -64,6 +65,47 @@ class RunReport
             'stopped' => 'Task stopped. Review any applied changes before retrying.',
             default => 'Task failed. Review the evidence before retrying.',
         });
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showSnapshots(array $report, bool $verbose): void
+    {
+        $snapshots = $report['snapshots'] ?? [];
+        if ($snapshots === []) {
+            note('Component snapshots were not recorded for this run.');
+
+            return;
+        }
+
+        $rows = [];
+        foreach (['task_creation' => 'Task creation', 'before' => 'Before execution', 'after' => 'After execution'] as $key => $label) {
+            $snapshot = $snapshots[$key] ?? [];
+            $rows[] = [$label, $snapshot['status'] ?? 'Not recorded', $snapshot['captured_at'] ?? 'Not recorded'];
+            if (! empty($snapshot['reason'])) {
+                note($label.': '.$snapshot['reason']);
+            }
+            if (isset($snapshot['preview'])) {
+                note($label.' preview: '.$snapshot['preview']['status'].'. '.$snapshot['preview']['reason']);
+            }
+            if ($verbose && ($snapshot['status'] ?? null) === 'captured') {
+                table([$label.' file', 'SHA-256', 'Component ID'], array_map(fn (array $file): array => [
+                    $file['path'], $file['sha256'] ?? 'File absent', $file['component']['id'] ?? 'Not a recognized component path',
+                ], $snapshot['files']));
+            }
+        }
+        table(['Snapshot', 'Status', 'Captured'], $rows);
+        if (empty($snapshots['task_creation'])) {
+            note('No task-creation snapshot is available. The original task context is unknown.');
+        }
+
+        $components = $report['components'] ?? [];
+        if (($components['status'] ?? null) !== 'compared') {
+            note($components['reason'] ?? 'Component changes were not recorded.');
+        } elseif ($components['changes'] === []) {
+            note('No recognized component source files were present in either run snapshot.');
+        } else {
+            table(['Component ID', 'Status'], array_map(fn (array $component): array => [$component['id'], $component['status']], $components['changes']));
+        }
     }
 
     /** @param array<string, mixed> $report */

@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Workspace;
 use Throwable;
@@ -38,7 +39,15 @@ class RunTask
                 'task_id' => $taskId,
                 'workspace' => $files->path,
                 'status' => 'running',
-                'report' => ['scope' => $paths, 'provider' => 'ollama', 'model' => config('molly.model')],
+                'report' => [
+                    'scope' => $paths, 'provider' => 'ollama', 'model' => config('molly.model'),
+                    'snapshots' => [
+                        'task_creation' => $taskId === null ? null : Task::find($taskId)?->context_snapshot,
+                        'before' => $files->snapshot($before),
+                        'after' => ['status' => 'not_captured', 'reason' => 'The run has not captured the final workspace.'],
+                    ],
+                    'components' => ['status' => 'not_compared', 'reason' => 'The run has not captured the final workspace.'],
+                ],
             ]);
 
             return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt);
@@ -114,18 +123,34 @@ class RunTask
                 && ($report['mode'] !== 'parallel' || $this->branchesPassed($report['branches']));
 
             $this->checkpoint($shouldStop, null, 'Completing the run');
+            $this->recordSnapshot($report, $workspace, $before, $after);
             $run->update(['status' => $completed ? 'completed' : 'failed', 'report' => $report]);
         } catch (Throwable $exception) {
             $report['error'] = $exception->getMessage();
             try {
-                $report['changes'] = $workspace->changes($before, $workspace->read(array_keys($before)));
-            } catch (Throwable) {
+                $observed = $workspace->read(array_keys($before));
+                $report['changes'] = $workspace->changes($before, $observed);
+                $this->recordSnapshot($report, $workspace, $before, $observed);
+            } catch (Throwable $captureFailure) {
                 $report['changes_unavailable'] = true;
+                $report['snapshots']['after'] = ['status' => 'unavailable', 'reason' => 'SNAPSHOT_CAPTURE_FAILED: '.$captureFailure->getMessage()];
+                $report['components'] = ['status' => 'unavailable', 'reason' => 'The final workspace could not be read. Component changes are unknown.'];
             }
             $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
         }
 
         return $run->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $report
+     * @param  array<string, ?string>  $before
+     * @param  array<string, ?string>  $contents
+     */
+    private function recordSnapshot(array &$report, Workspace $workspace, array $before, array $contents): void
+    {
+        $report['snapshots']['after'] = $workspace->snapshot($contents);
+        $report['components'] = ['status' => 'compared', 'changes' => $workspace->componentChanges($report['changes'] ?? [], $before)];
     }
 
     /** @param list<array<string, mixed>> $branches */

@@ -24,7 +24,7 @@ class CreateTask
 
         $paths = $files->taskPaths($paths, $testPath);
 
-        $files->read($paths);
+        $snapshot = $files->snapshot($files->read($paths));
 
         try {
             json_encode($source, JSON_THROW_ON_ERROR);
@@ -42,6 +42,7 @@ class CreateTask
                 'paths' => $paths,
                 'test_path' => $testPath,
                 'source' => $source === [] ? null : $source,
+                'context_snapshot' => $snapshot,
             ]);
         } catch (UniqueConstraintViolationException $exception) {
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);

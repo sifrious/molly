@@ -258,13 +258,79 @@ class Workspace
                 $changes[] = [
                     'path' => $path,
                     'status' => $content === null ? 'added' : ($current === null ? 'removed' : 'modified'),
-                    'before_hash' => $content === null ? null : hash('sha256', $content),
-                    'after_hash' => $current === null ? null : hash('sha256', $current),
+                    'before_hash' => $this->contentHash($content),
+                    'after_hash' => $this->contentHash($current),
                 ];
             }
         }
 
         return $changes;
+    }
+
+    /**
+     * @param  array<string, ?string>  $contents
+     * @return array{version: int, status: string, captured_at: string, files: list<array{path: string, sha256: ?string, component: ?array{id: string, kind: string}}>, preview: array{status: string, reason: string}}
+     */
+    public function snapshot(array $contents): array
+    {
+        ksort($contents, SORT_STRING);
+        $files = [];
+        foreach ($contents as $path => $content) {
+            $files[] = ['path' => $path, 'sha256' => $this->contentHash($content), 'component' => $this->component($path)];
+        }
+
+        return [
+            'version' => 1,
+            'status' => 'captured',
+            'captured_at' => now()->toIso8601String(),
+            'files' => $files,
+            'preview' => ['status' => 'unavailable', 'reason' => 'No local preview renderer is configured.'],
+        ];
+    }
+
+    /**
+     * @param  list<array{path: string, status: string, before_hash: ?string, after_hash: ?string}>  $changes
+     * @param  array<string, ?string>  $before
+     * @return list<array{path: string, status: string, before_hash: ?string, after_hash: ?string, id: string, kind: string}>
+     */
+    public function componentChanges(array $changes, array $before): array
+    {
+        $components = [];
+        $changedPaths = array_column($changes, null, 'path');
+        foreach ($before as $path => $content) {
+            if (($component = $this->component($path)) !== null && ($content !== null || isset($changedPaths[$path]))) {
+                $components[] = [
+                    ...($changedPaths[$path] ?? ['path' => $path, 'status' => 'unchanged', 'before_hash' => $this->contentHash($content), 'after_hash' => $this->contentHash($content)]),
+                    ...$component,
+                ];
+            }
+        }
+        usort($components, fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
+
+        return $components;
+    }
+
+    private function contentHash(?string $content): ?string
+    {
+        return $content === null ? null : hash('sha256', $content);
+    }
+
+    /** @return array{id: string, kind: string}|null */
+    private function component(string $path): ?array
+    {
+        foreach ([
+            'app/Livewire/' => ['.php', 'livewire_class'],
+            'app/View/Components/' => ['.php', 'blade_class'],
+            'resources/views/livewire/' => ['.blade.php', 'livewire_view'],
+            'resources/views/components/' => ['.blade.php', 'blade_component'],
+            'resources/views/' => ['.blade.php', 'blade_view'],
+        ] as $prefix => [$extension, $kind]) {
+            if (str_starts_with($path, $prefix) && str_ends_with($path, $extension)) {
+                return ['id' => 'component:'.$path, 'kind' => $kind];
+            }
+        }
+
+        return null;
     }
 
     private function resolve(string $path): string

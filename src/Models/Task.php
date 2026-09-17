@@ -14,7 +14,7 @@ class Task extends Model
 
     protected $table = 'molly_tasks';
 
-    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'status', 'source', 'stop_requested_at'];
+    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'status', 'source', 'stop_requested_at', 'context_snapshot'];
 
     protected $attributes = ['status' => 'pending'];
 
@@ -52,7 +52,7 @@ class Task extends Model
 
     protected function casts(): array
     {
-        return ['paths' => 'array', 'source' => 'array', 'stop_requested_at' => 'datetime'];
+        return ['paths' => 'array', 'source' => 'array', 'stop_requested_at' => 'datetime', 'context_snapshot' => 'array'];
     }
 
     public function runs(): HasMany

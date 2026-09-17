@@ -23,7 +23,7 @@
     <a href="#tarpit">Tarpit findings</a>
     <a href="#clever">Clever measurements</a>
     <a href="#pest">Pest verification</a>
-    <a href="#changes">Changed files</a>
+    <a href="#changes">What changed</a>
 </nav>
 <h2 id="tarpit">Tarpit review</h2>
 <p>The model reviews supplied files. A clean review does not prove whole-repository safety.</p>
@@ -66,6 +66,31 @@
     <p>File contents are not stored in this report. Compare the workspace diff with these recorded hashes.</p>
 </details>
 @empty<p>No changed files recorded.</p>@endforelse
+<h3>Component changes</h3>
+@if(($report['components']['status'] ?? null) === 'compared')
+    @if(empty($report['components']['changes']))<p>No recognized component source files were present in either run snapshot.</p>@else
+    <div class="table-scroll"><table><caption>Selected component source changes</caption><thead><tr><th scope="col">Component ID</th><th scope="col">Kind</th><th scope="col">Status</th></tr></thead><tbody>
+    @foreach($report['components']['changes'] as $component)<tr><th scope="row"><code>{{ $component['id'] }}</code></th><td>{{ $component['kind'] }}</td><td>{{ $component['status'] }}</td></tr>@endforeach
+    </tbody></table></div>
+    @endif
+@else<p>{{ $report['components']['reason'] ?? 'Component changes were not recorded.' }}</p>@endif
+<p>Component IDs describe recognized Blade and Livewire source paths. A source change does not establish a visual change.</p>
+<h3>Source snapshots</h3>
+@if(empty($report['snapshots']))<p>Component snapshots were not recorded for this run.</p>@else
+    @foreach(['task_creation' => 'Task creation', 'before' => 'Before execution', 'after' => 'After execution'] as $key => $label)
+    @php($snapshot = $report['snapshots'][$key] ?? [])
+    <details><summary>{{ $label }}: {{ $snapshot['status'] ?? 'Not recorded' }}</summary>
+        @if(($snapshot['status'] ?? null) === 'captured')
+        <p>Captured {{ $snapshot['captured_at'] }}. A null hash means the selected file was absent at capture.</p>
+        <div class="table-scroll"><table><caption>{{ $label }} source metadata</caption><thead><tr><th scope="col">File</th><th scope="col">SHA-256</th><th scope="col">Component ID</th></tr></thead><tbody>
+        @foreach($snapshot['files'] as $file)<tr><th scope="row"><code>{{ $file['path'] }}</code></th><td><code>{{ $file['sha256'] ?? 'File absent' }}</code></td><td><code>{{ $file['component']['id'] ?? 'Not a recognized component path' }}</code></td></tr>@endforeach
+        </tbody></table></div>
+        <p>Preview: {{ $snapshot['preview']['status'] }}. {{ $snapshot['preview']['reason'] }}</p>
+        @elseif($key === 'task_creation' && $snapshot === [])<p>No task-creation snapshot is available. The original task context is unknown.</p>
+        @else<p>{{ $snapshot['reason'] ?? 'Snapshot evidence is unavailable.' }}</p>@endif
+    </details>
+    @endforeach
+@endif
 <h2>Run details</h2>
 <details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd></dl></details>
 @if(!empty($report['branches']))

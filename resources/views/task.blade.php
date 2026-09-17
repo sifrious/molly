@@ -2,6 +2,7 @@
 @section('title', 'Task '.$task->reference())
 @section('content')
 <h1>{{ $task->nickname ?? 'Task' }}</h1>
+<p><a href="{{ route('molly.tasks.connections', $task->id) }}">Find linked Amp threads</a></p>
 <dl><dt>Task ID</dt><dd>{{ $task->id }}</dd><dt>Status</dt><dd>{{ $task->status }}</dd><dt>Workspace</dt><dd>{{ $task->workspace }}</dd><dt>Required test</dt><dd>{{ $task->test_path }}</dd></dl>
 <form method="post" action="{{ route('molly.tasks.name', $task->id) }}">
 @csrf
