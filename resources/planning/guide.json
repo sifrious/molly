@@ -1,0 +1,365 @@
+{
+  "version": "2026-09-17",
+  "steps": [
+    {
+      "id": "outcome",
+      "title": "Describe the outcome",
+      "question": "What must the user be able to do, and what is outside this task?",
+      "help": "Describe an observable result and one concrete example. Separate the requirement from a preferred implementation.",
+      "source_ids": [
+        "mary-tarpit",
+        "laravel-testing"
+      ]
+    },
+    {
+      "id": "state",
+      "title": "Identify essential data",
+      "question": "Which facts must survive the request, and which values can be computed?",
+      "help": "Name the records, ownership, and allowed state changes. Explain any duplicated or cached value that the requirement needs.",
+      "source_ids": [
+        "mary-tarpit",
+        "laravel-eloquent",
+        "laravel-validation"
+      ]
+    },
+    {
+      "id": "laravel",
+      "title": "Use existing Laravel behavior",
+      "question": "Which existing application code and Laravel facilities already handle this work?",
+      "help": "Check routing, validation, Eloquent, container resolution, events, and queues before adding another mechanism. For a native target, consult the matching NativePHP track and installed version.",
+      "source_ids": [
+        "mary-tarpit",
+        "laravel-routing",
+        "laravel-validation",
+        "laravel-eloquent",
+        "laravel-container",
+        "laravel-events",
+        "laravel-queues",
+        "nativephp-desktop",
+        "nativephp-mobile"
+      ]
+    },
+    {
+      "id": "boundaries",
+      "title": "Justify each boundary",
+      "question": "What concrete requirement needs a new interface, layer, package, or native integration?",
+      "help": "Describe the caller and the behavior that must vary. Prefer existing framework resolution when sufficient. Keep the simplest direct implementation when no current requirement needs another boundary.",
+      "source_ids": [
+        "mary-tarpit",
+        "laravel-container",
+        "nativephp-desktop",
+        "nativephp-mobile"
+      ]
+    },
+    {
+      "id": "verification",
+      "title": "Define passing evidence",
+      "question": "Which acceptance tests and Tarpit findings will show that the requirement is met?",
+      "help": "Specify successful behavior, important failure cases, and any complexity that remains necessary. Keep test results and complexity review separate; explain each unresolved finding.",
+      "source_ids": [
+        "mary-tarpit",
+        "laravel-testing",
+        "laravel-events"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "laravel-routing",
+      "title": "Laravel 13 routing",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/routing.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-routing.md",
+      "topics": [
+        "route",
+        "http",
+        "request",
+        "controller",
+        "web",
+        "form",
+        "api"
+      ],
+      "sha256": "ffc4504550cef667c0098177fb9eb33466d8e7154bb35db6bd0f95aead8b8963"
+    },
+    {
+      "id": "laravel-validation",
+      "title": "Laravel 13 validation",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/validation.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-validation.md",
+      "topics": [
+        "validate",
+        "validation",
+        "input",
+        "form",
+        "error",
+        "rules"
+      ],
+      "sha256": "a14de7da35e6cdd26f87a9b3529322dcac3544925353d0792c201bb98e2a03e6"
+    },
+    {
+      "id": "laravel-eloquent",
+      "title": "Laravel 13 eloquent",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/eloquent.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-eloquent.md",
+      "topics": [
+        "state",
+        "data",
+        "model",
+        "database",
+        "persist",
+        "eloquent",
+        "record"
+      ],
+      "sha256": "feec7d037fca0ee01f4c6a20f9c6b0552ec6eea90562c8c3e675c9312ad8292d"
+    },
+    {
+      "id": "laravel-container",
+      "title": "Laravel 13 container",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/container.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-container.md",
+      "topics": [
+        "interface",
+        "dependency",
+        "container",
+        "binding",
+        "service",
+        "abstraction"
+      ],
+      "sha256": "1a0e1f3917f2df6fc0b60ef9c9c1d187b7c87f22366b25af1ffb3a2dd06d1408"
+    },
+    {
+      "id": "laravel-events",
+      "title": "Laravel 13 events",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/events.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-events.md",
+      "topics": [
+        "event",
+        "listener",
+        "notification",
+        "side effect"
+      ],
+      "sha256": "388575b04efe50c73b3f3c6fed9975067302af49563e71c71a2bf80f0798c752"
+    },
+    {
+      "id": "laravel-queues",
+      "title": "Laravel 13 queues",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/queues.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-queues.md",
+      "topics": [
+        "queue",
+        "job",
+        "worker",
+        "background",
+        "retry",
+        "timeout"
+      ],
+      "sha256": "c4eda439dfc273cb0c4b2a04771a0e2bef26f3542462f567cd9ddf962d4b3443"
+    },
+    {
+      "id": "laravel-testing",
+      "title": "Laravel 13 testing",
+      "url": "https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/testing.md",
+      "revision": "b94b890362111c44de223e09502c610a9d9f20d8",
+      "path": "sources/laravel-testing.md",
+      "topics": [
+        "test",
+        "acceptance",
+        "verification",
+        "pest",
+        "phpunit",
+        "failure"
+      ],
+      "sha256": "4686198d94546a41915e5f4ff9ecdb105ef77c7544b9a223709910448f6aecf9"
+    },
+    {
+      "id": "mary-tarpit",
+      "title": "Mary Perry: Cleverness is a loan",
+      "url": "https://clever.mary.win/",
+      "revision": "sha256:afc4c4d05d4efca5ecdc05f54b7a35cded9b1c07677fda6e74e8cd33e56ed32d",
+      "path": "sources/mary-tarpit.md",
+      "topics": [
+        "tarpit",
+        "complexity",
+        "requirement",
+        "outcome",
+        "state",
+        "computed",
+        "boundary",
+        "interface",
+        "architecture",
+        "laravel"
+      ],
+      "sha256": "fd26e2a6aee43808607864d9dfdcb25fef52dddb2f3ec7126cfd501e1d13613a"
+    },
+    {
+      "id": "nativephp-desktop",
+      "title": "NativePHP Desktop v2",
+      "url": "https://github.com/NativePHP/nativephp.com/blob/0c1da20fc3cc98accef49dab372a57cbf60ad872/resources/views/docs/desktop/2/getting-started/introduction.md",
+      "revision": "0c1da20fc3cc98accef49dab372a57cbf60ad872",
+      "path": "sources/nativephp-desktop.md",
+      "topics": [
+        "nativephp",
+        "desktop",
+        "native",
+        "device",
+        "offline",
+        "desktop",
+        "window",
+        "macos",
+        "windows",
+        "linux"
+      ],
+      "sha256": "f609b33101f3ae299ac01cf7dca6adf17762ae969ced510ee0d568d8fd5139f2"
+    },
+    {
+      "id": "nativephp-mobile",
+      "title": "NativePHP Mobile v4",
+      "url": "https://github.com/NativePHP/nativephp.com/blob/0c1da20fc3cc98accef49dab372a57cbf60ad872/resources/views/docs/mobile/4/getting-started/introduction.md",
+      "revision": "0c1da20fc3cc98accef49dab372a57cbf60ad872",
+      "path": "sources/nativephp-mobile.md",
+      "topics": [
+        "nativephp",
+        "mobile",
+        "native",
+        "device",
+        "offline",
+        "ios",
+        "android",
+        "mobile"
+      ],
+      "sha256": "e6e68eb5ef0116764f3adfb4974f841390d32930129ecd23ebb6a54a66b8ed1e"
+    }
+  ],
+  "edges": [
+    {
+      "from": "step:outcome",
+      "to": "step:state",
+      "relation": "next"
+    },
+    {
+      "from": "step:state",
+      "to": "step:laravel",
+      "relation": "next"
+    },
+    {
+      "from": "step:laravel",
+      "to": "step:boundaries",
+      "relation": "next"
+    },
+    {
+      "from": "step:boundaries",
+      "to": "step:verification",
+      "relation": "next"
+    },
+    {
+      "from": "step:outcome",
+      "to": "source:mary-tarpit",
+      "relation": "consult"
+    },
+    {
+      "from": "step:outcome",
+      "to": "source:laravel-testing",
+      "relation": "consult"
+    },
+    {
+      "from": "step:state",
+      "to": "source:mary-tarpit",
+      "relation": "consult"
+    },
+    {
+      "from": "step:state",
+      "to": "source:laravel-eloquent",
+      "relation": "consult"
+    },
+    {
+      "from": "step:state",
+      "to": "source:laravel-validation",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:mary-tarpit",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-routing",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-validation",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-eloquent",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-container",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-events",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:laravel-queues",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:nativephp-desktop",
+      "relation": "consult"
+    },
+    {
+      "from": "step:laravel",
+      "to": "source:nativephp-mobile",
+      "relation": "consult"
+    },
+    {
+      "from": "step:boundaries",
+      "to": "source:mary-tarpit",
+      "relation": "consult"
+    },
+    {
+      "from": "step:boundaries",
+      "to": "source:laravel-container",
+      "relation": "consult"
+    },
+    {
+      "from": "step:boundaries",
+      "to": "source:nativephp-desktop",
+      "relation": "consult"
+    },
+    {
+      "from": "step:boundaries",
+      "to": "source:nativephp-mobile",
+      "relation": "consult"
+    },
+    {
+      "from": "step:verification",
+      "to": "source:mary-tarpit",
+      "relation": "consult"
+    },
+    {
+      "from": "step:verification",
+      "to": "source:laravel-testing",
+      "relation": "consult"
+    },
+    {
+      "from": "step:verification",
+      "to": "source:laravel-events",
+      "relation": "consult"
+    }
+  ]
+}

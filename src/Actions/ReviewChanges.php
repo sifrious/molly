@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
+use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Agents\TarpitReviewer;
 
@@ -17,12 +18,18 @@ class ReviewChanges
      */
     public function handle(string $prompt, array $before, array $after): array
     {
-        LocalOllama::validate();
-        $response = TarpitReviewer::make()->prompt(
-            json_encode(['task' => $prompt, 'before' => $before, 'after' => $after], JSON_THROW_ON_ERROR),
-            provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
-        );
-        $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+        $input = json_encode(['task' => $prompt, 'before' => $before, 'after' => $after], JSON_THROW_ON_ERROR);
+        if (config('molly.agent', 'ollama') === 'amp') {
+            $result = app(AmpResponse::class)->prompt(new TarpitReviewer, $input);
+        } elseif (config('molly.agent', 'ollama') === 'ollama') {
+            LocalOllama::validate();
+            $response = TarpitReviewer::make()->prompt(
+                $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
+            );
+            $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+        } else {
+            throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');
+        }
         $this->validate($result, $after);
 
         return ['checks' => $result['checks'], 'findings' => $result['findings']];

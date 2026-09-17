@@ -23,7 +23,7 @@ class EvaluateChanges
         $branches = $processes = $inputs = $results = [];
         foreach (['verification', 'review'] as $kind) {
             $id = $kind.'-'.bin2hex(random_bytes(12));
-            $branches[$kind] = ['kind' => $kind, 'branch_id' => $id, 'attempt_id' => $attempt, 'execution_target' => 'local', 'provider' => $kind === 'review' ? 'ollama' : null, 'model' => $kind === 'review' ? config('molly.model') : null, 'started_at' => now()->toISOString(), 'finished_at' => null, 'status' => 'running', 'result_ref' => $evidenceDirectory.'/'.$id.'.json', 'failure_classification' => null];
+            $branches[$kind] = ['kind' => $kind, 'branch_id' => $id, 'attempt_id' => $attempt, 'execution_target' => 'local', 'provider' => $kind === 'review' ? config('molly.agent', 'ollama') : null, 'model' => $kind === 'review' && config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null, 'started_at' => now()->toISOString(), 'finished_at' => null, 'status' => 'running', 'result_ref' => $evidenceDirectory.'/'.$id.'.json', 'failure_classification' => null];
             $inputs[$kind] = $evidenceDirectory.'/'.$id.'-input.json';
             try {
                 $this->writeInput($inputs[$kind], [...$branches[$kind], 'prompt' => $prompt, 'workspace' => $workspace, 'workspace_lease' => $workspaceLease, 'before' => $before, 'after' => $after, 'test_path' => $testPath, 'evidence_directory' => $evidenceDirectory, 'config' => $this->settings()]);
@@ -65,7 +65,7 @@ class EvaluateChanges
     /** @return array<string, mixed> */
     private function settings(): array
     {
-        return ['molly.model' => config('molly.model'), 'molly.timeout' => config('molly.timeout'), 'molly.test_timeout' => config('molly.test_timeout'), 'ai.providers.ollama' => config('ai.providers.ollama')];
+        return ['molly.agent' => config('molly.agent', 'ollama'), 'molly.model' => config('molly.model'), 'molly.timeout' => config('molly.timeout'), 'molly.test_timeout' => config('molly.test_timeout'), 'ai.providers.ollama' => config('ai.providers.ollama')];
     }
 
     private function timeout(string $kind): int

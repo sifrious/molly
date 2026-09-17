@@ -3,6 +3,7 @@
 namespace Sifrious\Molly;
 
 use Illuminate\Support\ServiceProvider;
+use Laravel\Mcp\Facades\Mcp;
 use Livewire\Livewire;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Complexity\Console\Commands\HotspotsCommand;
@@ -10,18 +11,23 @@ use Sifrious\Molly\Complexity\Console\Commands\LonelyFilesCommand;
 use Sifrious\Molly\Complexity\Console\Commands\OwnedDiffCommand;
 use Sifrious\Molly\Complexity\Console\Commands\ScanCommand;
 use Sifrious\Molly\Complexity\Console\Commands\WeldsCommand;
+use Sifrious\Molly\Console\MollyChatCommand;
 use Sifrious\Molly\Console\MollyCheckCommand;
 use Sifrious\Molly\Console\MollyCreateCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
+use Sifrious\Molly\Console\MollyPlanCommand;
 use Sifrious\Molly\Console\MollyRetryCommand;
+use Sifrious\Molly\Console\MollyReviewCommitCommand;
 use Sifrious\Molly\Console\MollyRunCommand;
+use Sifrious\Molly\Console\MollySetupCommand;
 use Sifrious\Molly\Console\MollyShowCommand;
 use Sifrious\Molly\Console\MollyStartCommand;
 use Sifrious\Molly\Console\MollyStopCommand;
 use Sifrious\Molly\Console\MollyTaskCommand;
 use Sifrious\Molly\Console\MollyTasksCommand;
 use Sifrious\Molly\Livewire\RunStatus;
+use Sifrious\Molly\Mcp\MollyServer;
 
 class MollyServiceProvider extends ServiceProvider
 {
@@ -33,6 +39,9 @@ class MollyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->environment('local', 'testing')) {
+            Mcp::local('molly', MollyServer::class);
+        }
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'molly');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
@@ -43,7 +52,7 @@ class MollyServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
                 MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
-                MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class]);
+                MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
             }

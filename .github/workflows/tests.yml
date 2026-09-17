@@ -116,3 +116,29 @@ jobs:
           task_id=$(php -r '$task = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); if (($task["status"] ?? null) !== "pending" || !is_string($task["id"] ?? null) || $task["id"] === "" || ($task["task"]["id"] ?? null) !== $task["id"]) { exit(1); } echo $task["id"];')
           php artisan molly:task "$task_id" --json --no-interaction > "$RUNNER_TEMP/molly-found.json"
           php -r '$created = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); $found = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-found.json"), true, flags: JSON_THROW_ON_ERROR); if (($found["id"] ?? null) !== $created["id"] || ($found["status"] ?? null) !== "pending" || ($found["task"]["id"] ?? null) !== $created["id"]) { exit(1); } echo "Created and retrieved the pending task without executing a model.\n";'
+
+      - name: Keep the development package out of production installs
+        run: |
+          cd "$RUNNER_TEMP/molly-host"
+          composer install --no-dev --no-interaction --prefer-dist --no-progress
+          php artisan list --raw > "$RUNNER_TEMP/production-commands.txt"
+          php -r '$commands = file_get_contents(getenv("RUNNER_TEMP")."/production-commands.txt"); if (preg_match("/^molly:/m", $commands)) { exit(1); } echo "Production commands do not load Molly.\n";'
+
+      - name: Check the download contents and size
+        run: |
+          git archive --format=zip --output="$RUNNER_TEMP/molly.zip" HEAD
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = Path(os.environ['RUNNER_TEMP']) / 'molly.zip'
+          with ZipFile(archive) as package:
+              names = package.namelist()
+              assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
+              assert 'resources/planning/guide.json' in names
+              assert 'resources/planning/LARAVEL-LICENSE.md' in names
+              assert 'src/Complexity/LICENSE.md' in names
+              assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
+              assert archive.stat().st_size <= 256 * 1024
+              print(f'Package archive: {archive.stat().st_size} bytes')
+          PY

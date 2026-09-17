@@ -1,12 +1,12 @@
 # Molly
 
-Give Molly a small coding task and choose the files Molly may change. Molly asks a local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity. The terminal shows test evidence and complexity findings together.
+Give Molly a small coding task and choose the files Molly may change. Molly asks your selected Amp agent or local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity. The terminal shows test evidence and complexity findings together.
 
-Molly is a Laravel package in development. You can run a one-off prompt or save a task with attempt history, bounded retries, and stop requests. Molly permits one writing run per workspace. No alpha release is tagged yet.
+Molly is a development dependency for Laravel applications. You can plan a collection of tasks, consult cited offline guidance, and save tasks with attempt history, bounded retries, and stop requests. Molly permits one writing run per workspace. No alpha release is tagged yet.
 
 ## Install in a local application
 
-Start in a trusted, disposable checkout of a Laravel 13 application with PHP 8.3 or later, the DOM extension, and Pest 4 installed. Keep the application's normal database configuration and use `APP_ENV=local`. Start Ollama before checking the environment.
+Start in a trusted, disposable checkout of a Laravel 13 application with PHP 8.3 or later, the DOM extension, and Pest 4 installed. Keep the application's normal database configuration and use `APP_ENV=local`. Start Ollama for local inference, or use an authenticated Amp CLI.
 
 If the application does not already use Pest, install Pest and its Laravel plugin:
 
@@ -33,7 +33,7 @@ php artisan migrate
 ollama list
 ```
 
-Choose a locally installed model that supports structured output. Set `MOLLY_LOCAL_MODEL` in the application's `.env` to the exact model name from `ollama list`. Molly does not download models or switch to a paid provider.
+Choose a locally installed model that supports structured output. Set `MOLLY_LOCAL_MODEL` in the application's `.env` to the exact model name from `ollama list`. Molly does not download models or silently switch providers. Amp is used only after you select it.
 
 Set the local endpoint in `.env`:
 
@@ -48,7 +48,7 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
-Resolve failed checks before running a task. Doctor checks task and run tables, the workspace Pest installation, local provider configuration, installed model, bundled measurements, and the POSIX functions required for parallel checks. Measurements enable themselves in `local` and `testing` by default and stay disabled in production.
+Resolve failed checks before running a task. Doctor checks task and run tables, the workspace Pest installation, the selected provider and account or installed local model, bundled measurements, and the POSIX functions required for parallel checks. Measurements enable themselves in `local` and `testing` by default and stay disabled in production.
 
 Parallel checks require PHP's `posix_setsid` and `posix_kill` functions. Doctor reports a failed check if either function is unavailable. Enable those functions, or set `'parallel_checks' => false` in the published `config/molly.php` to run Pest and Tarpit review serially. Run `php artisan config:clear` and `php artisan molly:doctor` after changing that setting. Molly never silently falls back to serial execution.
 
@@ -80,6 +80,66 @@ php artisan molly:doctor --json
 ```
 
 `molly:run --json` writes one JSON object containing `id`, `status`, and `report`. Both commands exit nonzero on failure. A missing prompt fails when `--json` or `--no-interaction` is set.
+
+## Plan before creating tasks
+
+A project means a collection of tasks. Start with an outcome and choose whether to walk through Tarpit review:
+
+```bash
+php artisan molly:plan 'Let people review and retry failed tasks from a NativePHP mobile app.'
+php artisan molly:plan --resume=PLAN_ID
+```
+
+The five questions cover the required outcome, essential data, existing Laravel behavior, justified boundaries, and passing evidence. Answers save after each question. Planning does not execute code. Use `--skip-review` to record that the review was skipped. The web interface also exposes planning and a browsable source graph. A ready plan can create several pending tasks; each task keeps a snapshot of the planning decisions and citation metadata.
+
+For an agent or script:
+
+```bash
+php artisan molly:plan 'Show pending tasks.' --json --no-interaction
+php artisan molly:plan --resume=PLAN_ID --step=outcome --answer='Show pending tasks on one screen.' --json --no-interaction
+```
+
+`src/PlanningGuide.php` reads `resources/planning/guide.json` and the bundled passages without network requests. Topic matching selects references to consult; a match does not establish that a package or abstraction belongs in the design. Each question links to its supporting sources. The graph contains selected Laravel 13 passages, Mary Perry's public Tarpit material, and separate NativePHP Desktop v2 and Mobile v4 summaries. Citations retain the original URL, revision, and content digest. [Source permissions and limits](resources/planning/MANIFEST.md) describe the bundle. Check installed package versions before using an API. A new guide version requires a new guided plan; saved answers remain available.
+
+## Connect an agent
+
+Choose Amp or an installed local Ollama model:
+
+```bash
+php artisan molly:setup --agent=amp
+php artisan molly:chat
+
+php artisan molly:setup --agent=ollama --model=YOUR_INSTALLED_MODEL
+```
+
+Amp setup launches the official `amp login` command in an interactive terminal, then adds a workspace MCP connection. Amp owns the login credentials. Molly saves only the selected agent and local model settings in the host application's `.env`. Noninteractive setup prints the login command instead of waiting for a browser login. `--no-login` configures the connection without launching login. Setup reports Amp's approval and connection-check commands; a saved connection does not prove authentication succeeded. See [Amp's MCP documentation](https://ampcode.com/docs/customize/mcp).
+
+When `MOLLY_AGENT=amp`, proposal generation and Tarpit review use the authenticated Amp CLI. Molly invokes each request in a temporary directory with tools, MCP connections, and IDE access disabled. The response parser requires an empty tool list and an explicit successful terminal result. The same file-scope and structured-review validation used for Ollama applies before accepting the response. File contents selected for the task are sent to Amp. This is local execution using Amp's service, not remote Orb execution. The CLI does not always report its model, so Molly records an unknown model rather than guessing. [Amp settings](https://ampcode.com/docs/cli/settings) and [streaming JSON](https://ampcode.com/docs/cli/streaming-json) describe the CLI contract.
+
+`molly:chat` opens Amp's existing terminal interface with a session-level Molly MCP configuration. Amp keeps its other configured servers. The MCP connection starts `php artisan mcp:start molly` over stdio. Molly registers this server only in local and testing environments, with no HTTP MCP route.
+
+The server exposes `molly_guide`, `molly_plan`, and `molly_task`. The guide tool reads the graph or one full bundled source. The plan tool creates, reads, answers, and evaluates a plan. The task tool creates, imports, reads, queues, retries, or stops a task through the same application actions as the CLI and web UI. Start and retry use `src/Actions/QueueTask.php` and require a running host queue worker. See [Laravel MCP local servers](https://laravel.com/framework/docs/13.x/mcp).
+
+## Ask Jev to review a plan or commit
+
+TypeSafe AI is optional and disabled by default. To enable Jev, set `molly.typesafe.enabled` to `true` in the published configuration and supply `TYPESAFE_API_KEY` through the host environment. Never commit the key. No JavaScript bridge or TypeSafe SDK is installed. `src/Actions/EvaluateWithTypeSafe.php` uses the [documented TypeSafe HTTP API](https://docs.typesafe.ai/api).
+
+During planning, request a Jev suggestion in the web interface or through the MCP plan tool. Jev selects one of the five review areas. Molly supplies the corresponding question and citations from the graph, then saves the confidence and the answers used for evaluation. A suggestion does not advance the review or overwrite your decisions. The ordinary guide remains usable without Jev.
+
+Review a commit or staged PHP changes:
+
+```bash
+php artisan molly:review-commit HEAD
+php artisan molly:review-commit --staged --json
+```
+
+The command reads PHP changes, excludes vendor and environment files, runs `git diff --check`, and optionally sends the bounded diff with cited Tarpit/Laravel guidance to Jev. The command does not run tests, change files, or create a commit. The report names its scope and diff digest. `continue` means Jev identified no semantic blocker; it does not prove that the code works. `retry`, `stop`, and `needs_review` require attention and produce a nonzero exit. Disabled or empty evaluations stay explicitly unevaluated. A Git whitespace failure also produces a nonzero exit.
+
+Enabling TypeSafe permits sending planning descriptions, answers, selected source passages, or the explicitly requested commit diff to the hosted service. The complete evaluation input is limited to 32 KiB; commit diffs are limited to 16 KiB. Oversized input is rejected before sending, with no silent truncation. Low confidence, missing answers, malformed results, timeouts, and provider errors produce `needs_review`. Jev cannot bypass tests, Tarpit blockers, or attempt limits. Automatic loop execution from these suggestions is not implemented.
+
+## Distribution size
+
+Install Molly with `composer require --dev`. Production installs using `composer install --no-dev` omit Molly. The source graph and citations must remain below 128 KiB uncompressed. Distribution archives exclude tests and repository automation through `.gitattributes`; they retain the runtime guide, attribution, and licenses. These limits describe Molly's files, not the size of Composer dependencies already installed by the host.
 
 ## Save and manage tasks
 
@@ -225,6 +285,7 @@ The `molly-config` publish tag copies `config/molly.php` and `config/molly-compl
 
 | Key | Default | Purpose and consumer |
 | --- | --- | --- |
+| `molly.agent` | `ollama` | Choose `ollama` or `amp` using `MOLLY_AGENT`. `src/Actions/ConfigureAgent.php` persists onboarding choices. Generation, review, doctor, and parallel workers consume the selected provider. |
 | `molly.model` | Required | Local Ollama model name from `MOLLY_LOCAL_MODEL`. `src/Agents/LocalOllama.php` validates the choice; `src/Actions/GenerateChanges.php` and `src/Actions/ReviewChanges.php` use the model. |
 | `molly.timeout` | `180` | Positive integer timeout in seconds for each model request. The writer and reviewer consume this value. |
 | `molly.test_timeout` | `120` | Pest process timeout in seconds, bounded to 1 through 3600 by `src/Actions/VerifyChanges.php`. |
@@ -237,7 +298,18 @@ The `molly-config` publish tag copies `config/molly.php` and `config/molly-compl
 | `ai.providers.ollama.driver` | `ollama` | Laravel AI provider driver. Molly requires `ollama`. |
 | `ai.providers.ollama.url` | `http://localhost:11434` | Local Ollama endpoint from `OLLAMA_URL`. Molly permits HTTP loopback addresses without credentials, a query, or an extra path. |
 
-Laravel AI owns the Ollama provider settings. `MOLLY_LOCAL_MODEL` selects the model. `MOLLY_COMPLEXITY_ENABLED` controls bundled measurements outside production. `MOLLY_UI_ENABLED` opts in to the local web interface. The web dispatcher reads the host queue connection through `queue.default` and its driver and `retry_after` settings in `src/Http/TaskController.php`. Laravel maps `QUEUE_CONNECTION` to `queue.default` in the host configuration. Edit the remaining settings in the published files.
+Laravel AI owns the Ollama provider settings. `MOLLY_LOCAL_MODEL` selects the model. `MOLLY_COMPLEXITY_ENABLED` controls bundled measurements outside production. `MOLLY_UI_ENABLED` opts in to the local web interface. Web and MCP dispatchers read the host queue connection through `queue.default` and its driver and `retry_after` settings in `src/Actions/QueueTask.php`. Laravel maps `QUEUE_CONNECTION` to `queue.default` in the host configuration. Edit the remaining settings in the published files.
+
+| TypeSafe key | Default | Purpose |
+| --- | --- | --- |
+| `molly.typesafe.enabled` | `false` | Explicitly permit hosted evaluations. No automatic provider fallback. |
+| `molly.typesafe.api_key` | `TYPESAFE_API_KEY` | Credential for the official TypeSafe endpoint. Store the key only in the host environment. |
+| `molly.typesafe.model` | `jev-latest` | Model identifier sent to TypeSafe. |
+| `molly.typesafe.confidence_threshold` | `0.8` | Lower-confidence answers become `needs_review`. Must be between zero and one. |
+| `molly.typesafe.timeout` | `30` | HTTP timeout in seconds, from 1 to 120. |
+| `molly.typesafe.instructions` | Task-evidence question | Instructions for the public task-evidence evaluator. Planning and commit evaluation use their own bounded questions. |
+
+`src/Actions/EvaluateWithTypeSafe.php` consumes these settings. Only the API key has a corresponding environment variable. Existing published configuration must add the `typesafe` section to opt in. `SuggestPlanReview` and `ReviewCommit` use the same client with distinct rubrics.
 
 | Complexity key | Default | Purpose |
 | --- | --- | --- |
@@ -266,15 +338,18 @@ Use a trusted, disposable checkout. The file allowlist confines writer proposals
 
 Failed verification or review leaves applied edits in place for inspection. Molly does not commit changes. An interrupted process can leave a run marked `running`; that state is uncertain and does not mean success. Saved tasks support explicit interruption settlement through `molly:stop`. One-off runs have no task controls. Automatic resume is not implemented.
 
-Arbitrary task graphs, Bloom integration, GitHub-to-Pest todo generation, approval controls, remote execution, and TypeSafe evaluation remain outside this build.
+Arbitrary task dependency graphs, automatic task decomposition or bulk import, Bloom integration, GitHub-to-Pest todo generation, approval controls, and remote execution remain outside this build. The bundled source graph guides planning; it is not a task scheduler. TypeSafe suggestions and commit evaluation are available, but do not yet customize or automatically execute a general loop.
 
 ## Terms
 
 | Term | Meaning | Implementation |
 | --- | --- | --- |
+| Plan | A description for a collection of tasks, an explicit guided-or-skipped choice, and saved planning decisions | `src/Models/Plan.php`, `src/Actions/AnswerPlan.php` |
+| Planning suggestion | Jev's optional review focus with confidence, cited guidance, and an answer snapshot | `src/Actions/SuggestPlanReview.php` |
+| Source graph | Bundled questions and source passages linked by stable IDs, revisions, and digests | `src/PlanningGuide.php`, `resources/planning/guide.json` |
 | Task | A saved prompt, selected files, source context, and lifecycle state | `src/Models/Task.php`, `src/Actions/CreateTask.php` |
 | Run | A persisted attempt with `running`, `completed`, `failed`, or `stopped` status and a report | `src/Models/Run.php` |
-| Queued execution request | A task ID and start-or-retry choice waiting for a host queue worker; a request does not count as a run until execution begins | `src/Jobs/StartSavedTask.php`, `src/Http/TaskController.php` |
+| Queued execution request | A task ID and start-or-retry choice waiting for a host queue worker; a request does not count as a run until execution begins | `src/Jobs/StartSavedTask.php`, `src/Actions/QueueTask.php` |
 | Execution branch | One local Pest verification or Tarpit review process with its own result and failure metadata; a branch result is separate from run completion | `src/Actions/EvaluateChanges.php`, `src/Console/MollyCheckCommand.php` |
 | Workspace | The checkout containing selected files and the per-workspace lock | `src/Workspace.php` |
 | Verification | Pest execution and the JUnit evidence required for completion | `src/Actions/VerifyChanges.php` |
@@ -302,3 +377,5 @@ The local web workflow passed a live create, queue, and retry check with the sam
 ## Source credit
 
 The bundled measurements derive from Clever commit `650a32a595036ef610a7c7af1fad4869b23ef05a` in [sifrious/cleverness](https://github.com/sifrious/cleverness). Molly preserves the original MIT notice and source reference in `src/Complexity/LICENSE.md`. Molly does not copy Clever's web interface or require the original package.
+
+The Amp path passed a live bounded coding check in the demo application: Amp proposed a PHP file and its Pest test, Molly applied the allowed files, Pest passed one test with one assertion, and a parallel Amp Tarpit review passed. The run records provider `amp` and model `null`. Amp's MCP doctor also connected to all three Molly tools. These checks do not establish remote Orb execution or a live TypeSafe result. TypeSafe behavior is covered with documented response fixtures until a key is configured.
