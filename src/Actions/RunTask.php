@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -19,7 +20,7 @@ class RunTask
     ) {}
 
     /** @param list<string> $paths */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null): Run
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null): Run
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -31,33 +32,35 @@ class RunTask
             throw new RuntimeException('TEST_PATH_INVALID: Include the required PHP test file in --file and select it with --test.');
         }
 
-        return $files->exclusively(function () use ($files, $paths, $prompt, $testPath, $progress): Run {
+        return $files->exclusively(function () use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop): Run {
             $before = $files->read($paths);
             $run = Run::create([
                 'prompt' => $prompt,
+                'task_id' => $taskId,
                 'workspace' => $files->path,
                 'status' => 'running',
                 'report' => ['scope' => $paths, 'provider' => 'ollama', 'model' => config('molly.model')],
             ]);
 
-            return $this->execute($run, $files, $before, $testPath, $progress);
+            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop);
         });
     }
 
     /** @param array<string, ?string> $before */
-    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress): Run
+    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop): Run
     {
         $report = $run->report;
         $evidence = storage_path('molly/'.$run->id);
 
         try {
             File::ensureDirectoryExists($evidence, 0700);
-            $progress?->__invoke('Measuring complexity before changes');
+            $this->checkpoint($shouldStop, $progress, 'Measuring complexity before changes');
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
-            $progress?->__invoke('Writing the selected files with Ollama');
+            $this->checkpoint($shouldStop, $progress, 'Writing the selected files with Ollama');
             $proposal = $this->generate->handle($run->prompt, $before, $testPath);
+            $this->checkpoint($shouldStop, $progress, 'Applying the proposed changes');
             $workspace->apply($proposal['files'], $before);
             $after = $workspace->read(array_keys($before));
             $report['summary'] = $proposal['summary'];
@@ -68,15 +71,15 @@ class RunTask
                 throw new RuntimeException('NO_CHANGES: The agent returned no changes. The task was not verified as new work.');
             }
 
-            $progress?->__invoke('Running the required Pest tests');
+            $this->checkpoint($shouldStop, $progress, 'Running the required Pest tests');
             $report['verification'] = $this->verify->handle($workspace->path, $testPath, $evidence);
             $run->update(['report' => $report]);
 
-            $progress?->__invoke('Reviewing complexity with the seven Tarpit checks');
+            $this->checkpoint($shouldStop, $progress, 'Reviewing complexity with the seven Tarpit checks');
             $report['review'] = $this->review->handle($run->prompt, $before, $after);
             $run->update(['report' => $report]);
 
-            $progress?->__invoke('Measuring complexity after changes');
+            $this->checkpoint($shouldStop, $progress, 'Measuring complexity after changes');
             $report['complexity_after'] = $this->measure->handle($workspace->path, $evidence.'/after');
             $this->requireMeasurements($report['complexity_after']);
 
@@ -87,6 +90,7 @@ class RunTask
             $completed = ($report['verification']['status'] ?? null) === 'passed'
                 && $this->reviewPassed($report['review']);
 
+            $this->checkpoint($shouldStop, null, 'Completing the run');
             $run->update(['status' => $completed ? 'completed' : 'failed', 'report' => $report]);
         } catch (Throwable $exception) {
             $report['error'] = $exception->getMessage();
@@ -95,10 +99,21 @@ class RunTask
             } catch (Throwable) {
                 $report['changes_unavailable'] = true;
             }
-            $run->update(['status' => 'failed', 'report' => $report]);
+            $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
         }
 
         return $run->fresh();
+    }
+
+    private function checkpoint(?Closure $shouldStop, ?Closure $progress, string $message): void
+    {
+        if ($shouldStop?->__invoke()) {
+            throw new RunStopped('RUN_STOPPED: Molly stopped at an execution boundary. Applied edits remain available for review.');
+        }
+        $progress?->__invoke($message);
+        if ($shouldStop?->__invoke()) {
+            throw new RunStopped('RUN_STOPPED: Molly stopped at an execution boundary. Applied edits remain available for review.');
+        }
     }
 
     /** @param array<string, mixed> $measurement */

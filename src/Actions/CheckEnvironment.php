@@ -2,10 +2,10 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Clever\Clever\Clever;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Agents\LocalOllama;
+use Sifrious\Molly\Complexity\Clever;
 use Throwable;
 
 class CheckEnvironment
@@ -19,8 +19,8 @@ class CheckEnvironment
         };
 
         try {
-            $ready = Schema::hasTable('molly_runs');
-            $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Run history is ready.' : 'Run php artisan migrate to create Molly run history.');
+            $ready = Schema::hasTable('molly_runs') && Schema::hasTable('molly_tasks');
+            $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Task and run history are ready.' : 'Run php artisan migrate to create Molly task and run history.');
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');
         }
@@ -61,11 +61,10 @@ class CheckEnvironment
         }
 
         try {
-            $installed = class_exists(Clever::class);
-            $enabled = $installed && app(Clever::class)->enabled();
-            $add('Clever', $enabled, ! $installed ? 'clever_missing' : ($enabled ? 'clever_ready' : 'clever_disabled'), ! $installed ? 'Install maryperry/clever in the host application to measure complexity.' : ($enabled ? 'Clever measurements are enabled.' : 'Enable Clever in the host application to measure complexity.'));
+            $enabled = app(Clever::class)->enabled();
+            $add('Clever', $enabled, $enabled ? 'clever_ready' : 'clever_disabled', $enabled ? 'Bundled Clever measurements are enabled.' : 'Enable molly-complexity.enabled outside production to measure complexity.');
         } catch (Throwable) {
-            $add('Clever', false, 'clever_unavailable', 'Molly could not load Clever in the host application.');
+            $add('Clever', false, 'clever_unavailable', 'Molly could not load the bundled Clever measurements.');
         }
 
         return ['ready' => ! in_array('failed', array_column($checks, 'status'), true), 'checks' => $checks];

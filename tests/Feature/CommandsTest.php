@@ -55,13 +55,17 @@ it('prints doctor checks as JSON and fails when requirements are missing', funct
     Http::preventStrayRequests();
     Http::fake(['localhost:11434/api/tags' => Http::response(['models' => [['name' => 'different-model']]])]);
     config()->set('molly.model', 'required-model');
-    Schema::dropIfExists('molly_runs');
+    Schema::rename('molly_runs', 'molly_runs_unavailable');
 
-    $exit = Artisan::call('molly:doctor', ['--workspace' => '/missing-workspace', '--json' => true]);
-    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    try {
+        $exit = Artisan::call('molly:doctor', ['--workspace' => '/missing-workspace', '--json' => true]);
+        $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    } finally {
+        Schema::rename('molly_runs_unavailable', 'molly_runs');
+    }
 
     expect($exit)->toBe(1)->and($result['ready'])->toBeFalse()
-        ->and(array_column($result['checks'], 'code'))->toContain('migration_missing', 'pest_missing', 'model_missing', 'clever_missing');
+        ->and(array_column($result['checks'], 'code'))->toContain('migration_missing', 'pest_missing', 'model_missing', 'clever_ready');
     Http::assertSentCount(1);
 });
 
@@ -155,7 +159,7 @@ it('shows probe limitations and the workspace without dumping file arrays', func
         ->expectsOutputToContain('Workspace: /tmp/another-checkout')
         ->expectsOutputToContain('The checkout has no Git commits.')
         ->expectsOutputToContain('Run git shortlog -s in the selected workspace.')
-        ->expectsOutputToContain('Standalone Clever commands use the host application root or clever.root.')
+        ->expectsOutputToContain('Standalone Clever commands use the host application root or molly-complexity.root.')
         ->expectsOutputToContain('/tmp/evidence/clever.json')
         ->expectsOutputToContain('An interrupted run may still have this status.')
         ->doesntExpectOutputToContain('NESTED_DETAILS_NOT_FOR_TABLE')

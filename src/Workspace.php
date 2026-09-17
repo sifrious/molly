@@ -4,6 +4,7 @@ namespace Sifrious\Molly;
 
 use Closure;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -24,8 +25,22 @@ class Workspace
 
     public function exclusively(Closure $callback): mixed
     {
+        return $this->withLock('run.lock', $callback);
+    }
+
+    public function exclusivelyForTask(string $taskId, Closure $callback): mixed
+    {
+        if (! Str::isUuid($taskId)) {
+            throw new RuntimeException('TASK_ID_INVALID: Use a saved task UUID.');
+        }
+
+        return $this->withLock('task-'.strtolower($taskId).'.lock', $callback);
+    }
+
+    private function withLock(string $filename, Closure $callback): mixed
+    {
         $directory = $this->path.'/.molly';
-        $lockPath = $directory.'/run.lock';
+        $lockPath = $directory.'/'.$filename;
         clearstatcache();
 
         if (is_link($directory) || is_link($lockPath)

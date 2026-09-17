@@ -53,6 +53,7 @@ class RunReport
         outro(match ($run->status) {
             'completed' => 'Task completed. Review the changed files before committing.',
             'running' => 'Run is marked running. An interrupted run may still have this status.',
+            'stopped' => 'Task stopped. Review any applied changes before retrying.',
             default => 'Task failed. Review the evidence before retrying.',
         });
     }
@@ -64,7 +65,7 @@ class RunReport
         $after = collect($report['complexity_after']['probes'] ?? [])->keyBy('key')->all();
         if ($before !== [] || $after !== []) {
             note('Clever measures code structure. Lower counts alone do not prove a simpler design.');
-            note('Standalone Clever commands use the host application root or clever.root. Match that root to the workspace.');
+            note('Standalone Clever commands use the host application root or molly-complexity.root. Match that root to the workspace.');
         }
         foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $key) {
             $this->compareProbe($before[$key] ?? [], $after[$key] ?? [], $verbose);
