@@ -143,6 +143,15 @@ QUEUE_CONNECTION=database
 
 The database queue needs Laravel's jobs and failed-jobs tables. Keep the host application's queue migrations and run `php artisan migrate` before starting a worker. In the host application's `config/queue.php`, set the database connection's `retry_after` to `3700` seconds. The reservation must exceed the job's 3600-second timeout, or another worker could reserve the same request while execution is still active.
 
+For multiple workers sharing SQLite, the tested configuration requires PHP 8.4 or later. Set these keys on the SQLite connection in the host application's `config/database.php`:
+
+```php
+'transaction_mode' => 'IMMEDIATE',
+'busy_timeout' => 10000,
+```
+
+`busy_timeout` is in milliseconds. With SQLite's default `DEFERRED` transactions, concurrent workers can fail while reserving a job with `database is locked`, before Molly starts the task. Laravel applies `transaction_mode` only on PHP 8.4 or later. Use one SQLite worker on PHP 8.3. Molly does not change the host's database settings.
+
 Clear cached configuration, then start a worker:
 
 ```bash
@@ -280,7 +289,7 @@ vendor/bin/pest
 vendor/bin/pint --format agent
 ```
 
-`.github/workflows/tests.yml` runs Composer validation and the package tests on Ubuntu with PHP 8.3, 8.4, and 8.5. Each job resolves dependencies for its PHP version because the package does not commit `composer.lock`. CI installs DOM, SQLite, PCNTL, and POSIX extensions for the verification and process tests. The suite uses model and process fakes where needed and does not require Ollama or a queue worker.
+`.github/workflows/tests.yml` runs Composer validation and the package tests on Ubuntu with PHP 8.3, 8.4, and 8.5. Each job resolves dependencies for its PHP version because the package does not commit `composer.lock`. CI installs DOM, SQLite, PCNTL, and POSIX extensions for the verification and process tests. The suite uses model and process fakes where needed and does not require Ollama or an externally managed queue worker. `tests/Feature/QueuedExecutionTest.php` starts isolated database workers with file-backed SQLite, real Pest subprocesses, and the parallel check engine. Only model responses are faked in those integration cases. The competing SQLite workers case skips on PHP 8.3 because Laravel does not apply `transaction_mode` on that version. The single-worker failure and stop cases still run.
 
 The package tests use Pest and Orchestra Testbench. Laravel AI fakes test model responses without requiring Ollama. A live demo requires an installed local model and a host application. Molly supplies the complexity commands.
 

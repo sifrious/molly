@@ -112,7 +112,7 @@ class RunTask
             }
 
             $completed = ($report['verification']['status'] ?? null) === 'passed'
-                && $this->review->passed($report['review'])
+                && $this->review->passed($report['review'], $after)
                 && ($report['mode'] !== 'parallel' || $this->branchesPassed($report['branches']));
 
             $this->checkpoint($shouldStop, null, 'Completing the run');

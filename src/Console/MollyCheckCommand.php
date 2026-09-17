@@ -34,7 +34,7 @@ class MollyCheckCommand extends Command
             $result = (new Workspace($input['workspace']))->duringCheck((string) ($input['workspace_lease'] ?? ''), fn (): array => $input['kind'] === 'verification'
                 ? $verify->handle($input['workspace'], $input['test_path'], $input['evidence_directory'])
                 : $review->handle($input['prompt'], $input['before'], $input['after']));
-            $passed = $input['kind'] === 'verification' ? ($result['status'] ?? null) === 'passed' : $review->passed($result);
+            $passed = $input['kind'] === 'verification' ? ($result['status'] ?? null) === 'passed' : $review->passed($result, $input['after']);
             $failure = $passed ? null : ($result['reason'] ?? 'review_blocking');
         } catch (Throwable $exception) {
             $passed = false;
