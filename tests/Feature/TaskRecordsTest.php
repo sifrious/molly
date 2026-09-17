@@ -47,7 +47,7 @@ it('stores a pending task without editing files or starting a run', function () 
         ->and(Run::count())->toBe(0)
         ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;')
         ->and(File::exists($this->workspace.'/tests/GreetingTest.php'))->toBeFalse()
-        ->and(File::exists($this->workspace.'/.molly'))->toBeFalse();
+        ->and(File::exists($this->workspace.'/.molly/JOURNAL.md'))->toBeTrue();
     ChangeWriter::assertNeverPrompted();
 });
 
@@ -196,6 +196,7 @@ it('keeps a stop requested when the workspace no longer exists', function () {
 it('does not mistake an invalid lock for an active writer', function () {
     $task = createMollyRecord();
     $task->update(['status' => 'running']);
+    File::deleteDirectory($this->workspace.'/.molly');
     File::put($this->workspace.'/.molly', 'not a directory');
 
     expect(fn () => app(StopTask::class)->handle($task->id))

@@ -11,6 +11,7 @@ use Sifrious\Molly\Complexity\Console\Commands\LonelyFilesCommand;
 use Sifrious\Molly\Complexity\Console\Commands\OwnedDiffCommand;
 use Sifrious\Molly\Complexity\Console\Commands\ScanCommand;
 use Sifrious\Molly\Complexity\Console\Commands\WeldsCommand;
+use Sifrious\Molly\Console\MollyAdviceCommand;
 use Sifrious\Molly\Console\MollyChatCommand;
 use Sifrious\Molly\Console\MollyCheckCommand;
 use Sifrious\Molly\Console\MollyConnectionsCommand;
@@ -57,7 +58,7 @@ class MollyServiceProvider extends ServiceProvider
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
                 MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyNameCommand::class,
-                MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class,
+                MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);

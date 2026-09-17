@@ -7,6 +7,7 @@ use Sifrious\Molly\Models\Task;
 
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 class TaskReport
 {
@@ -20,6 +21,18 @@ class TaskReport
         note('Workspace: '.$task->workspace);
         note('Required test: '.$task->test_path);
         table(['Allowed file'], array_map(fn (string $path): array => [$path], $task->paths));
+        $journal = $task->journal_status ?? [];
+        if (($journal['status'] ?? null) === 'written') {
+            note('Project journal refreshed at '.$journal['checked_at'].'.');
+            note('Journal: '.$journal['journal_path']);
+            note('Glossary: '.$journal['glossary_path']);
+        } elseif (($journal['status'] ?? null) === 'unavailable') {
+            warning('Project journal unavailable. '.$journal['reason']);
+            note('The journal warning does not change the task result.');
+        } else {
+            note('Project journal has not been refreshed for this task.');
+        }
+        note('Refresh the project journal with php artisan molly:journal '.$task->reference().' --project.');
         if ($task->status === 'running' && $task->stop_requested_at !== null) {
             note('Stop requested. Molly will stop at the next execution boundary. An active model request or test process may finish first.');
         }

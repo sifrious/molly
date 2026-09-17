@@ -8,6 +8,8 @@ use Sifrious\Molly\Models\Task;
 
 class NameTask
 {
+    public function __construct(private RefreshProjectJournal $journal) {}
+
     public function handle(string $reference, string $nickname): Task
     {
         $task = Task::findByReference($reference)
@@ -20,6 +22,6 @@ class NameTask
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
         }
 
-        return $task->fresh();
+        return $this->journal->handle($task->fresh());
     }
 }

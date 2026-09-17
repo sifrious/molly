@@ -13,11 +13,21 @@ use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 
+beforeEach(function (): void {
+    $this->nicknameWorkspace = sys_get_temp_dir().'/molly-nicknames-'.Str::uuid();
+    File::ensureDirectoryExists($this->nicknameWorkspace);
+    $this->nicknameWorkspace = realpath($this->nicknameWorkspace);
+});
+
+afterEach(function (): void {
+    File::deleteDirectory($this->nicknameWorkspace);
+});
+
 function nicknameTask(array $attributes = []): Task
 {
     return Task::create([
         'prompt' => 'Add a readiness check.',
-        'workspace' => sys_get_temp_dir(),
+        'workspace' => test()->nicknameWorkspace,
         'paths' => ['routes/web.php', 'tests/Feature/ReadyTest.php'],
         'test_path' => 'tests/Feature/ReadyTest.php',
         ...$attributes,
@@ -54,7 +64,7 @@ it('renames a task without changing its identity or attempt history', function (
     $task = nicknameTask(['nickname' => 'old-name', 'status' => 'failed', 'source' => ['issue_number' => 42]]);
     $run = $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => ['error' => 'A test failed.']]);
     $before = $task->fresh()->getRawOriginal();
-    unset($before['nickname'], $before['updated_at']);
+    unset($before['nickname'], $before['updated_at'], $before['journal_status']);
 
     $named = app(NameTask::class)->handle(' OLD-NAME ', ' Ready-Check ');
     $found = app(ShowTask::class)->handle('READY-CHECK');

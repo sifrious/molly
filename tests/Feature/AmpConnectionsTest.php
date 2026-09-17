@@ -53,14 +53,15 @@ it('reads only requested connection fields and raw executor types without exposi
 });
 
 it('waits past the initial empty snapshot and deduplicates canonical thread IDs', function () {
-    $id = ampThreadId();
+    $id = 'T-abcdefab-cdef-abcd-efab-cdefabcdefab';
     fakeAmpConnections([ampSnapshot(), ampSnapshot([['id' => $id, 'executorConnected' => false, 'working' => false]])], [
         $id => ['id' => $id, 'meta' => ['executorType' => 'sandbox']],
     ]);
 
-    $report = app(ReadAmpConnections::class)->handle([$id, ' '.strtolower($id).' ']);
+    $report = app(ReadAmpConnections::class)->handle([$id, ' '.strtolower($id).' ', strtoupper($id)]);
 
     expect($report['threads'])->toHaveCount(1)
+        ->and($report['threads'][0]['thread_id'])->toBe('T-abcdefab-cdef-abcd-efab-cdefabcdefab')
         ->and($report['threads'][0]['executor_connected'])->toBeFalse()
         ->and($report['threads'][0]['working'])->toBeFalse()
         ->and($report['threads'][0]['executor_type'])->toBe('sandbox');

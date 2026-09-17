@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -13,7 +14,7 @@ use Sifrious\Molly\Models\Task;
 
 function connectionTask(string $name): Task
 {
-    return Task::create(['nickname' => $name, 'prompt' => 'Check the greeting.', 'workspace' => sys_get_temp_dir(),
+    return Task::create(['nickname' => $name, 'prompt' => 'Check the greeting.', 'workspace' => test()->connectionWorkspace,
         'paths' => ['tests/GreetingTest.php'], 'test_path' => 'tests/GreetingTest.php']);
 }
 
@@ -21,8 +22,14 @@ beforeEach(function () {
     config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
     config()->set('session.driver', 'array');
     config()->set('molly.ui.enabled', true);
+    $this->connectionWorkspace = sys_get_temp_dir().'/molly-connections-'.Str::uuid();
+    File::ensureDirectoryExists($this->connectionWorkspace);
     Process::preventStrayProcesses();
     Queue::fake();
+});
+
+afterEach(function () {
+    File::deleteDirectory($this->connectionWorkspace);
 });
 
 it('records exact task history and preserves links after a nickname changes', function () {
@@ -91,6 +98,25 @@ it('does not contact Amp for empty or stored-only history', function () {
     expect(app(FindTaskConnections::class)->handle('greeting'))->toMatchArray(['status' => 'not_checked', 'matches' => [], 'observed_at' => null]);
     app(LinkTaskThread::class)->handle('greeting', 'T-'.Str::uuid());
     expect(app(FindTaskConnections::class)->handle('greeting', false)['matches'][0]['connection'])->toBe('unknown');
+});
+
+it('uses one current association record when a thread moves away and back during the probe', function () {
+    connectionTask('greeting');
+    connectionTask('other-task');
+    $thread = 'T-'.Str::uuid();
+    app(LinkTaskThread::class)->handle('greeting', $thread);
+    $latest = null;
+    $this->mock(ReadAmpConnections::class)->shouldReceive('handle')->once()->andReturnUsing(function () use ($thread, &$latest): array {
+        app(LinkTaskThread::class)->handle('other-task', $thread);
+        $latest = app(LinkTaskThread::class)->handle('greeting', $thread);
+
+        return ['status' => 'observed', 'reason' => null, 'observed_at' => now()->toIso8601String(), 'provider_version' => 'test',
+            'threads' => [['thread_id' => $thread, 'status' => 'observed', 'executor_connected' => true, 'working' => false]]];
+    });
+
+    $result = app(FindTaskConnections::class)->handle('greeting');
+
+    expect($result['matches'][0])->toMatchArray(['association' => 'latest_recorded', 'association_id' => $latest['id'], 'linked_at' => $latest['linked_at']]);
 });
 
 it('limits connection probes to the twenty most recent exact associations', function () {

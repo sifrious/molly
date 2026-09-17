@@ -103,13 +103,14 @@ class PlanController
     {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:1000'],
+            'nickname' => ['nullable', 'string', 'max:64'],
             'workspace' => ['required', 'string', 'max:4096'],
-            'paths' => ['required', 'string', 'max:32768'],
+            'paths' => ['nullable', 'string', 'max:32768'],
             'test_path' => ['required', 'string', 'max:4096'],
         ]);
-        $paths = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $data['paths']))));
+        $paths = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $data['paths'] ?? ''))));
         try {
-            $task = $create->handle($plan, $data['prompt'], $data['workspace'], $paths, $data['test_path']);
+            $task = $create->handle($plan, $data['prompt'], $data['workspace'], $paths, $data['test_path'], nickname: $data['nickname'] ?? null);
         } catch (RuntimeException $exception) {
             throw ValidationException::withMessages(['task' => $exception->getMessage()]);
         }

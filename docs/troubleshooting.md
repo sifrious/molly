@@ -21,9 +21,10 @@ Replace `health-check` with your task nickname or UUID, and `RUN_ID` with the ru
 
 | Code | What to check |
 | --- | --- |
-| `migration_missing` | Run `php artisan migrate` in the host application after reviewing pending migrations. Molly needs both `molly_tasks` and `molly_runs`, including the task nickname migration. |
+| `migration_missing` | Run `php artisan migrate` in the host application after reviewing pending migrations. Molly needs task, run, plan, and thread-association tables, including nickname, context-snapshot, and journal-status columns. |
 | `database_unavailable` | Check the application's database connection and credentials. Molly uses the host application's database configuration. |
 | `pest_missing` | Install Pest 4 in the selected workspace. `--workspace` must point to the project that contains `vendor/bin/pest`. |
+| `amp_unavailable` | Check `amp usage` and the account login. Run `php artisan molly:setup --agent=amp` to use Amp's login flow. |
 | `parallel_process_groups_unavailable` | Enable PHP's `posix_setsid` and `posix_kill`, or set `parallel_checks` to `false` in `config/molly.php`. |
 | `model_not_configured` | Set `MOLLY_LOCAL_MODEL` in `.env` to a model listed by `ollama list`. |
 | `model_not_local` | Select a local model whose name does not contain `cloud`. |
@@ -128,6 +129,14 @@ Do not delete `.molly` lock files to force a retry. `WORKSPACE_BUSY` means Molly
 `molly:start` accepts pending tasks. `molly:retry` accepts failed or stopped tasks. A completed task cannot be retried.
 
 `ATTEMPT_LIMIT_REACHED` means the task used the configured total number of attempts. The default is three, including the first run. Inspect previous evidence before changing the task's scope or configuration. `molly.max_attempts` accepts integers from 1 through 10. Molly never retries automatically.
+
+Run `php artisan molly:advice health-check` for an explanation of the allowed next step. Optional TypeSafe advice cannot override the attempt limit or turn failed evidence into a pass. See [task advice](task-advice.md).
+
+## A journal or connection check is unavailable
+
+Journal warnings do not invalidate a saved task or completed run. Correct the reported path or permission problem, then run `php artisan molly:journal health-check --project`. Molly rejects journal destinations that pass through symbolic links. See [journal behavior](journal.md).
+
+For Amp lookup, `unknown` means Molly lacks a usable current observation. A saved task association does not prove a live connection. A successful command can return an unavailable observation; scripts must inspect `status` and each match's `connection`. See [connection states](connections.md).
 
 ## A task nickname is rejected or no longer resolves
 

@@ -20,18 +20,7 @@ class ReadAmpConnections
      */
     public function handle(array $threadIds): array
     {
-        $ids = [];
-        foreach ($threadIds as $id) {
-            if (! is_string($id) || ! preg_match('/\AT-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/iD', trim($id))) {
-                throw new RuntimeException('AMP_THREAD_INVALID: Use an Amp thread ID beginning with T- followed by a UUID.');
-            }
-            $ids[] = 'T-'.strtolower(substr(trim($id), 2));
-        }
-        $ids = array_values(array_unique($ids));
-        if (count($ids) > 20) {
-            throw new RuntimeException('AMP_THREAD_LIMIT: Read at most 20 Amp threads at a time.');
-        }
-
+        $ids = $this->normalizeThreadIds($threadIds);
         $report = [
             'status' => 'unknown', 'reason' => null, 'provider_version' => null,
             'observed_at' => now()->toIso8601String(),
@@ -86,13 +75,8 @@ class ReadAmpConnections
                 $thread['reason'] = $report['reason'];
             }
             $metadata = $this->capture(['threads', 'export', $thread['thread_id']], 2, 5242880, $deadline, $bytes);
-            try {
-                $export = $metadata['status'] === 'ok' ? json_decode($metadata['output'], true, 64, JSON_THROW_ON_ERROR) : null;
-            } catch (JsonException) {
-                $export = null;
-            }
-            $type = is_array($export) && ($export['id'] ?? null) === $thread['thread_id'] ? ($export['meta']['executorType'] ?? null) : null;
-            if (is_string($type) && preg_match('/\A[a-zA-Z0-9_.:-]{1,64}\z/D', $type)) {
+            $type = $metadata['status'] === 'ok' ? $this->executorType($metadata['output'], $thread['thread_id']) : null;
+            if ($type !== null) {
                 $thread['executor_type'] = $type;
             } elseif ($thread['reason'] === null) {
                 $thread['reason'] = 'AMP_METADATA_UNAVAILABLE: Amp did not return an executor type for this thread.';
@@ -107,6 +91,39 @@ class ReadAmpConnections
         $report['reason'] ??= $observed === count($ids) ? null : 'AMP_PARTIAL: Some requested threads have no current connection observation.';
 
         return $report;
+    }
+
+    /**
+     * @param  list<string>  $threadIds
+     * @return list<string>
+     */
+    private function normalizeThreadIds(array $threadIds): array
+    {
+        $ids = [];
+        foreach ($threadIds as $id) {
+            if (! is_string($id) || ! preg_match('/\AT-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/iD', trim($id))) {
+                throw new RuntimeException('AMP_THREAD_INVALID: Use an Amp thread ID beginning with T- followed by a UUID.');
+            }
+            $ids[] = 'T-'.strtolower(substr(trim($id), 2));
+        }
+        $ids = array_values(array_unique($ids));
+        if (count($ids) > 20) {
+            throw new RuntimeException('AMP_THREAD_LIMIT: Read at most 20 Amp threads at a time.');
+        }
+
+        return $ids;
+    }
+
+    private function executorType(string $output, string $threadId): ?string
+    {
+        try {
+            $export = json_decode($output, true, 64, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+        $type = is_array($export) && ($export['id'] ?? null) === $threadId ? ($export['meta']['executorType'] ?? null) : null;
+
+        return is_string($type) && preg_match('/\A[a-zA-Z0-9_.:-]{1,64}\z/D', $type) ? $type : null;
     }
 
     /**

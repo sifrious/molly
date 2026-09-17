@@ -8,24 +8,26 @@ use Sifrious\Molly\Workspace;
 
 class StopTask
 {
+    public function __construct(private RefreshProjectJournal $journal) {}
+
     public function handle(string $id): Task
     {
         $id = Task::findByReference($id)?->id
             ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches that name or ID.');
 
-        Task::whereKey($id)->where('status', 'pending')->update([
+        $stopped = Task::whereKey($id)->where('status', 'pending')->update([
             'status' => 'stopped',
             'stop_requested_at' => now(),
         ]);
 
-        Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update([
+        $requested = Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update([
             'stop_requested_at' => now(),
         ]);
 
         $task = Task::find($id) ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches this ID.');
 
         if ($task->status !== 'running') {
-            return $task;
+            return $stopped > 0 ? $this->journal->handle($task) : $task;
         }
 
         try {
@@ -38,6 +40,11 @@ class StopTask
         } catch (RuntimeException $exception) {
             if (! str_starts_with($exception->getMessage(), 'WORKSPACE_BUSY:')) {
                 throw $exception;
+            }
+        } finally {
+            $current = $task->fresh();
+            if ($requested > 0 || $current->status !== $task->status) {
+                $this->journal->handle($current);
             }
         }
 

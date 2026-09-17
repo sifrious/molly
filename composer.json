@@ -55,11 +55,16 @@
     "prefer-stable": true,
     "archive": {
         "exclude": [
+            "/.git",
             "/vendor",
             "/composer.lock",
             "/tests",
             "/.github",
             "/build",
+            "/_site",
+            "/docs/_site",
+            "/docs/.jekyll-cache",
+            "/docs/.jekyll-metadata",
             "/.molly",
             "/.env",
             "/.env.*",

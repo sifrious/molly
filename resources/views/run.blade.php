@@ -91,6 +91,13 @@
     </details>
     @endforeach
 @endif
+@if(isset($report['advice']))
+<section aria-labelledby="advice-heading">
+<h2 id="advice-heading">Saved next-step advice</h2>
+<p>{{ $report['advice']['reason'] ?? 'Read the saved advice in the complete report.' }}</p>
+<p>Requested at {{ $report['advice']['recorded_at'] ?? 'an unknown time' }}. Task commands check current state and limits again.</p>
+</section>
+@endif
 <h2>Run details</h2>
 <details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd></dl></details>
 @if(!empty($report['branches']))

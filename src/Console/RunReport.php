@@ -56,6 +56,11 @@ class RunReport
             note('Suggested change: '.$finding['recommendation']);
         }
         $this->showMeasurements($report, $verbose);
+        if (isset($report['advice'])) {
+            note('Saved next-step advice / '.($report['advice']['recorded_at'] ?? 'Time not recorded'));
+            note($report['advice']['reason'] ?? 'Read the saved advice in the JSON report.');
+            note('Advice describes the state when requested. Task commands check the current state again.');
+        }
         if (! empty($report['error'])) {
             error($this->describe($report['error']));
         }

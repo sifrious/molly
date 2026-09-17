@@ -19,11 +19,23 @@ The host database remains the source of truth. Exporting does not run a model, e
 
 ## Project chronology
 
-The application action also provides `ExportTaskJournal::forWorkspace($workspace)`. It rebuilds `.molly/JOURNAL.md` with every saved task and linked attempt for that workspace in creation order. Entries include their stable UUIDs, current status, and saved update time. Replaying the export replaces those entries without duplication.
+Saving, importing, renaming, starting, or stopping a saved task refreshes `.molly/JOURNAL.md`. Each finished attempt refreshes the project journal again. The journal lists every saved task and linked attempt for that workspace in creation order. Entries include their stable UUIDs, current status, and saved update time. Refreshing replaces those entries without duplication.
 
 The same operation writes Molly's task, attempt, verification, and complexity terms in a marked section of `.molly/GLOSSARY.md`. Add project-specific definitions outside that section. Molly preserves the surrounding text and refuses an update if the file changes during export. An incomplete or repeated section marker causes an export error so Molly does not replace ambiguous content.
 
-These files are generated views of current records. They do not preserve every intermediate status transition. A complete structured lifecycle event log remains separate work. The per-task CLI command above exports only the requested task.
+These files are generated views of current records. They do not preserve every intermediate status transition. A complete structured lifecycle event log remains separate work. One-off `molly:run` executions are outside the saved-task project journal. The per-task CLI command above exports only the requested task.
+
+## Retry a project journal warning
+
+The task page and CLI report show the last journal result. A failed journal write does not change the saved task or run result. After correcting the failure, refresh the project files:
+
+```bash
+php artisan molly:journal health-check --project
+```
+
+Add `--json` to return `task_id`, `status`, `checked_at`, and the journal paths or failure reason. A written journal exits with code `0`; an unavailable journal exits with code `1`. Refreshing the journal does not change the task's lifecycle update time. Older tasks with no recorded refresh show that the journal has not been refreshed.
+
+`src/Actions/RefreshProjectJournal.php` calls `ExportTaskJournal::forWorkspace($workspace)` and records the result in `molly_tasks.journal_status`. The task lifecycle actions share that behavior across CLI, web, and MCP.
 
 ## Use the journal in scripts
 

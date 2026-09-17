@@ -103,7 +103,7 @@ it('renames an existing task without changing its lifecycle or run history', fun
     $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'old-name');
     $task->update(['status' => 'failed']);
     $run = Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $this->workspace, 'status' => 'failed', 'report' => ['error' => 'A required test failed.']]);
-    $taskBefore = Arr::except($task->fresh()->getAttributes(), ['nickname', 'updated_at']);
+    $taskBefore = Arr::except($task->fresh()->getAttributes(), ['nickname', 'updated_at', 'journal_status']);
     $runBefore = $run->fresh()->getAttributes();
     Queue::fake();
 
@@ -116,7 +116,7 @@ it('renames an existing task without changing its lifecycle or run history', fun
 
     $response->assertRedirect(route('molly.tasks.show', $task->id))->assertSessionHasNoErrors();
     expect($task->fresh()->nickname)->toBe('greeting-tests')
-        ->and(Arr::except($task->fresh()->getAttributes(), ['nickname', 'updated_at']))->toBe($taskBefore)
+        ->and(Arr::except($task->fresh()->getAttributes(), ['nickname', 'updated_at', 'journal_status']))->toBe($taskBefore)
         ->and($run->fresh()->getAttributes())->toBe($runBefore);
     $this->assertDatabaseCount('molly_runs', 1);
     Queue::assertNothingPushed();

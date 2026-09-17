@@ -14,6 +14,17 @@
 <h2>Prompt</h2><pre>{{ $task->prompt }}</pre>
 <h2>Selected files</h2><ul>@foreach($task->paths as $path)<li><code>{{ $path }}</code></li>@endforeach</ul>
 @if($task->source)<h2>Source context</h2><p>Imported issue text is task context, not verification evidence.</p><pre>{{ json_encode($task->source, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) }}</pre>@endif
+<h2>Project journal</h2>
+@php($journal = $task->journal_status ?? [])
+@if(($journal['status'] ?? null) === 'written')
+<p>Project journal refreshed at {{ $journal['checked_at'] }}.</p>
+<dl><dt>Journal</dt><dd><code>{{ $journal['journal_path'] }}</code></dd><dt>Glossary</dt><dd><code>{{ $journal['glossary_path'] }}</code></dd></dl>
+@elseif(($journal['status'] ?? null) === 'unavailable')
+<p><strong>Project journal unavailable.</strong> {{ $journal['reason'] }}</p>
+<p>Last checked {{ $journal['checked_at'] }}. The journal warning does not change the task result.</p>
+@else<p>Project journal has not been refreshed for this task.</p>@endif
+<p>Refresh the project journal from the saved task records:</p>
+<pre>php artisan molly:journal {{ $task->reference() }} --project</pre>
 <div class="actions">
 @if($task->status === 'pending')<form method="post" action="{{ route('molly.tasks.start', $task->id) }}">@csrf<flux:button type="submit" :loading="false">Start task</flux:button></form>@endif
 @if(in_array($task->status, ['failed', 'stopped']))<form method="post" action="{{ route('molly.tasks.retry', $task->id) }}">@csrf<flux:button type="submit" :loading="false">Retry task</flux:button></form>@endif
@@ -22,6 +33,11 @@
 </div>
 <p>The queue worker starts each attempt. Refresh this page to see the result.</p>
 <details><summary>If no attempt appears</summary><p>Check the queue worker output and failed jobs. The worker checks the task state and attempt limit before starting a run.</p></details>
+<form method="post" action="{{ route('molly.tasks.advice', $task->id) }}">
+@csrf
+<flux:button type="submit" :loading="false">Get next-step advice</flux:button>
+<p>Check attempt limits and saved evidence. Optional TypeSafe evaluation may recommend a next step.</p>
+</form>
 <h2>Attempts</h2>
 @if($task->runs->isEmpty())<p>No attempts recorded.</p>@else
 <table><caption>Run history, oldest first</caption><thead><tr><th scope="col">Run</th><th scope="col">Status</th></tr></thead><tbody>@foreach($task->runs as $run)<tr><th scope="row"><a href="{{ route('molly.runs.show', $run->id) }}">{{ $run->id }}</a></th><td>{{ $run->status }}</td></tr>@endforeach</tbody></table>

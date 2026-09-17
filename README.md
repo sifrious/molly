@@ -8,7 +8,7 @@ Molly is a development dependency for Laravel applications. No alpha release is 
 
 ## Get started
 
-Molly requires Laravel 13 and PHP 8.3 or later. The first-run guide covers Pest, Ollama, the public Composer repository, and a bounded task you can inspect afterward.
+Molly requires Laravel 13 and PHP 8.3 or later. The first-run guide covers Pest, Amp or Ollama setup, the public Composer repository, and a bounded task you can inspect afterward.
 
 [Install Molly and run your first task](docs/getting-started.md).
 
@@ -28,6 +28,10 @@ You can also plan a collection of tasks with cited Laravel, Tarpit, and NativePH
 | --- | --- |
 | A map of the current build and its limits | [Documentation overview](docs/index.md) |
 | Saved tasks, retries, stopping, and GitHub import | [Manage tasks](docs/tasks.md) |
+| Guided planning, Amp setup, and MCP | [Planning](docs/planning.md), [agents](docs/agents.md) |
+| What to do after a failed task | [Next-step advice](docs/task-advice.md) |
+| Source changes and local history | [Component snapshots](docs/component-snapshots.md), [journals](docs/journal.md) |
+| Current and prior Amp task associations | [Task connections](docs/connections.md) |
 | Browser setup and task controls | [Local web interface](docs/web-interface.md) |
 | Completion rules, Tarpit findings, and Clever measurements | [Verification and complexity evidence](docs/verification.md) |
 | Help with setup errors or a failed run | [Troubleshooting](docs/troubleshooting.md) |

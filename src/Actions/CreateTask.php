@@ -10,6 +10,8 @@ use Sifrious\Molly\Workspace;
 
 class CreateTask
 {
+    public function __construct(private RefreshProjectJournal $journal) {}
+
     /**
      * @param  list<string>  $paths
      * @param  array<string, mixed>  $source
@@ -35,7 +37,7 @@ class CreateTask
         $nickname = $nickname === null || trim($nickname) === '' ? null : Task::validateNickname($nickname);
 
         try {
-            return Task::create([
+            $task = Task::create([
                 'nickname' => $nickname,
                 'prompt' => $prompt,
                 'workspace' => $files->path,
@@ -47,5 +49,7 @@ class CreateTask
         } catch (UniqueConstraintViolationException $exception) {
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
         }
+
+        return $this->journal->handle($task);
     }
 }

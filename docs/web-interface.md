@@ -55,6 +55,8 @@ Use the task page's nickname form to name or rename a task. The nickname also wo
 
 The run page starts with Tarpit, Clever, and Pest results. Follow the section links to inspect findings, compare measurements, read test output, and check changed-file hashes. Branch identities and the complete JSON report remain available in expandable details.
 
+The task page also shows journal status. Choose **Get next-step advice** to inspect attempt limits and request optional TypeSafe guidance. The result does not start work. Choose **Find linked Amp threads** to record an association or check current connection status. Both flows use native forms and work without JavaScript. Read [advice](task-advice.md) and [connections](connections.md) for the exact behavior.
+
 Livewire refreshes the run status and current phase when JavaScript is available. **Refresh all evidence** reloads the full saved report. Every core page renders complete HTML, and the create, import, name, start, retry, and stop forms work without JavaScript.
 
 A completed run has passed the required checks. Review the workspace diff and test assertions before committing. A missing or skipped result does not become a passing check. See [verification and complexity evidence](verification.md).

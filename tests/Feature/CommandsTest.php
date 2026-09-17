@@ -82,6 +82,25 @@ it('does not contact a nonlocal Ollama endpoint', function (): void {
     Http::assertNothingSent();
 });
 
+it('requires every task history migration before declaring the database ready', function (string $filename): void {
+    config(['molly.model' => '']);
+    $migration = require __DIR__.'/../../database/migrations/'.$filename;
+    $migration->down();
+    try {
+        $checks = array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], null, 'name');
+        expect($checks['Run history']['code'])->toBe('migration_missing');
+    } finally {
+        $migration->up();
+    }
+    $checks = array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], null, 'name');
+    expect($checks['Run history']['code'])->toBe('database_ready');
+})->with([
+    'snapshot' => '2026_09_17_070000_add_context_snapshot_to_molly_tasks_table.php',
+    'thread associations' => '2026_09_17_080000_create_molly_task_threads_table.php',
+    'journal' => '2026_09_17_090000_add_journal_status_to_molly_tasks_table.php',
+    'plans' => '2026_09_17_060000_create_molly_plans_table.php',
+]);
+
 it('classifies an unreachable Ollama server', function (): void {
     Http::fake(['*' => Http::failedConnection()]);
 

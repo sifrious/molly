@@ -22,7 +22,8 @@ class CheckEnvironment
         try {
             $ready = Schema::hasTable('molly_runs') && Schema::hasTable('molly_tasks')
                 && Schema::hasColumn('molly_tasks', 'nickname') && Schema::hasColumn('molly_tasks', 'context_snapshot')
-                && Schema::hasTable('molly_task_threads');
+                && Schema::hasColumn('molly_tasks', 'journal_status')
+                && Schema::hasTable('molly_task_threads') && Schema::hasTable('molly_plans');
             $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Task and run history are ready.' : 'Run php artisan migrate to update Molly task and run history.');
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');

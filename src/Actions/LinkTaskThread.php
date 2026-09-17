@@ -20,6 +20,7 @@ class LinkTaskThread
         $threadId = 'T-'.strtolower(substr($threadId, 2));
 
         return DB::transaction(function () use ($task, $threadId): array {
+            Task::whereKey($task->id)->lockForUpdate()->firstOrFail();
             $latest = DB::table('molly_task_threads')->where('thread_id', $threadId)->orderByDesc('id')->lockForUpdate()->first();
             if ($latest === null || $latest->task_id !== $task->id) {
                 $id = DB::table('molly_task_threads')->insertGetId([

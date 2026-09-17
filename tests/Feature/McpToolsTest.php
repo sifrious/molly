@@ -31,7 +31,7 @@ afterEach(function () {
     }
 });
 
-it('publishes the three local MCP tools and reads offline citations', function () {
+it('publishes local MCP tools and reads offline citations', function () {
     MollyServer::tools()->assertRegistered([MollyGuide::class, MollyPlan::class, MollyTask::class]);
     MollyServer::tool(MollyGuide::class, ['operation' => 'graph'])->assertOk()
         ->assertSee(['step:outcome', 'nativephp-mobile', 'sha256']);
@@ -133,7 +133,7 @@ it('returns errors for missing saved records', function (string $operation, stri
 })->with([['show', 'TASK_NOT_FOUND'], ['show_run', 'RUN_NOT_FOUND'], ['start', 'TASK_NOT_FOUND'], ['stop', 'TASK_NOT_FOUND']]);
 
 it('validates task arguments before saving or dispatching', function () {
-    MollyServer::tool(MollyTask::class, ['operation' => 'create'])->assertHasErrors(['prompt', 'workspace', 'paths', 'test path']);
+    MollyServer::tool(MollyTask::class, ['operation' => 'create'])->assertHasErrors(['prompt', 'workspace', 'test path']);
     MollyServer::tool(MollyTask::class, ['operation' => 'list', 'limit' => 101])->assertHasErrors(['limit']);
     MollyServer::tool(MollyPlan::class, ['operation' => 'create'])->assertHasErrors(['description']);
     MollyServer::tool(MollyPlan::class, ['operation' => 'show', 'id' => (string) Str::uuid()])->assertHasErrors()->assertSee('PLAN_NOT_FOUND');

@@ -5,9 +5,9 @@ title: Getting started
 
 # Getting started
 
-Run Molly in a trusted Laravel application on your computer. This walkthrough installs Molly, connects a local model, and asks Molly to add a small JSON endpoint with a required Pest test.
+Run Molly in a trusted Laravel application on your computer. This walkthrough installs Molly, selects Amp or local Ollama, and asks Molly to add a small JSON endpoint with a required Pest test.
 
-Molly is available from the `main` branch. No alpha release is tagged yet. The first model download can take longer than the rest of the setup.
+Molly is available from the `main` branch. No alpha release is tagged yet. If you choose Ollama, the first model download can take longer than the rest of the setup.
 
 ## Prepare a Laravel application
 
@@ -54,9 +54,9 @@ php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
 
-Composer installs Laravel AI, Laravel Prompts, free Flux, and Livewire with Molly. Clever commands are included in Molly. No separate Clever package is required.
+Composer installs Laravel AI, Laravel MCP, Laravel Prompts, free Flux, and Livewire with Molly. Clever commands are included in Molly. No separate Clever package is required. Installing Molly with `--dev` keeps Molly out of production installs that use `composer install --no-dev`.
 
-The publish command creates `config/molly.php` and `config/molly-complexity.php`. The migrations create task and run history in the application's configured database. When upgrading an existing Molly installation, run `php artisan migrate` to add task nicknames. Review any other pending application migrations before running `migrate` in an existing project.
+The publish command creates `config/molly.php` and `config/molly-complexity.php`. The migrations create task, run, and plan history in the application's configured database. When upgrading, run `php artisan migrate` to add any missing task nickname, snapshot, planning, thread-association, and journal-status storage. Review other pending application migrations before running `migrate` in an existing project.
 
 Add this entry to the application's `.gitignore`:
 
@@ -66,7 +66,28 @@ Add this entry to the application's `.gitignore`:
 
 Molly uses the directory for workspace and task locks.
 
-## Start Ollama and download a model
+## Choose an agent
+
+Set `APP_ENV=local` in the application's `.env`. Choose one provider for code proposals and Tarpit review. Molly applies edits and runs Pest locally with either choice. There is no automatic provider fallback.
+
+### Use Amp
+
+With the official Amp CLI installed, run:
+
+```bash
+php artisan molly:setup --agent=amp
+```
+
+Setup opens Amp's login flow in an interactive terminal and saves a workspace MCP connection. Amp owns the credentials; Molly saves the agent choice in `.env`. Complete the follow-up commands printed by setup:
+
+```bash
+amp mcp approve molly
+amp mcp doctor molly
+```
+
+This option sends the selected task content to your Amp account's service. Molly's proposal and review requests disable Amp tools and remote execution. Amp execution has a recorded live acceptance check; the public Ollama example below still needs one. Read [agent setup](agents.md) for noninteractive setup, chat, and MCP details. Continue to [check the environment](#check-the-environment) after setup.
+
+### Use local Ollama
 
 Install [Ollama for your operating system](https://ollama.com/download). Open the Ollama application. If you use a terminal installation without a running server, start the server in a separate terminal:
 
@@ -87,15 +108,20 @@ ollama list
 
 Molly asks Ollama for schema-constrained JSON for both file edits and Tarpit review. See [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs) for the underlying API. A model appearing in `ollama list` confirms installation, not the model's ability to complete a Molly task.
 
-Set these values in the Laravel application's `.env`:
+Set the local endpoint in the Laravel application's `.env`:
 
 ```dotenv
 APP_ENV=local
 OLLAMA_URL=http://127.0.0.1:11434
-MOLLY_LOCAL_MODEL=qwen2.5-coder:7b
 ```
 
-If you already have another suitable local model, use the exact name from `ollama list`. Molly does not download models or switch to a paid provider.
+Save the installed model choice:
+
+```bash
+php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+```
+
+Setup writes `MOLLY_AGENT=ollama` and `MOLLY_LOCAL_MODEL=qwen2.5-coder:7b` to `.env`. If you already have another suitable local model, use the exact name from `ollama list`. Molly does not download models or change to Amp without your selection.
 
 ## Check the environment
 
@@ -106,7 +132,7 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
-Doctor checks the database tables, Pest, local model configuration, Ollama connection, installed model, bundled measurements, and POSIX functions for parallel checks. Every listed check must pass. A ready environment ends with:
+Doctor checks task and run storage, Pest, the selected provider, bundled measurements, and POSIX functions for parallel checks. With Amp, doctor runs `amp usage` to check account access. With Ollama, doctor checks the loopback endpoint and installed model. Every listed check must pass. A ready environment ends with:
 
 ```text
 Molly is ready.
@@ -196,4 +222,4 @@ php artisan molly:retry health-check
 
 The retry receives a bounded excerpt of the previous failure evidence. Each retry creates a new run and preserves the earlier report. The default limit is three attempts total. Molly never retries automatically.
 
-Continue with [task management](tasks.md), [verification and complexity review](verification.md), or the [local web interface](web-interface.md).
+Continue with [planning a collection of tasks](planning.md), [task management](tasks.md), [verification and complexity review](verification.md), or the [local web interface](web-interface.md).

@@ -128,18 +128,21 @@ jobs:
       - name: Check the download contents and size
         run: |
           git archive --format=zip --output="$RUNNER_TEMP/molly.zip" HEAD
+          composer archive --format=zip --dir="$RUNNER_TEMP" --file=molly-composer --no-interaction
           python3 - <<'PY'
           import os
           from pathlib import Path
           from zipfile import ZipFile
-          archive = Path(os.environ['RUNNER_TEMP']) / 'molly.zip'
-          with ZipFile(archive) as package:
-              names = package.namelist()
-              assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
-              assert 'resources/planning/guide.json' in names
-              assert 'resources/planning/LARAVEL-LICENSE.md' in names
-              assert 'src/Complexity/LICENSE.md' in names
-              assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
-              assert archive.stat().st_size <= 256 * 1024
-              print(f'Package archive: {archive.stat().st_size} bytes')
+          for filename in ['molly.zip', 'molly-composer.zip']:
+              archive = Path(os.environ['RUNNER_TEMP']) / filename
+              with ZipFile(archive) as package:
+                  names = package.namelist()
+                  assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
+                  assert not any(name == '.git' or name.startswith(('.git/', '_site/', 'docs/_site/', 'docs/.jekyll-cache/')) for name in names)
+                  assert 'resources/planning/guide.json' in names
+                  assert 'resources/planning/LARAVEL-LICENSE.md' in names
+                  assert 'src/Complexity/LICENSE.md' in names
+                  assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
+                  assert archive.stat().st_size <= 256 * 1024
+                  print(f'{filename}: {archive.stat().st_size} bytes')
           PY

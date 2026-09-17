@@ -11,7 +11,7 @@ use Throwable;
 
 class StartTask
 {
-    public function __construct(private RunTask $runTask) {}
+    public function __construct(private RunTask $runTask, private RefreshProjectJournal $journal) {}
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
     {
@@ -24,6 +24,7 @@ class StartTask
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);
             $this->claim($task, $retry);
+            $this->journal->handle($task->refresh());
 
             return $this->execute($task, $progress, $retry);
         });
@@ -75,6 +76,8 @@ class StartTask
             Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update(['status' => 'failed']);
             Task::whereKey($id)->where('status', 'running')->whereNotNull('stop_requested_at')->update(['status' => 'stopped']);
             throw $exception;
+        } finally {
+            $this->journal->handle($task->refresh());
         }
     }
 

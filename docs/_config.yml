@@ -27,10 +27,22 @@ navigation:
         url: /getting-started.html
       - title: Tasks and retries
         url: /tasks.html
+      - title: Planning
+        url: /planning.html
+      - title: Agents and MCP
+        url: /agents.html
+      - title: Next-step advice
+        url: /task-advice.html
       - title: Web interface
         url: /web-interface.html
       - title: Verification and review
         url: /verification.html
+      - title: Component snapshots
+        url: /component-snapshots.html
+      - title: Task journals
+        url: /journal.html
+      - title: Task connections
+        url: /connections.html
       - title: Troubleshooting
         url: /troubleshooting.html
   - title: Reference

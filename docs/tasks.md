@@ -9,6 +9,8 @@ Save a task when you want attempt history, retries, or stop controls. Use `molly
 
 Complete the [first-run setup](getting-started.md) before starting a task. The [web interface](web-interface.md) calls the same task actions through a queue worker.
 
+For a collection of tasks, start with a [plan](planning.md). You can answer guided complexity questions, consult the bundled Laravel and NativePHP sources, then create named tasks from the saved decisions.
+
 ## Create a task
 
 Run the task form:
@@ -31,6 +33,8 @@ php artisan molly:create \
 ```
 
 Creation validates the prompt, nickname, and file scope, then saves a pending task. Molly does not call the model or edit the selected files during creation. The examples below use the `ready-check` nickname. You can also use the task UUID printed by Molly.
+
+Creation also captures the selected files' hashes and refreshes the local project journal. Journal files live under `.molly/` and are ignored by Git by default. A journal failure appears as a warning without discarding the saved task. See [component snapshots](component-snapshots.md) and [journals](journal.md).
 
 `--json` and `--no-interaction` never ask questions. Missing required inputs return an error. Repeat `--file` for each additional file a script allows Molly to edit. Omit `--file` for a task that only changes the test.
 
@@ -93,6 +97,8 @@ Each retry creates a new run. Earlier reports remain in task history. The defaul
 
 The writer receives the latest attempt's test status, counts, reason, and an output excerpt. The retry also includes up to three review findings for allowed files, with blocking findings first, plus a bounded run error when present. The encoded diagnostic input stays below 8,192 bytes. The writer must use the original task and file scope and must not weaken assertions to hide a failure.
 
+To check retry permission and request optional TypeSafe advice first, run `php artisan molly:advice ready-check`. Advice does not execute a retry. Read [next-step advice](task-advice.md) for the evidence sent to TypeSafe and the fallback when evaluation is unavailable.
+
 Molly sends these diagnostics separately as `previous_attempt`. The retry does not send the complete previous report, provider configuration, or source snapshots. A first attempt, or a stopped task with no prior run, has no previous-attempt diagnostics. `src/Actions/StartTask.php` selects the evidence and `src/Actions/GenerateChanges.php` passes the evidence to the writer.
 
 ## Stop a task
@@ -130,6 +136,8 @@ The saved source context includes the repository, issue number, URL, title, upda
 Molly accepts HTTPS `github.com` issue URLs without a query string or fragment. Pull requests and responses that identify a different issue fail validation. The complete generated task prompt must fit within 8,192 bytes. Oversized imports fail without truncation; create a smaller task manually for a large issue. GitHub-to-Pest todo generation is not implemented.
 
 ## States and failures
+
+Use [task connections](connections.md) to link an Amp thread, find its current executor status, and preserve an earlier association when the thread moves to another task. Task links accept the same nicknames and UUIDs.
 
 | Task state | What you can do |
 | --- | --- |
