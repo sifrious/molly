@@ -1,0 +1,43 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "sifrious/molly",
+    "description": "Run local AI coding tasks in Laravel with Pest verification and complexity review.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "ext-dom": "*",
+        "illuminate/console": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/process": "^13.0",
+        "illuminate/support": "^13.0",
+        "illuminate/validation": "^13.0",
+        "laravel/ai": "^0.11.2",
+        "laravel/prompts": "^0.3.24"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-laravel": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {"Sifrious\\Molly\\": "src/"}
+    },
+    "autoload-dev": {
+        "psr-4": {"Sifrious\\Molly\\Tests\\": "tests/"}
+    },
+    "extra": {
+        "laravel": {"providers": ["Sifrious\\Molly\\MollyServiceProvider"]}
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint --format agent"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {"pestphp/pest-plugin": true}
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
