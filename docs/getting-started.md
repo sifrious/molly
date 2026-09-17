@@ -1,0 +1,192 @@
+---
+layout: default
+title: Getting started
+---
+
+# Getting started
+
+Run Molly in a trusted Laravel application on your computer. This walkthrough installs Molly, connects a local model, and asks Molly to add a small JSON endpoint with a required Pest test.
+
+Molly is available from the `main` branch. No alpha release is tagged yet. The first model download can take longer than the rest of the setup.
+
+## Prepare a Laravel application
+
+Use PHP 8.3 or later, Composer, and a Laravel 13 application with a working database connection. PHP must include the DOM extension. Parallel checks also require `posix_setsid` and `posix_kill`. If your PHP installation lacks these functions, the doctor step below explains how to select serial checks.
+
+Work in a disposable checkout. Molly applies generated PHP and executes the selected test file with your user account's permissions. The allowed file list limits Molly's edits; the list does not sandbox executed code.
+
+Run the commands below from the application's root, where `artisan` and `composer.json` live. Check the installed versions:
+
+```bash
+php --version
+composer show laravel/framework
+```
+
+If the application does not have Pest 4 and its Laravel plugin, install both:
+
+```bash
+composer config allow-plugins.pestphp/pest-plugin true
+composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
+```
+
+Add the following binding to `tests/Pest.php`. Create the file if necessary, and keep any existing setup:
+
+```php
+<?php
+
+pest()->extend(Tests\TestCase::class)->in('Feature');
+```
+
+The binding gives Pest feature tests access to Laravel's application test case. Run the application's existing tests before asking Molly to change the application:
+
+```bash
+vendor/bin/pest
+```
+
+## Install Molly
+
+Add the public repository to Composer and install the development branch:
+
+```bash
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:dev-main
+php artisan vendor:publish --tag=molly-config
+php artisan migrate
+```
+
+Composer installs Laravel AI, Laravel Prompts, free Flux, and Livewire with Molly. Clever commands are included in Molly. No separate Clever package is required.
+
+The publish command creates `config/molly.php` and `config/molly-complexity.php`. The migrations create task and run history in the application's configured database. Review any other pending application migrations before running `migrate` in an existing project.
+
+Add this entry to the application's `.gitignore`:
+
+```gitignore
+.molly/
+```
+
+Molly uses the directory for workspace and task locks.
+
+## Start Ollama and download a model
+
+Install [Ollama for your operating system](https://ollama.com/download). Open the Ollama application. If you use a terminal installation without a running server, start the server in a separate terminal:
+
+```bash
+ollama serve
+```
+
+Keep that terminal open. An address-in-use message usually means an Ollama server already owns the port. Check the running server with `ollama list` before starting another. The [Ollama CLI reference](https://docs.ollama.com/cli) documents server and model commands.
+
+Download a local model. The following example uses [Qwen2.5-Coder 7B](https://ollama.com/library/qwen2.5-coder:7b), whose published download is about 4.7 GB. Running the model needs additional memory.
+
+```bash
+ollama pull qwen2.5-coder:7b
+ollama list
+```
+
+`qwen2.5-coder:7b` should appear in the model list. Molly has not yet completed a live acceptance check with this public setup example. The recorded Molly demo used a locally customized `gpt-oss:120b-code` model. That custom name is not a public model to download.
+
+Molly asks Ollama for schema-constrained JSON for both file edits and Tarpit review. See [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs) for the underlying API. A model appearing in `ollama list` confirms installation, not the model's ability to complete a Molly task.
+
+Set these values in the Laravel application's `.env`:
+
+```dotenv
+APP_ENV=local
+OLLAMA_URL=http://127.0.0.1:11434
+MOLLY_LOCAL_MODEL=qwen2.5-coder:7b
+```
+
+If you already have another suitable local model, use the exact name from `ollama list`. Molly does not download models or switch to a paid provider.
+
+## Check the environment
+
+Clear cached configuration and run doctor:
+
+```bash
+php artisan config:clear
+php artisan molly:doctor
+```
+
+Doctor checks the database tables, Pest, local model configuration, Ollama connection, installed model, bundled measurements, and POSIX functions for parallel checks. Every listed check must pass. A ready environment ends with:
+
+```text
+Molly is ready.
+```
+
+Doctor checks setup without asking the model to generate code. For a failed check, read the [troubleshooting guide](troubleshooting.md#doctor-reports-a-failed-check).
+
+If POSIX functions are unavailable, set `parallel_checks` to `false` in `config/molly.php`:
+
+```php
+'parallel_checks' => false,
+```
+
+Run `php artisan config:clear` and `php artisan molly:doctor` again. Serial mode runs the same Pest and Tarpit checks one after the other. Molly never switches modes silently.
+
+## Create your first task
+
+Choose a small change whose result is easy to inspect. The example below adds a new `/molly-health` endpoint and a feature test. Use an endpoint and test filename that do not already exist in your application:
+
+```bash
+php artisan molly:create \
+  'Add GET /molly-health returning exactly {"status":"ok"}. Add one Pest feature test that calls $this->get("/molly-health") and asserts HTTP 200 and the exact JSON. Preserve existing routes.' \
+  --file=routes/web.php \
+  --file=tests/Feature/MollyHealthTest.php \
+  --test=tests/Feature/MollyHealthTest.php
+```
+
+Each `--file` grants permission to change one workspace-relative file. The test file must appear in both `--file` and `--test`. A selected file may be new. Molly creates missing parent directories when applying valid edits.
+
+Creation saves a `pending` task and prints the task ID. Creation does not call the model or edit the selected files. Replace `TASK_ID` below with the printed ID:
+
+```bash
+php artisan molly:task TASK_ID
+php artisan molly:start TASK_ID
+```
+
+The start command runs in the foreground. No queue worker or web server is needed for CLI execution.
+
+## Read the result
+
+Molly measures complexity, asks the model for edits, and applies the proposal. Pest and Tarpit review then run in parallel unless you selected serial mode. Molly measures complexity again and saves the results.
+
+A successful report identifies the run as `completed` and ends with:
+
+```text
+Task completed. Review the changed files before committing.
+```
+
+Check the evidence before accepting the edit:
+
+- Pest must report at least one executed test and a passing result. Read the actual assertion count and test output.
+- Tarpit must report all seven checks. An unresolved blocking finding prevents completion.
+- Clever shows before and after measurements separately. Read any skipped probe and its reason. Smaller counts alone do not prove a simpler design.
+- In parallel mode, both `verification` and `review` branches must pass and record results.
+
+The run ID identifies one attempt. The task ID identifies the saved task and its attempt history. Replace `RUN_ID` with the run ID from the report:
+
+```bash
+php artisan molly:show RUN_ID --verbose
+php artisan molly:show RUN_ID --json
+git diff -- routes/web.php
+git status --short
+```
+
+Open `tests/Feature/MollyHealthTest.php` as well. Git does not include a new, untracked test file in ordinary `git diff` output. Molly runs only the required test file, so run the application's broader suite before committing:
+
+```bash
+vendor/bin/pest
+```
+
+## Handle a failed attempt
+
+An attempt may fail because the generated code does not pass Pest, the review finds a blocker, or a required check cannot run. A passing review does not override failed tests. Applied edits remain in the workspace after failed verification.
+
+Read the failed report and the changed files. After resolving setup errors, you can ask Molly to retry the same task:
+
+```bash
+php artisan molly:retry TASK_ID
+```
+
+The retry receives a bounded excerpt of the previous failure evidence. Each retry creates a new run and preserves the earlier report. The default limit is three attempts total. Molly never retries automatically.
+
+Continue with [task management](tasks.md), [verification and complexity review](verification.md), or the [local web interface](web-interface.md).

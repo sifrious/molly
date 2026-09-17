@@ -1,0 +1,53 @@
+title: Molly
+description: Run local coding tasks, check the result, and review the complexity of each change.
+url: https://sifrious.github.io
+baseurl: /molly
+repository: sifrious/molly
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  smart_quotes: [apos, apos, quot, quot]
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+navigation:
+  - title: Start here
+    pages:
+      - title: Overview
+        url: /
+      - title: Getting started
+        url: /getting-started.html
+      - title: Tasks and retries
+        url: /tasks.html
+      - title: Web interface
+        url: /web-interface.html
+      - title: Verification and review
+        url: /verification.html
+      - title: Troubleshooting
+        url: /troubleshooting.html
+  - title: Reference
+    pages:
+      - title: Commands
+        url: /reference/commands.html
+      - title: Configuration
+        url: /reference/configuration.html
+      - title: Glossary
+        url: /reference/glossary.html
+  - title: Project
+    pages:
+      - title: Contributing
+        url: /contributing.html
+      - title: Publishing the docs
+        url: /publishing.html
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor

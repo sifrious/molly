@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | escape }} | {{ site.title | escape }}</title>
+  <meta name="description" content="{{ page.description | default: site.description | escape }}">
+  <link rel="canonical" href="{{ page.url | absolute_url }}">
+  <link rel="stylesheet" href="{{ '/assets/docs.css' | relative_url }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="{{ '/index.html' | relative_url }}">Molly <span>Documentation</span></a>
+    <a href="https://github.com/{{ site.repository }}">View on GitHub</a>
+  </header>
+  <div class="site-body">
+    <nav class="docs-nav" aria-label="Documentation">
+      {% for group in site.navigation %}
+      <div class="nav-group">
+        <p class="nav-heading">{{ group.title | escape }}</p>
+        <ul>
+          {% for item in group.pages %}
+          <li><a href="{{ item.url | relative_url }}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.title | escape }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </nav>
+    <main id="main" tabindex="-1">
+      <article class="prose">
+        {{ content }}
+      </article>
+      <footer class="page-footer">
+        <a href="https://github.com/{{ site.repository }}/blob/main/docs/{{ page.path }}">Read this page on GitHub</a>
+        <p>Molly runs checks before a task can complete. Read the <a href="{{ '/verification.html' | relative_url }}">verification rules</a>.</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
