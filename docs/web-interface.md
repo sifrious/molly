@@ -59,6 +59,17 @@ Livewire refreshes the run status and current phase when JavaScript is available
 
 A completed run has passed the required checks. Review the workspace diff and test assertions before committing. A missing or skipped result does not become a passing check. See [verification and complexity evidence](verification.md).
 
+## Multiple SQLite workers
+
+For multiple workers sharing SQLite, the tested configuration requires PHP 8.4 or later. Set these keys on the SQLite connection in the host application's `config/database.php`:
+
+```php
+'transaction_mode' => 'IMMEDIATE',
+'busy_timeout' => 10000,
+```
+
+`busy_timeout` is in milliseconds. With SQLite's default `DEFERRED` transactions, concurrent workers can fail while reserving a job with `database is locked`, before Molly starts the task. Laravel applies `transaction_mode` only on PHP 8.4 or later. Use one SQLite worker on PHP 8.3. Molly does not change the host's database settings.
+
 ## Queue connections
 
 The web dispatcher accepts database, Redis, Beanstalkd, and SQS connections. Database, Redis, and Beanstalkd require `retry_after` above 3600 seconds. For SQS, set the queue's visibility timeout above 3600 seconds in AWS. Molly cannot inspect that setting.

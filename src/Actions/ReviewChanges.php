@@ -28,31 +28,29 @@ class ReviewChanges
         return ['checks' => $result['checks'], 'findings' => $result['findings']];
     }
 
-    /** @param array<string, mixed> $review */
-    public function passed(array $review): bool
+    /**
+     * @param  array<string, mixed>  $review
+     * @param  array<string, string>|null  $after
+     */
+    public function passed(array $review, ?array $after = null): bool
     {
-        foreach (range('A', 'G') as $code) {
-            if (! in_array($review['checks'][$code]['status'] ?? null, ['clean', 'findings'], true)
-                || ! is_string($review['checks'][$code]['evidence'] ?? null) || trim($review['checks'][$code]['evidence']) === '') {
-                return false;
-            }
-        }
-        if (! isset($review['findings']) || ! is_array($review['findings'])) {
-            return false;
-        }
-        foreach ($review['findings'] as $finding) {
-            if (! is_array($finding) || ($finding['severity'] ?? null) === 'blocking') {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->hasValidStructure($review)
+            && ($after === null || $this->findingsMatchFiles($review, $after))
+            && ! collect($review['findings'])->contains(fn (array $finding): bool => $finding['severity'] === 'blocking');
     }
 
     /** @param array<string, mixed> $result
      * @param  array<string, string>  $after
      */
     private function validate(array $result, array $after): void
+    {
+        if (! $this->hasValidStructure($result) || ! $this->findingsMatchFiles($result, $after)) {
+            $this->invalid();
+        }
+    }
+
+    /** @param array<string, mixed> $result */
+    private function hasValidStructure(array $result): bool
     {
         $rules = [
             'checks' => ['required', 'array:A,B,C,D,E,F,G'],
@@ -72,30 +70,37 @@ class ReviewChanges
             $rules["checks.$code.evidence"] = ['required', 'string'];
         }
         if (Validator::make($result, $rules)->fails()) {
-            $this->invalid();
+            return false;
         }
-        $this->validateFindings($result, $after);
-    }
-
-    /** @param array<string, mixed> $result
-     * @param  array<string, string>  $after
-     */
-    private function validateFindings(array $result, array $after): void
-    {
         foreach ($result['findings'] as $finding) {
-            if (! array_key_exists($finding['path'], $after)
-                || ! is_int($finding['line'])
-                || $finding['line'] > substr_count($after[$finding['path']], "\n") + 1
-                || ($finding['severity'] === 'blocking' && $finding['classification'] !== 'accidental')) {
-                $this->invalid();
+            if (! is_int($finding['line'])) {
+                return false;
             }
         }
         foreach (range('A', 'G') as $code) {
             $hasFindings = in_array($code, array_column($result['findings'], 'code'), true);
             if (($result['checks'][$code]['status'] === 'findings') !== $hasFindings) {
-                $this->invalid();
+                return false;
             }
         }
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $result
+     * @param  array<string, string>  $after
+     */
+    private function findingsMatchFiles(array $result, array $after): bool
+    {
+        foreach ($result['findings'] as $finding) {
+            if (! array_key_exists($finding['path'], $after)
+                || $finding['line'] > substr_count($after[$finding['path']], "\n") + 1
+                || ($finding['severity'] === 'blocking' && $finding['classification'] !== 'accidental')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function invalid(): never

@@ -40,4 +40,80 @@ jobs:
 
       - name: Run package tests
         timeout-minutes: 5
-        run: vendor/bin/pest --colors=never
+        run: |
+          seed=$((GITHUB_RUN_ID % 2147483647))
+          echo "Pest random-order seed: $seed"
+          vendor/bin/pest --colors=never --order-by=random --random-order-seed="$seed" --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
+
+  coverage:
+    name: PHP 8.4 coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP with PCOV
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Install package and test dependencies
+        timeout-minutes: 8
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Measure coverage
+        timeout-minutes: 5
+        run: vendor/bin/pest --colors=never --coverage-clover=build/coverage/clover.xml --coverage-html=build/coverage/html --coverage-text=build/coverage/summary.txt
+
+      - name: Upload coverage reports
+        if: ${{ !cancelled() && hashFiles('build/coverage/clover.xml') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: php-8.4-coverage
+          path: build/coverage/
+          if-no-files-found: error
+          retention-days: 14
+
+  install:
+    name: Fresh Laravel 13 installation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Install into a fresh Laravel application
+        timeout-minutes: 10
+        run: |
+          composer create-project laravel/laravel "$RUNNER_TEMP/molly-host" '^13.0' --no-interaction --prefer-dist
+          cd "$RUNNER_TEMP/molly-host"
+          composer config repositories.molly path "$GITHUB_WORKSPACE"
+          composer require --dev 'sifrious/molly:@dev' --no-interaction --prefer-dist --no-progress
+          php artisan vendor:publish --tag=molly-config --no-interaction
+          php artisan migrate --no-interaction
+
+      - name: Create and read a saved task without a model
+        timeout-minutes: 2
+        run: |
+          cd "$RUNNER_TEMP/molly-host"
+          php artisan molly:create 'Add a readiness route and its test.' --file=routes/web.php --test=tests/Feature/MollySmokeTest.php --name=smoke-test --json --no-interaction > "$RUNNER_TEMP/molly-created.json"
+          task_id=$(php -r '$task = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); if (($task["status"] ?? null) !== "pending" || !is_string($task["id"] ?? null) || $task["id"] === "" || ($task["task"]["id"] ?? null) !== $task["id"]) { exit(1); } echo $task["id"];')
+          php artisan molly:task "$task_id" --json --no-interaction > "$RUNNER_TEMP/molly-found-by-id.json"
+          php artisan molly:task smoke-test --json --no-interaction > "$RUNNER_TEMP/molly-found.json"
+          php -r '$created = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); $found = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-found.json"), true, flags: JSON_THROW_ON_ERROR); if (($found["id"] ?? null) !== $created["id"] || ($found["status"] ?? null) !== "pending" || ($found["task"]["id"] ?? null) !== $created["id"]) { exit(1); } echo "Created and retrieved the pending task without executing a model.\n";'

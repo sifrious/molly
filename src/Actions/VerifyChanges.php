@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Actions;
 
 use DOMDocument;
+use DOMNode;
 use DOMXPath;
 use Dotenv\Dotenv;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
@@ -71,6 +72,10 @@ class VerifyChanges
      */
     private function readEvidence(string $path): array
     {
+        clearstatcache(true, $path);
+        if (is_link($path)) {
+            return ['reason' => 'junit_invalid'];
+        }
         if (! is_file($path) || ! is_readable($path)) {
             return ['reason' => 'junit_missing'];
         }
@@ -103,11 +108,11 @@ class VerifyChanges
     /**
      * @return array{tests: int, assertions: int, failures: int, errors: int, skipped: int}|null
      */
-    private function testCounts(DOMXPath $xpath): ?array
+    private function testCounts(DOMXPath $xpath, ?DOMNode $context = null): ?array
     {
         $counts = ['tests' => 0, 'assertions' => 0, 'failures' => 0, 'errors' => 0, 'skipped' => 0];
 
-        foreach ($xpath->query('//testcase') as $test) {
+        foreach ($xpath->query('.//testcase', $context) as $test) {
             $assertions = $test->getAttribute('assertions');
 
             if (! ctype_digit($assertions)) {
@@ -129,28 +134,25 @@ class VerifyChanges
      */
     private function suiteCountsMatch(DOMXPath $xpath, array $counts): bool
     {
-        $declared = ['tests' => 0];
-
-        foreach ($xpath->query('/testsuite | /testsuites/testsuite') as $suite) {
-            foreach (array_keys($counts) as $key) {
-                if ($key !== 'tests' && ! $suite->hasAttribute($key)) {
-                    continue;
-                }
-
-                if (! ctype_digit($suite->getAttribute($key))) {
-                    return false;
-                }
-
-                $declared[$key] = ($declared[$key] ?? 0) + (int) $suite->getAttribute($key);
-            }
-        }
-
-        foreach ($declared as $key => $count) {
-            if ($count !== $counts[$key]) {
+        foreach ($xpath->query('//testsuite | /testsuites') as $suite) {
+            $descendants = $this->testCounts($xpath, $suite);
+            if ($descendants === null) {
                 return false;
             }
+            foreach ($descendants as $key => $count) {
+                if (! $suite->hasAttribute($key) && ($key !== 'tests' || $suite->nodeName === 'testsuites')) {
+                    continue;
+                }
+                if (! ctype_digit($suite->getAttribute($key)) || (int) $suite->getAttribute($key) !== $count) {
+                    return false;
+                }
+            }
+        }
+        $declaredTests = 0;
+        foreach ($xpath->query('/testsuite | /testsuites/testsuite') as $suite) {
+            $declaredTests += (int) $suite->getAttribute('tests');
         }
 
-        return true;
+        return $declaredTests === $counts['tests'];
     }
 }

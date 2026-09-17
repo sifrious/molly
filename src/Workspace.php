@@ -83,7 +83,12 @@ class Workspace
             || (file_exists($lockPath) && ! is_file($lockPath))) {
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory and a regular file.');
         }
-        File::ensureDirectoryExists($directory, 0700);
+        if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create the workspace lock directory.');
+        }
+        if (is_link($directory) || ! is_dir($directory)) {
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory.');
+        }
         $lock = fopen($lockPath, 'c');
         if ($lock === false) {
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not open the workspace lock.');

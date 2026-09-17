@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Tests;
 
 use Flux\FluxServiceProvider;
+use Illuminate\Support\Facades\Http;
 use Laravel\Ai\AiServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -10,6 +11,13 @@ use Sifrious\Molly\MollyServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     protected function getPackageProviders($app): array
     {
         return [LivewireServiceProvider::class, FluxServiceProvider::class, AiServiceProvider::class, MollyServiceProvider::class];

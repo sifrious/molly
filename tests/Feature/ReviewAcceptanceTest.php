@@ -6,7 +6,11 @@ it('accepts complete reviews with no blocking findings', function (bool $warning
     $review = ['checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'The supplied function adds no indirection.']), 'findings' => []];
     if ($warning) {
         $review['checks']['F']['status'] = 'findings';
-        $review['findings'][] = ['code' => 'F', 'severity' => 'warning'];
+        $review['findings'][] = [
+            'code' => 'F', 'classification' => 'pragmatic', 'severity' => 'warning',
+            'path' => 'app/Example.php', 'line' => 1, 'problem' => 'The function is long.',
+            'recommendation' => 'Keep the related steps together for now.',
+        ];
     }
 
     expect(app(ReviewChanges::class)->passed($review))->toBeTrue();
