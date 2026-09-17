@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Complexity\Clever;
@@ -38,34 +39,47 @@ class CheckEnvironment
                 : 'Parallel checks require posix_setsid and posix_kill. Enable these PHP functions or set molly.parallel_checks to false to run checks serially.');
         }
 
-        $url = (string) config('ai.providers.ollama.url', '');
-        $model = trim((string) config('molly.model', ''));
-        $valid = false;
-        try {
-            LocalOllama::validate();
-            $valid = true;
-            $add('Local provider and model', true, 'ollama_configured', 'Laravel AI uses the local Ollama model '.$model.'.');
-        } catch (Throwable) {
-            $code = $model === '' ? 'model_not_configured' : (str_contains($model, 'cloud') ? 'model_not_local' : 'ollama_config_invalid');
-            $add('Local provider and model', false, $code, 'Set a local MOLLY_LOCAL_MODEL, an Ollama driver, a loopback HTTP URL, and a positive integer molly.timeout.');
-        }
-
-        if ($valid) {
+        if (config('molly.agent', 'ollama') === 'amp') {
             try {
-                $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
-                $models = $response->json('models');
-                if (! $response->successful() || ! is_array($models)) {
-                    $add('Ollama', false, 'ollama_response_invalid', 'Ollama did not return a valid model list.');
-                } else {
-                    $add('Ollama', true, 'ollama_reachable', 'Ollama is responding.');
-                    if ($model !== '') {
-                        $names = array_column($models, 'name');
-                        $installed = in_array($model, $names, true) || in_array($model.':latest', $names, true);
-                        $add('Installed model', $installed, $installed ? 'model_ready' : 'model_missing', $installed ? 'The requested model is installed.' : 'Ollama does not have the requested model: '.$model);
-                    }
-                }
+                $available = Process::timeout(15)->run(['amp', 'usage'])->successful();
+                $add('Amp account', $available, $available ? 'amp_ready' : 'amp_unavailable', $available
+                    ? 'The Amp CLI can access the configured account. Model selection is managed by Amp.'
+                    : 'Install the Amp CLI and sign in with amp login before running tasks.');
             } catch (Throwable) {
-                $add('Ollama', false, 'ollama_unreachable', 'Molly could not reach Ollama. Start Ollama and try again.');
+                $add('Amp account', false, 'amp_unavailable', 'Molly could not check the Amp account. Install the Amp CLI and sign in with amp login.');
+            }
+        } elseif (config('molly.agent', 'ollama') !== 'ollama') {
+            $add('Agent', false, 'agent_invalid', 'Choose amp or ollama for molly.agent.');
+        } else {
+            $url = (string) config('ai.providers.ollama.url', '');
+            $model = trim((string) config('molly.model', ''));
+            $valid = false;
+            try {
+                LocalOllama::validate();
+                $valid = true;
+                $add('Local provider and model', true, 'ollama_configured', 'Laravel AI uses the local Ollama model '.$model.'.');
+            } catch (Throwable) {
+                $code = $model === '' ? 'model_not_configured' : (str_contains($model, 'cloud') ? 'model_not_local' : 'ollama_config_invalid');
+                $add('Local provider and model', false, $code, 'Set a local MOLLY_LOCAL_MODEL, an Ollama driver, a loopback HTTP URL, and a positive integer molly.timeout.');
+            }
+
+            if ($valid) {
+                try {
+                    $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
+                    $models = $response->json('models');
+                    if (! $response->successful() || ! is_array($models)) {
+                        $add('Ollama', false, 'ollama_response_invalid', 'Ollama did not return a valid model list.');
+                    } else {
+                        $add('Ollama', true, 'ollama_reachable', 'Ollama is responding.');
+                        if ($model !== '') {
+                            $names = array_column($models, 'name');
+                            $installed = in_array($model, $names, true) || in_array($model.':latest', $names, true);
+                            $add('Installed model', $installed, $installed ? 'model_ready' : 'model_missing', $installed ? 'The requested model is installed.' : 'Ollama does not have the requested model: '.$model);
+                        }
+                    }
+                } catch (Throwable) {
+                    $add('Ollama', false, 'ollama_unreachable', 'Molly could not reach Ollama. Start Ollama and try again.');
+                }
             }
         }
 

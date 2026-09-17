@@ -11,6 +11,7 @@
         header { border-bottom: 1px solid #bac2ba; } nav { display: flex; flex-wrap: wrap; gap: 1.25rem; } a { color: #174f86; text-underline-offset: .2em; }
         h1 { font-size: 2rem; line-height: 1.2; } h2 { margin-top: 2rem; } label { display: block; font-weight: 650; margin-top: 1.2rem; }
         input, textarea { display: block; width: 100%; font: inherit; padding: .6rem; border: 1px solid #606d61; border-radius: .3rem; background: white; color: #17202a; }
+        input[type="radio"] { display: inline-block; width: auto; margin-right: .5rem; }
         textarea { min-height: 8rem; } button, [data-flux-button] { font: inherit; background: #174f40; color: white; border: 1px solid #174f40; padding: .55rem 1rem; border-radius: .3rem; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
         :focus-visible { outline: 3px solid #ab4300; outline-offset: 3px; } .actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.25rem; } .actions form { margin: 0; }
         .notice { padding: 1rem; border: 1px solid #6a7968; background: #fff; } .errors { border-color: #9a2518; } .hint { margin-top: .25rem; color: #46534b; }
@@ -21,7 +22,7 @@
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
-<header><nav aria-label="Molly"><a href="{{ route('molly.tasks.index') }}">Molly tasks</a><a href="{{ route('molly.tasks.create') }}">Create task</a></nav></header>
+<header><nav aria-label="Molly"><a href="{{ route('molly.tasks.index') }}">Molly tasks</a><a href="{{ route('molly.plans.index') }}">Plans</a><a href="{{ route('molly.tasks.create') }}">Create task</a></nav></header>
 <main id="content">
     @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<div class="notice errors" role="alert"><h2>Check the request</h2><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

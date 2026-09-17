@@ -2,12 +2,21 @@
 
 use Illuminate\Support\Facades\Route;
 use Sifrious\Molly\Http\LocalUi;
+use Sifrious\Molly\Http\PlanController;
 use Sifrious\Molly\Http\RunController;
 use Sifrious\Molly\Http\TaskConnectionController;
 use Sifrious\Molly\Http\TaskController;
 
 Route::middleware(['web', LocalUi::class])->prefix(config('molly.ui.prefix', 'molly'))->name('molly.')->group(function (): void {
     Route::get('/', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('/guide', [PlanController::class, 'guide'])->name('guide');
+    Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+    Route::post('/plans/{plan}/suggest', [PlanController::class, 'suggest'])->name('plans.suggest');
+    Route::get('/plans/create', [PlanController::class, 'create'])->name('plans.create');
+    Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');
+    Route::get('/plans/{plan}', [PlanController::class, 'show'])->name('plans.show');
+    Route::post('/plans/{plan}/answers', [PlanController::class, 'answer'])->name('plans.answers');
+    Route::post('/plans/{plan}/tasks', [PlanController::class, 'task'])->name('plans.tasks');
     Route::get('/tasks/create', [TaskController::class, 'create'])->name('tasks.create');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');

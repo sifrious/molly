@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
+use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Agents\LocalOllama;
 
@@ -17,12 +18,18 @@ class GenerateChanges
      */
     public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null): array
     {
-        LocalOllama::validate();
-        $response = ChangeWriter::make()->prompt(
-            json_encode(['task' => $prompt, 'allowed_files' => $files, 'required_test' => $testPath, ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt])], JSON_THROW_ON_ERROR),
-            provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
-        );
-        $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+        $input = json_encode(['task' => $prompt, 'allowed_files' => $files, 'required_test' => $testPath, ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt])], JSON_THROW_ON_ERROR);
+        if (config('molly.agent', 'ollama') === 'amp') {
+            $result = app(AmpResponse::class)->prompt(new ChangeWriter, $input);
+        } elseif (config('molly.agent', 'ollama') === 'ollama') {
+            LocalOllama::validate();
+            $response = ChangeWriter::make()->prompt(
+                $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
+            );
+            $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+        } else {
+            throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');
+        }
         $validator = Validator::make($result, [
             'summary' => ['required', 'string'],
             'files' => ['required', 'array', 'list', 'min:1'],

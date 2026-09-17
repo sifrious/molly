@@ -6,8 +6,9 @@ use RuntimeException;
 
 class LocalOllama
 {
-    public static function validate(): void
+    public static function validate(?string $model = null): void
     {
+        $model ??= config('molly.model');
         $provider = config('ai.providers.ollama', []);
         $url = $provider['url'] ?? '';
         $parts = is_string($url) ? parse_url($url) : false;
@@ -19,8 +20,8 @@ class LocalOllama
             || isset($parts['user']) || isset($parts['pass'])
             || isset($parts['query']) || isset($parts['fragment'])
             || ! in_array($parts['path'] ?? '', ['', '/'], true)
-            || ! is_string(config('molly.model')) || trim(config('molly.model')) === ''
-            || str_contains(config('molly.model'), 'cloud')
+            || ! is_string($model) || trim($model) === ''
+            || str_contains($model, 'cloud')
             || ! is_int(config('molly.timeout')) || config('molly.timeout') < 1) {
             throw new RuntimeException('LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.');
         }

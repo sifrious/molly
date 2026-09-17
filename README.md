@@ -1,10 +1,10 @@
 # Molly
 
-Give Molly a small coding task and choose the files Molly may change. Molly asks a local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity.
+Give Molly a small coding task and choose the files Molly may change. Molly asks your selected Amp agent or local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity.
 
 Read test evidence, all seven Tarpit checks, and separate Clever measurements in the terminal or local web interface. Retry a failed task with the previous attempt's diagnostics. Clever commands ship with Molly.
 
-Molly is a Laravel package in development. No alpha release is tagged yet.
+Molly is a development dependency for Laravel applications. No alpha release is tagged yet.
 
 ## Get started
 
@@ -19,6 +19,8 @@ php artisan molly:create
 ```
 
 Molly asks what to change, an optional task nickname, which Pest test should pass, and which other files may change. Selecting the test also permits test edits. Creation saves the task without running the model. Start a named task with `php artisan molly:start health-check`, replacing `health-check` with your nickname.
+
+You can also plan a collection of tasks with cited Laravel, Tarpit, and NativePHP guidance. Amp can access Molly through local MCP tools. Optional TypeSafe evaluation helps focus planning and review commits. No TypeSafe key is required for local tasks.
 
 ## Documentation
 
@@ -42,7 +44,7 @@ You can run one-off prompts or save tasks with attempt history, bounded retries,
 
 Use a trusted, disposable checkout. Pest runs PHP with your local user's permissions, and the model may edit the selected test file. Review the diff and assertions before accepting a result.
 
-The original alpha checklist still includes Bloom integration, execution-target selection, tracked GitHub-to-Pest todos, approval controls, component previews, project journals, and TypeSafe evaluation. These capabilities are not implemented yet.
+The original alpha checklist still includes Bloom integration, execution-target selection, tracked GitHub-to-Pest todos, approval controls, component previews, and structured lifecycle event history. These capabilities are not implemented yet.
 
 ## Source credit
 

@@ -40,7 +40,8 @@ class RunTask
                 'workspace' => $files->path,
                 'status' => 'running',
                 'report' => [
-                    'scope' => $paths, 'provider' => 'ollama', 'model' => config('molly.model'),
+                    'scope' => $paths, 'provider' => config('molly.agent', 'ollama'),
+                    'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
                     'snapshots' => [
                         'task_creation' => $taskId === null ? null : Task::find($taskId)?->context_snapshot,
                         'before' => $files->snapshot($before),
@@ -71,7 +72,7 @@ class RunTask
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
-            $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with Ollama');
+            $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $proposal = $previousAttempt === null
                 ? $this->generate->handle($run->prompt, $before, $testPath)
                 : $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt);
