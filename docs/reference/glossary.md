@@ -5,61 +5,69 @@ title: Glossary
 
 # Glossary
 
-Molly uses these terms in commands, reports, and the web interface. A task, run, and execution branch describe different levels of work.
+Use this page when a Molly report or guide uses a term you do not recognize.
 
-| Term | Meaning | Implementation |
-| --- | --- | --- |
-| Host application | The Laravel application where Molly is installed and Artisan runs. The host stores task history and evidence, even when another checkout is the workspace. | `src/MollyServiceProvider.php`, `src/Actions/RunTask.php` |
-| Workspace | The checkout containing the selected files and workspace locks. The workspace needs its own Pest installation. | `src/Workspace.php` |
-| File scope | The selected workspace-relative files the writer may propose changing, including the required Pest test. Also called the file allowlist. Selecting the test permits test edits. The scope does not sandbox code executed by Pest. | `src/Workspace.php`, `src/Actions/GenerateChanges.php` |
-| Task | A saved prompt, selected files, required test path, optional nickname and source context, and lifecycle state. Task states are `pending`, `running`, `completed`, `failed`, and `stopped`. | `src/Models/Task.php`, `src/Actions/CreateTask.php` |
-| Task nickname | An optional readable task reference, such as `health-check`, unique across the host application. Commands accept the nickname or the task UUID. Renaming leaves the task UUID and attempt history unchanged. A nickname does not identify an individual run. | `src/Models/Task.php` |
-| Plan | A saved description of a collection of tasks, a guided or skipped review choice, ordered answers, and a guide version. A ready plan can create pending tasks. Plan readiness does not establish passing tests or completed work. | `src/Models/Plan.php`, `src/Actions/CreatePlan.php`, `src/Actions/CreateTaskFromPlan.php` |
-| Guided planning review | Five questions about the outcome, essential state, existing Laravel behavior, justified boundaries, and passing evidence. Answers persist in order. Separate from the seven-check Tarpit review of implemented changes. | `src/Actions/AnswerPlan.php`, `resources/planning/guide.json` |
-| Planning source graph | The bundled questions, source passages, citations, and connections used for offline planning. Topic matches select references to consult, not architectural requirements. | `src/PlanningGuide.php`, `resources/planning/guide.json`, `resources/planning/MANIFEST.md` |
-| Guide version | The version recorded when Molly creates a plan. Adding answers or tasks requires the currently bundled version. Updating the guide does not delete old answers. | `src/Models/Plan.php`, `src/Actions/AnswerPlan.php`, `src/Actions/CreateTaskFromPlan.php` |
-| Agent provider | The selected `amp` or `ollama` provider for proposals and Tarpit reviews. Provider choice does not change required verification or file scope. | `src/Actions/ConfigureAgent.php`, `src/Actions/GenerateChanges.php`, `src/Actions/ReviewChanges.php` |
-| Amp response | A structured proposal or review from a restricted Amp CLI request. Molly requires no enabled tools and a successful terminal result before applying its own response validation. This is separate from interactive Amp chat and remote Orb execution. | `src/Agents/AmpResponse.php` |
-| Molly MCP server | The local stdio server registered as `molly` in local and testing environments. Tools call Molly's shared application actions. The server has no HTTP route. | `src/Mcp/MollyServer.php`, `src/MollyServiceProvider.php` |
-| Jev evaluation | An optional TypeSafe HTTP evaluation of selected evidence. Planning evaluations suggest a review area; commit and task evaluations suggest a next action. Confidence and failure reasons remain visible. An evaluation cannot replace tests or start a retry loop. | `src/Actions/EvaluateWithTypeSafe.php`, `src/Actions/SuggestPlanReview.php`, `src/Actions/ReviewCommit.php` |
-| Task advice | A recommendation based on saved task state, attempt limits, and optional TypeSafe evaluation of eligible failed-attempt evidence. The recommendation and retry permission are separate. Advice may be saved in the latest run report; advice never changes task state or executes the suggested command. | `src/Actions/RecommendTaskNextStep.php`, [Task advice](../task-advice.md) |
-| Run | One persisted execution attempt, with `running`, `completed`, `failed`, or `stopped` status and a report. A saved task can have several runs. A one-off run has no linked task. | `src/Models/Run.php`, `src/Actions/RunTask.php` |
-| Attempt | A run associated with a saved task. The configured attempt limit includes the first run. Retrying creates another run and retains earlier evidence. | `src/Actions/StartTask.php`, `src/Actions/RetryTask.php` |
-| Previous-attempt diagnostics | Selected, size-limited test errors and review findings supplied to a retry writer as `previous_attempt`. The diagnostics do not include the complete previous report. | `src/Actions/StartTask.php`, `src/Actions/GenerateChanges.php` |
-| Queued execution request | A task UUID and start-or-retry choice waiting for a host queue worker after a web or MCP request. A queued request is not a run until execution begins. | `src/Actions/QueueTask.php`, `src/Jobs/StartSavedTask.php` |
-| Execution branch | One local verification or review process, with its own status, result file, and failure metadata. A branch passing does not establish run completion. | `src/Actions/EvaluateChanges.php`, `src/Console/MollyCheckCommand.php` |
-| Branch attempt ID | Identifier shared by the verification and review branches in one parallel evaluation. The identifier binds branch results to that evaluation; the identifier is separate from the saved task and run IDs. | `src/Actions/EvaluateChanges.php` |
-| Verification | Pest execution plus the JUnit evidence required to establish that the selected test file passed. A model's statement about tests is not verification. | `src/Actions/VerifyChanges.php` |
-| Tarpit review | The model's seven checks for complexity in supplied before-and-after files. The review does not inspect the whole repository or run tests. | `src/Agents/TarpitReviewer.php`, `src/Actions/ReviewChanges.php` |
-| Essential complexity | Complexity needed by the current requirement. | `src/Agents/TarpitReviewer.php` |
-| Pragmatic complexity | Complexity justified by a documented tradeoff. | `src/Agents/TarpitReviewer.php` |
-| Accidental complexity | Complexity that can be removed while preserving required behavior. An unresolved accidental finding can block completion. | `src/Agents/TarpitReviewer.php`, `src/Actions/ReviewChanges.php` |
-| Finding | A review result naming the check, file, line, problem, recommendation, classification, and warning or blocking severity. | `src/Actions/ReviewChanges.php` |
-| Clever measurement | A probe result containing metrics, scope, limitations, and status. Measurements remain separate from the Tarpit decision and are never combined into a complexity score. | `src/Actions/MeasureComplexity.php`, `src/Complexity/Probes/ProbeResult.php` |
-| Probe | One executable measurement, such as owned diff or hotspots. A probe can return `ok`, `skipped`, or `error`. | `src/Complexity/Probes/Probe.php`, `src/Complexity/Probes/ProbeStatus.php` |
-| Owned diff | Counts of current code, comment, and blank lines and files in configured paths. The name does not mean a Git patch. | `src/Complexity/Probes/OwnedDiffProbe.php` |
-| Welded call site | A literal constructor or static call matched by the probe's text patterns. A match is a candidate for review, not proof of an unnecessary dependency. | `src/Complexity/Probes/WeldedCallSitesProbe.php`, `src/Complexity/Support/WeldScanner.php` |
-| Lonely file | A PHP file with one recorded Git author. The listed files must also meet the configured current-size minimum. | `src/Complexity/Probes/LonelyFilesProbe.php` |
-| Churn | Number of commits that touched a file path in the selected history window. Churn does not count changed lines. | `src/Complexity/Probes/HotspotsProbe.php` |
-| Hotspot | A frequently changed PHP file presented with its churn and current code lines as separate measurements. | `src/Complexity/Probes/HotspotsProbe.php` |
-| Evidence | Saved test output, JUnit results, review findings, content hashes, measurement reports, and branch results used to inspect an execution. The host stores supporting files under `storage/molly/{run-id}`. | `src/Actions/RunTask.php`, `src/Actions/VerifyChanges.php` |
-| Source snapshot | Metadata for selected files at a recorded moment, including relative paths, SHA-256 hashes, and recognized component identities. Snapshots contain no source contents or visual previews. A missing file and missing evidence have different representations. | `src/Workspace.php`, [Component snapshots](../component-snapshots.md) |
-| Task context snapshot | The source snapshot saved when a task is created or imported, stored in `molly_tasks.context_snapshot`. Attempts retain that creation context and capture their own before and after snapshots. Renaming or retrying a task does not replace its creation snapshot. | `src/Actions/CreateTask.php`, `src/Actions/RunTask.php`, [Stored snapshot fields](../component-snapshots.md#stored-report-fields) |
-| Component identity | `component:` followed by a recognized Blade or Livewire source path. The identity remains stable when file contents change. Molly does not resolve component aliases, connect classes to views, or establish visible changes from a hash comparison. | `src/Workspace.php`, [Stable component IDs](../component-snapshots.md#stable-component-ids) |
-| Task journal | A Markdown export of one saved task and its attempts at `.molly/journal/TASK_UUID.md` in the workspace. Exporting replaces that file with the latest selected evidence. The host database remains the source of truth. | `src/Actions/ExportTaskJournal.php`, [Task journal](../journal.md) |
-| Project journal | The generated `.molly/JOURNAL.md` view of saved tasks and linked attempts in one workspace, ordered by creation time. Entries show current saved state and stable UUIDs. This is not a complete history of status transitions. The same refresh updates Molly's marked section in `.molly/GLOSSARY.md`. | `src/Actions/ExportTaskJournal.php`, [Project chronology](../journal.md#project-chronology) |
-| Journal status | The latest project refresh result stored in `molly_tasks.journal_status`, with `written` or `unavailable`, a check time, and paths or a failure reason. No recorded result means the journal has not been refreshed. A journal failure does not change the task's execution result. | `src/Actions/RefreshProjectJournal.php`, [Retry a journal warning](../journal.md#retry-a-project-journal-warning) |
-| Workspace lease | A token in `.molly/checks.lease` that identifies the current owning run. Check children validate the token while holding a shared lock. A delayed child from an earlier run cannot begin its check with an expired lease. | `src/Workspace.php` |
-| Stop request | A persisted instruction to stop a saved task at an execution boundary. A request does not establish that the process has stopped. | `src/Actions/StopTask.php`, `src/Actions/StartTask.php` |
-| Interrupted run | A run whose original process exited without recording a final status. A saved task can settle the run through stop once task, workspace, and active-check locks are free. | `src/Actions/StopTask.php` |
-| Amp thread | An Amp conversation identified by `T-` followed by a UUID. Molly can record the thread against a saved task and inspect executor metadata. The thread ID alone does not verify an Orb identity. | `src/Actions/LinkTaskThread.php`, `src/Actions/ReadAmpConnections.php` |
-| Task thread association | A user-recorded link between an Amp thread ID and a canonical Molly task UUID. A link is a user assertion, not provider-confirmed work. Linking the thread to another task preserves the earlier association. Nickname changes preserve all links. | `src/Actions/LinkTaskThread.php`, `database/migrations/2026_09_17_080000_create_molly_task_threads_table.php` |
-| Latest recorded task | `latest_recorded` in connection reports. The thread's latest saved association names the requested task. The label does not establish the executor's current assignment. | `src/Actions/FindTaskConnections.php` |
-| Prior exact association | `prior_exact` in connection reports. The thread has a saved association with the requested task UUID, but the latest saved association names another task. Similar titles or prompts do not count. | `src/Actions/FindTaskConnections.php` |
-| Connection observation | A read of Amp executor state for requested thread IDs. Reports use `connected`, `disconnected`, or `unknown`; absence from a snapshot does not prove disconnection. Observations are returned for the current request and are not persisted as association history. | `src/Actions/ReadAmpConnections.php`, `src/Actions/FindTaskConnections.php` |
-| Executor type | Raw Amp metadata returned as `executor_type` when available. Molly preserves the value without classifying the executor as an Orb or making the executor eligible for work. | `src/Actions/ReadAmpConnections.php` |
-| Orb | A remote execution environment whose identity Molly has yet to verify through a provider protocol. Current Amp thread links and connection observations do not establish that identity. Orb identification and management remain planned. | [Proposed design](../execution-targets.md), no verified Orb connector yet. |
-| Orb task association | Planned. A provider-confirmed link between a verified Orb and a task UUID, with connection, run or branch references and timestamps when available. Distinct from today's user-recorded task thread association. | [Exact task lookup plan](../execution-targets.md#find-the-orb-associated-with-a-task), no implementation yet. |
-| Execution target | Planned. The explicitly chosen place to execute work. Discovering a connected Orb or finding prior task history does not select that Orb or start execution. Current branch reports record the local target only. | [Proposed design](../execution-targets.md), `src/Actions/EvaluateChanges.php` for current local branch metadata. |
+## Core work
 
-Read the [task guide](../tasks.md) for lifecycle behavior and the [verification guide](../verification.md) for completion rules.
+| Term | Meaning |
+| --- | --- |
+| Host application | The Laravel application where Molly is installed and where you run Artisan. It stores Molly's task and run records. |
+| Workspace | The checkout containing the files Molly may edit. It can be the host application or another local checkout. |
+| File scope | The selected files an agent may propose changing, including the required test. It limits edits but does not sandbox executed PHP. |
+| Task | A saved request with file scope, required test, optional nickname, and lifecycle state. |
+| Task nickname | An optional readable task reference such as `health-check`. The task UUID remains the stable identifier. |
+| Run | One execution attempt with its own status and evidence. |
+| Attempt | A run linked to a saved task. Retrying creates another attempt. |
+| Plan | Saved decisions for a larger piece of work. A plan does not edit code or prove implementation correctness. |
+
+## Verification
+
+| Term | Meaning |
+| --- | --- |
+| Verification | The required Pest execution and JUnit evidence for the selected test file. A model statement is not verification. |
+| Tarpit review | Seven model checks for unnecessary complexity in the supplied before-and-after files. It cannot override failed tests. |
+| Finding | A Tarpit issue with a check, file, line, problem, recommendation, classification, and severity. |
+| Essential complexity | Complexity required by the current requirement. |
+| Pragmatic complexity | Complexity justified by a documented tradeoff. |
+| Accidental complexity | Complexity that can be removed while preserving required behavior. It may block completion. |
+| Clever measurement | One descriptive code measurement. Molly does not combine measurements into one quality score. |
+| Evidence | Saved test results, review findings, hashes, measurements, and execution metadata used to inspect a run. |
+
+## Source and component evidence
+
+| Term | Meaning |
+| --- | --- |
+| Source snapshot | Metadata for selected files at one moment, including path and SHA-256 hash. It does not store source contents. |
+| Component identity | `component:` plus a recognized Blade or Livewire source path. It identifies source, not a rendered UI component. |
+| Task journal | Markdown export for one task at `.molly/journal/TASK_UUID.md`. |
+| Project journal | `.molly/JOURNAL.md`, a generated view of saved tasks and attempts in one workspace. |
+| Project glossary | `.molly/GLOSSARY.md`, including a Molly-managed section plus space for project-specific terms. |
+
+## Agents and providers
+
+| Term | Meaning |
+| --- | --- |
+| Agent provider | The selected `amp` or `ollama` path for proposals and Tarpit review. |
+| Molly MCP server | Local stdio server that exposes Molly actions to MCP clients. It has no HTTP route. |
+| TypeSafe evaluation | Optional hosted evaluation used only when explicitly enabled for selected planning, advice, or commit-review paths. |
+| Task advice | A recommendation based on saved state, attempt limits, and optional TypeSafe evidence. It never executes the recommendation. |
+
+## Amp connection terms
+
+| Term | Meaning |
+| --- | --- |
+| Amp thread | An Amp conversation identified by a `T-` UUID. |
+| Task thread association | A user-recorded link between an Amp thread and a Molly task UUID. It is not provider-confirmed work. |
+| `latest_recorded` | The thread's latest saved association names the requested task. |
+| `prior_exact` | The thread was linked to the requested task before, but its latest saved association names another task. |
+| Connection observation | A current read of Amp executor state for a requested thread. |
+| Executor type | Raw Amp metadata. Molly preserves it without treating it as verified Orb identity. |
+
+## Planned remote-execution terms
+
+| Term | Meaning |
+| --- | --- |
+| Orb | A planned remote execution environment whose identity Molly does not currently verify. |
+| Execution target | The place where work executes. Current Molly task execution is local; remote target selection is planned. |
+
+For current task behavior, read [Manage tasks](../tasks.md). For planned remote work, read [Execution targets](../execution-targets.md).
