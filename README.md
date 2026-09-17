@@ -1,55 +1,237 @@
 # Molly
 
-Give Molly a small coding task and choose the files Molly may change. Molly asks your selected Amp agent or local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity.
+Molly gives an AI agent one small Laravel task, limits which files it may
+change, and requires a Pest test to pass before the task can complete.
 
-Read test evidence, all seven Tarpit checks, and separate Clever measurements in the terminal or local web interface. Retry a failed task with the previous attempt's diagnostics. Clever commands ship with Molly.
+Molly runs during development. Install it with Composer's `--dev` flag. It is
+not part of your deployed application when production uses
+`composer install --no-dev`.
 
-Molly is a development dependency for Laravel applications. No alpha release is tagged yet.
+> Molly is in early development. No alpha release is tagged yet. The setup below
+> installs the current `main` branch.
 
-## Get started
+## What Molly does
 
-Molly requires Laravel 13 and PHP 8.3 or later. The first-run guide covers Pest, Amp or Ollama setup, the public Composer repository, and a bounded task you can inspect afterward.
+- Sends a bounded coding task to Amp or a local Ollama model.
+- Limits edits to the test file and other files you select.
+- Runs the required Pest test and all seven Tarpit checks.
+- Records Clever measurements before and after the edit without combining them
+  into a score.
+- Saves each attempt, its evidence, and the reason a failed task did not
+  complete.
+- Shows the same task history in Artisan commands and a local web interface.
 
-[Install Molly and run your first task](docs/getting-started.md).
+Molly does not retry a failed task on its own. You review the evidence and
+decide whether to retry, stop, or edit the task.
 
-After setup, create a task with:
+## Quick start
+
+Molly requires PHP 8.3 or later, Laravel 13, a working database connection, the
+PHP DOM extension, and Pest 4.
+
+Run these commands from the root of a Laravel application:
+
+```bash
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:dev-main
+php artisan vendor:publish --tag=molly-config
+php artisan migrate
+```
+
+Add Molly's local working directory to your application's `.gitignore`:
+
+```gitignore
+.molly/
+```
+
+### Use local Ollama
+
+Start Ollama and download a coding model. This example uses Qwen2.5-Coder 7B:
+
+```bash
+ollama pull qwen2.5-coder:7b
+php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+```
+
+Molly uses Ollama at `http://127.0.0.1:11434` by default. You can change the
+address with `OLLAMA_URL`.
+
+The public Ollama setup still needs a recorded live acceptance check. A model
+appearing in `ollama list` confirms that it is installed, not that it can
+complete a Molly task.
+
+### Use Amp
+
+Install the Amp CLI, then run:
+
+```bash
+php artisan molly:setup --agent=amp
+amp mcp approve molly
+amp mcp doctor molly
+```
+
+Amp owns its account credentials. Molly saves the selected agent in your
+application's `.env` file.
+
+### Check the setup
+
+```bash
+php artisan config:clear
+php artisan molly:doctor
+```
+
+Continue when every check passes and the command prints:
+
+```text
+Molly is ready.
+```
+
+For Pest setup, provider details, and failed doctor checks, read the
+[full installation guide](docs/getting-started.md).
+
+## Run your first task
+
+Create a saved task:
 
 ```bash
 php artisan molly:create
 ```
 
-Molly asks what to change, an optional task nickname, which Pest test should pass, and which other files may change. Selecting the test also permits test edits. Creation saves the task without running the model. Start a named task with `php artisan molly:start health-check`, replacing `health-check` with your nickname.
+Molly asks for:
 
-You can also plan a collection of tasks with cited Laravel, Tarpit, and NativePHP guidance. Amp can access Molly through local MCP tools. Optional TypeSafe evaluation helps focus planning and review commits. No TypeSafe key is required for local tasks.
+1. The change you want.
+2. An optional task name.
+3. The Pest test that must pass.
+4. Any other files the agent may change.
+
+Creating the task does not call the model or edit files. Start it with the name
+or UUID that Molly prints:
+
+```bash
+php artisan molly:start health-check
+```
+
+During the attempt, Molly:
+
+1. Records the task and its allowed files.
+2. Measures the selected code.
+3. Requests and applies the proposed edits.
+4. Runs Pest and Tarpit in parallel by default.
+5. Saves the test output, Tarpit findings, measurements, and changed-file
+   evidence.
+
+Inspect the result and your working tree before committing:
+
+```bash
+php artisan molly:task health-check
+php artisan molly:show RUN_ID --verbose
+git status --short
+vendor/bin/pest
+```
+
+If an attempt fails, fix any setup problem, review the changed files, and retry
+it yourself:
+
+```bash
+php artisan molly:retry health-check
+```
+
+Molly keeps the earlier attempt. The default limit is three attempts.
+
+## Local web interface
+
+Molly also has a local task interface built with free Flux and Livewire. It has
+no login and only accepts local requests.
+
+Set these values in the host application's `.env` file:
+
+```dotenv
+APP_ENV=local
+MOLLY_UI_ENABLED=true
+QUEUE_CONNECTION=database
+```
+
+Start a queue worker and local server, then open `http://127.0.0.1:8000/molly`:
+
+```bash
+php artisan queue:work --tries=1 --timeout=3600
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+Before using queued tasks, read the
+[web interface guide](docs/web-interface.md). Your queue's retry or visibility
+timeout must exceed Molly's 3,600-second job timeout.
+
+## Planning and optional TypeSafe evaluation
+
+Molly can turn a larger request into a saved plan with citations to Laravel,
+Tarpit, and NativePHP guidance:
+
+```bash
+php artisan molly:plan
+```
+
+Amp can also use Molly's local MCP tools to plan and manage tasks. TypeSafe
+evaluation is optional and can help review plans, failed-task advice, and PHP
+commits. Local tasks do not require a TypeSafe key.
+
+Read [planning](docs/planning.md) and [agents and MCP](docs/agents.md) before
+enabling these paths.
 
 ## Documentation
 
-| You need | Read |
-| --- | --- |
-| A map of the current build and its limits | [Documentation overview](docs/index.md) |
-| Saved tasks, retries, stopping, and GitHub import | [Manage tasks](docs/tasks.md) |
-| Guided planning, Amp setup, and MCP | [Planning](docs/planning.md), [agents](docs/agents.md) |
-| What to do after a failed task | [Next-step advice](docs/task-advice.md) |
-| Source changes and local history | [Component snapshots](docs/component-snapshots.md), [journals](docs/journal.md) |
-| Current and prior Amp task associations | [Task connections](docs/connections.md) |
-| Browser setup and task controls | [Local web interface](docs/web-interface.md) |
-| Completion rules, Tarpit findings, and Clever measurements | [Verification and complexity evidence](docs/verification.md) |
-| Help with setup errors or a failed run | [Troubleshooting](docs/troubleshooting.md) |
-| CLI options and JSON results | [Command reference](docs/reference/commands.md) |
-| Defaults and environment variables | [Configuration reference](docs/reference/configuration.md) |
-| Domain terms | [Glossary](docs/reference/glossary.md) |
-| Package tests and recorded live checks | [Contributing](docs/contributing.md) |
+- [Getting started](docs/getting-started.md) installs Molly and walks through
+  one task.
+- [Task management](docs/tasks.md) covers saving, inspecting, retrying,
+  stopping, and importing tasks.
+- [Verification](docs/verification.md) explains the Pest, Tarpit, and Clever
+  evidence.
+- [Agents and MCP](docs/agents.md) covers Amp, Ollama, MCP, and optional
+  TypeSafe evaluation.
+- [Local web interface](docs/web-interface.md) explains the browser setup.
+- [Troubleshooting](docs/troubleshooting.md) covers failed setup checks and
+  task runs.
+- [Command reference](docs/reference/commands.md) and
+  [configuration](docs/reference/configuration.md) list commands and settings.
+- [Glossary](docs/reference/glossary.md) defines Molly's terms.
 
-The docs are Markdown in this repository. [The publishing plan](docs/publishing.md) proposes GitHub Pages at `molly.mary.win`. That hostname is not a published documentation link yet.
+The [documentation overview](docs/index.md) links to task connections, local
+journals, component snapshots, contributing instructions, and the rest of the
+guides.
 
-## Current scope
+## Current limits
 
-You can run one-off prompts or save tasks with attempt history, bounded retries, and stop requests. Molly permits one writing run per workspace, then runs Pest and Tarpit review in parallel by default. The local web interface uses free Flux and Livewire, with complete HTML pages and native forms.
+The current `dev-main` build supports saved tasks, bounded retries, Amp and
+Ollama, parallel Pest and Tarpit checks, a local web interface, planning, MCP
+tools, optional TypeSafe evaluation, journals, and component hashes.
 
-Use a trusted, disposable checkout. Pest runs PHP with your local user's permissions, and the model may edit the selected test file. Review the diff and assertions before accepting a result.
+The following work is not finished:
 
-The original alpha checklist still includes Bloom integration, execution-target selection, tracked GitHub-to-Pest todos, approval controls, component previews, and structured lifecycle event history. These capabilities are not implemented yet.
+- Bloom integration.
+- Verified Orb identity and remote execution-target selection.
+- Tracked GitHub-to-Pest tasks.
+- Approval controls.
+- Visual component previews.
+- Complete structured lifecycle event history.
+
+Read the [execution target plan](docs/execution-targets.md) for the current
+task-to-Amp-thread behavior and its limits.
+
+## Safety
+
+Use Molly in a trusted, disposable checkout. The allowed-file list limits
+proposed edits, but it is not a sandbox. Pest runs PHP with your local user's
+permissions, and the agent may edit the selected test file.
+
+Review the diff and test assertions before accepting a result. A skipped check
+never counts as a passing check.
 
 ## Source credit
 
-Molly's bundled measurements derive from Clever commit `650a32a595036ef610a7c7af1fad4869b23ef05a` in [sifrious/cleverness](https://github.com/sifrious/cleverness). The original MIT notice and source reference remain in [src/Complexity/LICENSE.md](src/Complexity/LICENSE.md). Molly does not require a separate Clever installation.
+Molly's bundled measurements derive from Clever commit
+[`650a32a`](https://github.com/sifrious/cleverness/commit/650a32a595036ef610a7c7af1fad4869b23ef05a).
+The original MIT notice and source reference remain in
+[src/Complexity/LICENSE.md](src/Complexity/LICENSE.md). Molly does not require a
+separate Clever installation.
+
+Molly is available under the [MIT license](LICENSE).
