@@ -23,8 +23,8 @@ it('completes when required Pest and Tarpit checks pass', function () {
 
     expect($decision['completed'])->toBeTrue()
         ->and($decision['blockers'])->toBe([])
-        ->and($decision['outcomes']['pest'])->toBe(['state' => 'pass', 'policy' => 'required'])
-        ->and($decision['outcomes']['tarpit'])->toBe(['state' => 'pass', 'policy' => 'required']);
+        ->and($decision['outcomes']['pest'])->toBe(['state' => 'PASS', 'policy' => 'required'])
+        ->and($decision['outcomes']['tarpit'])->toBe(['state' => 'PASS', 'policy' => 'required']);
 });
 
 it('blocks when a required verifier did not run', function () {
@@ -36,7 +36,7 @@ it('blocks when a required verifier did not run', function () {
     ], ['app/Greeting.php' => '<?php return "Hello";']);
 
     expect($decision['completed'])->toBeFalse()
-        ->and($decision['outcomes']['pest']['state'])->toBe('not_run')
+        ->and($decision['outcomes']['pest']['state'])->toBe('NOT_RUN')
         ->and($decision['blockers'])->toContain('pest');
 });
 
@@ -50,7 +50,7 @@ it('does not let a clean Tarpit review override failed Pest', function () {
     ], ['app/Greeting.php' => '<?php return "Hello";']);
 
     expect($decision['completed'])->toBeFalse()
-        ->and($decision['outcomes']['pest']['state'])->toBe('fail')
+        ->and($decision['outcomes']['pest']['state'])->toBe('FAIL')
         ->and($decision['blockers'])->toContain('pest');
 });
 
@@ -68,5 +68,5 @@ it('requires a valid parallel join when parallel mode is used', function () {
     ], ['app/Greeting.php' => '<?php return "Hello";']);
 
     expect($decision['completed'])->toBeTrue()
-        ->and($decision['outcomes']['parallel_join'])->toBe(['state' => 'pass', 'policy' => 'required']);
+        ->and($decision['outcomes']['parallel_join'])->toBe(['state' => 'PASS', 'policy' => 'required']);
 });
