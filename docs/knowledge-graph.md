@@ -1,40 +1,31 @@
 ---
 layout: default
-title: Local Laravel knowledge
+title: Laravel knowledge
 ---
 
-# Local Laravel knowledge
+# Laravel knowledge
 
-Molly can build a small Laravel knowledge graph inside your project. Agents can
-use it to find connected documentation and framework source without adding a
-hosted graph database or sending the whole manual to a model.
+Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The first slice covers Laravel queues. It connects queue concepts to the pinned
-Laravel documentation bundled with Molly and to symbols in the installed
-framework. Later slices can add other Laravel chapters and separate namespaces
-for Pest, PHP, NativePHP, Super Native, and selected packages.
+The current version covers Laravel queues only.
 
 ## Build the graph
-
-Run the index command from your Laravel project:
 
 ```bash
 php artisan molly:knowledge:index laravel
 ```
 
-Molly detects the installed Laravel major version. You can state the expected
-version when a script should fail on a mismatch:
+Molly detects the installed Laravel major version and rebuilds the snapshot for that version.
+
+For a script that should fail when the installed version is not what you expect:
 
 ```bash
 php artisan molly:knowledge:index laravel --laravel-version=13
 ```
 
-The command rebuilds that Laravel version as one snapshot. Running it twice
-does not add duplicate nodes or relationships.
+Running the index more than once does not create duplicate logical nodes or relationships.
 
-## Ask a question
-
-Search for a concept after indexing:
+## Query it
 
 ```bash
 php artisan molly:knowledge:query Queue
@@ -42,52 +33,81 @@ php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
 ```
 
-A query starts with an exact concept or symbol match, then falls back to a
-partial name match. It returns connected nodes in a stable order. Depth can be
-0 through 3, and the result can contain at most 40 nodes. These limits keep an
-agent request small.
+A query first looks for an exact concept or symbol. If there is no exact match, it falls back to a partial name match.
 
-Use `--json` for scripts. The `molly_knowledge` MCP tool returns the same
-structured result to an agent and does not change the graph.
+The result is intentionally small:
 
-## Read the provenance
+- depth: 0 through 3
+- maximum nodes: 40
+- stable result ordering
+- optional relationship filters
 
-Every returned node and relationship has a `sources` array. A source records:
+Use `--json` for scripts.
 
-- its namespace and Laravel version;
-- whether it came from documentation or framework source;
-- its documentation URL or local source path;
-- its pinned revision and SHA-256 digest;
-- its documentation retrieval date or PHP symbol when available.
+## What is in the queue graph
 
-Molly does not report a connection that the indexer did not create. The first
-queue index contains direct relationships such as `documented_in`,
-`configured_by`, `implements`, `uses`, and `tested_by`.
+The first index connects concepts such as:
+
+- jobs
+- `ShouldQueue`
+- retries
+- middleware
+- queue testing
+- relevant documentation sections
+- relevant framework symbols
+
+Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
+
+## Provenance
+
+Every returned node and relationship has source information. A source can identify:
+
+- the Laravel version
+- documentation or framework source
+- documentation URL or local source path
+- pinned revision and digest
+- retrieval date or PHP symbol when available
+
+Molly does not invent a relationship at query time. The query can only return relationships created by the indexer.
 
 ## Local storage
 
-The default database is `.molly/knowledge.sqlite` in the host application.
-`.molly/` should remain in `.gitignore`. Delete the database whenever you want
-to rebuild it.
+By default, Molly stores the graph here:
 
-Set another local path with:
+```text
+.molly/knowledge.sqlite
+```
+
+The file is disposable. Delete it and rebuild whenever you want.
+
+To use another local path:
 
 ```dotenv
 MOLLY_KNOWLEDGE_DATABASE=.molly/another-name.sqlite
 ```
 
-Molly uses PDO SQLite directly. This release does not require Neo4j, a hosted
-service, or a Burdgen package.
+Molly uses PDO SQLite directly. No hosted graph database is required.
 
-## Burdgen reuse review
+## Current scope
 
-The implementation review covered Burdgen's proposal graph records,
-visualizer, and topology projection. They confirmed useful rules for stable
-identities, explicit evidence, and bounded output. Those classes depend on
-Burdgen-specific proposal and presentation models, so Molly did not copy them.
-The graph contracts, SQLite store, indexer, commands, MCP tool, and tests in
-this slice are Molly-owned code.
+Current:
 
-The separate project and blocker graph remains tracked in MME-5219. It can use
-these small graph records after this storage contract is reviewed, without
-adding project-work concepts to the Laravel queue index.
+- Laravel queues
+- bundled queue documentation guidance
+- matching installed framework source
+- local version-aware SQLite storage
+- CLI and read-only MCP queries
+
+Planned later:
+
+- more Laravel documentation areas
+- separate namespaces for Pest, PHP, NativePHP, Super Native, and selected packages
+- a separate project and blocker graph
+
+The project graph is separate work. It should reuse the small graph records without mixing project tasks into the Laravel queue index.
+
+## Next
+
+- [Agents and MCP](agents.md)
+- [Command reference](reference/commands.md)
+- [Configuration](reference/configuration.md)

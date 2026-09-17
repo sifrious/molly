@@ -5,48 +5,48 @@ title: Troubleshooting
 
 # Troubleshooting
 
-Start with the saved evidence. A failed run can contain applied edits, passing checks, and one failed check. Read each result before retrying.
+Start with saved evidence instead of retrying blindly.
+
+Run these first:
 
 ```bash
 php artisan molly:doctor --json
-php artisan molly:task health-check --json
+php artisan molly:task TASK --json
 php artisan molly:show RUN_ID --verbose
 ```
 
-Replace `health-check` with your task nickname or UUID, and `RUN_ID` with the run ID from Molly's output. `molly:show` reads the saved report without running the model again. A successful lookup exits zero even when the saved run failed. `molly:start` and `molly:retry` exit zero only when the new run completes.
+Replace `TASK` and `RUN_ID` with the values from your run.
 
-## Doctor reports a failed check
+## Doctor fails
 
-`molly:doctor --json` includes a `code` for each check. Resolve failed checks, clear cached configuration, then run doctor again.
-
-| Code | What to check |
-| --- | --- |
-| `migration_missing` | Run `php artisan migrate` in the host application after reviewing pending migrations. Molly needs task, run, plan, and thread-association tables, including nickname, context-snapshot, and journal-status columns. |
-| `database_unavailable` | Check the application's database connection and credentials. Molly uses the host application's database configuration. |
-| `pest_missing` | Install Pest 4 in the selected workspace. `--workspace` must point to the project that contains `vendor/bin/pest`. |
-| `amp_unavailable` | Check `amp usage` and the account login. Run `php artisan molly:setup --agent=amp` to use Amp's login flow. |
-| `parallel_process_groups_unavailable` | Enable PHP's `posix_setsid` and `posix_kill`, or set `parallel_checks` to `false` in `config/molly.php`. |
-| `model_not_configured` | Set `MOLLY_LOCAL_MODEL` in `.env` to a model listed by `ollama list`. |
-| `model_not_local` | Select a local model whose name does not contain `cloud`. |
-| `ollama_config_invalid` | Use the `ollama` driver, a loopback HTTP URL, a local model name, and a positive integer `molly.timeout`. |
-| `ollama_unreachable` | Start the Ollama application or server. Check `OLLAMA_URL` and run `ollama list`. |
-| `ollama_response_invalid` | Confirm that the configured port serves Ollama. Doctor expects a successful `/api/tags` response containing a model list. |
-| `model_missing` | Pull the configured model or correct `MOLLY_LOCAL_MODEL` to match the installed name. |
-| `clever_disabled` | Use `APP_ENV=local` or `testing` and remove a false `MOLLY_COMPLEXITY_ENABLED` override. Measurements stay disabled in production. |
-| `clever_unavailable` | Check the package installation and application logs. Clever ships inside Molly; installing another Clever package is unnecessary. |
-
-After changing `.env` or published configuration:
+After changing `.env` or Molly configuration, always run:
 
 ```bash
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-Restart long-running queue workers after changing configuration. See the [configuration reference](reference/configuration.md) for keys and defaults.
+Common doctor codes:
+
+| Code | What to do |
+| --- | --- |
+| `migration_missing` | Review pending migrations, then run `php artisan migrate`. |
+| `database_unavailable` | Fix the host application's database connection. |
+| `pest_missing` | Install Pest 4 in the selected workspace. |
+| `amp_unavailable` | Check `amp usage` and Amp login. |
+| `parallel_process_groups_unavailable` | Install POSIX support or set `parallel_checks` to `false`. |
+| `model_not_configured` | Set `MOLLY_LOCAL_MODEL` to a model from `ollama list`. |
+| `model_not_local` | Choose a local model instead of a cloud model name. |
+| `ollama_unreachable` | Start Ollama and check `OLLAMA_URL`. |
+| `model_missing` | Pull the configured model or correct the model name. |
+| `clever_disabled` | Use local/testing or remove an explicit false override. |
+| `clever_unavailable` | Check the package install and application logs. |
+
+Restart long-running queue workers after configuration changes.
 
 ## Composer cannot install Molly
 
-Molly requires PHP 8.3 or later, the DOM extension, and Laravel 13 components. Check the PHP version used by the terminal and Composer:
+Check the runtime Composer is using:
 
 ```bash
 php --version
@@ -54,139 +54,132 @@ composer show laravel/framework
 composer check-platform-reqs
 ```
 
-Use the public VCS repository and the explicit `dev-main` requirement from [getting started](getting-started.md#install-molly). No tagged Molly version is available yet. Read Composer's conflict output before changing existing application dependencies.
+Molly currently requires PHP 8.3 or later and Laravel 13. There is no tagged release yet, so the documented install uses `dev-main`.
 
-## Pest fails or reports no usable evidence
+## Pest fails
 
-Read the Pest output in `molly:show RUN_ID --verbose`. Run the selected test directly from the workspace to reproduce the failure:
+Read the recorded test output:
 
 ```bash
-vendor/bin/pest tests/Feature/MollyHealthTest.php
+php artisan molly:show RUN_ID --verbose
 ```
 
-Replace the example path with the task's required test. Molly adds strict failure flags and JUnit output to the recorded command. A direct run without those flags may finish differently when tests are skipped, risky, or incomplete.
+Then run the required test directly:
 
-| Verification reason | Next step |
+```bash
+vendor/bin/pest tests/Feature/YourTest.php
+```
+
+Common reasons:
+
+| Reason | Meaning |
 | --- | --- |
-| `tests_failed` | Read the assertion failure or exception. Repair the behavior or ask Molly to retry with the saved diagnostics. Do not weaken assertions to make the result pass. |
-| `no_tests` | Check that the selected file contains an executable Pest test. A file containing only setup code cannot verify a task. |
-| `tests_skipped_or_incomplete` | Implement required tests and remove skip or todo markers only when the promised behavior exists. |
-| `test_timeout` | Check for a hanging test or slow dependency. Set a justified `test_timeout` in `config/molly.php`; Molly bounds the value to 1 through 3600 seconds. |
-| `test_process_failed` | Read process output for PHP errors, missing extensions, risky tests, warnings, or a nonzero Pest exit. |
-| `junit_missing` or `junit_invalid` | Inspect the recorded command, Pest output, and evidence path. Molly cannot accept missing or inconsistent test evidence. |
-| `evidence_directory_unwritable` | Check that the application user can create and write the run's evidence directory under `storage/molly`. |
+| `tests_failed` | An assertion or test execution failed. |
+| `no_tests` | Molly could not find an executed test in the required file. |
+| `tests_skipped_or_incomplete` | The required evidence is incomplete. |
+| `test_timeout` | Pest exceeded the configured timeout. |
+| `test_process_failed` | The Pest process exited unsuccessfully. |
+| `junit_missing` / `junit_invalid` | Molly cannot trust the recorded test evidence. |
 
-If a feature test cannot access the application or Laravel test helpers, check the `Tests\TestCase` binding in `tests/Pest.php`. The [getting started guide](getting-started.md#prepare-a-laravel-application) shows the binding.
+Do not weaken assertions just to make a retry pass.
 
-## Tarpit review blocks completion
+## Tarpit blocks completion
 
-A valid review includes checks A through G and consistent findings for selected files. Read each finding's path, line, problem, and recommendation.
+Read the finding's file, line, problem, classification, and recommendation.
 
-An accidental-complexity finding with `blocking` severity prevents completion. Warnings remain visible. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no valid review decision to accept.
+Only unresolved accidental complexity can be blocking. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no valid review evidence to accept.
 
-For a saved task, inspect the changes and use `molly:retry health-check` with your nickname or task UUID when another attempt is justified. Retry preserves the original task and file scope. A narrower task may work better when the model cannot keep the review and proposed edits within the selected files.
+A passing review cannot override failed tests.
 
-## A model call is slow or returns invalid changes
+## The model is slow or returns invalid changes
 
-Confirm that the model is installed and the Ollama server is responding. Doctor does not exercise model generation, so a passing setup check does not prove the model will meet Molly's response schema.
+The default proposal/review timeout is 180 seconds.
 
-The default model timeout is 180 seconds per request. Edit the positive integer `timeout` in `config/molly.php` if local inference needs longer, then clear cached configuration. Prefer a smaller task before increasing timeouts. Parallel review deadlines are bounded to 3600 seconds plus startup and cleanup time.
+Before raising it, try a smaller task. If you do change the timeout, edit `config/molly.php`, clear configuration, and run doctor again.
 
-`GENERATION_INVALID` means the model's response failed the proposal schema or named an unselected file. `CHANGES_INVALID` means the workspace rejected an empty proposal, a repeated file, or a file outside the allowed list. `FILE_TOO_LARGE` means selected content or a proposed replacement exceeded the configured file limit. `NO_CHANGES` means the proposal left the selected files unchanged. Molly does not mark unchanged output as verified new work.
+Useful failure names include:
+
+- `GENERATION_INVALID`: provider output did not match the proposal contract.
+- `CHANGES_INVALID`: the proposal was empty, duplicated a file, or named a disallowed file.
+- `FILE_TOO_LARGE`: selected content or a replacement exceeded the configured limit.
+- `NO_CHANGES`: the proposal did not change the selected files.
 
 ## A parallel check fails
 
-Use `molly:show RUN_ID --verbose` to read branch IDs, timestamps, failure classifications, and result references.
-
-| Classification or error | Meaning and next step |
-| --- | --- |
-| `branch_start_failed` | The host could not launch the child check. Read the recorded error and check the PHP executable, host `artisan`, and evidence directory. |
-| `branch_timeout` | A check exceeded its deadline. Read the affected branch and its timeout configuration. |
-| `branch_cancelled` | The task received a stop request. Inspect applied changes before retrying. |
-| `branch_result_invalid` | The child result was missing or did not match the expected branch and attempt. Read the recorded error. A process exit alone is not passing evidence. |
-| `CHECK_PROCESS_GROUP_UNAVAILABLE` | The check could not establish the POSIX process group needed for cleanup. Resolve the PHP environment or select serial checks explicitly. |
-
-Both branches must pass and record results. A passing Pest branch cannot replace missing review evidence, and a passing review cannot replace failed tests.
-
-## A task stays running after the process exits
-
-Read the task and latest run first. A recorded `running` status may outlive the process that wrote the status.
+Use:
 
 ```bash
-php artisan molly:task health-check
-php artisan molly:stop health-check
-php artisan molly:task health-check
+php artisan molly:show RUN_ID --verbose
 ```
 
-Stop saves a request for an active run. Molly checks stop requests between stages and before applying generated changes. Generation must finish before Molly can honor the request. Parallel checks receive cancellation; serial checks finish the active test or review before stopping.
+Look for the failing branch and classification.
 
-If the original process has exited, stop settles an interrupted task only after the task, workspace, and active-check locks are free. The attempt records `RUN_INTERRUPTED` and retains saved evidence. An active child check may still own a lock after its parent exits.
+Common values:
 
-Do not delete `.molly` lock files to force a retry. `WORKSPACE_BUSY` means Molly could not acquire a required lock. Wait for active execution to stop or inspect the remaining process before running another attempt. `WORKSPACE_LOCK_INVALID` indicates an invalid lock path or a permissions problem, not proof that execution has stopped.
+- `branch_start_failed`
+- `branch_timeout`
+- `branch_cancelled`
+- `branch_result_invalid`
+- `CHECK_PROCESS_GROUP_UNAVAILABLE`
+
+Both Pest and review branches need valid results. One passing branch cannot stand in for the other.
+
+## A task is stuck in `running`
+
+Read it before doing anything else:
+
+```bash
+php artisan molly:task TASK
+php artisan molly:stop TASK
+php artisan molly:task TASK
+```
+
+Do not delete `.molly` lock files to force a retry. `WORKSPACE_BUSY` means Molly could not acquire a lock. Check whether work is still running first.
 
 ## Retry is rejected
 
-`molly:start` accepts pending tasks. `molly:retry` accepts failed or stopped tasks. A completed task cannot be retried.
+`molly:start` is for pending tasks. `molly:retry` is for failed or stopped tasks.
 
-`ATTEMPT_LIMIT_REACHED` means the task used the configured total number of attempts. The default is three, including the first run. Inspect previous evidence before changing the task's scope or configuration. `molly.max_attempts` accepts integers from 1 through 10. Molly never retries automatically.
+`ATTEMPT_LIMIT_REACHED` means the task has used its configured number of attempts. The default is three total attempts.
 
-Run `php artisan molly:advice health-check` for an explanation of the allowed next step. Optional TypeSafe advice cannot override the attempt limit or turn failed evidence into a pass. See [task advice](task-advice.md).
-
-## A journal or connection check is unavailable
-
-Journal warnings do not invalidate a saved task or completed run. Correct the reported path or permission problem, then run `php artisan molly:journal health-check --project`. Molly rejects journal destinations that pass through symbolic links. See [journal behavior](journal.md).
-
-For Amp lookup, `unknown` means Molly lacks a usable current observation. A saved task association does not prove a live connection. A successful command can return an unavailable observation; scripts must inspect `status` and each match's `connection`. See [connection states](connections.md).
-
-## A task nickname is rejected or no longer resolves
-
-`TASK_NAME_INVALID` means the name does not meet Molly's rules. Start with an ASCII letter and use 1 through 64 ASCII letters, digits, or hyphens. UUID-shaped names are reserved. Molly trims surrounding spaces and stores names in lowercase.
-
-`TASK_NAME_TAKEN` means another task in the host application already uses the name. Choose another name. Renaming keeps the task's UUID and history, but the old nickname no longer identifies the task. Run `php artisan molly:tasks` to find the current nickname or UUID.
-
-If an upgraded installation reports a missing `nickname` column, run `php artisan migrate` in the host application after reviewing pending migrations.
-
-## Workspace contents changed during execution
-
-`WORKSPACE_CHANGED` can occur before Molly applies the proposal or after verification. Read the complete message to identify the stage. Another editor, process, or test may have changed a selected file.
-
-Review the current files against the saved hashes and your Git diff. Avoid editing selected files while Molly runs. Failed verification does not roll back an applied proposal.
-
-`WORKSPACE_WRITE_FAILED` means Molly could not finish applying the proposal and restored the original selected contents. `WORKSPACE_ROLLBACK_FAILED` lists files Molly could not restore. Inspect those files before continuing.
-
-## Clever is skipped or unavailable
-
-Read each probe's status and caveats in the run report. Git-dependent probes can be skipped when the checkout has no commits. A skipped probe does not count as a passing measurement, but the skipped probe alone does not block a run.
-
-`CLEVER_UNAVAILABLE` stops the run when measurements are disabled or a scan fails. Inspect the report reason and details. Standalone commands use the host application's root or `molly-complexity.root`; select the same project when comparing standalone measurements with a run.
-
-See [verification and complexity review](verification.md) for the commands and measurement limits.
-
-## The web interface returns 404 or rejects access
-
-Check `MOLLY_UI_ENABLED=true`, clear cached configuration, and use the configured prefix, which defaults to `/molly`.
-
-The interface requires `APP_ENV=local` or `testing`, a direct loopback connection, and a `localhost`, `127.0.0.1`, or `[::1]` host. A custom development domain, remote client, or production environment fails the local access guard. The same guard applies to Livewire status requests.
-
-The interface has no login or approval controls. Open the local server directly rather than through a reverse proxy or tunnel. Follow the [web interface setup](web-interface.md).
-
-## Start was requested, but no attempt appears
-
-Web start and retry submit a queue job. The confirmation means the request was queued, not that a run started. Check the worker output and failed jobs:
+For a saved explanation of the next allowed action:
 
 ```bash
-php artisan queue:failed
+php artisan molly:advice TASK
 ```
 
-The queue connection must use database, Redis, Beanstalkd, or SQS. For database, Redis, and Beanstalkd, set the connection's `retry_after` in `config/queue.php` above 3600 seconds. The [web interface guide](web-interface.md) uses 3700 seconds. SQS needs a visibility timeout above 3600 seconds in AWS.
+## The web UI returns 404 or no run appears
 
-Database queues also need the host application's jobs and failed-jobs tables. After correcting queue setup, clear cached configuration and start a worker:
+Check:
+
+```dotenv
+APP_ENV=local
+MOLLY_UI_ENABLED=true
+```
+
+Then:
 
 ```bash
 php artisan config:clear
-php artisan queue:work --tries=1 --timeout=3600
+php artisan queue:failed
 ```
 
-If an existing worker loaded old configuration, stop and restart that worker. Review the current task state before submitting another request. Duplicate queue requests cannot execute the same task concurrently, but a rejected request can still appear as a failed queue job.
+Make sure the queue worker is running and the queue reservation/visibility timeout is above 3600 seconds.
 
-CLI execution through `molly:start health-check` does not require a queue worker. Use your task nickname or UUID.
+CLI execution with `molly:start` does not need a queue worker.
+
+## Workspace changed during a run
+
+`WORKSPACE_CHANGED` means a selected file no longer matches the saved content Molly expected at that stage.
+
+Avoid editing selected files while Molly runs. Inspect the current Git diff and the saved hashes before retrying.
+
+Failed verification does not automatically restore an applied proposal.
+
+## Still stuck?
+
+Use the references for exact settings and return fields:
+
+- [Command reference](reference/commands.md)
+- [Configuration](reference/configuration.md)
+- [Verification](verification.md)

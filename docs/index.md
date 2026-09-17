@@ -5,45 +5,58 @@ title: Molly documentation
 
 # Molly documentation
 
-Give Molly a small coding task and choose the files Molly may change. Molly asks your Amp agent or local Ollama model for edits, runs a required Pest test file, and reviews the changes for unnecessary complexity.
+Molly helps you give an AI agent a small Laravel task, limit the files it may edit, and require real test evidence before the task can complete.
 
-The result includes test evidence, all seven Tarpit checks, and separate Clever measurements before and after the edit. A failed required check keeps the run from completing.
+If this is your first time here, start with [Getting started](getting-started.md). Do not start with the reference pages.
 
-## Start here
+## Pick what you want to do
 
-[Install Molly and run your first task](getting-started.md). The guide covers a Laravel 13 application, PHP 8.3 or later, agent setup, and the result you should expect.
-
-Then choose the next guide for your work:
-
-| You want to | Read |
+| I want to... | Read this |
 | --- | --- |
-| Save tasks, inspect attempts, retry a failure, or import an issue | [Manage tasks](tasks.md) |
-| Review a project before turning the plan into tasks | [Plan with cited guidance](planning.md) |
-| Look up connected Laravel queue concepts and source | [Use local Laravel knowledge](knowledge-graph.md) |
-| Connect Amp or choose a local model | [Agents and MCP](agents.md) |
-| Decide what to do after a failure | [Get next-step advice](task-advice.md) |
-| Find a task's latest or earlier Amp thread | [Task connections](connections.md) |
-| Create and follow tasks in a browser | [Use the local web interface](web-interface.md) |
-| Understand a completed or failed run | [Read verification and complexity evidence](verification.md) |
-| Diagnose a setup error or interrupted run | [Troubleshoot Molly](troubleshooting.md) |
+| Install Molly and run one small task | [Getting started](getting-started.md) |
+| Create, start, retry, stop, or inspect tasks | [Manage tasks](tasks.md) |
+| Understand why a run passed or failed | [Verification](verification.md) |
+| Fix a setup or execution problem | [Troubleshooting](troubleshooting.md) |
+| Choose Amp or Ollama, or use MCP | [Agents and MCP](agents.md) |
+| Break a larger request into tasks | [Planning](planning.md) |
+| Query Laravel queue knowledge | [Laravel knowledge](knowledge-graph.md) |
+| Use Molly in a browser | [Local web interface](web-interface.md) |
+| Ask what to do after a failed task | [Task advice](task-advice.md) |
+| Link a task to an Amp thread | [Task connections](connections.md) |
+| Export local Markdown journals | [Journals](journal.md) |
+| Compare selected component source hashes | [Component snapshots](component-snapshots.md) |
 
-## Look up a detail
+## Reference
+
+Use these when you already know what you are looking for:
 
 - [Command reference](reference/commands.md)
-- [Configuration and environment variables](reference/configuration.md)
+- [Configuration reference](reference/configuration.md)
 - [Glossary](reference/glossary.md)
-- [Contributing and recorded verification](contributing.md)
-- [Proposed Orb connections and execution targets](execution-targets.md)
-- [Documentation publishing plan](publishing.md)
 
-## Current release scope
+## Maintainer docs
 
-These pages describe the current `dev-main` build. No alpha release is tagged yet. The CLI and local web interface share application actions. Pest and Tarpit review can run in parallel after Molly applies the selected edits. Clever commands are included in Molly.
+These pages are not normal first-run documentation:
 
-The build includes guided planning, nicknames, Amp and Ollama execution, MCP tools, optional TypeSafe planning and commit review, and failed-task advice. The [local Laravel knowledge graph](knowledge-graph.md) currently covers queues. [Component snapshots](component-snapshots.md) record selected source hashes. [Local journals](journal.md) export saved task and attempt evidence to Markdown.
+- [Contributing](contributing.md) explains the package test and CI workflow.
+- [Execution targets](execution-targets.md) describes planned remote execution work. It is not current user behavior.
+- [Publishing](publishing.md) is the maintainer plan for the documentation site.
 
-Bloom integration, remote execution-target selection, tracked GitHub-to-Pest todos, approval controls, visual component previews, and complete structured lifecycle event history remain unfinished. The original alpha checklist includes those capabilities.
+## How Molly decides a task is done
 
-[Task connections](connections.md) record exact task-to-Amp-thread associations and read current executor status through CLI, MCP, and web. Those observations do not establish a verified Orb identity. The [Orb plan](execution-targets.md) describes the remaining connection-management work.
+The important order is:
 
-Use a trusted, disposable checkout. The file allowlist limits the writer's proposals. Pest runs PHP with your local user's permissions, and Molly may edit the selected test file. Review the changed files and assertions before accepting a result.
+1. The agent proposes code.
+2. Molly applies only allowed-file changes.
+3. Pest produces test evidence.
+4. Tarpit reviews the supplied change for complexity.
+5. Molly records measurements separately.
+6. Required failures keep the run from completing.
+
+The model does not get to declare its own work correct. A passing review never turns failed tests into a pass.
+
+## Current scope
+
+These docs describe the current `dev-main` build. No alpha release is tagged yet.
+
+The Laravel knowledge graph currently covers queues. Remote Orb identity and remote execution selection are still planned. Visual component previews are also not implemented.
