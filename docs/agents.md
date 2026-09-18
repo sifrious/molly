@@ -76,7 +76,7 @@ The server is registered only in `local` and `testing` environments. Molly does 
 | Tool | What it does |
 | --- | --- |
 | `molly_guide` | Reads Molly's bundled planning guide and cited source passages. |
-| `molly_knowledge` | Reads the local Laravel knowledge graph. It never changes the graph. |
+| `molly_knowledge` | Reads the local Laravel or NativePHP knowledge graph. It never changes the graph. |
 | `molly_plan` | Creates, reads, answers, or reviews a saved plan. |
 | `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, human approval, handoff envelopes, and lifecycle requests. Approve requires `approve=true` and does not open a pull request. |
 | `molly_connections` | Reads saved Amp thread associations and optional current Amp connection observations. |
@@ -89,11 +89,12 @@ Build the graph first:
 
 ```bash
 php artisan molly:knowledge:index laravel
+php artisan molly:knowledge:index nativephp
 ```
 
-Then `molly_knowledge` can return a bounded, version-matched queue, routing, testing, validation, container, Eloquent, or events neighborhood with source provenance.
+Then `molly_knowledge` can return a bounded, version-matched Laravel or NativePHP neighborhood with source provenance. NativePHP queries need `namespace=nativephp` and `version=desktop-2` or `mobile-4`.
 
-Molly also attaches a small `laravel_knowledge` neighborhood to implementation prompts. It is advisory and cannot change allowed files, the protected test, or completion.
+Molly also attaches a small `laravel_knowledge` neighborhood to implementation prompts, and `nativephp_knowledge` when the task names desktop or mobile. That context is advisory and cannot change allowed files, the protected test, or completion.
 
 Read [Laravel knowledge](knowledge-graph.md) for current scope and limits.
 

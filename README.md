@@ -100,7 +100,7 @@ See the [command reference](docs/reference/commands.md) for the full list.
 
 ## Laravel knowledge graph
 
-Molly can build a small local graph from its bundled Laravel queue, routing, testing, validation, container, eloquent, and events guidance and the Laravel source installed in your project:
+Molly can build a small local graph from its bundled Laravel queue, routing, testing, validation, container, eloquent, and events guidance and the Laravel source installed in your project. NativePHP Desktop v2 and Mobile v4 live in a separate namespace:
 
 ```bash
 php artisan molly:knowledge:index laravel
@@ -111,9 +111,12 @@ php artisan molly:knowledge:query Validation
 php artisan molly:knowledge:query Container
 php artisan molly:knowledge:query Eloquent
 php artisan molly:knowledge:query Events
+php artisan molly:knowledge:index nativephp
+php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
+php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
 ```
 
-The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, version-aware, and currently covers queues, routing, testing, validation, the container, Eloquent, and events.
+The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, and version-aware. Laravel knowledge covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 stay separate.
 
 Read [Laravel knowledge](docs/knowledge-graph.md) for query examples and limits.
 
@@ -162,7 +165,7 @@ Reference:
 
 ## What is current and what is planned
 
-Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, and Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events.
+Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, and NativePHP Desktop v2 and Mobile v4 knowledge.
 
 These are not finished yet:
 
@@ -170,7 +173,7 @@ These are not finished yet:
 - Bloom-owned task UI, diffs, and pull requests
 - GitHub pull request opening and merge
 - Visual Bloom preview display
-- Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, and events
+- Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, and NativePHP
 
 Planned behavior is kept separate in [Execution targets](docs/execution-targets.md).
 

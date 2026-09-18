@@ -3,8 +3,10 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\CollectNativePhpKnowledge;
 use Sifrious\Molly\Actions\CollectRunKnowledge;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
+use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
 use Sifrious\Molly\Actions\QueryKnowledgeGraph;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphEdge;
@@ -152,6 +154,64 @@ it('rejects a requested Laravel version that is not installed', function () {
 
     expect(fn () => app(IndexLaravelKnowledge::class)->handle($other))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_VERSION_MISMATCH');
+});
+
+it('indexes NativePHP desktop and mobile as separate versions', function () {
+    $indexed = app(IndexNativePhpKnowledge::class)->handle();
+    $desktop = app(QueryKnowledgeGraph::class)->handle('Desktop', 'desktop-2', 1, 20, [], 'nativephp');
+    $mobile = app(QueryKnowledgeGraph::class)->handle('Mobile', 'mobile-4', 1, 20, [], 'nativephp');
+
+    expect($indexed)->toMatchArray(['namespace' => 'nativephp', 'versions' => ['desktop-2', 'mobile-4']])
+        ->and($indexed['sources'])->toBe(2)
+        ->and(array_column($desktop['nodes'], 'label'))->toContain('NativePHP', 'Desktop')
+        ->not->toContain('Mobile')
+        ->and($desktop['namespace'])->toBe('nativephp')
+        ->and($desktop['version'])->toBe('desktop-2')
+        ->and(array_column($mobile['nodes'], 'label'))->toContain('NativePHP', 'Mobile')
+        ->not->toContain('Desktop')
+        ->and($mobile['version'])->toBe('mobile-4');
+    foreach ([...$desktop['nodes'], ...$desktop['edges'], ...$mobile['nodes'], ...$mobile['edges']] as $record) {
+        expect($record['sources'])->not->toBeEmpty();
+    }
+});
+
+it('indexes and queries NativePHP through Artisan with JSON output', function () {
+    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'nativephp', '--json' => true]))->toBe(0);
+    $indexed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($indexed)->toMatchArray(['namespace' => 'nativephp', 'versions' => ['desktop-2', 'mobile-4']]);
+
+    expect(Artisan::call('molly:knowledge:query', [
+        'concept' => 'Mobile', '--namespace' => 'nativephp', '--nativephp-version' => 'mobile-4', '--depth' => '1', '--json' => true,
+    ]))->toBe(0);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($result['namespace'])->toBe('nativephp')
+        ->and($result['version'])->toBe('mobile-4')
+        ->and(array_column($result['nodes'], 'label'))->toContain('Mobile')
+        ->not->toContain('Desktop');
+});
+
+it('rejects NativePHP index with a Laravel version flag', function () {
+    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'nativephp', '--laravel-version' => '13', '--json' => true]))->toBe(1);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($result['error'])->toStartWith('KNOWLEDGE_VERSION_INVALID');
+});
+
+it('collects NativePHP knowledge only when the task names a track', function () {
+    $mobile = app(CollectNativePhpKnowledge::class)->handle(
+        'Add a NativePHP mobile task list.',
+        ['app/TaskList.php' => null],
+        'tests/TaskListTest.php',
+    );
+    $omitted = app(CollectNativePhpKnowledge::class)->handle(
+        'Validate the queued greeting route.',
+        ['app/Greeting.php' => null],
+        'tests/GreetingTest.php',
+    );
+
+    expect($mobile['status'])->toBeIn(['advisory', 'unavailable'])
+        ->and($mobile['concepts'])->toBe(['Mobile'])
+        ->and($omitted['status'])->toBe('omitted')
+        ->and($omitted['concepts'])->toBe([]);
 });
 
 it('collects bounded advisory knowledge for a run without requiring an index', function () {

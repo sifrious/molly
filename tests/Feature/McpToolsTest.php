@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
+use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\ReviewChanges;
@@ -60,6 +61,19 @@ it('returns indexed Laravel knowledge with provenance', function () {
     MollyServer::tool(MollyKnowledge::class, ['concept' => 'Queue', 'version' => '13', 'depth' => 3, 'limit' => 40])
         ->assertOk()
         ->assertSee(['Queue', 'Retry', 'ShouldQueue', 'sources', 'revision']);
+
+    File::delete($database);
+});
+
+it('returns indexed NativePHP knowledge without mixing desktop and mobile', function () {
+    $database = sys_get_temp_dir().'/molly-mcp-knowledge-'.Str::uuid().'.sqlite';
+    config()->set('molly.knowledge.database', $database);
+    app(IndexNativePhpKnowledge::class)->handle();
+
+    MollyServer::tool(MollyKnowledge::class, ['concept' => 'Mobile', 'namespace' => 'nativephp', 'version' => 'mobile-4', 'depth' => 1, 'limit' => 20])
+        ->assertOk()
+        ->assertSee(['Mobile', 'nativephp', 'mobile-4', 'sources', 'revision'])
+        ->assertDontSee('Desktop v2');
 
     File::delete($database);
 });

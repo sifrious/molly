@@ -11,7 +11,10 @@ use Sifrious\Molly\Agents\LocalOllama;
 
 class GenerateChanges
 {
-    public function __construct(private CollectRunKnowledge $knowledge) {}
+    public function __construct(
+        private CollectRunKnowledge $knowledge,
+        private CollectNativePhpKnowledge $nativephp,
+    ) {}
 
     /**
      * @param  array<string, string|null>  $files
@@ -26,6 +29,7 @@ class GenerateChanges
             'required_test' => $testPath,
             'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
             'laravel_knowledge' => $this->knowledge->handle($prompt, $files, $testPath),
+            'nativephp_knowledge' => $this->nativephp->handle($prompt, $files, $testPath),
             ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
         ], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {

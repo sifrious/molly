@@ -106,6 +106,9 @@ php artisan molly:knowledge:query Eloquent
 php artisan molly:knowledge:query Events
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
+php artisan molly:knowledge:index nativephp
+php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
+php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
 ```
 
 Query limits:
@@ -116,6 +119,8 @@ Query limits:
 
 The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
 
+NativePHP queries need `--namespace=nativephp` and `--nativephp-version=desktop-2` or `--nativephp-version=mobile-4`. Desktop and Mobile stay separate. Installed NativePHP packages are not required.
+
 ## Project graph
 
 ```bash
@@ -124,7 +129,7 @@ php artisan molly:project:query TASK_UUID
 php artisan molly:project:query pest --relation=blocked_by
 ```
 
-The project graph is separate from Laravel queue, routing, testing, validation, container, Eloquent, and events knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
+The project graph is separate from Laravel and NativePHP knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
 
 ## GitHub issue import
 

@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current Laravel namespace covers queues, routing, testing, validation, the container, Eloquent, and events. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
+The current Laravel namespace covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate `nativephp` namespace. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 
@@ -38,6 +38,9 @@ php artisan molly:knowledge:query Eloquent
 php artisan molly:knowledge:query Events
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
+php artisan molly:knowledge:index nativephp
+php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
+php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
 ```
 
 A query first looks for an exact concept or symbol. If there is no exact match, it falls back to a partial name match.
@@ -75,6 +78,8 @@ The Eloquent slice connects `Eloquent`, the Introduction section, and the instal
 
 The events slice connects `Events`, the Introduction section, and the installed `Illuminate\Events\Dispatcher` symbol.
 
+The NativePHP namespace indexes bundled Desktop v2 and Mobile v4 introductions as separate versions (`desktop-2` and `mobile-4`). A Desktop query cannot return Mobile nodes. Molly does not require or claim an installed NativePHP package.
+
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
 
 The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
@@ -91,7 +96,7 @@ Every returned node and relationship has source information. A source can identi
 
 Molly does not invent a relationship at query time. The query can only return relationships created by the indexer.
 
-Implementation runs receive a bounded `laravel_knowledge` neighborhood chosen from the task, allowed files, and required test. That context is advisory. Missing or empty neighborhoods do not fail the run, widen file scope, or override Pest.
+Implementation runs receive a bounded `laravel_knowledge` neighborhood chosen from the task, allowed files, and required test. When the task names NativePHP desktop or mobile, they also receive `nativephp_knowledge`. That context is advisory. Missing or empty neighborhoods do not fail the run, widen file scope, or override Pest.
 
 ## Local storage
 
@@ -116,15 +121,16 @@ Molly uses PDO SQLite directly. No hosted graph database is required.
 Current:
 
 - Laravel queues, routing, testing, validation, the container, Eloquent, and events
+- NativePHP Desktop v2 and Mobile v4 as a separate namespace
 - bundled documentation excerpts for those areas
-- matching installed framework source
+- matching installed Laravel framework source
 - local version-aware SQLite storage
 - CLI and read-only MCP queries
 
 Planned later:
 
 - more Laravel documentation areas
-- separate namespaces for Pest, PHP, NativePHP, Super Native, and selected packages
+- separate namespaces for Pest, PHP, Super Native, and selected packages
 
 The project graph is separate work. It reuses the small graph records without mixing project tasks into the Laravel knowledge index.
 
