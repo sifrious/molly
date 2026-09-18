@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+run_timed() {
+  local label="$1"
+  shift
+  echo "==> ${label}"
+  local start
+  start="$(date +%s)"
+  "$@"
+  echo "==> ${label} ($(($(date +%s) - start))s)"
+}
+
+need_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+package_installed() {
+  dpkg-query -W -f '${Status}' "$1" 2>/dev/null | grep -qx 'install ok installed'
+}
+
+ensure_sury_php_repo() {
+  if [[ -f /etc/apt/sources.list.d/php.list ]] && [[ -f /usr/share/keyrings/debsuryorg-archive-keyring.gpg ]]; then
+    echo "Sury PHP repository already configured."
+    return
+  fi
+
+  local apt_helpers=()
+  for pkg in ca-certificates curl lsb-release; do
+    if ! package_installed "$pkg"; then
+      apt_helpers+=("$pkg")
+    fi
+  done
+  if ((${#apt_helpers[@]})); then
+    need_root apt-get update
+    need_root apt-get install -y "${apt_helpers[@]}"
+  fi
+
+  curl -fsSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
+  need_root dpkg -i /tmp/debsuryorg-archive-keyring.deb
+  rm -f /tmp/debsuryorg-archive-keyring.deb
+
+  local codename
+  codename="$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")"
+  need_root tee /etc/apt/sources.list.d/php.list >/dev/null <<EOF
+deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ ${codename} main
+EOF
+}
+
+install_php() {
+  local packages=(
+    php8.4-cli
+    php8.4-curl
+    php8.4-mbstring
+    php8.4-sqlite3
+    php8.4-xml
+    php8.4-zip
+  )
+  local missing=()
+  local pkg
+
+  for pkg in "${packages[@]}"; do
+    if ! package_installed "$pkg"; then
+      missing+=("$pkg")
+    fi
+  done
+
+  if ((${#missing[@]} == 0)); then
+    echo "PHP 8.4 packages already installed."
+    php -v
+    return
+  fi
+
+  ensure_sury_php_repo
+  need_root apt-get update
+  need_root apt-get install -y "${missing[@]}"
+  php -v
+}
+
+install_composer() {
+  if command -v composer >/dev/null && composer --version --no-ansi 2>/dev/null | grep -q 'Composer version 2'; then
+    echo "Composer 2 already installed."
+    composer --version --no-ansi
+    return
+  fi
+
+  local expected actual
+  expected="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
+  php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+  actual="$(php -r "echo hash_file('sha384', 'composer-setup.php');")"
+  if [[ "$expected" != "$actual" ]]; then
+    rm -f composer-setup.php
+    echo "ERROR: Invalid Composer installer checksum" >&2
+    exit 1
+  fi
+
+  php composer-setup.php --quiet --install-dir=/tmp --filename=composer
+  rm -f composer-setup.php
+  need_root mv /tmp/composer /usr/local/bin/composer
+  need_root chmod 755 /usr/local/bin/composer
+  composer --version --no-ansi
+}
+
+install_php_dependencies() {
+  composer install --no-interaction --prefer-dist --no-progress
+}
+
+write_orb_guidance() {
+  local dest="${HOME}/.config/amp/AGENTS.md"
+  local marker="# Molly orb toolchain"
+  mkdir -p "$(dirname "$dest")"
+  if [[ -f "$dest" ]] && grep -Fqx "$marker" "$dest"; then
+    echo "Orb toolchain notes already present."
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+  cat >> "$dest" <<'EOF'
+
+# Molly orb toolchain
+
+PHP 8.4, Composer 2, and package dependencies are installed by `.agents/setup`.
+
+Run package checks with `vendor/bin/pest` and `vendor/bin/pint --format agent`. Tests use in-memory SQLite. Do not start a database server.
+EOF
+}
+
+run_timed "Install PHP 8.4" install_php
+run_timed "Install Composer 2" install_composer
+run_timed "Install PHP dependencies" install_php_dependencies
+run_timed "Write orb toolchain notes" write_orb_guidance

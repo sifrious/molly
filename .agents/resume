@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v php >/dev/null; then
+  echo "php is missing; run .agents/setup" >&2
+  exit 1
+fi
+
+if ! command -v composer >/dev/null; then
+  echo "composer is missing; run .agents/setup" >&2
+  exit 1
+fi
+
+if [[ ! -f vendor/autoload.php ]]; then
+  echo "vendor/autoload.php is missing; run .agents/setup" >&2
+  exit 1
+fi
