@@ -112,14 +112,16 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     $indexed = app(IndexLaravelKnowledge::class)->handle($version);
     $result = app(QueryKnowledgeGraph::class)->handle('Queue', $version, depth: 3, limit: 40);
 
-    expect($indexed['sources'])->toBeGreaterThanOrEqual(7)
-        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(18)
+    expect($indexed['sources'])->toBeGreaterThanOrEqual(9)
+        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(20)
         ->and($indexed['version'])->toBe($version)
         ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'QueueFake::assertPushed');
     $routing = app(QueryKnowledgeGraph::class)->handle('Route', $version, depth: 1, limit: 20);
     expect(array_column($routing['nodes'], 'label'))->toContain('Route');
     $testing = app(QueryKnowledgeGraph::class)->handle('Pest', $version, depth: 1, limit: 20);
     expect(array_column($testing['nodes'], 'label'))->toContain('Pest');
+    $validation = app(QueryKnowledgeGraph::class)->handle('Validation', $version, depth: 1, limit: 20);
+    expect(array_column($validation['nodes'], 'label'))->toContain('Validation', 'Validator');
     foreach ([...$result['nodes'], ...$result['edges']] as $record) {
         expect($record['sources'])->not->toBeEmpty();
     }

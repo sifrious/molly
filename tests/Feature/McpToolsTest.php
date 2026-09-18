@@ -8,6 +8,13 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
+use Sifrious\Molly\Actions\MeasureComplexity;
+use Sifrious\Molly\Actions\RecordLifecycleEvent;
+use Sifrious\Molly\Actions\ReviewChanges;
+use Sifrious\Molly\Actions\StartTask;
+use Sifrious\Molly\Actions\VerifyChanges;
+use Sifrious\Molly\Agents\ChangeWriter;
+use Sifrious\Molly\Contracts\DisplayStatus;
 use Sifrious\Molly\Jobs\StartSavedTask;
 use Sifrious\Molly\Mcp\MollyGuide;
 use Sifrious\Molly\Mcp\MollyKnowledge;
@@ -148,6 +155,31 @@ it('rejects unsafe queue configuration without dispatching work', function (stri
 it('returns errors for missing saved records', function (string $operation, string $message) {
     MollyServer::tool(MollyTask::class, ['operation' => $operation, 'id' => (string) Str::uuid()])->assertHasErrors()->assertSee($message);
 })->with([['show', 'TASK_NOT_FOUND'], ['show_run', 'RUN_NOT_FOUND'], ['start', 'TASK_NOT_FOUND'], ['stop', 'TASK_NOT_FOUND']]);
+
+it('records human approval through MCP without opening a pull request', function () {
+    $scope = mcpTaskScope();
+    $task = app(CreateTask::class)->handle('Return Hello.', $scope['workspace'], $scope['paths'], $scope['test_path']);
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
+        'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']),
+        'findings' => [],
+    ]);
+    ChangeWriter::fake([['summary' => 'Return Hello.', 'files' => [['path' => 'app/Hello.php', 'content' => '<?php return "Hello";']]]])->preventStrayPrompts();
+    config(['molly.parallel_checks' => false]);
+    app(StartTask::class)->handle($task->id);
+
+    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id])->assertHasErrors(['approve']);
+    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id, 'approve' => false])
+        ->assertHasErrors()->assertSee('APPROVAL_UNCONFIRMED');
+
+    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id, 'approve' => true])->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('approved', true)->where('display_status', DisplayStatus::Approved->value)->where('task_id', $task->id)->etc());
+
+    $log = app(RecordLifecycleEvent::class)->load($scope['workspace']);
+    expect($log->displayStatus($task->id))->toBe(DisplayStatus::Approved)
+        ->and($log->events($task->id)[array_key_last($log->events($task->id))]->payload['pull_request_opened'] ?? true)->toBeFalse();
+});
 
 it('validates task arguments before saving or dispatching', function () {
     MollyServer::tool(MollyTask::class, ['operation' => 'create'])->assertHasErrors(['prompt', 'workspace', 'test path']);

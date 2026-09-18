@@ -44,6 +44,26 @@ it('records a pending stop without starting work', function () {
         ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain('created', 'stopped');
 });
 
+it('records rejected edits when the agent proposes no file changes', function () {
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn(['status' => 'ok', 'probes' => []]);
+    ChangeWriter::fake([['summary' => 'No change.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return null;']]]])->preventStrayPrompts();
+    config(['molly.parallel_checks' => false]);
+
+    $run = app(StartTask::class)->handle($task->id);
+    $log = app(RecordLifecycleEvent::class)->load($this->workspace);
+
+    expect($run->status)->toBe('failed')
+        ->and($log->displayStatus($task->id))->toBe(DisplayStatus::Failed)
+        ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain(
+            'created',
+            'agent_started',
+            'proposal_received',
+            'edits_rejected',
+            'failed',
+        );
+});
+
 it('asks for human approval after required checks pass', function () {
     $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
@@ -63,6 +83,9 @@ it('asks for human approval after required checks pass', function () {
         ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain(
             'created',
             'agent_started',
+            'proposal_received',
+            'edits_accepted',
+            'verification_started',
             'verification_finished',
             'approval_requested',
         );

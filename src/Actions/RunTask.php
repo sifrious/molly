@@ -94,11 +94,10 @@ class RunTask
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
-            if ($taskId !== null) {
-                $this->lifecycle->handle($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
-            }
+            $this->record($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
             $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+            $this->record($workspace->path, LifecycleEventType::ProposalReceived, $taskId, $run->id);
 
             $this->checkpoint($shouldStop, $recordProgress, 'Applying the proposed changes');
             if (! $allowTestEdits && is_string($testDigest)) {
@@ -114,13 +113,16 @@ class RunTask
             $run->update(['report' => $report]);
 
             if ($report['changes'] === []) {
+                $this->record($workspace->path, LifecycleEventType::EditsRejected, $taskId, $run->id, ['reason' => 'NO_CHANGES']);
                 throw new RuntimeException('NO_CHANGES: The agent returned no changes. The task was not verified as new work.');
             }
+            $this->record($workspace->path, LifecycleEventType::EditsAccepted, $taskId, $run->id);
 
             if (! is_bool(config('molly.parallel_checks', true))) {
                 throw new RuntimeException('PARALLEL_CONFIG_INVALID: Set molly.parallel_checks to true or false.');
             }
 
+            $this->record($workspace->path, LifecycleEventType::VerificationStarted, $taskId, $run->id);
             if (config('molly.parallel_checks', true)) {
                 $this->checkpoint($shouldStop, $recordProgress, 'Running Pest and Tarpit review in parallel');
                 $report['mode'] = 'parallel';
@@ -220,6 +222,16 @@ class RunTask
     {
         $report['snapshots']['after'] = $this->withPreview($workspace, $contents, 'after');
         $report['components'] = ['status' => 'compared', 'changes' => $workspace->componentChanges($report['changes'] ?? [], $before)];
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function record(string $workspace, LifecycleEventType $type, ?string $taskId, string $runId, array $payload = []): void
+    {
+        if ($taskId === null) {
+            return;
+        }
+
+        $this->lifecycle->handle($workspace, $type, $taskId, $runId, $payload);
     }
 
     private function checkpoint(?Closure $shouldStop, ?Closure $progress, string $message): void

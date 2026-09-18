@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current Laravel namespace covers queues, routing, and testing. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
+The current Laravel namespace covers queues, routing, testing, and validation. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 
@@ -32,6 +32,7 @@ Running the index more than once does not create duplicate logical nodes or rela
 php artisan molly:knowledge:query Queue
 php artisan molly:knowledge:query Route
 php artisan molly:knowledge:query Pest
+php artisan molly:knowledge:query Validation
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
 ```
@@ -62,6 +63,8 @@ The queue slice connects concepts such as:
 The routing slice connects `Route`, `routes/web.php`, the Basic Routing section, and the installed `Illuminate\Support\Facades\Route` symbol.
 
 The testing slice connects Pest, PHPUnit, `tests/Feature`, the Introduction section, and `Illuminate\Foundation\Testing\TestCase`.
+
+The validation slice connects `Validation`, the Introduction section, and the installed `Illuminate\Validation\Validator` symbol. It does not claim `Illuminate\Http\Request::validate`, which this package Request class does not implement.
 
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
 
@@ -101,8 +104,8 @@ Molly uses PDO SQLite directly. No hosted graph database is required.
 
 Current:
 
-- Laravel queues
-- bundled queue documentation guidance
+- Laravel queues, routing, testing, and validation
+- bundled documentation excerpts for those areas
 - matching installed framework source
 - local version-aware SQLite storage
 - CLI and read-only MCP queries
@@ -111,9 +114,8 @@ Planned later:
 
 - more Laravel documentation areas
 - separate namespaces for Pest, PHP, NativePHP, Super Native, and selected packages
-- a separate project and blocker graph
 
-The project graph is separate work. It should reuse the small graph records without mixing project tasks into the Laravel queue index.
+The project graph is separate work. It reuses the small graph records without mixing project tasks into the Laravel knowledge index.
 
 ## Next
 

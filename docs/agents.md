@@ -78,7 +78,7 @@ The server is registered only in `local` and `testing` environments. Molly does 
 | `molly_guide` | Reads Molly's bundled planning guide and cited source passages. |
 | `molly_knowledge` | Reads the local Laravel knowledge graph. It never changes the graph. |
 | `molly_plan` | Creates, reads, answers, or reviews a saved plan. |
-| `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, handoff envelopes, and lifecycle requests. |
+| `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, human approval, handoff envelopes, and lifecycle requests. Approve requires `approve=true` and does not open a pull request. |
 | `molly_connections` | Reads saved Amp thread associations and optional current Amp connection observations. |
 
 Task start and retry requests from MCP use the host application's queue. A queued request means Molly dispatched work. It does not mean the run already completed.
@@ -91,7 +91,7 @@ Build the graph first:
 php artisan molly:knowledge:index laravel
 ```
 
-Then `molly_knowledge` can return a bounded, version-matched queue, routing, or testing neighborhood with source provenance.
+Then `molly_knowledge` can return a bounded, version-matched queue, routing, testing, or validation neighborhood with source provenance.
 
 Read [Laravel knowledge](knowledge-graph.md) for current scope and limits.
 
