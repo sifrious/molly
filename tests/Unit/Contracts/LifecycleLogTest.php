@@ -60,8 +60,12 @@ it('derives display status from known events instead of a stored status field', 
     $log->record(lifecycleEvent(LifecycleEventType::WorkspacePrepared, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'));
     $log->record(lifecycleEvent(LifecycleEventType::AgentStarted, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'));
     $log->record(lifecycleEvent(LifecycleEventType::ApprovalRequested, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
-    $log->record(lifecycleEvent(LifecycleEventType::Merged, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
+    expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::AwaitingApproval);
 
+    $log->record(lifecycleEvent(LifecycleEventType::ApprovalResolved, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
+    expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Approved);
+
+    $log->record(lifecycleEvent(LifecycleEventType::Merged, 'ffffffff-ffff-4fff-8fff-ffffffffffff'));
     expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Merged);
 });
 

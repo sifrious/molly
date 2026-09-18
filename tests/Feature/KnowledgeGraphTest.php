@@ -110,11 +110,13 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     $indexed = app(IndexLaravelKnowledge::class)->handle('13');
     $result = app(QueryKnowledgeGraph::class)->handle('Queue', '13', depth: 3, limit: 40);
 
-    expect($indexed['sources'])->toBeGreaterThanOrEqual(6)
-        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(15)
+    expect($indexed['sources'])->toBeGreaterThanOrEqual(7)
+        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(18)
         ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'QueueFake::assertPushed');
     $routing = app(QueryKnowledgeGraph::class)->handle('Route', '13', depth: 1, limit: 20);
     expect(array_column($routing['nodes'], 'label'))->toContain('Route');
+    $testing = app(QueryKnowledgeGraph::class)->handle('Pest', '13', depth: 1, limit: 20);
+    expect(array_column($testing['nodes'], 'label'))->toContain('Pest');
     foreach ([...$result['nodes'], ...$result['edges']] as $record) {
         expect($record['sources'])->not->toBeEmpty();
     }

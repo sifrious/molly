@@ -28,7 +28,7 @@ final class MollyKnowledgeIndexCommand extends Command
             if ($this->option('json')) {
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             } else {
-                note('Laravel '.$result['version'].' queue and routing knowledge indexed.');
+                note('Laravel '.$result['version'].' queue, routing, and testing knowledge indexed.');
                 table(['Sources', 'Nodes', 'Edges'], [[$result['sources'], $result['nodes'], $result['edges']]]);
                 note('Database: '.$result['database']);
             }

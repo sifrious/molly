@@ -12,6 +12,7 @@ use Sifrious\Molly\Complexity\Console\Commands\OwnedDiffCommand;
 use Sifrious\Molly\Complexity\Console\Commands\ScanCommand;
 use Sifrious\Molly\Complexity\Console\Commands\WeldsCommand;
 use Sifrious\Molly\Console\MollyAdviceCommand;
+use Sifrious\Molly\Console\MollyApproveCommand;
 use Sifrious\Molly\Console\MollyBloomContractCommand;
 use Sifrious\Molly\Console\MollyChatCommand;
 use Sifrious\Molly\Console\MollyCheckCommand;
@@ -64,7 +65,7 @@ class MollyServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
-                MollyBloomContractCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
+                MollyBloomContractCommand::class, MollyApproveCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
                 MollyPrBodyCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,

@@ -8,6 +8,7 @@ use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Knowledge\LaravelQueueGraph;
 use Sifrious\Molly\Knowledge\LaravelRoutingGraph;
+use Sifrious\Molly\Knowledge\LaravelTestingGraph;
 use Sifrious\Molly\Knowledge\LaravelVersion;
 
 final class IndexLaravelKnowledge
@@ -16,6 +17,7 @@ final class IndexLaravelKnowledge
         private Graph $graph,
         private LaravelQueueGraph $queues,
         private LaravelRoutingGraph $routing,
+        private LaravelTestingGraph $testing,
         private LaravelVersion $versions,
     ) {}
 
@@ -23,7 +25,10 @@ final class IndexLaravelKnowledge
     public function handle(?string $requestedVersion = null): array
     {
         $version = $this->versions->current($requestedVersion);
-        $snapshot = $this->merge($this->queues->build($version), $this->routing->build($version));
+        $snapshot = $this->merge(
+            $this->merge($this->queues->build($version), $this->routing->build($version)),
+            $this->testing->build($version),
+        );
         $counts = $this->graph->replace('laravel', $version, $snapshot['sources'], $snapshot['nodes'], $snapshot['edges']);
 
         return ['namespace' => 'laravel', 'version' => $version, 'database' => $this->graph->path(), ...$counts];

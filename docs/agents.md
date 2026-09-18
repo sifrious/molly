@@ -91,7 +91,7 @@ Build the graph first:
 php artisan molly:knowledge:index laravel
 ```
 
-Then `molly_knowledge` can return a bounded, version-matched queue or routing neighborhood with source provenance.
+Then `molly_knowledge` can return a bounded, version-matched queue, routing, or testing neighborhood with source provenance.
 
 Read [Laravel knowledge](knowledge-graph.md) for current scope and limits.
 
