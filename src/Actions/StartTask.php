@@ -11,7 +11,7 @@ use Throwable;
 
 class StartTask
 {
-    public function __construct(private RunTask $runTask, private RefreshProjectJournal $journal) {}
+    public function __construct(private RunTask $runTask, private RefreshProjectJournal $journal, private RestoreTaskBaseline $baseline) {}
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
     {
@@ -55,6 +55,9 @@ class StartTask
     {
         $id = $task->id;
         try {
+            if ($retry) {
+                $this->baseline->handle($task);
+            }
             $previousAttempt = $retry ? $this->previousAttempt($task) : null;
             $run = $this->runTask->handle(
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,

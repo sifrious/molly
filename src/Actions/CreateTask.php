@@ -10,7 +10,7 @@ use Sifrious\Molly\Workspace;
 
 class CreateTask
 {
-    public function __construct(private RefreshProjectJournal $journal) {}
+    public function __construct(private RefreshProjectJournal $journal, private RestoreTaskBaseline $baseline) {}
 
     /**
      * @param  list<string>  $paths
@@ -30,7 +30,8 @@ class CreateTask
             throw new RuntimeException('PROTECTED_TEST_MISSING: Create and approve the required Pest test before the implementation turn.');
         }
 
-        $snapshot = $files->snapshot([...$files->read($paths), ...$files->readProtectedTest($testPath)]);
+        $contents = [...$files->read($paths), ...$files->readProtectedTest($testPath)];
+        $snapshot = $files->snapshot($contents);
 
         try {
             json_encode($source, JSON_THROW_ON_ERROR);
@@ -56,6 +57,9 @@ class CreateTask
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
         }
 
-        return $this->journal->handle($task);
+        $task = $this->journal->handle($task);
+        $this->baseline->store($task, $contents);
+
+        return $task;
     }
 }
