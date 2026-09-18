@@ -141,7 +141,9 @@ it('creates reads lists and stops a saved task without running it', function () 
     Queue::fake();
     MollyServer::tool(MollyTask::class, ['operation' => 'create', 'prompt' => 'Return Hello.', ...mcpTaskScope()])->assertOk();
     $task = Task::sole();
-    MollyServer::tool(MollyTask::class, ['operation' => 'show', 'id' => $task->id])->assertOk()->assertSee('Return Hello.');
+    MollyServer::tool(MollyTask::class, ['operation' => 'show', 'id' => $task->id])->assertOk()
+        ->assertSee('Return Hello.')
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('display_status', DisplayStatus::Pending->value)->where('linked_pr', null)->where('issue_url', null)->etc());
     MollyServer::tool(MollyTask::class, ['operation' => 'list', 'limit' => 1])->assertOk()->assertSee($task->id);
     MollyServer::tool(MollyTask::class, ['operation' => 'stop', 'id' => $task->id])->assertOk();
     expect($task->fresh()->status)->toBe('stopped')->and(Run::count())->toBe(0);

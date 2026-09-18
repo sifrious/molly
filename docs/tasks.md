@@ -18,7 +18,7 @@ php artisan molly:task TASK
 php artisan molly:show RUN_ID --verbose
 ```
 
-`TASK` can be a nickname such as `health-check` or the task UUID.
+`TASK` can be a nickname such as `health-check` or the task UUID. `molly:task` also prints display status and any recorded GitHub issue, pull request, or merge SHA.
 
 A completed run records `workspace_prepared`, `dispatch_requested`, `proposal_received`, `edits_accepted`, and `verification_started` before it asks for approval. `workspace_prepared` records that Molly used the existing workspace and did not create another worktree. Empty proposals record `edits_rejected` and fail.
 

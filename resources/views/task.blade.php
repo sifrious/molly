@@ -3,7 +3,7 @@
 @section('content')
 <h1>{{ $task->nickname ?? 'Task' }}</h1>
 <p><a href="{{ route('molly.tasks.connections', $task->id) }}">Find linked Amp threads</a></p>
-<dl><dt>Task ID</dt><dd>{{ $task->id }}</dd><dt>Status</dt><dd>{{ $task->status }}</dd><dt>Workspace</dt><dd>{{ $task->workspace }}</dd><dt>Required test</dt><dd>{{ $task->test_path }}</dd></dl>
+<dl><dt>Task ID</dt><dd>{{ $task->id }}</dd><dt>Status</dt><dd>{{ $task->status }}</dd><dt>Display status</dt><dd>{{ $display_status }}</dd><dt>Workspace</dt><dd>{{ $task->workspace }}</dd><dt>Required test</dt><dd>{{ $task->test_path }}</dd></dl>
 <form method="post" action="{{ route('molly.tasks.name', $task->id) }}">
 @csrf
 <label for="nickname">Nickname</label><input id="nickname" name="nickname" required maxlength="64" value="{{ old('nickname', $task->nickname) }}" aria-describedby="nickname-help">
@@ -13,7 +13,15 @@
 @if($task->stop_requested_at)<p>Stop requested at {{ $task->stop_requested_at }}.</p>@endif
 <h2>Prompt</h2><pre>{{ $task->prompt }}</pre>
 <h2>Selected files</h2><ul>@foreach($task->paths as $path)<li><code>{{ $path }}</code></li>@endforeach</ul>
-@if($task->source)<h2>Source context</h2><p>Imported issue text is task context, not verification evidence.</p><pre>{{ json_encode($task->source, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) }}</pre>@endif
+@if($issue_url || $linked_pr)
+<h2>Source context</h2>
+<p>Imported issue text is task context, not verification evidence. Molly does not open or merge a pull request.</p>
+<dl>
+@if($issue_url)<dt>GitHub issue</dt><dd><a href="{{ $issue_url }}">{{ $issue_url }}</a></dd>@endif
+@if($linked_pr)<dt>Recorded pull request</dt><dd><a href="{{ $linked_pr['url'] }}">{{ $linked_pr['url'] }}</a></dd>@endif
+@if(($linked_pr['merge_sha'] ?? null) !== null)<dt>Recorded merge SHA</dt><dd><code>{{ $linked_pr['merge_sha'] }}</code></dd>@endif
+</dl>
+@endif
 <h2>Project journal</h2>
 @php($journal = $task->journal_status ?? [])
 @if(($journal['status'] ?? null) === 'written')

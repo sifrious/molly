@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\ApproveTask;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\InspectTask;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\RecordMerged;
@@ -115,6 +116,32 @@ it('records a merge SHA only after an opened pull request', function () {
     expect(fn () => app(RecordMerged::class)->handle($task->id, true, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'))
         ->toThrow(RuntimeException::class, 'MERGE_RECORD_CONFLICT');
     Process::assertNothingRan();
+});
+
+it('inspects display status and recorded pull request evidence', function () {
+    $task = approvedTask($this->workspace, [
+        'repository' => 'sifrious/molly',
+        'issue_number' => 42,
+        'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+        'linked_pr' => null,
+    ]);
+    app(RecordPullRequestOpened::class)->handle($task->id, true, $this->prUrl);
+    app(RecordMerged::class)->handle($task->id, true, $this->mergeSha);
+
+    $inspection = app(InspectTask::class)->handle($task->fresh());
+    expect($inspection['display_status'])->toBe(DisplayStatus::Merged->value)
+        ->and($inspection['issue_url'])->toBe('https://github.com/sifrious/molly/issues/42')
+        ->and($inspection['linked_pr'])->toBe([
+            'url' => $this->prUrl,
+            'number' => 12,
+            'merge_sha' => $this->mergeSha,
+        ]);
+
+    expect(Artisan::call('molly:task', ['task' => $task->id, '--json' => true]))->toBe(0);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($payload['display_status'])->toBe(DisplayStatus::Merged->value)
+        ->and($payload['linked_pr']['url'])->toBe($this->prUrl)
+        ->and($payload['issue_url'])->toBe('https://github.com/sifrious/molly/issues/42');
 });
 
 it('returns JSON from the pr-opened and merged commands', function () {

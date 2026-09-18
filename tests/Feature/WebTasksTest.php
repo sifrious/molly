@@ -77,7 +77,30 @@ it('renders task history and escapes saved context', function () {
     $task = webMollyTask();
     $task->update(['source' => ['issue_url' => 'javascript:alert(1)', 'issue_title' => '<script>bad()</script>']]);
     $this->get('/molly')->assertOk()->assertSee($task->prompt)->assertDontSee('<script>alert(1)</script>', false);
-    $this->get('/molly/tasks/'.$task->id)->assertOk()->assertSee('No attempts recorded.')->assertSee('The queue worker starts each attempt.')->assertSee('Start task')->assertDontSee('<script>bad()</script>', false)->assertDontSee('href="javascript:', false);
+    $this->get('/molly/tasks/'.$task->id)->assertOk()->assertSee('No attempts recorded.')->assertSee('Display status')->assertSee('pending')->assertSee('The queue worker starts each attempt.')->assertSee('Start task')->assertDontSee('<script>bad()</script>', false)->assertDontSee('href="javascript:', false)->assertDontSee('javascript:alert(1)');
+});
+
+it('shows a recorded pull request without dumping source JSON', function () {
+    $task = webMollyTask();
+    $task->update([
+        'source' => [
+            'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+            'issue_title' => 'Add health',
+            'token' => 'source-secret',
+            'linked_pr' => [
+                'url' => 'https://github.com/sifrious/molly/pull/12',
+                'number' => 12,
+                'merge_sha' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            ],
+        ],
+    ]);
+
+    $this->get('/molly/tasks/'.$task->id)->assertOk()
+        ->assertSee('https://github.com/sifrious/molly/issues/42')
+        ->assertSee('https://github.com/sifrious/molly/pull/12')
+        ->assertSee('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+        ->assertDontSee('source-secret')
+        ->assertDontSee('Add health');
 });
 
 it('queues start and retry by ID without running the task in HTTP', function (bool $retry) {

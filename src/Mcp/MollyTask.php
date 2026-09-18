@@ -18,6 +18,7 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\CreateTaskFromPlan;
 use Sifrious\Molly\Actions\HandOffTask;
 use Sifrious\Molly\Actions\ImportGitHubIssue;
+use Sifrious\Molly\Actions\InspectTask;
 use Sifrious\Molly\Actions\LinkTaskThread;
 use Sifrious\Molly\Actions\ListTasks;
 use Sifrious\Molly\Actions\NameTask;
@@ -63,7 +64,7 @@ class MollyTask extends Tool
         try {
             $result = match ($data['operation']) {
                 'list' => ['tasks' => app(ListTasks::class)->handle($data['limit'] ?? 20)->toArray()],
-                'show' => ['task' => (app(ShowTask::class)->handle($data['id']) ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches this ID.'))->toArray()],
+                'show' => $this->show($data['id']),
                 'show_run' => ['run' => (app(ShowRun::class)->handle($data['id']) ?? throw new RuntimeException('RUN_NOT_FOUND: No run matches this ID.'))->toArray()],
                 'create' => ['task' => app(CreateTask::class)->handle($data['prompt'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
                 'from_plan' => ['task' => app(CreateTaskFromPlan::class)->handle($data['plan_id'], $data['prompt'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
@@ -85,6 +86,21 @@ class MollyTask extends Tool
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }
+    }
+
+    /** @return array{task: array<string, mixed>, display_status: string, linked_pr: array{url: string, number: int|null, merge_sha: string|null}|null, issue_url: string|null} */
+    private function show(string $id): array
+    {
+        $task = app(ShowTask::class)->handle($id)
+            ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches this ID.');
+        $inspection = app(InspectTask::class)->handle($task);
+
+        return [
+            'task' => $task->toArray(),
+            'display_status' => $inspection['display_status'],
+            'linked_pr' => $inspection['linked_pr'],
+            'issue_url' => $inspection['issue_url'],
+        ];
     }
 
     /** @return array<string, Type> */

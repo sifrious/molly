@@ -9,6 +9,7 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ImportGitHubIssue;
+use Sifrious\Molly\Actions\InspectTask;
 use Sifrious\Molly\Actions\ListTasks;
 use Sifrious\Molly\Actions\NameTask;
 use Sifrious\Molly\Actions\QueueTask;
@@ -51,12 +52,12 @@ class TaskController
         return redirect()->route('molly.tasks.show', $task->id)->with('status', 'Task saved. No run has started.');
     }
 
-    public function show(string $task, ShowTask $show): View
+    public function show(string $task, ShowTask $show, InspectTask $inspect): View
     {
         $record = $show->handle($task);
         abort_if($record === null, 404);
 
-        return view('molly::task', ['task' => $record]);
+        return view('molly::task', $inspect->handle($record));
     }
 
     public function start(string $task, ShowTask $show, QueueTask $queue): RedirectResponse

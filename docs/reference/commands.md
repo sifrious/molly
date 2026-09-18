@@ -18,7 +18,7 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:create` | Saves a pending task. Does not call the model. |
 | `php artisan molly:start TASK` | Starts a pending task in the current terminal. |
 | `php artisan molly:tasks` | Lists saved tasks. |
-| `php artisan molly:task TASK` | Reads one task and its attempt history. |
+| `php artisan molly:task TASK` | Reads one task, display status, recorded pull request, and attempt history. |
 | `php artisan molly:show RUN_ID` | Reads one saved run. |
 | `php artisan molly:retry TASK` | Creates another attempt for a failed or stopped task if allowed. |
 | `php artisan molly:stop TASK` | Stops a pending task or requests an active task to stop. |

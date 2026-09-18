@@ -99,7 +99,12 @@ it('reads task history without starting another attempt', function (): void {
     $exit = Artisan::call('molly:task', ['task' => 'saved-task', '--json' => true]);
 
     expect($exit)->toBe(0)->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe([
-        'id' => 'saved-task', 'status' => 'failed', 'task' => ['status' => 'failed', 'id' => 'saved-task', 'runs' => [['id' => 'saved-run', 'status' => 'failed']]],
+        'id' => 'saved-task',
+        'status' => 'failed',
+        'display_status' => 'pending',
+        'linked_pr' => null,
+        'issue_url' => null,
+        'task' => ['status' => 'failed', 'id' => 'saved-task', 'runs' => [['id' => 'saved-run', 'status' => 'failed']]],
     ]);
 });
 
