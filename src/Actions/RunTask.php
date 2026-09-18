@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Classification\ClassifyRunEvidence;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
@@ -23,6 +24,8 @@ class RunTask
         private EvaluateChanges $evaluate,
         private DecideRunCompletion $decideCompletion,
         private ClassifyRunEvidence $classify,
+        private CaptureComponentPreview $preview,
+        private RecordLifecycleEvent $lifecycle,
     ) {}
 
     /** @param list<string> $paths */
@@ -63,19 +66,19 @@ class RunTask
                     'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
                     'snapshots' => [
                         'task_creation' => $taskId === null ? null : Task::find($taskId)?->context_snapshot,
-                        'before' => $files->snapshot($before),
+                        'before' => $this->withPreview($files, $before, 'before'),
                         'after' => ['status' => 'not_captured', 'reason' => 'The run has not captured the final workspace.'],
                     ],
                     'components' => ['status' => 'not_compared', 'reason' => 'The run has not captured the final workspace.'],
                 ],
             ]);
 
-            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest);
+            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId);
         });
     }
 
     /** @param array<string, ?string> $before */
-    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt, bool $allowTestEdits, ?string $testDigest): Run
+    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt, bool $allowTestEdits, ?string $testDigest, ?string $taskId): Run
     {
         $report = $run->report;
         $evidence = storage_path('molly/'.$run->id);
@@ -91,6 +94,9 @@ class RunTask
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
+            if ($taskId !== null) {
+                $this->lifecycle->handle($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
+            }
             $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
 
@@ -194,13 +200,25 @@ class RunTask
     }
 
     /**
+     * @param  array<string, ?string>  $contents
+     * @return array<string, mixed>
+     */
+    private function withPreview(Workspace $workspace, array $contents, string $phase): array
+    {
+        $snapshot = $workspace->snapshot($contents);
+        $snapshot['preview'] = $this->preview->handle($workspace->path, $contents, $phase);
+
+        return $snapshot;
+    }
+
+    /**
      * @param  array<string, mixed>  $report
      * @param  array<string, ?string>  $before
      * @param  array<string, ?string>  $contents
      */
     private function recordSnapshot(array &$report, Workspace $workspace, array $before, array $contents): void
     {
-        $report['snapshots']['after'] = $workspace->snapshot($contents);
+        $report['snapshots']['after'] = $this->withPreview($workspace, $contents, 'after');
         $report['components'] = ['status' => 'compared', 'changes' => $workspace->componentChanges($report['changes'] ?? [], $before)];
     }
 

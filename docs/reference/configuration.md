@@ -47,6 +47,9 @@ The task prompt limit is 8,192 bytes. Changing size limits does not expand the a
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `molly.knowledge.database` | `.molly/knowledge.sqlite` | Local SQLite knowledge graph. Environment: `MOLLY_KNOWLEDGE_DATABASE`. |
+| `molly.preview.command` | `null` | Local preview renderer. Placeholders: `{input}`, `{output}`, `{url}`, `{viewport}`. Environment: `MOLLY_PREVIEW_COMMAND`. |
+| `molly.preview.url` | `null` | Optional workspace URL passed to the renderer. Environment: `MOLLY_PREVIEW_URL`. |
+| `molly.preview.viewport` | `1280x720` | Recorded viewport label. Environment: `MOLLY_PREVIEW_VIEWPORT`. |
 
 Keep `.molly/` out of version control. The knowledge database is disposable.
 

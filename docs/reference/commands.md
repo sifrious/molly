@@ -96,6 +96,7 @@ Plan step IDs are `outcome`, `state`, `laravel`, `boundaries`, and `verification
 php artisan molly:knowledge:index laravel
 php artisan molly:knowledge:index laravel --laravel-version=13
 php artisan molly:knowledge:query Queue
+php artisan molly:knowledge:query Route
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
 ```
@@ -116,7 +117,7 @@ php artisan molly:project:query TASK_UUID
 php artisan molly:project:query pest --relation=blocked_by
 ```
 
-The project graph is separate from Laravel queue knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
+The project graph is separate from Laravel queue and routing knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
 
 ## GitHub issue import
 

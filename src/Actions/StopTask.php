@@ -3,12 +3,13 @@
 namespace Sifrious\Molly\Actions;
 
 use RuntimeException;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 
 class StopTask
 {
-    public function __construct(private RefreshProjectJournal $journal) {}
+    public function __construct(private RefreshProjectJournal $journal, private RecordLifecycleEvent $lifecycle) {}
 
     public function handle(string $id): Task
     {
@@ -27,7 +28,13 @@ class StopTask
         $task = Task::find($id) ?? throw new RuntimeException('TASK_NOT_FOUND: No task matches this ID.');
 
         if ($task->status !== 'running') {
-            return $stopped > 0 ? $this->journal->handle($task) : $task;
+            if ($stopped > 0) {
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::Stopped, $task->id);
+
+                return $this->journal->handle($task);
+            }
+
+            return $task;
         }
 
         try {

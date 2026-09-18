@@ -39,6 +39,10 @@ navigation:
         url: /verification.html
       - title: Component snapshots
         url: /component-snapshots.html
+      - title: Laravel knowledge
+        url: /knowledge-graph.html
+      - title: Project graph
+        url: /project-graph.html
       - title: Task journals
         url: /journal.html
       - title: Task connections

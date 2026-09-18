@@ -5,12 +5,18 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Database\UniqueConstraintViolationException;
 use JsonException;
 use RuntimeException;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 
 class CreateTask
 {
-    public function __construct(private RefreshProjectJournal $journal, private RestoreTaskBaseline $baseline) {}
+    public function __construct(
+        private RefreshProjectJournal $journal,
+        private RestoreTaskBaseline $baseline,
+        private CaptureComponentPreview $preview,
+        private RecordLifecycleEvent $lifecycle,
+    ) {}
 
     /**
      * @param  list<string>  $paths
@@ -32,6 +38,7 @@ class CreateTask
 
         $contents = [...$files->read($paths), ...$files->readProtectedTest($testPath)];
         $snapshot = $files->snapshot($contents);
+        $snapshot['preview'] = $this->preview->handle($files->path, $contents, 'task_creation');
 
         try {
             json_encode($source, JSON_THROW_ON_ERROR);
@@ -59,6 +66,7 @@ class CreateTask
 
         $task = $this->journal->handle($task);
         $this->baseline->store($task, $contents);
+        $this->lifecycle->handle($files->path, LifecycleEventType::Created, $task->id);
 
         return $task;
     }

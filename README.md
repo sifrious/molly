@@ -99,14 +99,15 @@ See the [command reference](docs/reference/commands.md) for the full list.
 
 ## Laravel knowledge graph
 
-Molly can build a small local graph from its bundled Laravel queue guidance and the Laravel source installed in your project:
+Molly can build a small local graph from its bundled Laravel queue and routing guidance and the Laravel source installed in your project:
 
 ```bash
 php artisan molly:knowledge:index laravel
 php artisan molly:knowledge:query Queue
+php artisan molly:knowledge:query Route
 ```
 
-The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, version-aware, and currently covers queues only.
+The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, version-aware, and currently covers queues and routing.
 
 Read [Laravel knowledge](docs/knowledge-graph.md) for query examples and limits.
 
@@ -155,15 +156,15 @@ Reference:
 
 ## What is current and what is planned
 
-Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, and the queue-focused Laravel knowledge graph.
+Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, and Laravel knowledge for queues and routing.
 
 These are not finished yet:
 
 - Verified Orb identity and remote execution selection
 - Bloom-owned task UI, diffs, and pull requests
 - GitHub pull request opening and merge
-- Visual component previews
-- Broader Laravel knowledge namespaces
+- Visual Bloom preview display
+- Broader Laravel knowledge beyond queues and routing
 
 Planned behavior is kept separate in [Execution targets](docs/execution-targets.md).
 

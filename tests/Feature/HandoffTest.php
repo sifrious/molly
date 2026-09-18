@@ -43,7 +43,7 @@ it('hands a locked implementation envelope to a different Bloom workspace', func
 
     $log = app(RecordLifecycleEvent::class)->load($this->workspace);
     expect($log->displayStatus($this->task->id))->toBe(DisplayStatus::Running)
-        ->and($log->events($this->task->id))->toHaveCount(2);
+        ->and(array_map(fn ($event) => $event->type()?->value, $log->events($this->task->id)))->toContain('created', 'handed_off', 'recovered');
 });
 
 it('ignores a duplicate handoff event id', function () {
@@ -51,7 +51,8 @@ it('ignores a duplicate handoff event id', function () {
     app(HandOffTask::class)->handle($this->task->id, $this->sender, $this->recipient, 'implement', 'Implement the locked greeting test.', ['handoff_id' => $id]);
     app(HandOffTask::class)->handle($this->task->id, $this->sender, $this->recipient, 'implement', 'Implement the locked greeting test.', ['handoff_id' => $id]);
 
-    expect(app(RecordLifecycleEvent::class)->load($this->workspace)->events($this->task->id))->toHaveCount(1);
+    $types = array_map(fn ($event) => $event->type()?->value, app(RecordLifecycleEvent::class)->load($this->workspace)->events($this->task->id));
+    expect($types)->toBe(['created', 'handed_off']);
 });
 
 it('rejects a handoff that would merge or edit the protected test', function () {

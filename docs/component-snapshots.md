@@ -7,7 +7,7 @@ title: Component snapshots
 
 Molly records SHA-256 hashes for the files selected by a task. This lets a run report show which selected component source files changed.
 
-Snapshots do not contain source code and do not render visual previews.
+Snapshots do not contain source code. Optional local previews are separate advisory evidence.
 
 ## Example
 
@@ -64,11 +64,23 @@ Retries get their own before and after snapshots. Earlier run evidence is not re
 
 A source hash change proves only that file content changed. It does not prove a visible UI change.
 
-## No visual previews yet
+## Optional local previews
 
-Preview status is currently `unavailable`. Molly does not render screenshots or visual diffs in this release.
+Source hashes remain the default evidence. A visual preview is advisory and never overrides Pest.
 
-That planned capability should not be confused with the source snapshot feature that exists today.
+Configure a local renderer when you want before and after images:
+
+```bash
+MOLLY_PREVIEW_COMMAND="your-renderer {input} {output}"
+MOLLY_PREVIEW_URL="http://127.0.0.1:8000"
+MOLLY_PREVIEW_VIEWPORT=1280x720
+```
+
+`{input}` is a generated HTML fixture, `{output}` is a PNG path under `.molly/previews/`, and `{url}` is the optional workspace URL. Molly records viewport, fixture name, renderer, source commit when Git is available, and the image digest.
+
+If no command is set, preview status stays `unavailable` with a reason. A configured URL without a renderer command is also unavailable.
+
+Do not treat a captured preview as proof that the UI is correct unless the task names a deterministic visual assertion.
 
 ## Next
 

@@ -25,6 +25,11 @@ return [
     'knowledge' => [
         'database' => env('MOLLY_KNOWLEDGE_DATABASE', '.molly/knowledge.sqlite'),
     ],
+    'preview' => [
+        'command' => env('MOLLY_PREVIEW_COMMAND'),
+        'url' => env('MOLLY_PREVIEW_URL'),
+        'viewport' => env('MOLLY_PREVIEW_VIEWPORT', '1280x720'),
+    ],
     'typesafe' => [
         'enabled' => false,
         'api_key' => env('TYPESAFE_API_KEY'),

@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current Laravel namespace covers queues only. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
+The current Laravel namespace covers queues and routing. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 
@@ -29,6 +29,7 @@ Running the index more than once does not create duplicate logical nodes or rela
 
 ```bash
 php artisan molly:knowledge:query Queue
+php artisan molly:knowledge:query Route
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
 ```
@@ -44,9 +45,9 @@ The result is intentionally small:
 
 Use `--json` for scripts.
 
-## What is in the queue graph
+## What is in the graph
 
-The first index connects concepts such as:
+The queue slice connects concepts such as:
 
 - jobs
 - `ShouldQueue`
@@ -55,6 +56,8 @@ The first index connects concepts such as:
 - queue testing
 - relevant documentation sections
 - relevant framework symbols
+
+The routing slice connects `Route`, `routes/web.php`, the Basic Routing section, and the installed `Illuminate\Support\Facades\Route` symbol.
 
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
 

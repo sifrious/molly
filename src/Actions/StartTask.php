@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Actions;
 
 use Closure;
 use RuntimeException;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
@@ -11,7 +12,12 @@ use Throwable;
 
 class StartTask
 {
-    public function __construct(private RunTask $runTask, private RefreshProjectJournal $journal, private RestoreTaskBaseline $baseline) {}
+    public function __construct(
+        private RunTask $runTask,
+        private RefreshProjectJournal $journal,
+        private RestoreTaskBaseline $baseline,
+        private RecordLifecycleEvent $lifecycle,
+    ) {}
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
     {
@@ -57,6 +63,7 @@ class StartTask
         try {
             if ($retry) {
                 $this->baseline->handle($task);
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
             }
             $previousAttempt = $retry ? $this->previousAttempt($task) : null;
             $run = $this->runTask->handle(
@@ -74,10 +81,32 @@ class StartTask
                 Task::whereKey($id)->where('status', 'running')->update(['status' => 'stopped']);
             }
 
-            return $run->fresh();
+            $finished = $run->fresh();
+            if ($finished->status === 'completed') {
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::VerificationFinished, $task->id, $finished->id);
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::ApprovalRequested, $task->id, $finished->id, [
+                    'before_pull_request' => true,
+                    'before_merge' => true,
+                ]);
+            } else {
+                $this->lifecycle->handle(
+                    $task->workspace,
+                    $finished->status === 'stopped' ? LifecycleEventType::Stopped : LifecycleEventType::Failed,
+                    $task->id,
+                    $finished->id,
+                );
+            }
+
+            return $finished;
         } catch (Throwable $exception) {
             Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update(['status' => 'failed']);
             Task::whereKey($id)->where('status', 'running')->whereNotNull('stop_requested_at')->update(['status' => 'stopped']);
+            $current = $task->fresh();
+            $this->lifecycle->handle(
+                $task->workspace,
+                $current->status === 'stopped' ? LifecycleEventType::Stopped : LifecycleEventType::Failed,
+                $task->id,
+            );
             throw $exception;
         } finally {
             $this->journal->handle($task->refresh());

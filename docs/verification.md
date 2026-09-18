@@ -122,7 +122,7 @@ Serial mode runs the same required checks one after another.
 
 Molly records hashes for selected files when a task is created and around each run. This helps show which selected files changed.
 
-A hash comparison does not prove a visible UI change. Molly does not currently render component previews.
+A hash comparison does not prove a visible UI change. Optional local previews are advisory and never override Pest.
 
 Read [Component snapshots](component-snapshots.md) for the exact behavior.
 
