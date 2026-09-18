@@ -5,8 +5,10 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CollectNativePhpKnowledge;
 use Sifrious\Molly\Actions\CollectRunKnowledge;
+use Sifrious\Molly\Actions\CollectTarpitKnowledge;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
 use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
+use Sifrious\Molly\Actions\IndexTarpitKnowledge;
 use Sifrious\Molly\Actions\QueryKnowledgeGraph;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphEdge;
@@ -210,6 +212,59 @@ it('collects NativePHP knowledge only when the task names a track', function () 
 
     expect($mobile['status'])->toBeIn(['advisory', 'unavailable'])
         ->and($mobile['concepts'])->toBe(['Mobile'])
+        ->and($omitted['status'])->toBe('omitted')
+        ->and($omitted['concepts'])->toBe([]);
+});
+
+it('indexes tarpit notes without mixing Laravel or NativePHP', function () {
+    $indexed = app(IndexTarpitKnowledge::class)->handle();
+    $result = app(QueryKnowledgeGraph::class)->handle('Tarpit', null, 1, 20, [], 'tarpit');
+
+    expect($indexed['namespace'])->toBe('tarpit')
+        ->and($indexed['version'])->toStartWith('notes-')
+        ->and($indexed['sources'])->toBe(1)
+        ->and($result['namespace'])->toBe('tarpit')
+        ->and($result['version'])->toBe($indexed['version'])
+        ->and(array_column($result['nodes'], 'label'))->toContain('Tarpit', 'Complexity')
+        ->not->toContain('Queue', 'Desktop', 'Mobile');
+    foreach ([...$result['nodes'], ...$result['edges']] as $record) {
+        expect($record['sources'])->not->toBeEmpty();
+    }
+});
+
+it('indexes and queries tarpit notes through Artisan with JSON output', function () {
+    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'tarpit', '--json' => true]))->toBe(0);
+    $indexed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($indexed['namespace'])->toBe('tarpit')->and($indexed['version'])->toStartWith('notes-');
+
+    expect(Artisan::call('molly:knowledge:query', [
+        'concept' => 'Cleverness', '--namespace' => 'tarpit', '--depth' => '1', '--json' => true,
+    ]))->toBe(0);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($result['namespace'])->toBe('tarpit')
+        ->and(array_column($result['nodes'], 'label'))->toContain('Cleverness');
+});
+
+it('rejects tarpit index with a Laravel version flag', function () {
+    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'tarpit', '--laravel-version' => '13', '--json' => true]))->toBe(1);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($result['error'])->toStartWith('KNOWLEDGE_VERSION_INVALID');
+});
+
+it('collects tarpit knowledge only when the task names those notes', function () {
+    $named = app(CollectTarpitKnowledge::class)->handle(
+        'Reduce accidental complexity in the greeting.',
+        ['app/Greeting.php' => null],
+        'tests/GreetingTest.php',
+    );
+    $omitted = app(CollectTarpitKnowledge::class)->handle(
+        'Validate the queued greeting route.',
+        ['app/Greeting.php' => null],
+        'tests/GreetingTest.php',
+    );
+
+    expect($named['status'])->toBeIn(['advisory', 'unavailable'])
+        ->and($named['concepts'])->toContain('Accident')
         ->and($omitted['status'])->toBe('omitted')
         ->and($omitted['concepts'])->toBe([]);
 });

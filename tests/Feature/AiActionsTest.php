@@ -34,7 +34,8 @@ it('returns a proposal through one local model request', function (): void {
             && ! array_key_exists('previous_attempt', $payload)
             && $payload['laravel_knowledge']['status'] === 'advisory'
             && in_array('Pest', $payload['laravel_knowledge']['concepts'], true)
-            && $payload['nativephp_knowledge']['status'] === 'omitted';
+            && $payload['nativephp_knowledge']['status'] === 'omitted'
+            && $payload['tarpit_knowledge']['status'] === 'omitted';
     });
     ChangeWriter::assertPromptedTimes(1);
 });

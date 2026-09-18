@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current Laravel namespace covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate `nativephp` namespace. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
+The current Laravel namespace covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate `nativephp` namespace. Bundled tarpit notes live in a separate `tarpit` namespace. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 
@@ -41,6 +41,9 @@ php artisan molly:knowledge:query Job --relation=uses
 php artisan molly:knowledge:index nativephp
 php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
 php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
+php artisan molly:knowledge:index tarpit
+php artisan molly:knowledge:query Tarpit --namespace=tarpit
+php artisan molly:knowledge:query Cleverness --namespace=tarpit
 ```
 
 A query first looks for an exact concept or symbol. If there is no exact match, it falls back to a partial name match.
@@ -80,6 +83,8 @@ The events slice connects `Events`, the Introduction section, and the installed 
 
 The NativePHP namespace indexes bundled Desktop v2 and Mobile v4 introductions as separate versions (`desktop-2` and `mobile-4`). A Desktop query cannot return Mobile nodes. Molly does not require or claim an installed NativePHP package.
 
+The tarpit namespace indexes Mary Perry's bundled talk notes as `notes-YYYY-MM-DD`. Those notes discuss essence, accident, and cleverness. They are not a quality score and cannot override Pest, Tarpit checks, or Clever measurements.
+
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
 
 The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
@@ -96,7 +101,7 @@ Every returned node and relationship has source information. A source can identi
 
 Molly does not invent a relationship at query time. The query can only return relationships created by the indexer.
 
-Implementation runs receive a bounded `laravel_knowledge` neighborhood chosen from the task, allowed files, and required test. When the task names NativePHP desktop or mobile, they also receive `nativephp_knowledge`. That context is advisory. Missing or empty neighborhoods do not fail the run, widen file scope, or override Pest.
+Implementation runs receive a bounded `laravel_knowledge` neighborhood chosen from the task, allowed files, and required test. When the task names NativePHP desktop or mobile, they also receive `nativephp_knowledge`. When it names tarpit, cleverness, or essential versus accidental complexity, they also receive `tarpit_knowledge`. That context is advisory. Missing or empty neighborhoods do not fail the run, widen file scope, or override Pest.
 
 ## Local storage
 
@@ -122,6 +127,7 @@ Current:
 
 - Laravel queues, routing, testing, validation, the container, Eloquent, and events
 - NativePHP Desktop v2 and Mobile v4 as a separate namespace
+- bundled tarpit notes as a separate namespace
 - bundled documentation excerpts for those areas
 - matching installed Laravel framework source
 - local version-aware SQLite storage

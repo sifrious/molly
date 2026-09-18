@@ -14,6 +14,7 @@ class GenerateChanges
     public function __construct(
         private CollectRunKnowledge $knowledge,
         private CollectNativePhpKnowledge $nativephp,
+        private CollectTarpitKnowledge $tarpit,
     ) {}
 
     /**
@@ -30,6 +31,7 @@ class GenerateChanges
             'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
             'laravel_knowledge' => $this->knowledge->handle($prompt, $files, $testPath),
             'nativephp_knowledge' => $this->nativephp->handle($prompt, $files, $testPath),
+            'tarpit_knowledge' => $this->tarpit->handle($prompt, $files, $testPath),
             ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
         ], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {

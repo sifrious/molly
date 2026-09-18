@@ -6,10 +6,15 @@ use RuntimeException;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphQuery;
 use Sifrious\Molly\Knowledge\LaravelVersion;
+use Sifrious\Molly\Knowledge\TarpitGraph;
 
 final class QueryKnowledgeGraph
 {
-    public function __construct(private Graph $graph, private LaravelVersion $versions) {}
+    public function __construct(
+        private Graph $graph,
+        private LaravelVersion $versions,
+        private TarpitGraph $tarpit,
+    ) {}
 
     /**
      * @param  list<string>  $relations
@@ -21,7 +26,8 @@ final class QueryKnowledgeGraph
         $version = match ($namespace) {
             'laravel' => $this->versions->current($requestedVersion),
             'nativephp' => $this->nativephpVersion($requestedVersion),
-            default => throw new RuntimeException('KNOWLEDGE_NAMESPACE_INVALID: Choose laravel or nativephp.'),
+            'tarpit' => $this->tarpitVersion($requestedVersion),
+            default => throw new RuntimeException('KNOWLEDGE_NAMESPACE_INVALID: Choose laravel, nativephp, or tarpit.'),
         };
 
         return $this->graph->query(new GraphQuery($namespace, $version, $concept, $depth, $limit, $relations))->toArray();
@@ -38,5 +44,15 @@ final class QueryKnowledgeGraph
         }
 
         return $requested;
+    }
+
+    private function tarpitVersion(?string $requested): string
+    {
+        $version = $this->tarpit->version();
+        if ($requested !== null && $requested !== '' && $requested !== $version) {
+            throw new RuntimeException("KNOWLEDGE_VERSION_MISMATCH: Tarpit notes {$version} are bundled, not {$requested}.");
+        }
+
+        return $version;
     }
 }

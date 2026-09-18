@@ -15,7 +15,7 @@ final class MollyKnowledgeQueryCommand extends Command
 {
     protected $signature = 'molly:knowledge:query {concept : Concept or symbol to find} {--namespace=laravel : Knowledge namespace} {--nativephp-version= : NativePHP desktop-2 or mobile-4} {--laravel-version= : Installed Laravel major version} {--depth=2 : Relationship depth from 0 through 3} {--limit=20 : Node limit from 1 through 40} {--relation=* : Include only these relationships} {--json : Print JSON only}';
 
-    protected $description = 'Read a bounded Laravel or NativePHP knowledge neighborhood';
+    protected $description = 'Read a bounded Laravel, NativePHP, or tarpit knowledge neighborhood';
 
     public function handle(QueryKnowledgeGraph $query): int
     {
@@ -34,7 +34,11 @@ final class MollyKnowledgeQueryCommand extends Command
                 return self::SUCCESS;
             }
 
-            $label = $result['namespace'] === 'nativephp' ? 'NativePHP '.$result['version'] : 'Laravel '.$result['version'];
+            $label = match ($result['namespace']) {
+                'nativephp' => 'NativePHP '.$result['version'],
+                'tarpit' => 'Tarpit '.$result['version'],
+                default => 'Laravel '.$result['version'],
+            };
             if ($result['nodes'] === []) {
                 note('No '.$label.' knowledge matched "'.$result['concept'].'".');
 
@@ -75,6 +79,13 @@ final class MollyKnowledgeQueryCommand extends Command
             }
 
             return filled($nativephp) ? (string) $nativephp : null;
+        }
+        if ($namespace === 'tarpit') {
+            if (filled($nativephp) || filled($laravel)) {
+                throw new RuntimeException('KNOWLEDGE_VERSION_INVALID: Tarpit queries do not use --nativephp-version or --laravel-version.');
+            }
+
+            return null;
         }
         if (filled($nativephp)) {
             throw new RuntimeException('KNOWLEDGE_VERSION_INVALID: Laravel queries use --laravel-version, not --nativephp-version.');

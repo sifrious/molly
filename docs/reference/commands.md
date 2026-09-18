@@ -109,6 +109,9 @@ php artisan molly:knowledge:query Job --relation=uses
 php artisan molly:knowledge:index nativephp
 php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
 php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
+php artisan molly:knowledge:index tarpit
+php artisan molly:knowledge:query Tarpit --namespace=tarpit
+php artisan molly:knowledge:query Cleverness --namespace=tarpit
 ```
 
 Query limits:
@@ -120,6 +123,8 @@ Query limits:
 The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
 
 NativePHP queries need `--namespace=nativephp` and `--nativephp-version=desktop-2` or `--nativephp-version=mobile-4`. Desktop and Mobile stay separate. Installed NativePHP packages are not required.
+
+Tarpit queries need `--namespace=tarpit`. Molly uses the bundled notes version. Those notes are not a quality score.
 
 ## Project graph
 

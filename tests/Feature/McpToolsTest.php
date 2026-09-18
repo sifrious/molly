@@ -9,6 +9,7 @@ use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
 use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
+use Sifrious\Molly\Actions\IndexTarpitKnowledge;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\ReviewChanges;
@@ -74,6 +75,19 @@ it('returns indexed NativePHP knowledge without mixing desktop and mobile', func
         ->assertOk()
         ->assertSee(['Mobile', 'nativephp', 'mobile-4', 'sources', 'revision'])
         ->assertDontSee('Desktop v2');
+
+    File::delete($database);
+});
+
+it('returns indexed tarpit notes without mixing Laravel or NativePHP', function () {
+    $database = sys_get_temp_dir().'/molly-mcp-knowledge-'.Str::uuid().'.sqlite';
+    config()->set('molly.knowledge.database', $database);
+    app(IndexTarpitKnowledge::class)->handle();
+
+    MollyServer::tool(MollyKnowledge::class, ['concept' => 'Tarpit', 'namespace' => 'tarpit', 'depth' => 1, 'limit' => 20])
+        ->assertOk()
+        ->assertSee(['Tarpit', 'tarpit', 'notes-', 'sources', 'revision'])
+        ->assertDontSee('ShouldQueue');
 
     File::delete($database);
 });

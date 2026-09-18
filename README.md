@@ -114,9 +114,11 @@ php artisan molly:knowledge:query Events
 php artisan molly:knowledge:index nativephp
 php artisan molly:knowledge:query Desktop --namespace=nativephp --nativephp-version=desktop-2
 php artisan molly:knowledge:query Mobile --namespace=nativephp --nativephp-version=mobile-4
+php artisan molly:knowledge:index tarpit
+php artisan molly:knowledge:query Tarpit --namespace=tarpit
 ```
 
-The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, and version-aware. Laravel knowledge covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 stay separate.
+The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, and version-aware. Laravel knowledge covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 stay separate. Tarpit notes stay separate and are not a quality score.
 
 Read [Laravel knowledge](docs/knowledge-graph.md) for query examples and limits.
 
@@ -165,7 +167,7 @@ Reference:
 
 ## What is current and what is planned
 
-Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, and NativePHP Desktop v2 and Mobile v4 knowledge.
+Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes.
 
 These are not finished yet:
 
@@ -173,7 +175,7 @@ These are not finished yet:
 - Bloom-owned task UI, diffs, and pull requests
 - GitHub pull request opening and merge
 - Visual Bloom preview display
-- Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, and NativePHP
+- Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, NativePHP, and tarpit notes
 
 Planned behavior is kept separate in [Execution targets](docs/execution-targets.md).
 

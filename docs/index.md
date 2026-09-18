@@ -61,4 +61,4 @@ The model does not get to declare its own work correct. A passing review never t
 
 These docs describe the current `dev-main` build. No alpha release is tagged yet.
 
-The Laravel knowledge graph currently covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate namespace. The project graph covers saved Molly records in one workspace. Remote Orb identity and Bloom-owned pull requests are still planned. Visual previews are optional and advisory.
+The Laravel knowledge graph currently covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate namespace. Bundled tarpit notes live in a separate namespace and are not a quality score. The project graph covers saved Molly records in one workspace. Remote Orb identity and Bloom-owned pull requests are still planned. Visual previews are optional and advisory.
