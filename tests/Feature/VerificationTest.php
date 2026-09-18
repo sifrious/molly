@@ -84,6 +84,19 @@ it('fails without usable complete JUnit evidence', function (?string $xml, strin
     'entity declaration' => ['<!DOCTYPE testsuite [<!ENTITY test "unsafe">]><testsuite tests="0"/>', 'junit_invalid'],
 ]);
 
+it('fails when Pest exits successfully despite failing JUnit counts', function (): void {
+    $this->workspace = mollyVerificationWorkspace();
+    Process::fake(function (PendingProcess $process) {
+        file_put_contents($process->command[array_search('--log-junit', $process->command, true) + 1], '<testsuite tests="1" failures="1"><testcase assertions="1"><failure/></testcase></testsuite>');
+
+        return Process::result(output: 'OK');
+    });
+
+    $result = app(VerifyChanges::class)->handle($this->workspace, 'tests', $this->workspace.'/evidence');
+
+    expect($result)->toMatchArray(['status' => 'failed', 'reason' => 'tests_failed']);
+});
+
 it('fails when Pest exits unsuccessfully despite passing report counts', function (): void {
     $this->workspace = mollyVerificationWorkspace();
     Process::fake(function (PendingProcess $process) {

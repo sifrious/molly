@@ -91,7 +91,7 @@ Build the graph first:
 php artisan molly:knowledge:index laravel
 ```
 
-Then `molly_knowledge` can return a bounded, version-matched queue, routing, testing, validation, or container neighborhood with source provenance.
+Then `molly_knowledge` can return a bounded, version-matched queue, routing, testing, validation, container, Eloquent, or events neighborhood with source provenance.
 
 Molly also attaches a small `laravel_knowledge` neighborhood to implementation prompts. It is advisory and cannot change allowed files, the protected test, or completion.
 

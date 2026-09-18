@@ -113,8 +113,8 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     $indexed = app(IndexLaravelKnowledge::class)->handle($version);
     $result = app(QueryKnowledgeGraph::class)->handle('Queue', $version, depth: 3, limit: 40);
 
-    expect($indexed['sources'])->toBeGreaterThanOrEqual(11)
-        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(22)
+    expect($indexed['sources'])->toBeGreaterThanOrEqual(15)
+        ->and($indexed['nodes'])->toBeGreaterThanOrEqual(26)
         ->and($indexed['version'])->toBe($version)
         ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'QueueFake::assertPushed');
     $routing = app(QueryKnowledgeGraph::class)->handle('Route', $version, depth: 1, limit: 20);
@@ -125,6 +125,10 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     expect(array_column($validation['nodes'], 'label'))->toContain('Validation', 'Validator');
     $container = app(QueryKnowledgeGraph::class)->handle('Container', $version, depth: 1, limit: 20);
     expect(array_column($container['nodes'], 'label'))->toContain('Container');
+    $eloquent = app(QueryKnowledgeGraph::class)->handle('Eloquent', $version, depth: 1, limit: 20);
+    expect(array_column($eloquent['nodes'], 'label'))->toContain('Eloquent', 'Model');
+    $events = app(QueryKnowledgeGraph::class)->handle('Events', $version, depth: 1, limit: 20);
+    expect(array_column($events['nodes'], 'label'))->toContain('Events', 'Dispatcher');
     foreach ([...$result['nodes'], ...$result['edges']] as $record) {
         expect($record['sources'])->not->toBeEmpty();
     }

@@ -7,6 +7,8 @@ use Sifrious\Molly\Knowledge\GraphEdge;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Knowledge\LaravelContainerGraph;
+use Sifrious\Molly\Knowledge\LaravelEloquentGraph;
+use Sifrious\Molly\Knowledge\LaravelEventsGraph;
 use Sifrious\Molly\Knowledge\LaravelQueueGraph;
 use Sifrious\Molly\Knowledge\LaravelRoutingGraph;
 use Sifrious\Molly\Knowledge\LaravelTestingGraph;
@@ -22,6 +24,8 @@ final class IndexLaravelKnowledge
         private LaravelTestingGraph $testing,
         private LaravelValidationGraph $validation,
         private LaravelContainerGraph $container,
+        private LaravelEloquentGraph $eloquent,
+        private LaravelEventsGraph $events,
         private LaravelVersion $versions,
     ) {}
 
@@ -33,7 +37,10 @@ final class IndexLaravelKnowledge
             $this->merge($this->queues->build($version), $this->routing->build($version)),
             $this->merge(
                 $this->merge($this->testing->build($version), $this->validation->build($version)),
-                $this->container->build($version),
+                $this->merge(
+                    $this->container->build($version),
+                    $this->merge($this->eloquent->build($version), $this->events->build($version)),
+                ),
             ),
         );
         $counts = $this->graph->replace('laravel', $version, $snapshot['sources'], $snapshot['nodes'], $snapshot['edges']);

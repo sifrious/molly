@@ -79,6 +79,10 @@ final class CollectRunKnowledge
             'test' => 'Pest',
             'container' => 'Container',
             'inject' => 'Container',
+            'eloquent' => 'Eloquent',
+            'model' => 'Eloquent',
+            'event' => 'Events',
+            'listener' => 'Events',
         ] as $needle => $concept) {
             if (str_contains($haystack, $needle)) {
                 $candidates[$concept] = true;

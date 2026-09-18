@@ -19,7 +19,7 @@ If this is your first time here, start with [Getting started](getting-started.md
 | Fix a setup or execution problem | [Troubleshooting](troubleshooting.md) |
 | Choose Amp or Ollama, or use MCP | [Agents and MCP](agents.md) |
 | Break a larger request into tasks | [Planning](planning.md) |
-| Query Laravel queue, routing, testing, validation, and container knowledge | [Laravel knowledge](knowledge-graph.md) |
+| Query Laravel queue, routing, testing, validation, container, Eloquent, and events knowledge | [Laravel knowledge](knowledge-graph.md) |
 | Inspect task, test, and blocker relationships | [Project graph](project-graph.md) |
 | Use Molly in a browser | [Local web interface](web-interface.md) |
 | Ask what to do after a failed task | [Task advice](task-advice.md) |
@@ -61,4 +61,4 @@ The model does not get to declare its own work correct. A passing review never t
 
 These docs describe the current `dev-main` build. No alpha release is tagged yet.
 
-The Laravel knowledge graph currently covers queues, routing, testing, validation, and the container. The project graph covers saved Molly records in one workspace. Remote Orb identity and Bloom-owned pull requests are still planned. Visual previews are optional and advisory.
+The Laravel knowledge graph currently covers queues, routing, testing, validation, the container, Eloquent, and events. The project graph covers saved Molly records in one workspace. Remote Orb identity and Bloom-owned pull requests are still planned. Visual previews are optional and advisory.
