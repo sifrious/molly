@@ -26,11 +26,13 @@ use Sifrious\Molly\Console\MollyJournalCommand;
 use Sifrious\Molly\Console\MollyKnowledgeIndexCommand;
 use Sifrious\Molly\Console\MollyKnowledgeQueryCommand;
 use Sifrious\Molly\Console\MollyLinkThreadCommand;
+use Sifrious\Molly\Console\MollyMergedCommand;
 use Sifrious\Molly\Console\MollyNameCommand;
 use Sifrious\Molly\Console\MollyPlanCommand;
 use Sifrious\Molly\Console\MollyPrBodyCommand;
 use Sifrious\Molly\Console\MollyProjectIndexCommand;
 use Sifrious\Molly\Console\MollyProjectQueryCommand;
+use Sifrious\Molly\Console\MollyPrOpenedCommand;
 use Sifrious\Molly\Console\MollyRetryCommand;
 use Sifrious\Molly\Console\MollyReviewCommitCommand;
 use Sifrious\Molly\Console\MollyRunCommand;
@@ -67,7 +69,7 @@ class MollyServiceProvider extends ServiceProvider
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
                 MollyBloomContractCommand::class, MollyApproveCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
-                MollyPrBodyCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
+                MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
                 MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);

@@ -64,8 +64,8 @@ final class LifecycleLog
                 LifecycleEventType::RetryScheduled,
                 LifecycleEventType::Recovered => DisplayStatus::Running,
                 LifecycleEventType::ApprovalRequested => DisplayStatus::AwaitingApproval,
-                LifecycleEventType::ApprovalResolved => DisplayStatus::Approved,
-                LifecycleEventType::PullRequestOpened => DisplayStatus::AwaitingApproval,
+                LifecycleEventType::ApprovalResolved,
+                LifecycleEventType::PullRequestOpened => DisplayStatus::Approved,
                 LifecycleEventType::HandedOff => DisplayStatus::HandedOff,
                 LifecycleEventType::Stopped => DisplayStatus::Stopped,
                 LifecycleEventType::Failed => DisplayStatus::Failed,
@@ -109,5 +109,17 @@ final class LifecycleLog
     public function contains(string $eventId): bool
     {
         return isset($this->events[$eventId]);
+    }
+
+    public function latestOf(string $taskId, LifecycleEventType $type): ?LifecycleEvent
+    {
+        $latest = null;
+        foreach ($this->events($taskId) as $event) {
+            if ($event->type() === $type) {
+                $latest = $event;
+            }
+        }
+
+        return $latest;
     }
 }

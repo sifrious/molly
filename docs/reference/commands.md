@@ -28,6 +28,8 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:approve TASK --approve` | Records human approval after required checks pass. Does not open a pull request. |
 | `php artisan molly:comment TASK --approve` | Posts or updates a GitHub issue comment after explicit approval. |
 | `php artisan molly:pr-body TASK` | Prints a pull request body that links the issue, acceptance test, and evidence. Does not open a pull request. |
+| `php artisan molly:pr-opened TASK --url URL --approve` | Records that a human opened a pull request. Does not open one. |
+| `php artisan molly:merged TASK --sha SHA --approve` | Records that a human merged a pull request. Does not merge. |
 | `php artisan molly:handoff TASK --from UUID --to UUID` | Prints a handoff envelope for a child Bloom workspace. Does not create a worktree. |
 
 `TASK` accepts either a nickname or task UUID. `RUN_ID` is a run UUID.
@@ -153,9 +155,11 @@ After a human approves a comment:
 php artisan molly:comment TASK --approve
 php artisan molly:pr-body TASK
 php artisan molly:pr-body TASK --close
+php artisan molly:pr-opened TASK --url https://github.com/OWNER/REPO/pull/123 --approve
+php artisan molly:merged TASK --sha MERGE_SHA --approve
 ```
 
-`molly:comment` posts or updates one concise issue comment. `--close` adds closing language only after required checks pass. Molly still does not open or merge a pull request.
+`molly:comment` posts or updates one concise issue comment. `--close` adds closing language only after required checks pass. `molly:pr-opened` and `molly:merged` record the human-opened pull request and merge SHA after `--approve`. Molly still does not open or merge a pull request.
 
 ## Journals and advice
 

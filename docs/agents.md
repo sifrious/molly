@@ -78,7 +78,7 @@ The server is registered only in `local` and `testing` environments. Molly does 
 | `molly_guide` | Reads Molly's bundled planning guide and cited source passages. |
 | `molly_knowledge` | Reads the local Laravel, NativePHP, or tarpit knowledge graph. It never changes the graph. |
 | `molly_plan` | Creates, reads, answers, or reviews a saved plan. |
-| `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, human approval, handoff envelopes, and lifecycle requests. Approve requires `approve=true` and does not open a pull request. |
+| `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, human approval, recorded pull requests, merge SHAs, handoff envelopes, and lifecycle requests. Approve, pr_opened, and merged require `approve=true` and do not open or merge a pull request. |
 | `molly_connections` | Reads saved Amp thread associations and optional current Amp connection observations. |
 
 Task start and retry requests from MCP use the host application's queue. A queued request means Molly dispatched work. It does not mean the run already completed.

@@ -22,7 +22,7 @@ php artisan molly:show RUN_ID --verbose
 
 A completed run records `workspace_prepared`, `dispatch_requested`, `proposal_received`, `edits_accepted`, and `verification_started` before it asks for approval. `workspace_prepared` records that Molly used the existing workspace and did not create another worktree. Empty proposals record `edits_rejected` and fail.
 
-Imported GitHub issues stay pending until you start them. After required checks pass, `molly:approve TASK --approve` records human approval. After a human approves writeback, `molly:comment` can post a status comment and `molly:pr-body` can print a pull request body. Molly does not open or merge the pull request.
+Imported GitHub issues stay pending until you start them. After required checks pass, `molly:approve TASK --approve` records human approval. After a human approves writeback, `molly:comment` can post a status comment and `molly:pr-body` can print a pull request body. After a human opens the pull request, `molly:pr-opened TASK --url URL --approve` records that URL. After a human merges it, `molly:merged TASK --sha SHA --approve` records the merge commit. Molly does not open or merge the pull request.
 
 ## Create a task
 

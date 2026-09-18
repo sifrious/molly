@@ -56,6 +56,24 @@ class IndexProjectGraph
                 ]);
                 $this->edge($edges, 'implements', $taskNode, $issueNode, $source);
             }
+            $linked = $task->source['linked_pr'] ?? null;
+            if (is_array($linked) && is_string($linked['url'] ?? null)) {
+                $approvalNode = $this->node($nodes, 'approval', $task->id.':pull_request', 'Recorded pull request', $source, [
+                    'url' => $linked['url'],
+                    'merge_sha' => $linked['merge_sha'] ?? null,
+                ]);
+                $this->edge($edges, 'approved_by', $taskNode, $approvalNode, $source);
+                $prNode = $this->node($nodes, 'pull_request', $linked['url'], $linked['url'], $source, [
+                    'number' => $linked['number'] ?? null,
+                    'repository' => $linked['repository'] ?? null,
+                    'merge_sha' => $linked['merge_sha'] ?? null,
+                ]);
+                $this->edge($edges, 'produced', $taskNode, $prNode, $source);
+                if (is_string($linked['merge_sha'] ?? null)) {
+                    $commitNode = $this->node($nodes, 'commit', $linked['merge_sha'], $linked['merge_sha'], $source);
+                    $this->edge($edges, 'produced', $prNode, $commitNode, $source);
+                }
+            }
             foreach ($task->runs as $run) {
                 $this->indexRun($nodes, $edges, $source, $taskNode, $testNode, $run);
             }

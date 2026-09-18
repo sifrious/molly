@@ -56,6 +56,28 @@ it('keeps Tarpit findings as evidence nodes rather than vague task labels', func
         ->and(array_column($result['nodes'], 'label'))->not->toContain('needs work');
 });
 
+it('indexes a recorded pull request and merge commit as evidence nodes', function () {
+    $this->task->update([
+        'source' => [
+            'repository' => 'sifrious/molly',
+            'issue_number' => 42,
+            'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+            'linked_pr' => [
+                'url' => 'https://github.com/sifrious/molly/pull/12',
+                'number' => 12,
+                'repository' => 'sifrious/molly',
+                'merge_sha' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            ],
+        ],
+    ]);
+
+    app(IndexProjectGraph::class)->handle($this->workspace);
+    $result = app(QueryProjectGraph::class)->handle('https://github.com/sifrious/molly/pull/12', $this->workspace, depth: 2, limit: 40);
+
+    expect(array_column($result['nodes'], 'type'))->toContain('pull_request', 'commit', 'task', 'approval')
+        ->and(array_column($result['edges'], 'relation'))->toContain('approved_by', 'produced');
+});
+
 it('indexes and queries the project graph through Artisan', function () {
     $exit = Artisan::call('molly:project:index', ['--workspace' => $this->workspace, '--json' => true]);
     $indexed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);

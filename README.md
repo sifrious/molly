@@ -93,6 +93,8 @@ php artisan molly:show RUN_ID --verbose  # Read one run
 php artisan molly:retry TASK             # Retry a failed or stopped task
 php artisan molly:stop TASK              # Request a stop
 php artisan molly:approve TASK --approve # Record human approval after required checks
+php artisan molly:pr-opened TASK --url URL --approve # Record a human-opened pull request
+php artisan molly:merged TASK --sha SHA --approve # Record a human merge commit
 php artisan molly:doctor                 # Check setup
 ```
 

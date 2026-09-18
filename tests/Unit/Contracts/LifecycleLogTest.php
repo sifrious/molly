@@ -65,6 +65,10 @@ it('derives display status from known events instead of a stored status field', 
     $log->record(lifecycleEvent(LifecycleEventType::ApprovalResolved, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'));
     expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Approved);
 
+    $log->record(lifecycleEvent(LifecycleEventType::PullRequestOpened, '11111111-1111-4111-8111-111111111111'));
+    expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Approved)
+        ->and($log->latestOf(ContractFixtures::TASK_ID, LifecycleEventType::PullRequestOpened)?->type())->toBe(LifecycleEventType::PullRequestOpened);
+
     $log->record(lifecycleEvent(LifecycleEventType::Merged, 'ffffffff-ffff-4fff-8fff-ffffffffffff'));
     expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Merged);
 });
