@@ -21,6 +21,7 @@ For a script that should fail when the installed version is not what you expect:
 
 ```bash
 php artisan molly:knowledge:index laravel --laravel-version=13
+php artisan molly:knowledge:index laravel --laravel-version=12
 ```
 
 Running the index more than once does not create duplicate logical nodes or relationships.
@@ -63,6 +64,8 @@ The routing slice connects `Route`, `routes/web.php`, the Basic Routing section,
 The testing slice connects Pest, PHPUnit, `tests/Feature`, the Introduction section, and `Illuminate\Foundation\Testing\TestCase`.
 
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
+
+The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
 
 ## Provenance
 

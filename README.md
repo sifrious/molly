@@ -11,7 +11,7 @@ Molly asks an AI agent for the code change, then checks the result before it can
 
 ## Start here
 
-You need PHP 8.3 or later, Laravel 13, Pest 4, and a working database connection.
+You need PHP 8.3 or later, Laravel 12 or 13, Pest 4, and a working database connection.
 
 Install Molly in a Laravel project:
 

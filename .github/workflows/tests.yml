@@ -81,9 +81,13 @@ jobs:
           retention-days: 14
 
   install:
-    name: Fresh Laravel 13 installation
+    name: Fresh Laravel ${{ matrix.laravel }} installation
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        laravel: ['12', '13']
     steps:
       - name: Check out the package
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -101,7 +105,7 @@ jobs:
       - name: Install into a fresh Laravel application
         timeout-minutes: 10
         run: |
-          composer create-project laravel/laravel "$RUNNER_TEMP/molly-host" '^13.0' --no-interaction --prefer-dist
+          composer create-project laravel/laravel "$RUNNER_TEMP/molly-host" "^${{ matrix.laravel }}.0" --no-interaction --prefer-dist
           cd "$RUNNER_TEMP/molly-host"
           composer config repositories.molly path "$GITHUB_WORKSPACE"
           composer require --dev 'sifrious/molly:@dev' --no-interaction --prefer-dist --no-progress
@@ -124,8 +128,8 @@ jobs:
           cd "$RUNNER_TEMP/molly-host"
           composer show --format=json > "$RUNNER_TEMP/molly-packages.json"
           php -r '$packages = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-packages.json"), true, flags: JSON_THROW_ON_ERROR)["installed"] ?? []; foreach ($packages as $package) { if (str_contains($package["name"] ?? "", "burdgen")) { exit(1); } }'
-          php artisan molly:knowledge:index laravel --laravel-version=13 --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-index.json"
-          php artisan molly:knowledge:query Queue --laravel-version=13 --depth=3 --limit=40 --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-query.json"
+          php artisan molly:knowledge:index laravel --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-index.json"
+          php artisan molly:knowledge:query Queue --depth=3 --limit=40 --json --no-interaction > "$RUNNER_TEMP/molly-knowledge-query.json"
           php -r '$result = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-knowledge-query.json"), true, flags: JSON_THROW_ON_ERROR); $labels = array_column($result["nodes"] ?? [], "label"); if (!in_array("Retry", $labels, true) || !in_array("ShouldQueue", $labels, true)) { exit(1); } foreach ([...($result["nodes"] ?? []), ...($result["edges"] ?? [])] as $record) { if (($record["sources"] ?? []) === []) { exit(1); } } echo "Indexed versioned Laravel queue knowledge with source provenance.\n";'
 
       - name: Keep the development package out of production installs

@@ -17,7 +17,7 @@ vendor/bin/pint --format agent
 
 The main GitHub Actions test workflow runs the package on PHP 8.3, 8.4, and 8.5.
 
-CI also checks Composer metadata, documentation, package archives, mutation behavior, and a clean Laravel installation.
+CI also checks Composer metadata, documentation, package archives, mutation behavior, and a clean Laravel 12 or 13 installation.
 
 ## What tests may fake
 

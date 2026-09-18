@@ -96,6 +96,7 @@ Plan step IDs are `outcome`, `state`, `laravel`, `boundaries`, and `verification
 ```bash
 php artisan molly:knowledge:index laravel
 php artisan molly:knowledge:index laravel --laravel-version=13
+php artisan molly:knowledge:index laravel --laravel-version=12
 php artisan molly:knowledge:query Queue
 php artisan molly:knowledge:query Route
 php artisan molly:knowledge:query Pest
@@ -109,7 +110,7 @@ Query limits:
 - node limit: 1 through 40
 - `--relation` may be repeated
 
-The requested Laravel major version must match the installed major version.
+The requested Laravel major version must match the installed major version. Bundled documentation excerpts currently come from Laravel 13. On Laravel 12 they are still indexed against the installed major, with the excerpt provenance unchanged.
 
 ## Project graph
 

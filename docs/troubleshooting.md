@@ -54,7 +54,7 @@ composer show laravel/framework
 composer check-platform-reqs
 ```
 
-Molly currently requires PHP 8.3 or later and Laravel 13. There is no tagged release yet, so the documented install uses `dev-main`.
+Molly currently requires PHP 8.3 or later and Laravel 12 or 13. There is no tagged release yet, so the documented install uses `dev-main`.
 
 ## Pest fails
 

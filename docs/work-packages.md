@@ -28,7 +28,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | MOL-WP-09 | Laravel AI classification compatibility | Structured-output detection and an advisory Laravel AI adapter exist. They cannot upgrade a failed Pest run. Unreleased Laravel AI names are not used |
 | MOL-WP-10 | Project graph and broader Laravel knowledge | Project graph indexing exists. Laravel knowledge now covers queues, routing, and testing. A visual Bloom view remains |
 | MOL-WP-11 | Component previews | Optional local renderer exists. Unconfigured hosts stay unavailable. Visual evidence remains advisory |
-| MOL-WP-12 | Compatibility matrix and packaging | Not started |
+| MOL-WP-12 | Compatibility matrix and packaging | Composer and CI now accept Laravel 12 and 13. Packagist publication remains |
 | MOL-WP-13 | Docs site and tagged `v0.1.0-alpha.1` | Not started |
 
 Do not call a work package done because a class or screen exists. The alpha is done only after the end-to-end proofs in the execution handoff.

@@ -14,7 +14,7 @@ You should finish with three things: `molly:doctor` passes, Molly can create a t
 Molly currently expects:
 
 - PHP 8.3 or later
-- Laravel 13
+- Laravel 12 or 13
 - Pest 4
 - PHP DOM
 - A working Laravel database connection

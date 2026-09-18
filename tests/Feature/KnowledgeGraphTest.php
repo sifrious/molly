@@ -10,6 +10,7 @@ use Sifrious\Molly\Knowledge\GraphEdge;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphQuery;
 use Sifrious\Molly\Knowledge\GraphSource;
+use Sifrious\Molly\Knowledge\LaravelVersion;
 
 function knowledgeFixture(string $version = '13'): array
 {
@@ -107,15 +108,17 @@ it('respects relationship and size limits', function () {
 });
 
 it('indexes the bundled queue guide and installed Laravel source', function () {
-    $indexed = app(IndexLaravelKnowledge::class)->handle('13');
-    $result = app(QueryKnowledgeGraph::class)->handle('Queue', '13', depth: 3, limit: 40);
+    $version = app(LaravelVersion::class)->current();
+    $indexed = app(IndexLaravelKnowledge::class)->handle($version);
+    $result = app(QueryKnowledgeGraph::class)->handle('Queue', $version, depth: 3, limit: 40);
 
     expect($indexed['sources'])->toBeGreaterThanOrEqual(7)
         ->and($indexed['nodes'])->toBeGreaterThanOrEqual(18)
+        ->and($indexed['version'])->toBe($version)
         ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'QueueFake::assertPushed');
-    $routing = app(QueryKnowledgeGraph::class)->handle('Route', '13', depth: 1, limit: 20);
+    $routing = app(QueryKnowledgeGraph::class)->handle('Route', $version, depth: 1, limit: 20);
     expect(array_column($routing['nodes'], 'label'))->toContain('Route');
-    $testing = app(QueryKnowledgeGraph::class)->handle('Pest', '13', depth: 1, limit: 20);
+    $testing = app(QueryKnowledgeGraph::class)->handle('Pest', $version, depth: 1, limit: 20);
     expect(array_column($testing['nodes'], 'label'))->toContain('Pest');
     foreach ([...$result['nodes'], ...$result['edges']] as $record) {
         expect($record['sources'])->not->toBeEmpty();
@@ -123,14 +126,23 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
 });
 
 it('indexes and queries through Artisan with JSON output', function () {
-    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'laravel', '--laravel-version' => '13', '--json' => true]))->toBe(0);
+    $version = app(LaravelVersion::class)->current();
+    expect(Artisan::call('molly:knowledge:index', ['namespace' => 'laravel', '--laravel-version' => $version, '--json' => true]))->toBe(0);
     $indexed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($indexed)->toMatchArray(['namespace' => 'laravel', 'version' => '13']);
+    expect($indexed)->toMatchArray(['namespace' => 'laravel', 'version' => $version]);
 
-    expect(Artisan::call('molly:knowledge:query', ['concept' => 'Queue', '--laravel-version' => '13', '--depth' => '1', '--json' => true]))->toBe(0);
+    expect(Artisan::call('molly:knowledge:query', ['concept' => 'Queue', '--laravel-version' => $version, '--depth' => '1', '--json' => true]))->toBe(0);
     $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
     expect(array_column($result['nodes'], 'label'))->toContain('Queue');
+});
+
+it('rejects a requested Laravel version that is not installed', function () {
+    $installed = app(LaravelVersion::class)->current();
+    $other = $installed === '13' ? '12' : '13';
+
+    expect(fn () => app(IndexLaravelKnowledge::class)->handle($other))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_VERSION_MISMATCH');
 });
 
 it('does not require a Burdgen package at runtime', function () {

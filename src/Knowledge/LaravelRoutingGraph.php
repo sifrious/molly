@@ -18,8 +18,8 @@ final class LaravelRoutingGraph
     public function build(string $version): array
     {
         $document = $this->guide->source('laravel-routing');
-        if (! str_contains($document['title'], 'Laravel '.$version.' ')) {
-            throw new RuntimeException("KNOWLEDGE_DOC_VERSION_MISMATCH: The bundled routing guide is not for Laravel {$version}.");
+        if (! preg_match('/Laravel \\d+ /', $document['title'])) {
+            throw new RuntimeException('KNOWLEDGE_DOC_INVALID: The bundled routing guide needs a Laravel major version in its title.');
         }
 
         $sources = [];
