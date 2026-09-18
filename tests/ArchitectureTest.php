@@ -31,3 +31,17 @@ arch('knowledge storage does not depend on agents or presentation')
         'Laravel\Prompts',
         'Livewire',
     ]);
+
+arch('cross-repository contracts do not depend on transport or presentation')
+    ->expect('Sifrious\Molly\Contracts')
+    ->not->toUse([
+        'Sifrious\Molly\Actions',
+        'Sifrious\Molly\Agents',
+        'Sifrious\Molly\Console',
+        'Sifrious\Molly\Http',
+        'Sifrious\Molly\Livewire',
+        'Sifrious\Molly\Models',
+        'Laravel\Mcp',
+        'Laravel\Prompts',
+        'Livewire',
+    ]);

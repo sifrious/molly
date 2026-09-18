@@ -45,7 +45,7 @@ Recorded live checks cover small local tasks through Ollama and Amp, saved tasks
 
 Those checks show that the exercised paths worked in those environments. They are not a claim that every model, project, or future feature is supported.
 
-Remote Orb identity and remote execution selection remain planned.
+Remote Orb identity and remote execution selection remain planned. The alpha backlog lives in [Work packages](work-packages.md).
 
 ## Documentation site
 

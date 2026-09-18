@@ -40,6 +40,7 @@ These pages are not normal first-run documentation:
 
 - [Contributing](contributing.md) explains the package test and CI workflow.
 - [Execution targets](execution-targets.md) describes planned remote execution work. It is not current user behavior.
+- [Work packages](work-packages.md) tracks the alpha backlog without Linear.
 - [Publishing](publishing.md) is the maintainer plan for the documentation site.
 
 ## How Molly decides a task is done
