@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Contracts\LifecycleEvent;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
@@ -88,7 +89,8 @@ class ExportTaskJournal
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
             '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
-            ...$this->issueLines($task), '',
+            ...$this->issueLines($task),
+            ...$this->lifecycleSummary($task), '',
             $this->quote($task->prompt), '',
         ];
     }
@@ -108,8 +110,47 @@ class ExportTaskJournal
         if (is_string($source['github_comment_url'] ?? null)) {
             $lines[] = '- GitHub comment: '.$this->escape($source['github_comment_url']);
         }
+        $linked = $source['linked_pr'] ?? null;
+        if (is_array($linked) && is_string($linked['url'] ?? null)) {
+            $lines[] = '- Recorded pull request: '.$this->escape($linked['url']);
+            if (is_string($linked['merge_sha'] ?? null)) {
+                $lines[] = '- Recorded merge SHA: '.$this->escape($linked['merge_sha']);
+            }
+        }
 
         return $lines;
+    }
+
+    /** @return list<string> */
+    private function lifecycleSummary(Task $task): array
+    {
+        $log = app(RecordLifecycleEvent::class)->load($task->workspace);
+        $events = $log->events($task->id);
+        if ($events === []) {
+            return [];
+        }
+
+        $lines = ['- Display status: '.$this->escape($log->displayStatus($task->id)->value)];
+        foreach ($events as $event) {
+            $lines[] = '- Lifecycle: '.$this->escape($this->lifecycleLine($event));
+        }
+
+        return $lines;
+    }
+
+    private function lifecycleLine(LifecycleEvent $event): string
+    {
+        $line = $event->type;
+        $url = $event->payload['url'] ?? null;
+        $sha = $event->payload['sha'] ?? ($event->payload['merge_sha'] ?? null);
+        if (is_string($url) && $url !== '') {
+            $line .= ' '.$url;
+        }
+        if (is_string($sha) && $sha !== '') {
+            $line .= ' '.$sha;
+        }
+
+        return $line;
     }
 
     private function glossary(): string
@@ -126,7 +167,9 @@ Molly updates this marked section with the project journal. Add project-specific
 - Tarpit review: Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.
 - Accidental complexity: A finding whose removal preserves the required behavior. A blocking finding prevents completion.
 - Clever measurements: Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.
-- Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Current records do not preserve every lifecycle transition.
+- Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.
+- Recorded pull request: A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.
+- Recorded merge: A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.
 - Handoff: A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.
 
 The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.
@@ -190,7 +233,8 @@ MARKDOWN;
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
             '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
-            ...$this->issueLines($task), '',
+            ...$this->issueLines($task),
+            ...$this->lifecycleSummary($task), '',
             '## Requested work', '', $this->quote($task->prompt), '',
             '## Editable files', '',
         ];

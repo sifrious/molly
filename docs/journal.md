@@ -23,7 +23,7 @@ Molly writes:
 
 Run the command again after another attempt to refresh the same file.
 
-The export includes the task request, file scope, required test, attempt states, Pest counts, Tarpit checks and findings, and separate Clever measurements.
+The export includes the task request, file scope, required test, attempt states, Pest counts, Tarpit checks and findings, separate Clever measurements, recorded pull request or merge SHA when present, and lifecycle events from `.molly/lifecycle.jsonl`.
 
 Missing evidence is shown as missing. A skipped check stays skipped.
 
@@ -40,7 +40,7 @@ The project journal lists saved tasks and their linked attempts for that workspa
 
 The glossary contains a marked Molly-managed section. You may add project-specific definitions outside that section.
 
-These files describe current saved records. They are not a complete event-by-event lifecycle log.
+The project journal lists current saved records. The per-task journal also lists recorded lifecycle events from `.molly/lifecycle.jsonl`. Editing either Markdown file does not change the database.
 
 ## Refresh after a warning
 

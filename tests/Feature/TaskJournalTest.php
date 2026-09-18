@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\ExportTaskJournal;
 use Sifrious\Molly\Actions\NameTask;
+use Sifrious\Molly\Actions\RecordLifecycleEvent;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 
 beforeEach(function (): void {
@@ -100,6 +102,42 @@ it('renders untrusted descriptions as quoted text without active HTML or links',
 
     expect($html)->not->toContain('<script', '<img', '<a ', '<h1>Forged heading')
         ->toContain('<blockquote>', '&lt;script&gt;', 'Forged heading');
+});
+
+it('exports recorded pull request, merge SHA, and lifecycle events without copying local paths', function (): void {
+    $task = journalTask([
+        'status' => 'completed',
+        'source' => [
+            'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+            'linked_pr' => [
+                'url' => 'https://github.com/sifrious/molly/pull/12',
+                'number' => 12,
+                'merge_sha' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            ],
+        ],
+    ]);
+    $lifecycle = app(RecordLifecycleEvent::class);
+    $lifecycle->handle($this->journalWorkspace, LifecycleEventType::Created, $task->id);
+    $lifecycle->handle($this->journalWorkspace, LifecycleEventType::ApprovalResolved, $task->id);
+    $lifecycle->handle($this->journalWorkspace, LifecycleEventType::PullRequestOpened, $task->id, null, [
+        'url' => 'https://github.com/sifrious/molly/pull/12',
+        'opened' => false,
+    ]);
+    $lifecycle->handle($this->journalWorkspace, LifecycleEventType::Merged, $task->id, null, [
+        'url' => 'https://github.com/sifrious/molly/pull/12',
+        'sha' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'merged' => false,
+    ]);
+
+    $result = app(ExportTaskJournal::class)->handle($task->id);
+    $markdown = File::get($result['path']);
+
+    expect($markdown)->toContain('Recorded pull request: https://github\\.com/sifrious/molly/pull/12')
+        ->toContain('Recorded merge SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+        ->toContain('Display status: merged')
+        ->toContain('Lifecycle: pull\\_request\\_opened https://github\\.com/sifrious/molly/pull/12')
+        ->toContain('Lifecycle: merged https://github\\.com/sifrious/molly/pull/12 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+        ->not->toContain($this->journalWorkspace);
 });
 
 it('exports a pending task through JSON without creating an attempt', function (): void {
@@ -228,7 +266,7 @@ it('rebuilds a project chronology without duplicating entries or including anoth
     expect($repeated)->toBe(['journal_path' => $this->journalWorkspace.'/.molly/JOURNAL.md', 'glossary_path' => $this->journalWorkspace.'/.molly/GLOSSARY.md', 'task_count' => 2, 'attempt_count' => 2])
         ->and(File::get($repeated['journal_path']))->toBe($original)
         ->and(File::get($repeated['glossary_path']))->toBe($glossary)
-        ->and($glossary)->toContain('Task:', 'Attempt:', 'Tarpit review:', 'Accidental complexity:', 'Clever measurements:')
+        ->and($glossary)->toContain('Task:', 'Attempt:', 'Tarpit review:', 'Accidental complexity:', 'Clever measurements:', 'Recorded pull request:', 'Recorded merge:')
         ->and($html)->toContain($firstTask->id, $secondTask->id, 'First attempt failed.')
         ->not->toContain($outside->id, 'Outside task must stay out.')
         ->and(strpos($html, $secondTask->id))->toBeLessThan(strpos($html, $firstRun->id))
