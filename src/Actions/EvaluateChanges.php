@@ -65,7 +65,14 @@ class EvaluateChanges
     /** @return array<string, mixed> */
     private function settings(): array
     {
-        return ['molly.agent' => config('molly.agent', 'ollama'), 'molly.model' => config('molly.model'), 'molly.timeout' => config('molly.timeout'), 'molly.test_timeout' => config('molly.test_timeout'), 'ai.providers.ollama' => config('ai.providers.ollama')];
+        return [
+            'molly.agent' => config('molly.agent', 'ollama'),
+            'molly.model' => config('molly.model'),
+            'molly.timeout' => config('molly.timeout'),
+            'molly.test_timeout' => config('molly.test_timeout'),
+            'molly.sandbox.allow_unsafe' => config('molly.sandbox.allow_unsafe'),
+            'ai.providers.ollama' => config('ai.providers.ollama'),
+        ];
     }
 
     private function timeout(string $kind): int

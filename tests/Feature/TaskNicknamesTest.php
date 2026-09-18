@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\NameTask;
+use Sifrious\Molly\Actions\RestoreTaskBaseline;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Run;
@@ -214,6 +215,7 @@ it('starts and retries by nickname while retaining UUID locks and run relationsh
     $workspace = sys_get_temp_dir().'/molly-nickname-'.Str::uuid();
     File::ensureDirectoryExists($workspace);
     $task = nicknameTask(['nickname' => 'ready-check', 'workspace' => $workspace, 'status' => $status]);
+    app(RestoreTaskBaseline::class)->store($task, []);
     $this->mock(RunTask::class)->shouldReceive('handle')->once()->andReturnUsing(function (string $prompt, string $root, array $paths, string $testPath, ?Closure $progress, string $taskId, Closure $shouldStop) use ($task): Run {
         expect($taskId)->toBe($task->id);
         expect(fn () => (new Workspace($root))->exclusivelyForTask($task->id, fn (): bool => true))
