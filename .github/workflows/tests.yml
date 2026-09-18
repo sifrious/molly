@@ -116,6 +116,8 @@ jobs:
         timeout-minutes: 2
         run: |
           cd "$RUNNER_TEMP/molly-host"
+          mkdir -p tests/Feature
+          printf '%s\n' '<?php' '' "it('is ready for Molly', function () {" '    expect(true)->toBeTrue();' '});' > tests/Feature/MollySmokeTest.php
           php artisan molly:create 'Add a readiness route and its test.' --file=routes/web.php --test=tests/Feature/MollySmokeTest.php --name=smoke-test --json --no-interaction > "$RUNNER_TEMP/molly-created.json"
           task_id=$(php -r '$task = json_decode(file_get_contents(getenv("RUNNER_TEMP")."/molly-created.json"), true, flags: JSON_THROW_ON_ERROR); if (($task["status"] ?? null) !== "pending" || !is_string($task["id"] ?? null) || $task["id"] === "" || ($task["task"]["id"] ?? null) !== $task["id"]) { exit(1); } echo $task["id"];')
           php artisan molly:task "$task_id" --json --no-interaction > "$RUNNER_TEMP/molly-found-by-id.json"

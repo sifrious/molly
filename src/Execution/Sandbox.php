@@ -43,7 +43,7 @@ final class Sandbox
      * @param  list<string>  $writablePaths
      * @param  list<string>  $command
      * @param  array<string, string|false>  $env
-     * @return array{exit_code: int, output: string, timed_out: bool}
+     * @return array{exit_code: int, output: string, error: string, timed_out: bool}
      */
     public function run(string $workspace, array $writablePaths, array $command, string $evidenceDirectory, int $timeout, array $env = [], bool $network = false): array
     {
@@ -77,13 +77,15 @@ final class Sandbox
 
             return [
                 'exit_code' => $result->exitCode() ?? 1,
-                'output' => $result->output().$result->errorOutput(),
+                'output' => $result->output(),
+                'error' => $result->errorOutput(),
                 'timed_out' => false,
             ];
         } catch (ProcessTimedOutException $exception) {
             return [
                 'exit_code' => 124,
-                'output' => $exception->result->output().$exception->result->errorOutput(),
+                'output' => $exception->result->output(),
+                'error' => $exception->result->errorOutput(),
                 'timed_out' => true,
             ];
         } finally {

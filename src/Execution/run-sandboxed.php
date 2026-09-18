@@ -2,6 +2,9 @@
 
 use Sifrious\Molly\Execution\Landlock;
 
+ini_set('display_errors', 'stderr');
+ini_set('log_errors', '0');
+
 $policyPath = $argv[1] ?? '';
 if ($policyPath === '' || ! is_file($policyPath)) {
     fwrite(STDERR, "SANDBOX_POLICY_INVALID\n");

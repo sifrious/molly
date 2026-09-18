@@ -28,17 +28,18 @@ afterEach(function () {
 });
 
 it('lets the writer change only the allowed file', function () {
-    $script = $this->root.'/probe.php';
+    $script = $this->root.'/workspace/probe.php';
     File::put($script, <<<'PHP'
 <?php
 error_reporting(0);
+ini_set('display_errors', 'stderr');
 $workspace = $argv[1];
 $outside = $argv[2];
 $ok = file_put_contents($workspace.'/app/Greeting.php', 'changed');
 $protected = @file_put_contents($workspace.'/tests/GreetingTest.php', 'pwn');
 $unlisted = @file_put_contents($workspace.'/app/pwned.php', 'pwn');
 $secret = @file_get_contents($outside.'/secret.txt');
-echo json_encode(['ok' => $ok !== false, 'protected' => $protected !== false, 'unlisted' => $unlisted !== false, 'secret' => $secret]);
+fwrite(STDOUT, json_encode(['ok' => $ok !== false, 'protected' => $protected !== false, 'unlisted' => $unlisted !== false, 'secret' => $secret]));
 PHP);
 
     $result = $this->sandbox->run(
@@ -50,7 +51,7 @@ PHP);
     );
     $payload = json_decode($result['output'], true);
 
-    expect($result['exit_code'])->toBe(0)
+    expect($result['exit_code'])->toBe(0, $result['error'])
         ->and($payload)->toMatchArray(['ok' => true, 'protected' => false, 'unlisted' => false, 'secret' => false])
         ->and(File::get($this->root.'/workspace/app/Greeting.php'))->toBe('changed')
         ->and(File::get($this->root.'/workspace/tests/GreetingTest.php'))->toBe('test')
@@ -88,15 +89,16 @@ PHP);
 });
 
 it('does not inherit removed credentials or default network access', function () {
-    $script = $this->root.'/probe.php';
+    $script = $this->root.'/workspace/probe.php';
     File::put($script, <<<'PHP'
 <?php
 error_reporting(0);
+ini_set('display_errors', 'stderr');
 $fp = @fsockopen('1.1.1.1', 443, $errno, $errstr, 1);
-echo json_encode([
+fwrite(STDOUT, json_encode([
     'secret' => getenv('AWS_SECRET_ACCESS_KEY'),
     'net' => $fp !== false,
-]);
+]));
 PHP);
 
     putenv('AWS_SECRET_ACCESS_KEY=test-secret');
@@ -112,7 +114,8 @@ PHP);
     );
     $payload = json_decode($result['output'], true);
 
-    expect($result['exit_code'])->toBe(0)
+    expect($result['exit_code'])->toBe(0, $result['error'])
+        ->and($payload)->toBeArray()
         ->and($payload['secret'])->toBeFalse()
         ->and($payload['net'])->toBeFalse();
 });

@@ -43,7 +43,7 @@ class VerifyChanges
                     $timeout,
                     $env,
                 );
-                $report['output'] = $sandboxed['output'];
+                $report['output'] = $sandboxed['output'].$sandboxed['error'];
                 $successful = ! $sandboxed['timed_out'] && $sandboxed['exit_code'] === 0;
                 if ($sandboxed['timed_out']) {
                     return [...$report, 'reason' => 'test_timeout'];
