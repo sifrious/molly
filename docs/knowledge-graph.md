@@ -85,6 +85,8 @@ Every returned node and relationship has source information. A source can identi
 
 Molly does not invent a relationship at query time. The query can only return relationships created by the indexer.
 
+Implementation runs receive a bounded `laravel_knowledge` neighborhood chosen from the task, allowed files, and required test. That context is advisory. Missing or empty neighborhoods do not fail the run, widen file scope, or override Pest.
+
 ## Local storage
 
 By default, Molly stores the graph here:

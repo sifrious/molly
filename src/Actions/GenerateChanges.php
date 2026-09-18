@@ -11,6 +11,8 @@ use Sifrious\Molly\Agents\LocalOllama;
 
 class GenerateChanges
 {
+    public function __construct(private CollectRunKnowledge $knowledge) {}
+
     /**
      * @param  array<string, string|null>  $files
      * @param  array<string, mixed>|null  $previousAttempt
@@ -23,6 +25,7 @@ class GenerateChanges
             'allowed_files' => $files,
             'required_test' => $testPath,
             'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
+            'laravel_knowledge' => $this->knowledge->handle($prompt, $files, $testPath),
             ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
         ], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {

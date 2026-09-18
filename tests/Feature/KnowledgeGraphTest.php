@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\CollectRunKnowledge;
 use Sifrious\Molly\Actions\IndexLaravelKnowledge;
 use Sifrious\Molly\Actions\QueryKnowledgeGraph;
 use Sifrious\Molly\Knowledge\Graph;
@@ -147,6 +148,18 @@ it('rejects a requested Laravel version that is not installed', function () {
 
     expect(fn () => app(IndexLaravelKnowledge::class)->handle($other))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_VERSION_MISMATCH');
+});
+
+it('collects bounded advisory knowledge for a run without requiring an index', function () {
+    $context = app(CollectRunKnowledge::class)->handle(
+        'Validate the queued greeting route.',
+        ['app/Greeting.php' => null, 'routes/web.php' => null],
+        'tests/GreetingTest.php',
+    );
+
+    expect($context['status'])->toBeIn(['advisory', 'unavailable'])
+        ->and($context['neighborhoods'])->toBeArray()
+        ->and($context['concepts'])->toContain('Validation', 'Queue', 'Route');
 });
 
 it('does not require a Burdgen package at runtime', function () {

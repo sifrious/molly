@@ -25,10 +25,16 @@ it('returns a proposal through one local model request', function (): void {
     $result = app(GenerateChanges::class)->handle('Add a greeting.', ['src/Greeting.php' => null], 'tests/GreetingTest.php');
 
     expect($result)->toBe($proposal);
-    ChangeWriter::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->provider->name() === 'ollama'
-        && $prompt->model === config('molly.model') && $prompt->timeout === config('molly.timeout')
-        && json_decode($prompt->prompt, true)['required_test'] === 'tests/GreetingTest.php'
-        && ! array_key_exists('previous_attempt', json_decode($prompt->prompt, true)));
+    ChangeWriter::assertPrompted(function (AgentPrompt $prompt): bool {
+        $payload = json_decode($prompt->prompt, true);
+
+        return $prompt->provider->name() === 'ollama'
+            && $prompt->model === config('molly.model') && $prompt->timeout === config('molly.timeout')
+            && $payload['required_test'] === 'tests/GreetingTest.php'
+            && ! array_key_exists('previous_attempt', $payload)
+            && $payload['laravel_knowledge']['status'] === 'advisory'
+            && in_array('Pest', $payload['laravel_knowledge']['concepts'], true);
+    });
     ChangeWriter::assertPromptedTimes(1);
 });
 
@@ -40,12 +46,16 @@ it('keeps retry diagnostics separate from the task and rejects paths requested b
     expect(fn () => app(GenerateChanges::class)->handle('Add a greeting.', ['src/Greeting.php' => null], 'tests/GreetingTest.php', $evidence))
         ->toThrow(RuntimeException::class, 'GENERATION_INVALID');
 
-    ChangeWriter::assertPrompted(fn (AgentPrompt $prompt): bool => json_decode($prompt->prompt, true) === [
-        'task' => 'Add a greeting.', 'allowed_files' => ['src/Greeting.php' => null],
-        'required_test' => 'tests/GreetingTest.php',
-        'protected_test' => ['path' => 'tests/GreetingTest.php', 'digest' => null, 'writable' => false],
-        'previous_attempt' => $evidence,
-    ]);
+    ChangeWriter::assertPrompted(function (AgentPrompt $prompt) use ($evidence): bool {
+        $payload = json_decode($prompt->prompt, true);
+
+        return $payload['task'] === 'Add a greeting.'
+            && $payload['allowed_files'] === ['src/Greeting.php' => null]
+            && $payload['required_test'] === 'tests/GreetingTest.php'
+            && $payload['protected_test'] === ['path' => 'tests/GreetingTest.php', 'digest' => null, 'writable' => false]
+            && $payload['previous_attempt'] === $evidence
+            && isset($payload['laravel_knowledge']['status']);
+    });
 });
 
 it('rejects malformed proposals and undeclared file changes', function (mixed $proposal): void {
