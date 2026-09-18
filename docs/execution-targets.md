@@ -7,7 +7,7 @@ title: Planned remote execution
 
 > This page is a maintainer design note. The Orb and remote execution controls described here are not shipped user features.
 
-Today, Molly can save an Amp thread association and read Amp's reported executor connection state. It cannot verify an Orb identity, connect or disconnect an Orb, or choose a remote execution target.
+Today, Molly can save an Amp thread association and read Amp's reported executor connection state. Local execution is the default. Molly refuses an Orb request unless a capability-checked target is supplied. An Amp thread ID is not that target.
 
 For current behavior, read [Task connections](connections.md).
 

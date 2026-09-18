@@ -23,7 +23,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |
 | MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline |
 | MOL-WP-06 | GitHub issue to Pest to PR traceability | Import stores a digest and is idempotent; GitHub writeback remains |
-| MOL-WP-07 | Verified Orb execution targets | Not started |
+| MOL-WP-07 | Verified Orb execution targets | Local default and Orb refusal exist; verified Orb dispatch remains |
 | MOL-WP-08 | Agent handoff inside Bloom | Not started |
 | MOL-WP-09 | Laravel AI classification compatibility | Internal fallback adapter exists; Laravel AI version detection remains |
 | MOL-WP-10 | Project graph and broader Laravel knowledge | Not started |
