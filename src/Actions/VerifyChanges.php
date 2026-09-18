@@ -8,6 +8,7 @@ use DOMXPath;
 use Dotenv\Dotenv;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Process;
+use Sifrious\Molly\Execution\Sandbox;
 use Throwable;
 
 class VerifyChanges
@@ -30,11 +31,31 @@ class VerifyChanges
         }
 
         try {
-            $result = Process::path($workspace)
-                ->env($this->workspaceEnvironment())
-                ->timeout(max(1, min(3600, (int) config('molly.test_timeout', 120))))
-                ->run($command);
-            $report['output'] = $result->output().$result->errorOutput();
+            $sandbox = app(Sandbox::class);
+            $timeout = max(1, min(3600, (int) config('molly.test_timeout', 120)));
+            $env = $this->workspaceEnvironment();
+            if ($sandbox->available() && ! $sandbox->allowUnsafe()) {
+                $sandboxed = $sandbox->run(
+                    $workspace,
+                    [$evidenceDirectory],
+                    $command,
+                    $evidenceDirectory,
+                    $timeout,
+                    $env,
+                );
+                $report['output'] = $sandboxed['output'];
+                $successful = ! $sandboxed['timed_out'] && $sandboxed['exit_code'] === 0;
+                if ($sandboxed['timed_out']) {
+                    return [...$report, 'reason' => 'test_timeout'];
+                }
+            } else {
+                $result = Process::path($workspace)
+                    ->env($env)
+                    ->timeout($timeout)
+                    ->run($command);
+                $report['output'] = $result->output().$result->errorOutput();
+                $successful = $result->successful();
+            }
         } catch (ProcessTimedOutException $exception) {
             return [...$report, 'reason' => 'test_timeout', 'output' => $exception->result->output().$exception->result->errorOutput()];
         } catch (Throwable $exception) {
@@ -49,7 +70,7 @@ class VerifyChanges
             $report['tests'] === 0 => 'no_tests',
             $report['failures'] > 0 || $report['errors'] > 0 => 'tests_failed',
             $report['skipped'] > 0 => 'tests_skipped_or_incomplete',
-            ! $result->successful() => 'test_process_failed',
+            ! $successful => 'test_process_failed',
             default => null,
         };
 

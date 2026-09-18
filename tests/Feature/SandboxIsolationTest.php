@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\VerifyChanges;
 use Sifrious\Molly\Execution\Sandbox;
 
 beforeEach(function () {
@@ -54,6 +55,36 @@ PHP);
         ->and(File::get($this->root.'/workspace/app/Greeting.php'))->toBe('changed')
         ->and(File::get($this->root.'/workspace/tests/GreetingTest.php'))->toBe('test')
         ->and(File::exists($this->root.'/workspace/app/pwned.php'))->toBeFalse();
+});
+
+it('runs Pest inside the sandbox and still produces JUnit evidence', function () {
+    symlink(dirname(__DIR__, 2).'/vendor', $this->root.'/workspace/vendor');
+    File::put($this->root.'/workspace/phpunit.xml', <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php">
+    <testsuites>
+        <testsuite name="Workspace">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
+XML);
+    File::put($this->root.'/workspace/tests/GreetingTest.php', <<<'PHP'
+<?php
+it('exists', function () {
+    expect(true)->toBeTrue();
+});
+PHP);
+
+    $result = app(VerifyChanges::class)->handle(
+        $this->root.'/workspace',
+        'tests/GreetingTest.php',
+        $this->root.'/evidence',
+    );
+
+    expect($result['status'])->toBe('passed')
+        ->and($result['tests'])->toBe(1)
+        ->and($result['junit'])->toBeFile();
 });
 
 it('does not inherit removed credentials or default network access', function () {
