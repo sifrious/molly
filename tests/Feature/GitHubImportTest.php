@@ -45,22 +45,37 @@ function importMollyIssue(): Task
 }
 
 it('imports issue context and provenance without starting work or writing to GitHub', function () {
+    $this->freezeTime();
     fakeMollyIssue(json_encode(mollyIssueFixture()));
 
     $task = importMollyIssue()->fresh();
 
     expect($task->status)->toBe('pending')
-        ->and($task->source)->toBe([
+        ->and($task->source)->toMatchArray([
             'repository' => 'sifrious/molly', 'issue_number' => 42,
             'issue_url' => 'https://github.com/sifrious/molly/issues/42',
             'issue_title' => 'Add a health route', 'issue_updated_at' => '2026-09-17T12:00:00Z',
+            'issue_digest' => hash('sha256', "Add a health route\nReturn a JSON health response."),
+            'imported_at' => now()->toIso8601String(),
             'labels' => ['enhancement'], 'linked_pr' => null,
         ])
         ->and($task->prompt)->toContain('Add a health route', 'Return a JSON health response.', 'https://github.com/sifrious/molly/issues/42')
         ->and($task->paths)->toBe(['routes/web.php'])
         ->and(Run::count())->toBe(0)
-        ->and($task->allow_test_edits)->toBeFalse();
+        ->and($task->allow_test_edits)->toBeFalse()
+        ->and($task->source['issue_digest'])->toBe(hash('sha256', "Add a health route\nReturn a JSON health response."));
     Process::assertRanTimes(fn (PendingProcess $process): bool => $process->command === ['gh', 'api', '--hostname', 'github.com', 'repos/sifrious/molly/issues/42'] && $process->timeout === 15, 1);
+});
+
+it('returns the existing pending task when the same issue is imported again', function () {
+    fakeMollyIssue(json_encode(mollyIssueFixture()));
+
+    $first = importMollyIssue();
+    $second = importMollyIssue();
+
+    expect($second->id)->toBe($first->id)
+        ->and(Task::count())->toBe(1)
+        ->and(Run::count())->toBe(0);
 });
 
 it('accepts an issue without a body', function () {

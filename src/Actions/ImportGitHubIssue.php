@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Process;
 use JsonException;
 use RuntimeException;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Workspace;
 use Throwable;
 
 class ImportGitHubIssue
@@ -63,14 +64,30 @@ class ImportGitHubIssue
             throw new RuntimeException('ISSUE_TOO_LARGE: The issue exceeds the 8192-byte task prompt limit. Create a task with a shorter scope.');
         }
 
-        return $this->createTask->handle($prompt, $workspace, $paths, $testPath, [
+        $source = [
             'repository' => $repository,
             'issue_number' => $number,
             'issue_url' => $issueUrl,
             'issue_title' => $issue['title'],
             'issue_updated_at' => $issue['updated_at'],
+            'issue_digest' => hash('sha256', $issue['title']."\n".($issue['body'] ?? '')),
+            'imported_at' => now()->toIso8601String(),
             'labels' => $labels,
             'linked_pr' => null,
-        ], nickname: $nickname, allowTestEdits: $allowTestEdits);
+        ];
+        $files = new Workspace($workspace);
+        $existing = Task::query()
+            ->where('workspace', $files->path)
+            ->get()
+            ->first(fn (Task $task): bool => ($task->source['repository'] ?? null) === $repository && ($task->source['issue_number'] ?? null) === $number);
+        if ($existing !== null) {
+            if (($existing->source['issue_digest'] ?? null) === $source['issue_digest'] && $existing->test_path === $testPath && $existing->paths === $files->taskPaths($paths, $testPath, $allowTestEdits)) {
+                return $existing;
+            }
+
+            throw new RuntimeException('ISSUE_ALREADY_IMPORTED: This issue already has a Molly task. Update that task instead of importing it again.');
+        }
+
+        return $this->createTask->handle($prompt, $workspace, $paths, $testPath, $source, nickname: $nickname, allowTestEdits: $allowTestEdits);
     }
 }
