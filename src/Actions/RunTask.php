@@ -94,6 +94,9 @@ class RunTask
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
+            $this->record($workspace->path, LifecycleEventType::DispatchRequested, $taskId, $run->id, [
+                'target' => 'local',
+            ]);
             $this->record($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
             $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);

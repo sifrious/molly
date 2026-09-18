@@ -57,6 +57,8 @@ it('records rejected edits when the agent proposes no file changes', function ()
         ->and($log->displayStatus($task->id))->toBe(DisplayStatus::Failed)
         ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain(
             'created',
+            'workspace_prepared',
+            'dispatch_requested',
             'agent_started',
             'proposal_received',
             'edits_rejected',
@@ -82,11 +84,15 @@ it('asks for human approval after required checks pass', function () {
         ->and($log->displayStatus($task->id))->toBe(DisplayStatus::AwaitingApproval)
         ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain(
             'created',
+            'workspace_prepared',
+            'dispatch_requested',
             'agent_started',
             'proposal_received',
             'edits_accepted',
             'verification_started',
             'verification_finished',
             'approval_requested',
-        );
+        )
+        ->and($log->events($task->id)[1]->payload['created_worktree'] ?? true)->toBeFalse()
+        ->and($log->dispatchDecision($task->id, $run->id))->toBe(DispatchDecision::AlreadyAccepted);
 });

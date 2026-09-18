@@ -65,6 +65,10 @@ class StartTask
                 $this->baseline->handle($task);
                 $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
             }
+            $this->lifecycle->handle($task->workspace, LifecycleEventType::WorkspacePrepared, $task->id, payload: [
+                'workspace' => $task->workspace,
+                'created_worktree' => false,
+            ]);
             $previousAttempt = $retry ? $this->previousAttempt($task) : null;
             $run = $this->runTask->handle(
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,

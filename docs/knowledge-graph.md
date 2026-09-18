@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current Laravel namespace covers queues, routing, testing, and validation. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
+The current Laravel namespace covers queues, routing, testing, validation, and the container. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 
@@ -33,6 +33,7 @@ php artisan molly:knowledge:query Queue
 php artisan molly:knowledge:query Route
 php artisan molly:knowledge:query Pest
 php artisan molly:knowledge:query Validation
+php artisan molly:knowledge:query Container
 php artisan molly:knowledge:query Retry --depth=1 --limit=10
 php artisan molly:knowledge:query Job --relation=uses
 ```
@@ -65,6 +66,8 @@ The routing slice connects `Route`, `routes/web.php`, the Basic Routing section,
 The testing slice connects Pest, PHPUnit, `tests/Feature`, the Introduction section, and `Illuminate\Foundation\Testing\TestCase`.
 
 The validation slice connects `Validation`, the Introduction section, and the installed `Illuminate\Validation\Validator` symbol. It does not claim `Illuminate\Http\Request::validate`, which this package Request class does not implement.
+
+The container slice connects `Container`, the Zero Configuration Resolution section, and the installed `Illuminate\Container\Container` symbol.
 
 Relationships include examples such as `documented_in`, `configured_by`, `implements`, `uses`, and `tested_by`.
 
@@ -104,7 +107,7 @@ Molly uses PDO SQLite directly. No hosted graph database is required.
 
 Current:
 
-- Laravel queues, routing, testing, and validation
+- Laravel queues, routing, testing, validation, and the container
 - bundled documentation excerpts for those areas
 - matching installed framework source
 - local version-aware SQLite storage
