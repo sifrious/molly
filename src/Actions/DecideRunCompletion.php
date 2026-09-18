@@ -24,7 +24,7 @@ class DecideRunCompletion
     {
         $checks = [
             'pest' => [
-                'state' => VerificationState::fromObserved($report['verification']['status'] ?? null),
+                'state' => $this->pestState($report['verification'] ?? []),
                 'policy' => $this->policy('pest'),
                 'failure_action' => $this->failureAction('pest', FailureAction::Retry),
             ],
@@ -72,6 +72,17 @@ class DecideRunCompletion
         }
 
         return true;
+    }
+
+    /** @param  array<string, mixed>  $verification */
+    private function pestState(array $verification): VerificationState
+    {
+        $state = VerificationState::fromObserved($verification['status'] ?? null);
+        if ($state === VerificationState::Pass && (int) ($verification['assertions'] ?? 0) < 1) {
+            return VerificationState::Fail;
+        }
+
+        return $state;
     }
 
     private function policy(string $name): VerifierPolicy

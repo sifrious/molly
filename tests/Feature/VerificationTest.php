@@ -74,6 +74,7 @@ it('fails without usable complete JUnit evidence', function (?string $xml, strin
     'broken XML' => ['<broken', 'junit_invalid'],
     'unrelated XML' => ['<document/>', 'junit_invalid'],
     'empty suite' => ['<testsuite tests="0"/>', 'no_tests'],
+    'zero assertions' => ['<testsuite tests="1" assertions="0"><testcase assertions="0"/></testsuite>', 'no_assertions'],
     'missing testcases' => ['<testsuite tests="2"><testcase assertions="1"/></testsuite>', 'junit_invalid'],
     'inconsistent failure count' => ['<testsuite tests="1" failures="1"><testcase assertions="1"/></testsuite>', 'junit_invalid'],
     'missing assertion evidence' => ['<testsuite tests="1"><testcase/></testsuite>', 'junit_invalid'],

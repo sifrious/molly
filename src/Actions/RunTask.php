@@ -26,6 +26,7 @@ class RunTask
         private ClassifyRunEvidence $classify,
         private CaptureComponentPreview $preview,
         private RecordLifecycleEvent $lifecycle,
+        private RecordVerificationReceipts $receipts,
     ) {}
 
     /** @param list<string> $paths */
@@ -161,6 +162,7 @@ class RunTask
             $decision = $this->decideCompletion->handle($report, $after);
             $report['verification_outcomes'] = $decision['outcomes'];
             $report['completion_blockers'] = $decision['blockers'];
+            $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
             $classification = $this->classify->handle([
                 'run_id' => $run->id,
                 'verification' => $report['verification'] ?? [],

@@ -80,6 +80,7 @@ Common reasons:
 | `test_timeout` | Pest exceeded the configured timeout. |
 | `test_process_failed` | The Pest process exited unsuccessfully. |
 | `junit_missing` / `junit_invalid` | Molly cannot trust the recorded test evidence. |
+| `no_assertions` | Pest ran a test file but recorded zero assertions. |
 
 Do not weaken assertions just to make a retry pass.
 

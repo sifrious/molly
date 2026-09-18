@@ -81,6 +81,9 @@ it('asks for human approval after required checks pass', function () {
     $log = app(RecordLifecycleEvent::class)->load($this->workspace);
 
     expect($run->status)->toBe('completed')
+        ->and($run->report['verification_receipts'])->not->toBeEmpty()
+        ->and($run->report['verification_receipts'][0]['schema'])->toBe('molly.verification_outcome.v1')
+        ->and(is_file($run->report['verification_receipts'][0]['path']))->toBeTrue()
         ->and($log->displayStatus($task->id))->toBe(DisplayStatus::AwaitingApproval)
         ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain(
             'created',

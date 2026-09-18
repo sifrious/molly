@@ -227,6 +227,7 @@ MARKDOWN;
 
         return [...$lines,
             ...$this->verification($report['verification'] ?? []),
+            ...$this->receipts($report['verification_receipts'] ?? []),
             ...$this->review($report['review'] ?? []),
             ...$this->measurements($report),
         ];
@@ -246,6 +247,24 @@ MARKDOWN;
             if (is_string($verification[$key] ?? null)) {
                 $lines = [...$lines, '', $this->quote($verification[$key])];
             }
+        }
+
+        return [...$lines, ''];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $receipts
+     * @return list<string>
+     */
+    private function receipts(array $receipts): array
+    {
+        if ($receipts === []) {
+            return [];
+        }
+
+        $lines = ['#### Verification receipts', ''];
+        foreach ($receipts as $receipt) {
+            $lines[] = '- '.$this->escape($receipt['verifier'] ?? null).': '.$this->escape($receipt['state'] ?? null).' / '.$this->escape($receipt['evidence_digest'] ?? null);
         }
 
         return [...$lines, ''];

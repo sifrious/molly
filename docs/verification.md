@@ -49,6 +49,9 @@ These prevent completion:
 - a timeout
 - missing or invalid JUnit evidence
 - an empty test file
+- a test file that runs but records zero assertions
+
+A completed or failed run also writes immutable verification receipts under `.molly/receipts/{run-id}/`. Each receipt stores verifier name, state, policy, failure action, evidence digest, and timestamps. Receipts do not replace Pest. Rewriting a receipt file does not change the saved run.
 
 Molly does not run your entire application test suite. Run the broader suite yourself before committing:
 

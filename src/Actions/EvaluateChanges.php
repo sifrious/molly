@@ -158,6 +158,7 @@ class EvaluateChanges
     {
         if ($kind === 'verification') {
             return ($result['status'] ?? null) === 'passed' && ($result['tests'] ?? 0) > 0
+                && ($result['assertions'] ?? 0) > 0
                 && ($result['failures'] ?? -1) === 0 && ($result['errors'] ?? -1) === 0 && ($result['skipped'] ?? -1) === 0;
         }
 

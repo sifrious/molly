@@ -21,7 +21,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | MOL-WP-02 | Bloom workspace, diff, approval, and PR loop | Headless contract export and molly:approve exist. Bloom adapter, diffs, and PR opening remain |
 | MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist; Bloom test-author approval remains |
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |
-| MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline |
+| MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline. Completed runs store immutable receipts. Pest cannot pass with zero assertions |
 | MOL-WP-06 | GitHub issue to Pest to PR traceability | Import is idempotent. Approved comments and PR bodies exist. Molly still does not open or merge a pull request |
 | MOL-WP-07 | Verified Orb execution targets | Local default and Orb refusal exist; verified Orb dispatch remains |
 | MOL-WP-08 | Agent handoff inside Bloom | Headless envelopes exist. Recipients cannot widen scope, edit the protected test, or merge. Bloom child workspaces remain |

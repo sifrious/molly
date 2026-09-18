@@ -70,6 +70,7 @@ class VerifyChanges
             $report['tests'] === 0 => 'no_tests',
             $report['failures'] > 0 || $report['errors'] > 0 => 'tests_failed',
             $report['skipped'] > 0 => 'tests_skipped_or_incomplete',
+            $report['assertions'] === 0 => 'no_assertions',
             ! $successful => 'test_process_failed',
             default => null,
         };
