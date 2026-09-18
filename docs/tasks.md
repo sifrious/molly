@@ -20,6 +20,8 @@ php artisan molly:show RUN_ID --verbose
 
 `TASK` can be a nickname such as `health-check` or the task UUID.
 
+Imported GitHub issues stay pending until you start them. After a human approves writeback, `molly:comment` can post a status comment and `molly:pr-body` can print a pull request body. Molly does not open or merge the pull request.
+
 ## Create a task
 
 Interactive creation:

@@ -20,6 +20,7 @@ If this is your first time here, start with [Getting started](getting-started.md
 | Choose Amp or Ollama, or use MCP | [Agents and MCP](agents.md) |
 | Break a larger request into tasks | [Planning](planning.md) |
 | Query Laravel queue knowledge | [Laravel knowledge](knowledge-graph.md) |
+| Inspect task, test, and blocker relationships | [Project graph](project-graph.md) |
 | Use Molly in a browser | [Local web interface](web-interface.md) |
 | Ask what to do after a failed task | [Task advice](task-advice.md) |
 | Link a task to an Amp thread | [Task connections](connections.md) |
@@ -60,4 +61,4 @@ The model does not get to declare its own work correct. A passing review never t
 
 These docs describe the current `dev-main` build. No alpha release is tagged yet.
 
-The Laravel knowledge graph currently covers queues. Remote Orb identity and remote execution selection are still planned. Visual component previews are also not implemented.
+The Laravel knowledge graph currently covers queues. The project graph covers saved Molly records in one workspace. Remote Orb identity and Bloom-owned pull requests are still planned. Visual component previews are also not implemented.

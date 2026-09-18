@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Closure;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
@@ -21,6 +22,7 @@ class RunTask
         private MeasureComplexity $measure,
         private EvaluateChanges $evaluate,
         private DecideRunCompletion $decideCompletion,
+        private ClassifyRunEvidence $classify,
     ) {}
 
     /** @param list<string> $paths */
@@ -148,6 +150,12 @@ class RunTask
             $decision = $this->decideCompletion->handle($report, $after);
             $report['verification_outcomes'] = $decision['outcomes'];
             $report['completion_blockers'] = $decision['blockers'];
+            $classification = $this->classify->handle([
+                'run_id' => $run->id,
+                'verification' => $report['verification'] ?? [],
+                'review' => $report['review'] ?? [],
+            ]);
+            $report['classification'] = [...$classification->toArray(), 'advisory' => true];
 
             $this->checkpoint($shouldStop, null, 'Completing the run');
             $this->recordSnapshot($report, $workspace, $before, $after);

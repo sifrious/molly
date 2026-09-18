@@ -25,6 +25,9 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:name TASK NAME` | Adds or changes a task nickname. |
 | `php artisan molly:doctor` | Checks whether the selected workspace and provider are ready. |
 | `php artisan molly:bloom-contract TASK` | Prints the versioned task contract for an existing Bloom workspace. Does not create a worktree. |
+| `php artisan molly:comment TASK --approve` | Posts or updates a GitHub issue comment after explicit approval. |
+| `php artisan molly:pr-body TASK` | Prints a pull request body that links the issue, acceptance test, and evidence. Does not open a pull request. |
+| `php artisan molly:handoff TASK --from UUID --to UUID` | Prints a handoff envelope for a child Bloom workspace. Does not create a worktree. |
 
 `TASK` accepts either a nickname or task UUID. `RUN_ID` is a run UUID.
 
@@ -105,6 +108,16 @@ Query limits:
 
 The requested Laravel major version must match the installed major version.
 
+## Project graph
+
+```bash
+php artisan molly:project:index
+php artisan molly:project:query TASK_UUID
+php artisan molly:project:query pest --relation=blocked_by
+```
+
+The project graph is separate from Laravel queue knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
+
 ## GitHub issue import
 
 ```bash
@@ -114,7 +127,17 @@ php artisan molly:import https://github.com/OWNER/REPO/issues/123 \
   --file=app/Example.php
 ```
 
-This requires an authenticated `gh` CLI. It creates a pending task and does not write back to GitHub.
+This requires an authenticated `gh` CLI. It creates a pending task and does not start an agent.
+
+After a human approves a comment:
+
+```bash
+php artisan molly:comment TASK --approve
+php artisan molly:pr-body TASK
+php artisan molly:pr-body TASK --close
+```
+
+`molly:comment` posts or updates one concise issue comment. `--close` adds closing language only after required checks pass. Molly still does not open or merge a pull request.
 
 ## Journals and advice
 

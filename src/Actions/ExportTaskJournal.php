@@ -87,9 +87,29 @@ class ExportTaskJournal
             '- Updated: '.$this->escape($task->updated_at?->toIso8601String()),
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
-            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'), '',
+            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
+            ...$this->issueLines($task), '',
             $this->quote($task->prompt), '',
         ];
+    }
+
+    /** @return list<string> */
+    private function issueLines(Task $task): array
+    {
+        $source = $task->source ?? [];
+        if (! is_string($source['issue_url'] ?? null)) {
+            return [];
+        }
+
+        $lines = ['- GitHub issue: '.$this->escape($source['issue_url'])];
+        if (is_string($source['issue_digest'] ?? null)) {
+            $lines[] = '- Issue digest: '.$this->escape($source['issue_digest']);
+        }
+        if (is_string($source['github_comment_url'] ?? null)) {
+            $lines[] = '- GitHub comment: '.$this->escape($source['github_comment_url']);
+        }
+
+        return $lines;
     }
 
     private function glossary(): string
@@ -107,6 +127,7 @@ Molly updates this marked section with the project journal. Add project-specific
 - Accidental complexity: A finding whose removal preserves the required behavior. A blocking finding prevents completion.
 - Clever measurements: Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.
 - Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Current records do not preserve every lifecycle transition.
+- Handoff: A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.
 
 The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.
 
@@ -168,7 +189,8 @@ MARKDOWN;
             '- Stop requested: '.$this->escape($task->stop_requested_at?->toIso8601String() ?? 'No'),
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
-            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'), '',
+            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
+            ...$this->issueLines($task), '',
             '## Requested work', '', $this->quote($task->prompt), '',
             '## Editable files', '',
         ];

@@ -22,11 +22,11 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist; Bloom test-author approval remains |
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |
 | MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline |
-| MOL-WP-06 | GitHub issue to Pest to PR traceability | Import stores a digest and is idempotent; GitHub writeback remains |
+| MOL-WP-06 | GitHub issue to Pest to PR traceability | Import is idempotent. Approved comments and PR bodies exist. Molly still does not open or merge a pull request |
 | MOL-WP-07 | Verified Orb execution targets | Local default and Orb refusal exist; verified Orb dispatch remains |
-| MOL-WP-08 | Agent handoff inside Bloom | Not started |
-| MOL-WP-09 | Laravel AI classification compatibility | Internal fallback adapter exists; Laravel AI version detection remains |
-| MOL-WP-10 | Project graph and broader Laravel knowledge | Not started |
+| MOL-WP-08 | Agent handoff inside Bloom | Headless envelopes exist. Recipients cannot widen scope, edit the protected test, or merge. Bloom child workspaces remain |
+| MOL-WP-09 | Laravel AI classification compatibility | Structured-output detection and an advisory Laravel AI adapter exist. They cannot upgrade a failed Pest run. Unreleased Laravel AI names are not used |
+| MOL-WP-10 | Project graph and broader Laravel knowledge | Project graph indexing exists. A visual Bloom view and extra Laravel namespaces remain |
 | MOL-WP-11 | Component previews | Not started |
 | MOL-WP-12 | Compatibility matrix and packaging | Not started |
 | MOL-WP-13 | Docs site and tagged `v0.1.0-alpha.1` | Not started |

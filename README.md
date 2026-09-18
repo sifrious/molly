@@ -110,6 +110,15 @@ The graph lives in `.molly/knowledge.sqlite`. It is local, disposable, version-a
 
 Read [Laravel knowledge](docs/knowledge-graph.md) for query examples and limits.
 
+Molly can also rebuild a project graph from saved tasks, tests, attempts, and verification blockers:
+
+```bash
+php artisan molly:project:index
+php artisan molly:project:query TASK_UUID
+```
+
+Read [Project graph](docs/project-graph.md) for node types and limits.
+
 ## Local web interface
 
 Molly also has a local browser interface for saved tasks and run evidence. It is disabled by default and has no login.
@@ -130,6 +139,7 @@ Using more features:
 - [Agents and MCP](docs/agents.md)
 - [Planning](docs/planning.md)
 - [Laravel knowledge](docs/knowledge-graph.md)
+- [Project graph](docs/project-graph.md)
 - [Local web interface](docs/web-interface.md)
 - [Task advice](docs/task-advice.md)
 - [Task connections](docs/connections.md)
@@ -150,11 +160,10 @@ Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest a
 These are not finished yet:
 
 - Verified Orb identity and remote execution selection
-- Bloom integration
-- GitHub-to-Pest todo tracking
-- Approval controls
+- Bloom-owned task UI, diffs, and pull requests
+- GitHub pull request opening and merge
 - Visual component previews
-- Complete lifecycle event history
+- Broader Laravel knowledge namespaces
 
 Planned behavior is kept separate in [Execution targets](docs/execution-targets.md).
 

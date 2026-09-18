@@ -15,9 +15,11 @@ use Sifrious\Molly\Console\MollyAdviceCommand;
 use Sifrious\Molly\Console\MollyBloomContractCommand;
 use Sifrious\Molly\Console\MollyChatCommand;
 use Sifrious\Molly\Console\MollyCheckCommand;
+use Sifrious\Molly\Console\MollyCommentCommand;
 use Sifrious\Molly\Console\MollyConnectionsCommand;
 use Sifrious\Molly\Console\MollyCreateCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
+use Sifrious\Molly\Console\MollyHandoffCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
 use Sifrious\Molly\Console\MollyJournalCommand;
 use Sifrious\Molly\Console\MollyKnowledgeIndexCommand;
@@ -25,6 +27,9 @@ use Sifrious\Molly\Console\MollyKnowledgeQueryCommand;
 use Sifrious\Molly\Console\MollyLinkThreadCommand;
 use Sifrious\Molly\Console\MollyNameCommand;
 use Sifrious\Molly\Console\MollyPlanCommand;
+use Sifrious\Molly\Console\MollyPrBodyCommand;
+use Sifrious\Molly\Console\MollyProjectIndexCommand;
+use Sifrious\Molly\Console\MollyProjectQueryCommand;
 use Sifrious\Molly\Console\MollyRetryCommand;
 use Sifrious\Molly\Console\MollyReviewCommitCommand;
 use Sifrious\Molly\Console\MollyRunCommand;
@@ -60,10 +65,11 @@ class MollyServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
                 MollyBloomContractCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
-                MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyNameCommand::class,
+                MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
+                MollyPrBodyCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
-                MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class]);
+                MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
             }

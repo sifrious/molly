@@ -7,7 +7,7 @@ title: Laravel knowledge
 
 Molly can build a small local knowledge graph for Laravel so agents can retrieve connected documentation and framework source without loading a whole manual into the prompt.
 
-The current version covers Laravel queues only.
+The current Laravel namespace covers queues only. Saved Molly tasks live in a separate project graph. See [Project graph](project-graph.md).
 
 ## Build the graph
 

@@ -15,7 +15,7 @@ use Sifrious\Molly\Actions\QueryKnowledgeGraph;
 use Throwable;
 
 #[Name('molly_knowledge')]
-#[Description('Read a small, version-matched neighborhood from Molly\'s local Laravel knowledge graph. Results contain source provenance for every node and relationship. Index the graph with molly:knowledge:index before querying it.')]
+#[Description('Read a small, version-matched neighborhood from Molly\'s local Laravel knowledge graph. Results contain source provenance for every node and relationship. Index the graph with molly:knowledge:index before querying it. Project graphs are separate and use molly:project:index.')]
 #[IsReadOnly]
 final class MollyKnowledge extends Tool
 {
