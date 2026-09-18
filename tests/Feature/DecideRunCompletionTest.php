@@ -23,8 +23,8 @@ it('completes when required Pest and Tarpit checks pass', function () {
 
     expect($decision['completed'])->toBeTrue()
         ->and($decision['blockers'])->toBe([])
-        ->and($decision['outcomes']['pest'])->toBe(['state' => 'PASS', 'policy' => 'required'])
-        ->and($decision['outcomes']['tarpit'])->toBe(['state' => 'PASS', 'policy' => 'required']);
+        ->and($decision['outcomes']['pest'])->toBe(['state' => 'PASS', 'policy' => 'required', 'failure_action' => 'retry'])
+        ->and($decision['outcomes']['tarpit'])->toBe(['state' => 'PASS', 'policy' => 'required', 'failure_action' => 'retry']);
 });
 
 it('blocks when a required verifier did not run', function () {
@@ -68,5 +68,5 @@ it('requires a valid parallel join when parallel mode is used', function () {
     ], ['app/Greeting.php' => '<?php return "Hello";']);
 
     expect($decision['completed'])->toBeTrue()
-        ->and($decision['outcomes']['parallel_join'])->toBe(['state' => 'PASS', 'policy' => 'required']);
+        ->and($decision['outcomes']['parallel_join'])->toBe(['state' => 'PASS', 'policy' => 'required', 'failure_action' => 'retry']);
 });

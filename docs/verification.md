@@ -13,12 +13,13 @@ The central rule is simple: deterministic evidence comes before model judgment. 
 
 After an agent proposes edits, Molly:
 
-1. Validates that the proposal only touches allowed files.
+1. Validates that the proposal only touches allowed files and does not change a protected test.
 2. Applies the changes.
-3. Runs the required Pest test file.
-4. Runs the seven-check Tarpit review.
-5. Records Clever measurements before and after the change.
-6. Confirms the selected files still match the reviewed contents.
+3. Checks the protected test digest again.
+4. Runs the required Pest test file.
+5. Runs the seven-check Tarpit review.
+6. Records Clever measurements before and after the change.
+7. Confirms the selected files and protected test still match the reviewed contents.
 
 A required failure blocks completion.
 
@@ -127,9 +128,11 @@ Read [Component snapshots](component-snapshots.md) for the exact behavior.
 
 ## Safety and limits
 
-The file allowlist restricts what the writer may propose changing. It is not a sandbox. Pest still runs PHP with your local user's permissions.
+The required Pest test is protected by default. A proposal that changes it is rejected before application. Molly also fails the run if the test digest changes on disk.
 
-The required test file is writable by the model. Review its assertions before accepting the result.
+Writer and Pest processes run in a Landlock sandbox with a network namespace when the host supports it. `molly:doctor` reports that as the Sandbox check. Pest still executes PHP, so keep the workspace disposable.
+
+Set `molly.sandbox.allow_unsafe` only for local diagnostics. That override is conspicuous, local-only, and excluded from release evidence.
 
 Failed runs may leave applied edits in the workspace. Molly does not commit them.
 

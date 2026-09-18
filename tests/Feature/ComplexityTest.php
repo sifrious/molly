@@ -117,7 +117,7 @@ it('measures source without external Clever and refreshes Git observations betwe
     file_put_contents($directory.'/plain/app/example.php', "<?php\n\$value = 1;\n");
     file_put_contents($directory.'/git/app/example.php', "<?php\n\$value = 1;\n\$other = 2;\n");
     config(['molly-complexity.lonely.min_lines' => 1]);
-    foreach ([['git', 'init'], ['git', 'add', '.'], ['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Initial source']] as $command) {
+    foreach ([['git', 'init'], ['git', 'config', 'commit.gpgsign', 'false'], ['git', 'add', '.'], ['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Initial source']] as $command) {
         Process::path($directory.'/git')->run($command)->throw();
     }
 

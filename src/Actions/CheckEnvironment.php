@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Complexity\Clever;
+use Sifrious\Molly\Execution\Sandbox;
 use Throwable;
 
 class CheckEnvironment
@@ -24,6 +25,9 @@ class CheckEnvironment
                 && Schema::hasColumn('molly_tasks', 'nickname') && Schema::hasColumn('molly_tasks', 'context_snapshot')
                 && Schema::hasColumn('molly_tasks', 'journal_status')
                 && Schema::hasTable('molly_task_threads') && Schema::hasTable('molly_plans');
+            $ready = $ready
+                && Schema::hasColumn('molly_tasks', 'test_digest')
+                && Schema::hasColumn('molly_tasks', 'allow_test_edits');
             $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Task and run history are ready.' : 'Run php artisan migrate to update Molly task and run history.');
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');
@@ -32,6 +36,20 @@ class CheckEnvironment
         $workspace = realpath($workspace);
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
+
+        $sandbox = app(Sandbox::class);
+        $available = $sandbox->available();
+        $unsafe = $sandbox->allowUnsafe();
+        $add(
+            'Sandbox',
+            $available || $unsafe,
+            $available ? 'sandbox_available' : ($unsafe ? 'sandbox_unsafe_override' : 'sandbox_unavailable'),
+            $available
+                ? 'This host isolates writer and verifier processes with Landlock and a network namespace.'
+                : ($unsafe
+                    ? 'This host cannot isolate writer and verifier processes. molly.sandbox.allow_unsafe is enabled for local diagnostics only.'
+                    : 'This host cannot supply a writer and verifier sandbox. molly:doctor refuses the safe workflow until Landlock and user/network namespaces are available, or you explicitly set molly.sandbox.allow_unsafe.'),
+        );
 
         if (config('molly.parallel_checks', true) === true) {
             $available = function_exists('posix_setsid') && function_exists('posix_kill');

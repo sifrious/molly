@@ -85,7 +85,9 @@ class ExportTaskJournal
             '- Status: '.$this->escape($task->status),
             '- Created: '.$this->escape($task->created_at?->toIso8601String()),
             '- Updated: '.$this->escape($task->updated_at?->toIso8601String()),
-            '- Required test: '.$this->escape($task->test_path), '',
+            '- Required test: '.$this->escape($task->test_path),
+            '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
+            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'), '',
             $this->quote($task->prompt), '',
         ];
     }
@@ -97,7 +99,7 @@ class ExportTaskJournal
 
 Molly updates this marked section with the project journal. Add project-specific definitions outside the section.
 
-- Task: A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes.
+- Task: A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.
 - Nickname: An optional readable task reference. Commands also accept the task UUID.
 - Attempt: One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.
 - Verification: The recorded Pest result and counts. A skipped or missing check is not a pass.
@@ -164,7 +166,9 @@ MARKDOWN;
             '- Created: '.$this->escape($task->created_at?->toIso8601String()),
             '- Updated: '.$this->escape($task->updated_at?->toIso8601String()),
             '- Stop requested: '.$this->escape($task->stop_requested_at?->toIso8601String() ?? 'No'),
-            '- Required test: '.$this->escape($task->test_path), '',
+            '- Required test: '.$this->escape($task->test_path),
+            '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
+            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'), '',
             '## Requested work', '', $this->quote($task->prompt), '',
             '## Editable files', '',
         ];

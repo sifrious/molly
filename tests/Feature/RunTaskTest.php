@@ -24,10 +24,9 @@ function mollyReviewFixture(): array
 function mollyProposalFixture(): array
 {
     return [
-        'summary' => 'Return a greeting and test the response.',
+        'summary' => 'Return a greeting.',
         'files' => [
             ['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";'],
-            ['path' => 'tests/GreetingTest.php', 'content' => '<?php it("greets", fn () => expect(require __DIR__."/../app/Greeting.php")->toBe("Hello"));'],
         ],
     ];
 }
@@ -36,6 +35,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-task-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    writeProtectedTest($this->workspace);
     config(['ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434']]);
 });
 
@@ -71,7 +71,7 @@ it('saves the active phase and completed measurements before requesting model ch
     TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
     $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
 
-    $run = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php', previousAttempt: $previous);
+    $run = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', previousAttempt: $previous);
 
     expect($run->status)->toBe('completed');
 });
@@ -87,8 +87,8 @@ it('persists completion only after tests and the complete review pass', function
     expect($run->status)->toBe('completed')
         ->and(Run::findOrFail($run->id)->status)->toBe('completed')
         ->and($run->report['verification']['tests'])->toBe(1)
-        ->and($run->report['changes'])->toHaveCount(2)
-        ->and($run->report['changes'][1]['status'])->toBe('added')
+        ->and($run->report['changes'])->toHaveCount(1)
+        ->and($run->report['changes'][0]['status'])->toBe('modified')
         ->and($run->report['complexity_after']['probes'][0]['status'])->toBe('skipped')
         ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return "Hello";');
     ChangeWriter::assertPromptedTimes(1);
@@ -135,7 +135,7 @@ it('records incomplete reviews as failures and retains the observed test results
     expect($run->status)->toBe('failed')
         ->and($run->report['error'])->toStartWith('REVIEW_INVALID:')
         ->and($run->report['verification']['tests'])->toBe(1)
-        ->and($run->report['changes'])->toHaveCount(2);
+        ->and($run->report['changes'])->toHaveCount(1);
 });
 
 it('does not edit files or call the model when Clever is unavailable', function () {
@@ -196,7 +196,7 @@ it('invalidates results when a file changes during verification', function () {
 });
 
 it('rejects invalid task input before creating a run', function (string $prompt, string $testPath) {
-    expect(fn () => app(RunTask::class)->handle($prompt, $this->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], $testPath))
+    expect(fn () => app(RunTask::class)->handle($prompt, $this->workspace, ['app/Greeting.php'], $testPath))
         ->toThrow(RuntimeException::class);
     expect(Run::count())->toBe(0);
 })->with([

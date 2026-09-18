@@ -63,8 +63,9 @@ Shared scope options:
 | Option | Meaning |
 | --- | --- |
 | `--workspace=PATH` | Existing checkout to work in. Defaults to the host Laravel app. |
-| `--test=PATH` | Required Pest PHP test under `tests/`. It is automatically editable. |
-| `--file=PATH` | Another editable file. Repeat as needed. |
+| `--test=PATH` | Required Pest PHP test under `tests/`. Protected unless `--allow-test-edits` is set. |
+| `--file=PATH` | A writable implementation file. Repeat as needed. |
+| `--allow-test-edits` | Permit this task to change the required Pest test. Not the default. |
 | `--json` | Print structured JSON. |
 
 Accepted edit paths stay under `app/`, `routes/`, `resources/`, and `tests/`.

@@ -14,6 +14,14 @@ return [
         'tarpit' => 'required',
         'parallel_join' => 'required',
     ],
+    'verification_actions' => [
+        'pest' => 'retry',
+        'tarpit' => 'retry',
+        'parallel_join' => 'retry',
+    ],
+    'sandbox' => [
+        'allow_unsafe' => env('MOLLY_SANDBOX_ALLOW_UNSAFE', false),
+    ],
     'knowledge' => [
         'database' => env('MOLLY_KNOWLEDGE_DATABASE', '.molly/knowledge.sqlite'),
     ],

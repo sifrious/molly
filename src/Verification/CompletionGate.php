@@ -5,7 +5,7 @@ namespace Sifrious\Molly\Verification;
 class CompletionGate
 {
     /**
-     * @param  array<string, array{state: VerificationState, policy: VerifierPolicy}>  $checks
+     * @param  array<string, array{state: VerificationState, policy: VerifierPolicy, failure_action?: FailureAction}>  $checks
      * @return array{completed: bool, blockers: list<string>, outcomes: array<string, array{state: string, policy: string}>}
      */
     public function evaluate(array $checks): array

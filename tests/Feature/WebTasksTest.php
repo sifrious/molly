@@ -20,6 +20,9 @@ beforeEach(function () {
     config()->set('queue.connections.database.retry_after', 3700);
     $this->workspace = sys_get_temp_dir().'/molly-web-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/tests');
+    File::ensureDirectoryExists($this->workspace.'/app');
+    File::put($this->workspace.'/app/Hello.php', '<?php');
+    writeProtectedTest($this->workspace, 'tests/Hello.php');
 });
 
 afterEach(function () {
@@ -28,7 +31,7 @@ afterEach(function () {
 
 function webMollyTask(): Task
 {
-    return app(CreateTask::class)->handle('Return <script>alert(1)</script>.', test()->workspace, ['tests/Hello.php'], 'tests/Hello.php');
+    return app(CreateTask::class)->handle('Return <script>alert(1)</script>.', test()->workspace, ['app/Hello.php'], 'tests/Hello.php');
 }
 
 it('hides the UI by default and in production', function () {
@@ -51,10 +54,10 @@ it('rejects remote clients and non-loopback hosts', function (array $server) {
 it('renders labeled server forms and saves a task without execution', function () {
     Queue::fake();
     $this->get('/molly/tasks/create')->assertOk()->assertSee('name="_token"', false)->assertSee('for="paths"', false)->assertSee('type="submit"', false);
-    $response = $this->post('/molly/tasks', ['prompt' => 'Return Hello.', 'workspace' => $this->workspace, 'paths' => "tests/Hello.php\n", 'test_path' => 'tests/Hello.php']);
+    $response = $this->post('/molly/tasks', ['prompt' => 'Return Hello.', 'workspace' => $this->workspace, 'paths' => "app/Hello.php\n", 'test_path' => 'tests/Hello.php']);
     $task = Task::sole();
     $response->assertRedirect(route('molly.tasks.show', $task->id));
-    expect($task->status)->toBe('pending')->and($task->paths)->toBe(['tests/Hello.php'])->and(Run::count())->toBe(0);
+    expect($task->status)->toBe('pending')->and($task->paths)->toBe(['app/Hello.php'])->and(Run::count())->toBe(0);
     Queue::assertNothingPushed();
 });
 
@@ -137,7 +140,7 @@ it('checks the local UI guard again for live status requests', function () {
 it('requires a CSRF token before saving a task outside the test bypass', function () {
     $this->app->detectEnvironment(fn () => 'local');
     try {
-        $this->post('/molly/tasks', ['prompt' => 'Hello', 'workspace' => $this->workspace, 'paths' => 'tests/Hello.php', 'test_path' => 'tests/Hello.php'])->assertStatus(419);
+        $this->post('/molly/tasks', ['prompt' => 'Hello', 'workspace' => $this->workspace, 'paths' => 'app/Hello.php', 'test_path' => 'tests/Hello.php'])->assertStatus(419);
         expect(Task::count())->toBe(0);
     } finally {
         $this->app->detectEnvironment(fn () => 'testing');
@@ -148,7 +151,7 @@ it('imports an issue through the same action without executing the task', functi
     Process::fake(["'gh' 'api' '--hostname' 'github.com' 'repos/sifrious/molly/issues/1'" => Process::result(output: json_encode([
         'html_url' => 'https://github.com/sifrious/molly/issues/1', 'number' => 1, 'title' => 'Add greeting', 'body' => 'Return Hello.', 'updated_at' => '2026-09-17T12:00:00Z', 'labels' => [],
     ]))]);
-    $this->post('/molly/tasks', ['issue_url' => 'https://github.com/sifrious/molly/issues/1', 'workspace' => $this->workspace, 'paths' => 'tests/Hello.php', 'test_path' => 'tests/Hello.php'])->assertRedirect()->assertSessionHasNoErrors();
+    $this->post('/molly/tasks', ['issue_url' => 'https://github.com/sifrious/molly/issues/1', 'workspace' => $this->workspace, 'paths' => 'app/Hello.php', 'test_path' => 'tests/Hello.php'])->assertRedirect()->assertSessionHasNoErrors();
     $task = Task::sole();
     expect($task->source['issue_number'])->toBe(1)->and($task->status)->toBe('pending')->and(Run::count())->toBe(0);
 });

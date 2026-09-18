@@ -44,10 +44,10 @@ Creating the task does not call the model. It saves a pending task with:
 - the request
 - an optional nickname
 - the required Pest test
-- the other files Molly may edit
+- the files Molly may edit
 - the workspace
 
-The required test is automatically part of the editable file scope.
+The required Pest test is protected by default. Molly records its SHA-256 digest and rejects proposals that change it. Pass `--allow-test-edits` only when a separate test-authoring task should change that file. The journal records that weaker trust model.
 
 ## File scope
 
@@ -55,12 +55,12 @@ Molly accepts selected paths under `app/`, `routes/`, `resources/`, and `tests/`
 
 By default:
 
-- At most 8 distinct files may be selected.
+- At most 8 distinct writable files may be selected. The protected test does not count toward that limit.
 - Each selected file or proposed replacement may be at most 65,536 bytes.
 - The required test must be a PHP file under `tests/`.
 - Hidden paths, path traversal, symlinks, directories, and special files are rejected.
 
-The file scope limits proposed edits. It does not sandbox PHP executed by Pest.
+The file scope limits proposed edits. Writer and Pest processes also run in a Landlock sandbox with a network namespace when `molly:doctor` reports that the host can isolate them.
 
 ## Name or rename a task
 

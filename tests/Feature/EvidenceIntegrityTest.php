@@ -15,6 +15,8 @@ beforeEach(function (): void {
     mkdir($this->evidenceWorkspace.'/vendor/bin', 0700, true);
     mkdir($this->evidenceWorkspace.'/app');
     touch($this->evidenceWorkspace.'/vendor/bin/pest');
+    file_put_contents($this->evidenceWorkspace.'/app/Example.php', '<?php return false;');
+    writeProtectedTest($this->evidenceWorkspace, 'tests/ExampleTest.php');
 });
 
 afterEach(function (): void {
@@ -109,7 +111,7 @@ it('refuses completion when review evidence names a file outside the actual run 
         'findings' => [['code' => 'F', 'classification' => 'pragmatic', 'severity' => 'warning', 'path' => 'app/Other.php', 'line' => 1, 'problem' => 'The function is long.', 'recommendation' => 'Keep the related steps together.']],
     ]);
 
-    $run = app(RunTask::class)->handle('Add the example.', $this->evidenceWorkspace, ['app/Example.php', 'tests/ExampleTest.php'], 'tests/ExampleTest.php');
+    $run = app(RunTask::class)->handle('Add the example.', $this->evidenceWorkspace, ['app/Example.php'], 'tests/ExampleTest.php');
 
     expect($run->status)->toBe('failed')
         ->and($run->report['verification']['status'])->toBe('passed')

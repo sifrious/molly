@@ -39,10 +39,10 @@ it('uses isolated tool-free Amp settings and validates the returned proposal', f
             ->and($process->command)->toContain('--no-ide', '--no-remote-control-terminal', '--stream-json', '-x')
             ->and($process->input)->toContain('allowed_files', 'required_test', 'previous_attempt');
 
-        return Process::result(output: ampSuccess(['summary' => 'Fix greeting.', 'files' => [['path' => 'tests/Hello.php', 'content' => '<?php']]]));
+        return Process::result(output: ampSuccess(['summary' => 'Fix greeting.', 'files' => [['path' => 'app/Hello.php', 'content' => '<?php']]]));
     });
-    $result = app(GenerateChanges::class)->handle('Fix greeting.', ['tests/Hello.php' => null], 'tests/Hello.php', ['failure' => 'wrong greeting']);
-    expect($result['files'][0]['path'])->toBe('tests/Hello.php')->and(is_dir($directory))->toBeFalse();
+    $result = app(GenerateChanges::class)->handle('Fix greeting.', ['app/Hello.php' => null], 'tests/Hello.php', ['failure' => 'wrong greeting']);
+    expect($result['files'][0]['path'])->toBe('app/Hello.php')->and(is_dir($directory))->toBeFalse();
     Process::assertRan(fn (PendingProcess $process) => $process->command[0] === 'amp');
     Http::assertNothingSent();
 });
@@ -142,7 +142,10 @@ it('records Amp provenance without claiming an Ollama model on a blocked run', f
     $directory = sys_get_temp_dir().'/molly-amp-provenance-'.bin2hex(random_bytes(8));
     mkdir($directory, 0700);
     try {
-        $run = app(RunTask::class)->handle('Return Hello.', $directory, ['tests/Hello.php'], 'tests/Hello.php');
+        mkdir($directory.'/app', 0700, true);
+        File::put($directory.'/app/Hello.php', '<?php');
+        writeProtectedTest($directory, 'tests/Hello.php');
+        $run = app(RunTask::class)->handle('Return Hello.', $directory, ['app/Hello.php'], 'tests/Hello.php');
         expect($run->status)->toBe('failed')->and($run->report['provider'])->toBe('amp')
             ->and($run->report['model'])->toBeNull()->and($run->report['error'])->toContain('CLEVER_UNAVAILABLE');
         Process::assertNothingRan();

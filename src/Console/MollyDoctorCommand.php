@@ -14,7 +14,7 @@ class MollyDoctorCommand extends Command
 {
     protected $signature = 'molly:doctor {--workspace= : Workspace containing Pest} {--json : Print JSON only}';
 
-    protected $description = 'Check local models, run history, Pest, and Clever';
+    protected $description = 'Check local models, run history, Pest, sandbox, and Clever';
 
     public function handle(CheckEnvironment $check): int
     {

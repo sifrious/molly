@@ -16,9 +16,15 @@ class GenerateChanges
      * @param  array<string, mixed>|null  $previousAttempt
      * @return array{summary: string, files: list<array{path: string, content: string}>}
      */
-    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null): array
+    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null, bool $allowTestEdits = false, ?string $testDigest = null): array
     {
-        $input = json_encode(['task' => $prompt, 'allowed_files' => $files, 'required_test' => $testPath, ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt])], JSON_THROW_ON_ERROR);
+        $input = json_encode([
+            'task' => $prompt,
+            'allowed_files' => $files,
+            'required_test' => $testPath,
+            'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
+            ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
+        ], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {
             $result = app(AmpResponse::class)->prompt(new ChangeWriter, $input);
         } elseif (config('molly.agent', 'ollama') === 'ollama') {
@@ -43,6 +49,9 @@ class GenerateChanges
         }
 
         foreach ($result['files'] as $file) {
+            if (! $allowTestEdits && $file['path'] === $testPath) {
+                throw new RuntimeException('PROTECTED_TEST_CHANGED: The required Pest test is read-only for this implementation run.');
+            }
             if (! array_key_exists($file['path'], $files)) {
                 throw new RuntimeException('GENERATION_INVALID: The model proposed a file outside the allowed paths.');
             }

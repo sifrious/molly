@@ -12,7 +12,7 @@ class CreateTaskFromPlan
     public function __construct(private CreateTask $create, private PlanningGuide $guide) {}
 
     /** @param list<string> $paths */
-    public function handle(string $id, string $prompt, string $workspace, array $paths, string $testPath, ?string $nickname = null): Task
+    public function handle(string $id, string $prompt, string $workspace, array $paths, string $testPath, ?string $nickname = null, bool $allowTestEdits = false): Task
     {
         $plan = Plan::find($id);
         if ($plan === null) {
@@ -35,6 +35,6 @@ class CreateTaskFromPlan
         return $this->create->handle($taskPrompt, $workspace, $paths, $testPath, [
             'provider' => 'molly-plan', 'plan_id' => $plan->id, 'guide_version' => $plan->guide_version,
             'planning' => $context, 'citations' => $citations,
-        ], nickname: $nickname);
+        ], nickname: $nickname, allowTestEdits: $allowTestEdits);
     }
 }

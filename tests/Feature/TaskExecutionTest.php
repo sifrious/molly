@@ -20,6 +20,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-execution-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    writeProtectedTest($this->workspace);
 });
 
 afterEach(function () {
@@ -28,7 +29,7 @@ afterEach(function () {
 
 function savedExecutionTask(): Task
 {
-    return app(CreateTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php');
+    return app(CreateTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 }
 
 function prepareTaskExecution(string $verification = 'passed'): void
@@ -106,7 +107,7 @@ it('sends bounded diagnostics from the latest attempt while preserving task scop
         $evidence = $payload['previous_attempt'];
         $encoded = json_encode($evidence, JSON_THROW_ON_ERROR);
         expect($payload['task'])->toBe('Return Hello.')
-            ->and(array_keys($payload['allowed_files']))->toBe(['app/Greeting.php', 'tests/GreetingTest.php'])
+            ->and(array_keys($payload['allowed_files']))->toBe(['app/Greeting.php'])
             ->and($payload['required_test'])->toBe('tests/GreetingTest.php')
             ->and($evidence['run_id'])->toBe($old->id)
             ->and($evidence['verification'])->toMatchArray(['status' => 'failed', 'tests' => 1, 'errors' => 1, 'reason' => 'tests_failed'])

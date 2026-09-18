@@ -15,6 +15,9 @@ beforeEach(function () {
     config()->set('molly.ui.enabled', true);
     $this->workspace = sys_get_temp_dir().'/molly-nickname-web-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/tests');
+    File::ensureDirectoryExists($this->workspace.'/routes');
+    File::put($this->workspace.'/routes/web.php', '<?php');
+    writeProtectedTest($this->workspace);
 });
 
 afterEach(function () {
@@ -35,7 +38,7 @@ it('saves a nickname and includes the required test without repeating the path i
     $task = Task::sole();
     $response->assertRedirect(route('molly.tasks.show', $task->id))->assertSessionHasNoErrors();
     expect($task->nickname)->toBe('greeting-endpoint')
-        ->and($task->paths)->toBe(['routes/web.php', 'tests/GreetingTest.php'])
+        ->and($task->paths)->toBe(['routes/web.php'])
         ->and($task->status)->toBe('pending');
     $this->assertDatabaseCount('molly_runs', 0);
     Queue::assertNothingPushed();
@@ -58,6 +61,7 @@ it('imports a named test-only task without requiring other editable files', func
         'workspace' => $this->workspace,
         'paths' => '',
         'test_path' => 'tests/GreetingTest.php',
+        'allow_test_edits' => '1',
     ]);
 
     $task = Task::sole();
@@ -75,6 +79,7 @@ it('keeps nicknames optional when saving a test-only task', function () {
         'prompt' => 'Test the greeting.',
         'workspace' => $this->workspace,
         'test_path' => 'tests/GreetingTest.php',
+        'allow_test_edits' => '1',
     ]);
 
     $task = Task::sole();
@@ -90,6 +95,7 @@ it('shows nickname validation feedback without saving a task', function () {
         'nickname' => 'not a nickname',
         'workspace' => $this->workspace,
         'test_path' => 'tests/GreetingTest.php',
+        'allow_test_edits' => '1',
     ]);
 
     $response->assertRedirect('/molly/tasks/create')->assertSessionHasErrors('task');
@@ -100,7 +106,7 @@ it('shows nickname validation feedback without saving a task', function () {
 });
 
 it('renames an existing task without changing its lifecycle or run history', function () {
-    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'old-name');
+    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true, nickname: 'old-name');
     $task->update(['status' => 'failed']);
     $run = Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $this->workspace, 'status' => 'failed', 'report' => ['error' => 'A required test failed.']]);
     $taskBefore = Arr::except($task->fresh()->getAttributes(), ['nickname', 'updated_at', 'journal_status']);
@@ -123,8 +129,10 @@ it('renames an existing task without changing its lifecycle or run history', fun
 });
 
 it('preserves both tasks when a requested nickname is already taken', function () {
-    $task = app(CreateTask::class)->handle('First task.', $this->workspace, [], 'tests/FirstTest.php', nickname: 'first-task');
-    $other = app(CreateTask::class)->handle('Second task.', $this->workspace, [], 'tests/SecondTest.php', nickname: 'second-task');
+    writeProtectedTest($this->workspace, 'tests/FirstTest.php');
+    writeProtectedTest($this->workspace, 'tests/SecondTest.php');
+    $task = app(CreateTask::class)->handle('First task.', $this->workspace, [], 'tests/FirstTest.php', nickname: 'first-task', allowTestEdits: true);
+    $other = app(CreateTask::class)->handle('Second task.', $this->workspace, [], 'tests/SecondTest.php', nickname: 'second-task', allowTestEdits: true);
     $taskBefore = $task->fresh()->getAttributes();
     $otherBefore = $other->fresh()->getAttributes();
     Queue::fake();
@@ -140,7 +148,7 @@ it('preserves both tasks when a requested nickname is already taken', function (
 });
 
 it('rejects an invalid nickname without changing the existing task', function () {
-    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'greeting-tests');
+    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true, nickname: 'greeting-tests');
     $before = $task->fresh()->getAttributes();
 
     $response = $this->post('/molly/tasks/'.$task->id.'/name', ['nickname' => 'bad name']);
@@ -151,7 +159,7 @@ it('rejects an invalid nickname without changing the existing task', function ()
 });
 
 it('shows the nickname and task ID while keeping task links and forms on UUID URLs', function () {
-    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'greeting-tests');
+    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true, nickname: 'greeting-tests');
 
     $this->get('/molly')->assertSee('greeting-tests')->assertSee($task->id)
         ->assertSee('href="'.route('molly.tasks.show', $task->id).'"', false);
@@ -162,7 +170,7 @@ it('shows the nickname and task ID while keeping task links and forms on UUID UR
 });
 
 it('does not rename a task for a remote web client', function () {
-    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'greeting-tests');
+    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true, nickname: 'greeting-tests');
     $before = $task->fresh()->getAttributes();
 
     $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.10'])
@@ -172,7 +180,7 @@ it('does not rename a task for a remote web client', function () {
 });
 
 it('requires a CSRF token before renaming a task outside the test bypass', function () {
-    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', nickname: 'greeting-tests');
+    $task = app(CreateTask::class)->handle('Test the greeting.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true, nickname: 'greeting-tests');
     $before = $task->fresh()->getAttributes();
     $this->app->detectEnvironment(fn () => 'local');
 

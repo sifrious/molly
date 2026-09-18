@@ -13,7 +13,7 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | --- | --- |
 | Host application | The Laravel application where Molly is installed and where you run Artisan. It stores Molly's task and run records. |
 | Workspace | The checkout containing the files Molly may edit. It can be the host application or another local checkout. |
-| File scope | The selected files an agent may propose changing, including the required test. It limits edits but does not sandbox executed PHP. |
+| File scope | The selected files an agent may propose changing. The required Pest test is protected unless the task explicitly allows test edits. |
 | Task | A saved request with file scope, required test, optional nickname, and lifecycle state. |
 | Task nickname | An optional readable task reference such as `health-check`. The task UUID remains the stable identifier. |
 | Run | One execution attempt with its own status and evidence. |
@@ -24,6 +24,8 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 
 | Term | Meaning |
 | --- | --- |
+| Protected test | The required Pest file whose SHA-256 digest is locked before implementation. Changing it fails the run. |
+| Failure action | What Molly does after a verifier does not pass: retry, fail, or warn. Policy and action stay separate fields. |
 | Verification | The required Pest execution and JUnit evidence for the selected test file. A model statement is not verification. |
 | Tarpit review | Seven model checks for unnecessary complexity in the supplied before-and-after files. It cannot override failed tests. |
 | Finding | A Tarpit issue with a check, file, line, problem, recommendation, classification, and severity. |

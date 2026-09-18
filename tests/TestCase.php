@@ -30,6 +30,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('database.connections.sqlite.database', ':memory:');
         $app['config']->set('molly.model', 'local-test-model');
         $app['config']->set('molly.parallel_checks', false);
+        $app['config']->set('molly.sandbox.allow_unsafe', true);
     }
 
     protected function defineDatabaseMigrations(): void

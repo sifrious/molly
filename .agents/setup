@@ -128,6 +128,8 @@ write_orb_guidance() {
 PHP 8.4, Composer 2, and package dependencies are installed by `.agents/setup`.
 
 Run package checks with `vendor/bin/pest` and `vendor/bin/pint --format agent`. Tests use in-memory SQLite. Do not start a database server.
+
+Bloom, when attached as an additional repository, lands at `../repos/bloom`. This Linux orb does not install Swift. Read Bloom contracts from that clone. Do not treat Amp threads as Orb identity.
 EOF
 }
 

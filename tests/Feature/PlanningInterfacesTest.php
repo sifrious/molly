@@ -16,6 +16,9 @@ beforeEach(function (): void {
     Http::preventStrayRequests();
     $this->planningWorkspace = sys_get_temp_dir().'/molly-planning-'.bin2hex(random_bytes(8));
     File::ensureDirectoryExists($this->planningWorkspace.'/tests');
+    File::ensureDirectoryExists($this->planningWorkspace.'/app');
+    File::put($this->planningWorkspace.'/app/Greeting.php', '<?php');
+    writeProtectedTest($this->planningWorkspace);
 });
 
 afterEach(function (): void {
@@ -89,7 +92,7 @@ it('creates a pending task after an explicit skipped review without starting exe
     $task = Task::sole();
     $response->assertRedirect(route('molly.tasks.show', $task->id));
     expect($task->status)->toBe('pending')
-        ->and($task->paths)->toBe(['app/Greeting.php', 'tests/GreetingTest.php'])
+        ->and($task->paths)->toBe(['app/Greeting.php'])
         ->and(Run::count())->toBe(0);
     Queue::assertNothingPushed();
     Http::assertNothingSent();
@@ -100,7 +103,7 @@ it('rejects task creation before guided answers are complete', function (): void
 
     $this->post('/molly/plans/'.$plan->id.'/tasks', [
         'prompt' => 'Add a greeting.', 'workspace' => $this->planningWorkspace,
-        'paths' => 'tests/GreetingTest.php', 'test_path' => 'tests/GreetingTest.php',
+        'paths' => 'tests/GreetingTest.php', 'test_path' => 'tests/GreetingTest.php', 'allow_test_edits' => '1',
     ])->assertSessionHasErrors('task');
 
     expect(Task::count())->toBe(0)->and($plan->fresh()->answers)->toBe([]);

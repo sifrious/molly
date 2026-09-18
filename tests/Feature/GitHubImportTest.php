@@ -12,7 +12,9 @@ use Sifrious\Molly\Models\Task;
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-import-'.Str::uuid();
-    File::ensureDirectoryExists($this->workspace);
+    File::ensureDirectoryExists($this->workspace.'/routes');
+    File::put($this->workspace.'/routes/web.php', '<?php');
+    writeProtectedTest($this->workspace, 'tests/HealthTest.php');
     Process::preventStrayProcesses();
 });
 
@@ -39,7 +41,7 @@ function fakeMollyIssue(string $output, int $exitCode = 0, string $errorOutput =
 
 function importMollyIssue(): Task
 {
-    return app(ImportGitHubIssue::class)->handle('https://github.com/sifrious/molly/issues/42', test()->workspace, ['routes/web.php', 'tests/HealthTest.php'], 'tests/HealthTest.php');
+    return app(ImportGitHubIssue::class)->handle('https://github.com/sifrious/molly/issues/42', test()->workspace, ['routes/web.php'], 'tests/HealthTest.php');
 }
 
 it('imports issue context and provenance without starting work or writing to GitHub', function () {
@@ -55,9 +57,9 @@ it('imports issue context and provenance without starting work or writing to Git
             'labels' => ['enhancement'], 'linked_pr' => null,
         ])
         ->and($task->prompt)->toContain('Add a health route', 'Return a JSON health response.', 'https://github.com/sifrious/molly/issues/42')
-        ->and($task->paths)->toBe(['routes/web.php', 'tests/HealthTest.php'])
+        ->and($task->paths)->toBe(['routes/web.php'])
         ->and(Run::count())->toBe(0)
-        ->and(File::allFiles($this->workspace))->toBe([]);
+        ->and($task->allow_test_edits)->toBeFalse();
     Process::assertRanTimes(fn (PendingProcess $process): bool => $process->command === ['gh', 'api', '--hostname', 'github.com', 'repos/sifrious/molly/issues/42'] && $process->timeout === 15, 1);
 });
 
@@ -129,7 +131,7 @@ it('returns JSON provenance from the import command', function () {
     Artisan::registerCommand(app(MollyImportCommand::class));
     fakeMollyIssue(json_encode(mollyIssueFixture()));
 
-    $exit = Artisan::call('molly:import', ['issue' => 'https://github.com/sifrious/molly/issues/42', '--workspace' => $this->workspace, '--file' => ['tests/HealthTest.php'], '--test' => 'tests/HealthTest.php', '--json' => true]);
+    $exit = Artisan::call('molly:import', ['issue' => 'https://github.com/sifrious/molly/issues/42', '--workspace' => $this->workspace, '--file' => ['routes/web.php'], '--test' => 'tests/HealthTest.php', '--json' => true]);
     $output = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($exit)->toBe(0)
@@ -142,7 +144,7 @@ it('classifies GitHub failures without exposing command stderr', function () {
     Artisan::registerCommand(app(MollyImportCommand::class));
     fakeMollyIssue('', 1, 'token secret-value private failure');
 
-    $exit = Artisan::call('molly:import', ['issue' => 'https://github.com/sifrious/molly/issues/42', '--workspace' => $this->workspace, '--file' => ['tests/HealthTest.php'], '--test' => 'tests/HealthTest.php', '--json' => true]);
+    $exit = Artisan::call('molly:import', ['issue' => 'https://github.com/sifrious/molly/issues/42', '--workspace' => $this->workspace, '--file' => ['routes/web.php'], '--test' => 'tests/HealthTest.php', '--json' => true]);
     $output = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($exit)->toBe(1)

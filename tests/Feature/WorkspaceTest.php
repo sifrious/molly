@@ -14,6 +14,17 @@ afterEach(function (): void {
     (new Filesystem)->deleteDirectory($this->workspaceDirectory);
 });
 
+it('keeps the required Pest test out of writable paths unless test edits are allowed', function (): void {
+    mkdir($this->workspaceDirectory.'/tests', 0700, true);
+    file_put_contents($this->workspaceDirectory.'/tests/GreetingTest.php', '<?php');
+    $workspace = new Workspace($this->workspaceDirectory);
+
+    expect($workspace->taskPaths(['app/File.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php'))->toBe(['app/File.php'])
+        ->and($workspace->taskPaths([], 'tests/GreetingTest.php', true))->toBe(['tests/GreetingTest.php']);
+    expect(fn () => $workspace->taskPaths([], 'tests/GreetingTest.php'))
+        ->toThrow(RuntimeException::class, 'TEST_PROTECTED');
+});
+
 it('reads missing files and applies new file contents', function (): void {
     $workspace = new Workspace($this->workspaceDirectory);
     $before = $workspace->read(['app/NewFile.php']);

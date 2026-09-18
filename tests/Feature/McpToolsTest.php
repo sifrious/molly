@@ -22,9 +22,12 @@ function mcpTaskScope(): array
 {
     $workspace = sys_get_temp_dir().'/molly-mcp-'.Str::uuid();
     File::ensureDirectoryExists($workspace.'/tests');
+    File::ensureDirectoryExists($workspace.'/app');
+    File::put($workspace.'/app/Hello.php', '<?php');
+    writeProtectedTest($workspace, 'tests/Hello.php');
     test()->mcpWorkspace = $workspace;
 
-    return ['workspace' => $workspace, 'paths' => ['tests/Hello.php'], 'test_path' => 'tests/Hello.php'];
+    return ['workspace' => $workspace, 'paths' => ['app/Hello.php'], 'test_path' => 'tests/Hello.php'];
 }
 
 afterEach(function () {

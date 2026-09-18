@@ -37,13 +37,15 @@ function lifecycleWorkspace(): string
 {
     $path = sys_get_temp_dir().'/molly-journal-lifecycle-'.Str::uuid();
     File::ensureDirectoryExists($path);
+    writeProtectedTest($path, 'tests/StatusTest.php');
+    writeProtectedTest($path, 'tests/HealthTest.php');
 
     return test()->journalWorkspace = realpath($path);
 }
 
 function lifecycleTask(): Task
 {
-    return app(CreateTask::class)->handle('Test the current status.', lifecycleWorkspace(), [], 'tests/StatusTest.php', nickname: 'status-test');
+    return app(CreateTask::class)->handle('Test the current status.', lifecycleWorkspace(), [], 'tests/StatusTest.php', nickname: 'status-test', allowTestEdits: true);
 }
 
 it('refreshes the project journal for created and imported tasks without starting work', function (): void {
@@ -56,7 +58,7 @@ it('refreshes the project journal for created and imported tasks without startin
         'updated_at' => '2026-09-17T12:00:00Z', 'labels' => [],
     ]))]);
 
-    $imported = app(ImportGitHubIssue::class)->handle('https://github.com/sifrious/molly/issues/42', $this->journalWorkspace, [], 'tests/HealthTest.php');
+    $imported = app(ImportGitHubIssue::class)->handle('https://github.com/sifrious/molly/issues/42', $this->journalWorkspace, [], 'tests/HealthTest.php', allowTestEdits: true);
     $journal = Str::markdown(File::get($task->journal_status['journal_path']));
 
     expect($task->journal_status)->toBe([
@@ -68,8 +70,8 @@ it('refreshes the project journal for created and imported tasks without startin
         ->and($imported->journal_status['status'])->toBe('written')
         ->and($journal)->toContain($task->id, $imported->id, 'Test the health endpoint.', 'Status: pending')
         ->and(substr_count($journal, '<h2>Task created</h2>'))->toBe(2)
-        ->and(File::exists($this->journalWorkspace.'/tests/StatusTest.php'))->toBeFalse()
-        ->and(File::exists($this->journalWorkspace.'/tests/HealthTest.php'))->toBeFalse()
+        ->and(File::exists($this->journalWorkspace.'/tests/StatusTest.php'))->toBeTrue()
+        ->and(File::exists($this->journalWorkspace.'/tests/HealthTest.php'))->toBeTrue()
         ->and(Run::count())->toBe(0);
     Process::assertRanTimes(fn (PendingProcess $process): bool => $process->command === ['gh', 'api', '--hostname', 'github.com', 'repos/sifrious/molly/issues/42'], 1);
 });
@@ -170,7 +172,8 @@ it('keeps a newly saved task when a linked project journal cannot be written', f
     symlink($workspace.'/untouched.md', $workspace.'/.molly/JOURNAL.md');
 
     try {
-        $task = app(CreateTask::class)->handle('Test the current status.', $workspace, [], 'tests/StatusTest.php');
+        writeProtectedTest($workspace, 'tests/StatusTest.php');
+        $task = app(CreateTask::class)->handle('Test the current status.', $workspace, [], 'tests/StatusTest.php', allowTestEdits: true);
 
         expect($task->fresh()->status)->toBe('pending')
             ->and($task->journal_status['status'])->toBe('unavailable')

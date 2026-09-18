@@ -42,7 +42,9 @@ it('keeps retry diagnostics separate from the task and rejects paths requested b
 
     ChangeWriter::assertPrompted(fn (AgentPrompt $prompt): bool => json_decode($prompt->prompt, true) === [
         'task' => 'Add a greeting.', 'allowed_files' => ['src/Greeting.php' => null],
-        'required_test' => 'tests/GreetingTest.php', 'previous_attempt' => $evidence,
+        'required_test' => 'tests/GreetingTest.php',
+        'protected_test' => ['path' => 'tests/GreetingTest.php', 'digest' => null, 'writable' => false],
+        'previous_attempt' => $evidence,
     ]);
 });
 

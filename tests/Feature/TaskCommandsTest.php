@@ -15,7 +15,7 @@ it('creates a saved task and returns JSON without starting a run', function (): 
     $task = new Task;
     $task->forceFill(['id' => 'task-created', 'prompt' => 'Fix greeting', 'status' => 'pending']);
     $action = Mockery::mock(CreateTask::class);
-    $action->shouldReceive('handle')->once()->with('Fix greeting', '/tmp/project', ['app/Greeting.php'], 'tests/Feature/GreetingTest.php')->andReturn($task);
+    $action->shouldReceive('handle')->once()->with('Fix greeting', '/tmp/project', ['app/Greeting.php'], 'tests/Feature/GreetingTest.php', [], null, false)->andReturn($task);
     $this->app->instance(CreateTask::class, $action);
     $start = Mockery::mock(StartTask::class);
     $start->shouldNotReceive('handle');
@@ -42,7 +42,7 @@ it('asks for a prompt before saving an interactive task', function (): void {
     $task = new Task;
     $task->forceFill(['id' => 'task-prompted', 'prompt' => 'Fix greeting', 'workspace' => '/tmp/project', 'paths' => ['app/Greeting.php'], 'test_path' => 'tests/Feature/GreetingTest.php', 'status' => 'pending']);
     $action = Mockery::mock(CreateTask::class);
-    $action->shouldReceive('handle')->once()->with('Fix greeting', Mockery::type('string'), ['app/Greeting.php'], 'tests/Feature/GreetingTest.php')->andReturn($task);
+    $action->shouldReceive('handle')->once()->with('Fix greeting', Mockery::type('string'), ['app/Greeting.php'], 'tests/Feature/GreetingTest.php', [], null, false)->andReturn($task);
     $this->app->instance(CreateTask::class, $action);
 
     $this->artisan('molly:create', ['--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php'])

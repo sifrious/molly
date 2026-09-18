@@ -12,6 +12,7 @@ it('requires both parallel branches and their evidence before completing a run',
     $workspace = sys_get_temp_dir().'/molly-join-'.Str::uuid();
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Greeting.php', '<?php return null;');
+    writeProtectedTest($workspace);
     config(['molly.parallel_checks' => true]);
     $branches = array_map(fn (string $kind): array => [
         'kind' => $kind, 'branch_id' => $kind.'-1', 'attempt_id' => 'attempt-1', 'execution_target' => 'local',
@@ -45,7 +46,7 @@ it('requires both parallel branches and their evidence before completing a run',
     $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
 
     try {
-        $run = app(RunTask::class)->handle('Return Hello.', $workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php');
+        $run = app(RunTask::class)->handle('Return Hello.', $workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 
         expect($run->status)->toBe($expectedStatus)
             ->and($run->report['mode'])->toBe('parallel')

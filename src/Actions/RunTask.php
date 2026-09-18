@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Closure;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
@@ -30,9 +31,19 @@ class RunTask
         }
 
         $files = new Workspace($workspace);
-        $paths = $files->taskPaths($paths, $testPath);
+        app(Sandbox::class)->refuseSafeWorkflow();
+        $task = $taskId === null ? null : Task::find($taskId);
+        $allowTestEdits = (bool) ($task?->allow_test_edits);
+        $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
+        $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
+        if (! $allowTestEdits) {
+            if ($testDigest === null) {
+                throw new RuntimeException('PROTECTED_TEST_MISSING: Create and approve the required Pest test before the implementation turn.');
+            }
+            $files->assertProtectedTestUnchanged($testPath, $testDigest);
+        }
 
-        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt): Run {
+        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest): Run {
             $before = $files->read($paths);
             $run = Run::create([
                 'prompt' => $prompt,
@@ -41,6 +52,11 @@ class RunTask
                 'status' => 'running',
                 'report' => [
                     'scope' => $paths,
+                    'protected_test' => [
+                        'path' => $testPath,
+                        'digest' => $testDigest,
+                        'writable' => $allowTestEdits,
+                    ],
                     'provider' => config('molly.agent', 'ollama'),
                     'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
                     'snapshots' => [
@@ -52,12 +68,12 @@ class RunTask
                 ],
             ]);
 
-            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt);
+            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest);
         });
     }
 
     /** @param array<string, ?string> $before */
-    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt): Run
+    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt, bool $allowTestEdits, ?string $testDigest): Run
     {
         $report = $run->report;
         $evidence = storage_path('molly/'.$run->id);
@@ -74,13 +90,17 @@ class RunTask
             $this->requireMeasurements($report['complexity_before']);
 
             $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
-            $proposal = $previousAttempt === null
-                ? $this->generate->handle($run->prompt, $before, $testPath)
-                : $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt);
+            $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
 
             $this->checkpoint($shouldStop, $recordProgress, 'Applying the proposed changes');
-            $workspace->apply($proposal['files'], $before);
+            if (! $allowTestEdits && is_string($testDigest)) {
+                $workspace->assertProtectedTestUnchanged($testPath, $testDigest);
+            }
+            $this->applyProposal($workspace, $proposal['files'], $before, $evidence);
             $after = $workspace->read(array_keys($before));
+            if (! $allowTestEdits && is_string($testDigest)) {
+                $workspace->assertProtectedTestUnchanged($testPath, $testDigest);
+            }
             $report['summary'] = $proposal['summary'];
             $report['changes'] = $workspace->changes($before, $after);
             $run->update(['report' => $report]);
@@ -121,6 +141,9 @@ class RunTask
             if ($workspace->read(array_keys($before)) !== $after) {
                 throw new RuntimeException('WORKSPACE_CHANGED: Files changed after implementation. Run verification again.');
             }
+            if (! $allowTestEdits && is_string($testDigest)) {
+                $workspace->assertProtectedTestUnchanged($testPath, $testDigest);
+            }
 
             $decision = $this->decideCompletion->handle($report, $after);
             $report['verification_outcomes'] = $decision['outcomes'];
@@ -144,6 +167,22 @@ class RunTask
         }
 
         return $run->fresh();
+    }
+
+    /**
+     * @param  list<array{path: string, content: string}>  $edits
+     * @param  array<string, ?string>  $before
+     */
+    private function applyProposal(Workspace $workspace, array $edits, array $before, string $evidence): void
+    {
+        $sandbox = app(Sandbox::class);
+        if ($sandbox->available() && ! $sandbox->allowUnsafe()) {
+            $sandbox->apply($workspace->path, $edits, array_keys($before), $evidence);
+
+            return;
+        }
+
+        $workspace->apply($edits, $before);
     }
 
     /**

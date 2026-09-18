@@ -65,8 +65,8 @@ Read [Getting started](docs/getting-started.md) for a complete first task.
 
 Molly keeps the order simple:
 
-1. You define the task, editable files, and required Pest test.
-2. The agent proposes changes only for those files.
+1. You define the task, writable files, and required Pest test.
+2. The agent proposes changes only for those writable files. The required test stays protected by default.
 3. Molly applies the proposal.
 4. Pest runs against the required test file.
 5. Tarpit reviews the changed files for unnecessary complexity.
@@ -160,9 +160,9 @@ Planned behavior is kept separate in [Execution targets](docs/execution-targets.
 
 ## Safety
 
-Use Molly in a trusted development checkout. The file list limits what Molly may propose changing, but it is not a sandbox. Pest runs PHP with your local user's permissions.
+Use Molly in a trusted development checkout. The required Pest test is protected by default. Writer and Pest processes run in a Landlock sandbox with a network namespace when `molly:doctor` reports that isolation is available.
 
-Review generated tests as carefully as generated application code.
+Review generated tests as carefully as generated application code. The weaker `--allow-test-edits` path is not the default.
 
 Molly's GitHub workflows run the HOL Guard scanner with read-only repository access. See [SECURITY.md](SECURITY.md) for supported versions and private reporting guidance.
 

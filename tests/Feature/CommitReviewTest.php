@@ -8,7 +8,7 @@ use Sifrious\Molly\Actions\ReviewCommit;
 beforeEach(function () {
     $this->commitWorkspace = sys_get_temp_dir().'/molly-commit-'.bin2hex(random_bytes(8));
     File::ensureDirectoryExists($this->commitWorkspace.'/app');
-    foreach ([['git', 'init', '-q'], ['git', 'config', 'user.name', 'Molly test'], ['git', 'config', 'user.email', 'molly@example.test']] as $command) {
+    foreach ([['git', 'init', '-q'], ['git', 'config', 'user.name', 'Molly test'], ['git', 'config', 'user.email', 'molly@example.test'], ['git', 'config', 'commit.gpgsign', 'false']] as $command) {
         expect(Process::path($this->commitWorkspace)->run($command)->successful())->toBeTrue();
     }
     File::put($this->commitWorkspace.'/app/Flag.php', '<?php return false;');

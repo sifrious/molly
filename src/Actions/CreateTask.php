@@ -16,7 +16,7 @@ class CreateTask
      * @param  list<string>  $paths
      * @param  array<string, mixed>  $source
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null): Task
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null, bool $allowTestEdits = false): Task
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -24,9 +24,13 @@ class CreateTask
 
         $files = new Workspace($workspace);
 
-        $paths = $files->taskPaths($paths, $testPath);
+        $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
+        $testDigest = $files->testDigest($testPath);
+        if (! $allowTestEdits && $testDigest === null) {
+            throw new RuntimeException('PROTECTED_TEST_MISSING: Create and approve the required Pest test before the implementation turn.');
+        }
 
-        $snapshot = $files->snapshot($files->read($paths));
+        $snapshot = $files->snapshot([...$files->read($paths), ...$files->readProtectedTest($testPath)]);
 
         try {
             json_encode($source, JSON_THROW_ON_ERROR);
@@ -43,6 +47,8 @@ class CreateTask
                 'workspace' => $files->path,
                 'paths' => $paths,
                 'test_path' => $testPath,
+                'test_digest' => $testDigest,
+                'allow_test_edits' => $allowTestEdits,
                 'source' => $source === [] ? null : $source,
                 'context_snapshot' => $snapshot,
             ]);

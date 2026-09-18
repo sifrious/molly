@@ -110,16 +110,70 @@ class Workspace
      * @param  list<string>  $paths
      * @return list<string>
      */
-    public function taskPaths(array $paths, string $testPath): array
+    public function taskPaths(array $paths, string $testPath, bool $allowTestEdits = false): array
     {
         if (! array_is_list($paths) || count(array_filter($paths, is_string(...))) !== count($paths)) {
             throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
         }
         if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/. Molly includes the test in the files it may change.');
+            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
         }
 
-        return in_array($testPath, $paths, true) ? $paths : [...$paths, $testPath];
+        $this->resolve($testPath);
+
+        if (count(array_unique($paths)) !== count($paths)) {
+            throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
+        }
+
+        $paths = array_values(array_unique($paths));
+        if ($allowTestEdits) {
+            return in_array($testPath, $paths, true) ? $paths : [...$paths, $testPath];
+        }
+
+        $paths = array_values(array_filter($paths, fn (string $path): bool => $path !== $testPath));
+        if ($paths === []) {
+            throw new RuntimeException('TEST_PROTECTED: Choose implementation files Molly may change. The required Pest test is read-only unless test edits are explicitly allowed.');
+        }
+
+        return $paths;
+    }
+
+    /** @return array<string, ?string> */
+    public function readProtectedTest(string $testPath): array
+    {
+        if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
+            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
+        }
+
+        $absolute = $this->resolve($testPath);
+        if (is_file($absolute) && filesize($absolute) > config('molly.max_file_bytes', 65536)) {
+            throw new RuntimeException("FILE_TOO_LARGE: {$testPath} exceeds the context limit.");
+        }
+
+        $contents = file_exists($absolute) ? File::get($absolute) : null;
+        if (strlen($contents ?? '') > config('molly.max_file_bytes', 65536)) {
+            throw new RuntimeException("FILE_TOO_LARGE: {$testPath} exceeds the context limit.");
+        }
+
+        return [$testPath => $contents];
+    }
+
+    public function testDigest(string $testPath): ?string
+    {
+        $contents = $this->readProtectedTest($testPath)[$testPath];
+
+        return $contents === null ? null : hash('sha256', $contents);
+    }
+
+    public function assertProtectedTestUnchanged(string $testPath, string $digest): void
+    {
+        $current = $this->testDigest($testPath);
+        if ($current === null) {
+            throw new RuntimeException('PROTECTED_TEST_MISSING: The required Pest test must exist before implementation starts.');
+        }
+        if (! hash_equals($digest, $current)) {
+            throw new RuntimeException('PROTECTED_TEST_CHANGED: The required Pest test changed. Implementation cannot continue.');
+        }
     }
 
     /** @param list<string> $paths

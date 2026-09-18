@@ -19,7 +19,10 @@ class TaskReport
         }
         note($task->prompt);
         note('Workspace: '.$task->workspace);
-        note('Required test: '.$task->test_path);
+        note('Required test: '.$task->test_path.($task->allow_test_edits ? ' (writable for this task)' : ' (protected)'));
+        if ($task->test_digest) {
+            note('Approved test digest: '.$task->test_digest);
+        }
         table(['Allowed file'], array_map(fn (string $path): array => [$path], $task->paths));
         $journal = $task->journal_status ?? [];
         if (($journal['status'] ?? null) === 'written') {

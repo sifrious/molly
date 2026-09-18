@@ -17,7 +17,8 @@ use Sifrious\Molly\Models\Task;
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-mcp-reference-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/tests');
-    $this->scope = ['workspace' => $this->workspace, 'test_path' => 'tests/HealthTest.php'];
+    writeProtectedTest($this->workspace, 'tests/HealthTest.php');
+    $this->scope = ['workspace' => $this->workspace, 'paths' => [], 'test_path' => 'tests/HealthTest.php', 'allow_test_edits' => true];
     Queue::fake();
 });
 
@@ -93,8 +94,8 @@ it('creates a named test-only task from a native plan form', function () {
     config(['molly.ui.enabled' => true, 'app.key' => 'base64:'.base64_encode(str_repeat('a', 32)), 'session.driver' => 'array']);
     $plan = app(CreatePlan::class)->handle('Test application health.', false);
 
-    $this->get(route('molly.plans.show', $plan->id))->assertOk()->assertSee('Task nickname, optional')->assertSee('Other files Molly may change, optional');
-    $this->post(route('molly.plans.tasks', $plan->id), ['prompt' => 'Test health.', 'nickname' => 'health', ...$this->scope])
+    $this->get(route('molly.plans.show', $plan->id))->assertOk()->assertSee('Task nickname, optional')->assertSee('Files Molly may change');
+    $this->post(route('molly.plans.tasks', $plan->id), ['prompt' => 'Test health.', 'nickname' => 'health', 'workspace' => $this->workspace, 'paths' => '', 'test_path' => 'tests/HealthTest.php', 'allow_test_edits' => '1'])
         ->assertSessionHasNoErrors()->assertRedirect(route('molly.tasks.show', Task::sole()->id));
     expect(Task::sole()->nickname)->toBe('health')->and(Task::sole()->paths)->toBe(['tests/HealthTest.php']);
     Queue::assertNothingPushed();

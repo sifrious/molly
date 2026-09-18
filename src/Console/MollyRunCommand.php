@@ -15,7 +15,7 @@ use function Laravel\Prompts\text;
 
 class MollyRunCommand extends Command
 {
-    protected $signature = 'molly:run {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file Molly may change and must pass} {--json : Print JSON only}';
+    protected $signature = 'molly:run {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file that must pass} {--json : Print JSON only}';
 
     protected $description = 'Make a bounded local change and report tests and complexity';
 

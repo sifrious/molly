@@ -99,6 +99,7 @@ it('requires every task history migration before declaring the database ready', 
     'thread associations' => '2026_09_17_080000_create_molly_task_threads_table.php',
     'journal' => '2026_09_17_090000_add_journal_status_to_molly_tasks_table.php',
     'plans' => '2026_09_17_060000_create_molly_plans_table.php',
+    'protected test' => '2026_09_18_100000_add_protected_test_to_molly_tasks_table.php',
 ]);
 
 it('classifies an unreachable Ollama server', function (): void {

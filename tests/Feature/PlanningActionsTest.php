@@ -86,7 +86,8 @@ it('copies completed planning decisions and source provenance into a pending tas
             $plan = app(AnswerPlan::class)->handle($plan->id, $step, $value);
         }
 
-        $task = app(CreateTaskFromPlan::class)->handle($plan->id, 'Render pending tasks.', $directory, ['tests/TaskListTest.php'], 'tests/TaskListTest.php');
+        writeProtectedTest($directory, 'tests/TaskListTest.php');
+        $task = app(CreateTaskFromPlan::class)->handle($plan->id, 'Render pending tasks.', $directory, ['app/TaskList.php'], 'tests/TaskListTest.php');
 
         expect($plan->completed())->toBeTrue()
             ->and($task->status)->toBe('pending')
@@ -95,7 +96,7 @@ it('copies completed planning decisions and source provenance into a pending tas
             ->and(array_column($task->source['citations'], 'id'))->toContain('nativephp-mobile')
             ->and($task->prompt)->toContain('No new interface.', 'Render pending tasks.')
             ->and(Run::count())->toBe(0)
-            ->and(File::exists($directory.'/tests/TaskListTest.php'))->toBeFalse();
+            ->and(File::exists($directory.'/tests/TaskListTest.php'))->toBeTrue();
     } finally {
         File::deleteDirectory($directory);
     }

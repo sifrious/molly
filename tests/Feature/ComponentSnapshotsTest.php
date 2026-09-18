@@ -18,6 +18,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-snapshots-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/resources/views/components');
     File::put($this->workspace.'/resources/views/components/status.blade.php', '<p>Waiting</p>');
+    writeProtectedTest($this->workspace, 'tests/StatusTest.php');
     config([
         'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
         'app.key' => 'base64:'.base64_encode(str_repeat('a', 32)),
@@ -34,7 +35,6 @@ function snapshotProposal(): array
 {
     return ['summary' => 'Show the completed state.', 'files' => [
         ['path' => 'resources/views/components/status.blade.php', 'content' => '<p>Completed</p>'],
-        ['path' => 'tests/StatusTest.php', 'content' => '<?php it("shows the completed state", fn () => expect(file_get_contents(__DIR__."/../resources/views/components/status.blade.php"))->toContain("Completed"));'],
     ]];
 }
 
@@ -57,7 +57,7 @@ it('freezes selected file hashes at task creation without saving source contents
         ->and($snapshot['captured_at'])->toBe(now()->toIso8601String())
         ->and($snapshot['files'])->toBe([
             ['path' => 'resources/views/components/status.blade.php', 'sha256' => hash('sha256', '<p>Waiting</p>'), 'component' => ['id' => 'component:resources/views/components/status.blade.php', 'kind' => 'blade_component']],
-            ['path' => 'tests/StatusTest.php', 'sha256' => null, 'component' => null],
+            ['path' => 'tests/StatusTest.php', 'sha256' => hash('sha256', '<?php it("exists", fn () => expect(true)->toBeTrue());'), 'component' => null],
         ])
         ->and($snapshot['preview'])->toBe(['status' => 'unavailable', 'reason' => 'No local preview renderer is configured.'])
         ->and(json_encode($snapshot))->not->toContain('<p>Waiting</p>');
@@ -188,14 +188,18 @@ it('runs older tasks without inventing a task creation snapshot', function () {
     expect(Artisan::output())->toContain('No task-creation snapshot is available. The original task context is unknown.');
 });
 
-it('reports unchanged selected components when only their test changes', function () {
-    $proposal = snapshotProposal();
-    $proposal['files'] = [$proposal['files'][1]];
+it('reports unchanged selected components when a non-component file changes', function () {
+    File::ensureDirectoryExists($this->workspace.'/app');
+    File::put($this->workspace.'/app/Status.php', '<?php return "waiting";');
+    $proposal = [
+        'summary' => 'Keep the Blade source and change the helper.',
+        'files' => [['path' => 'app/Status.php', 'content' => '<?php return "completed";']],
+    ];
     ChangeWriter::fake([$proposal])->preventStrayPrompts();
     snapshotChecks();
     $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
 
-    $run = app(RunTask::class)->handle('Add a test for the current status.', $this->workspace, ['resources/views/components/status.blade.php'], 'tests/StatusTest.php');
+    $run = app(RunTask::class)->handle('Keep the status component.', $this->workspace, ['resources/views/components/status.blade.php', 'app/Status.php'], 'tests/StatusTest.php');
 
     expect($run->status)->toBe('completed')
         ->and($run->report['components']['changes'])->toHaveCount(1)

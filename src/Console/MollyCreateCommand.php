@@ -14,7 +14,7 @@ use function Laravel\Prompts\text;
 
 class MollyCreateCommand extends Command
 {
-    protected $signature = 'molly:create {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file Molly may change and must pass} {--name= : Task nickname} {--json : Print JSON only}';
+    protected $signature = 'molly:create {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file that must pass} {--allow-test-edits : Permit this task to change the required Pest test} {--name= : Task nickname} {--json : Print JSON only}';
 
     protected $description = 'Save a task without running the model or changing files';
 
@@ -26,7 +26,7 @@ class MollyCreateCommand extends Command
             $prompt = $this->taskPrompt($interactive);
             $nickname = $this->taskNickname($guided);
             [$paths, $test] = $this->taskFiles($interactive);
-            $task = $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, ...($nickname === null ? [] : ['nickname' => $nickname]));
+            $task = $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
             if ($this->option('json')) {
                 $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {
@@ -93,11 +93,11 @@ class MollyCreateCommand extends Command
             if (! $interactive) {
                 throw new InvalidArgumentException('Use --test to name the Pest test file that must pass.');
             }
-            $test = text('Which Pest test should pass?', placeholder: 'tests/Feature/HealthTest.php', required: true, hint: 'Molly may create or edit this test.', transform: trim(...));
+            $test = text('Which Pest test should pass?', placeholder: 'tests/Feature/HealthTest.php', required: true, hint: 'This test is read-only unless you pass --allow-test-edits.', transform: trim(...));
         }
         $paths = $this->option('file');
         if ($paths === [] && $interactive) {
-            $answer = text('Which other files may Molly change?', placeholder: 'routes/web.php, app/Models/User.php', hint: 'Separate paths with commas. The required test is already included.', transform: trim(...));
+            $answer = text('Which files may Molly change?', placeholder: 'routes/web.php, app/Models/User.php', hint: 'Separate paths with commas. Do not include the required Pest test.', transform: trim(...));
             $paths = $answer === '' ? [] : array_map(trim(...), explode(',', $answer));
         }
 

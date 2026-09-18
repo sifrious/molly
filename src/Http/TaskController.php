@@ -36,12 +36,14 @@ class TaskController
             'workspace' => ['required', 'string', 'max:4096'],
             'paths' => ['nullable', 'string', 'max:32768'],
             'test_path' => ['required', 'string', 'max:4096'],
+            'allow_test_edits' => ['sometimes', 'boolean'],
         ]);
         $paths = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $data['paths'] ?? ''))));
+        $allowTestEdits = $request->boolean('allow_test_edits');
         try {
             $task = ! empty($data['issue_url'])
-                ? $import->handle($data['issue_url'], $data['workspace'], $paths, $data['test_path'], nickname: $data['nickname'] ?? null)
-                : $create->handle($data['prompt'], $data['workspace'], $paths, $data['test_path'], nickname: $data['nickname'] ?? null);
+                ? $import->handle($data['issue_url'], $data['workspace'], $paths, $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: $allowTestEdits)
+                : $create->handle($data['prompt'], $data['workspace'], $paths, $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: $allowTestEdits);
         } catch (RuntimeException $exception) {
             throw ValidationException::withMessages(['task' => $exception->getMessage()]);
         }

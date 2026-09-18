@@ -32,7 +32,10 @@ Restart long-running queue workers after configuration changes.
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
 | `molly.parallel_checks` | `true` | Run Pest and Tarpit at the same time. Set false when POSIX process-group support is unavailable. |
 | `molly.max_attempts` | `3` | Total attempts allowed for a saved task. Allowed range: 1 through 10. |
-| `molly.max_files` | `8` | Maximum selected files, including the required test. |
+| `molly.max_files` | `8` | Maximum writable files. The protected test does not count toward this limit. |
+| `molly.verification.pest` | `required` | Pest remains a completion gate. |
+| `molly.verification_actions.pest` | `retry` | Retry Pest failures while attempts remain. |
+| `molly.sandbox.allow_unsafe` | `false` | Local-only override when Landlock isolation is unavailable. Environment: `MOLLY_SANDBOX_ALLOW_UNSAFE`. |
 | `molly.max_file_bytes` | `65536` | Maximum bytes in one selected file or replacement. |
 | `molly.ui.enabled` | `false` | Enables local web routes. Environment: `MOLLY_UI_ENABLED`. |
 | `molly.ui.prefix` | `molly` | Local web route prefix. |

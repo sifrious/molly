@@ -103,7 +103,7 @@ Artisan::command('fixture:setup', function () use ($root, $settings, $kernel): v
         $table->longText('exception');
         $table->timestamp('failed_at')->useCurrent();
     });
-    $task = app(CreateTask::class)->handle('Return true from the flag.', $root, ['app/Flag.php', 'tests/QueuedFlagTest.php'], 'tests/QueuedFlagTest.php');
+    $task = app(CreateTask::class)->handle('Return true from the flag.', $root, ['app/Flag.php'], 'tests/QueuedFlagTest.php');
     Queue::push(new StartSavedTask($task->id));
     if ($settings['duplicate']) {
         Queue::push(new StartSavedTask($task->id));

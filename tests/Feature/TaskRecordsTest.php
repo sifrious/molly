@@ -19,6 +19,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-records-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    writeProtectedTest($this->workspace);
 });
 
 afterEach(function () {
@@ -27,26 +28,28 @@ afterEach(function () {
 
 function createMollyRecord(): Task
 {
-    return app(CreateTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php');
+    return app(CreateTask::class)->handle('Return Hello.', test()->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 }
 
 it('stores a pending task without editing files or starting a run', function () {
     ChangeWriter::fake()->preventStrayPrompts();
     $source = ['provider' => 'github', 'repository' => 'sifrious/molly', 'number' => 42];
 
-    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace.'/.', ['app/Greeting.php', 'tests/GreetingTest.php'], 'tests/GreetingTest.php', $source)->fresh();
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace.'/.', ['app/Greeting.php'], 'tests/GreetingTest.php', $source)->fresh();
 
     expect(Str::isUuid($task->id))->toBeTrue()
         ->and($task->status)->toBe('pending')
         ->and($task->prompt)->toBe('Return Hello.')
         ->and($task->workspace)->toBe(realpath($this->workspace))
-        ->and($task->paths)->toBe(['app/Greeting.php', 'tests/GreetingTest.php'])
+        ->and($task->paths)->toBe(['app/Greeting.php'])
         ->and($task->test_path)->toBe('tests/GreetingTest.php')
+        ->and($task->allow_test_edits)->toBeFalse()
+        ->and($task->test_digest)->toBe(hash('sha256', File::get($this->workspace.'/tests/GreetingTest.php')))
         ->and($task->source)->toBe($source)
         ->and($task->stop_requested_at)->toBeNull()
         ->and(Run::count())->toBe(0)
         ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;')
-        ->and(File::exists($this->workspace.'/tests/GreetingTest.php'))->toBeFalse()
+        ->and(File::exists($this->workspace.'/tests/GreetingTest.php'))->toBeTrue()
         ->and(File::exists($this->workspace.'/.molly/JOURNAL.md'))->toBeTrue();
     ChangeWriter::assertNeverPrompted();
 });
@@ -74,7 +77,7 @@ it('rejects an invalid workspace before saving a task', function () {
 });
 
 it('rejects source metadata that cannot be stored as JSON', function () {
-    expect(fn () => app(CreateTask::class)->handle('Hello', $this->workspace, ['tests/Hello.php'], 'tests/Hello.php', ['number' => INF]))
+    expect(fn () => app(CreateTask::class)->handle('Hello', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', ['number' => INF]))
         ->toThrow(RuntimeException::class, 'SOURCE_INVALID');
     expect(Task::count())->toBe(0);
 });
@@ -283,31 +286,32 @@ it('guides task creation and uses the nickname in the start command', function (
         ->expectsQuestion('What should Molly work on?', 'Return Hello.')
         ->expectsQuestion('Task nickname', 'greeting')
         ->expectsQuestion('Which Pest test should pass?', 'tests/GreetingTest.php')
-        ->expectsQuestion('Which other files may Molly change?', 'app/Greeting.php, routes/web.php')
+        ->expectsQuestion('Which files may Molly change?', 'app/Greeting.php, routes/web.php')
         ->expectsOutputToContain('php artisan molly:start greeting')
         ->assertSuccessful();
 
     $task = Task::sole();
     expect($task->nickname)->toBe('greeting')
-        ->and($task->paths)->toBe(['app/Greeting.php', 'routes/web.php', 'tests/GreetingTest.php'])
+        ->and($task->paths)->toBe(['app/Greeting.php', 'routes/web.php'])
         ->and($task->test_path)->toBe('tests/GreetingTest.php')
         ->and($task->status)->toBe('pending')
         ->and(Run::count())->toBe(0)
         ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;')
-        ->and(File::exists($this->workspace.'/tests/GreetingTest.php'))->toBeFalse();
+        ->and(File::exists($this->workspace.'/tests/GreetingTest.php'))->toBeTrue();
     ChangeWriter::assertNeverPrompted();
 });
 
-it('allows an unnamed guided task that changes only its test', function (): void {
-    $this->artisan('molly:create', ['prompt' => 'Test the greeting.', '--workspace' => $this->workspace])
+it('allows an unnamed guided task that changes only its test when test edits are opted in', function (): void {
+    $this->artisan('molly:create', ['prompt' => 'Test the greeting.', '--workspace' => $this->workspace, '--allow-test-edits' => true])
         ->expectsQuestion('Task nickname', '')
         ->expectsQuestion('Which Pest test should pass?', 'tests/GreetingTest.php')
-        ->expectsQuestion('Which other files may Molly change?', '')
+        ->expectsQuestion('Which files may Molly change?', '')
         ->assertSuccessful();
 
     $task = Task::sole();
     expect($task->nickname)->toBeNull()
         ->and($task->paths)->toBe(['tests/GreetingTest.php'])
+        ->and($task->allow_test_edits)->toBeTrue()
         ->and($task->reference())->toBe($task->id);
 });
 
@@ -321,7 +325,7 @@ it('creates a named task from flags without repeating the test path', function (
     expect($exit)->toBe(0);
     $task = Task::sole();
     expect($task->nickname)->toBe('greeting')
-        ->and($task->paths)->toBe(['app/Greeting.php', 'tests/GreetingTest.php']);
+        ->and($task->paths)->toBe(['app/Greeting.php']);
     if (isset($mode['--json'])) {
         $output = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
         expect($output['id'])->toBe($task->id)
@@ -329,12 +333,12 @@ it('creates a named task from flags without repeating the test path', function (
     }
 })->with([[['--json' => true]], [['--no-interaction' => true]]]);
 
-it('counts the included test toward the file limit', function (): void {
+it('does not count a protected test toward the writable file limit', function (): void {
     config()->set('molly.max_files', 1);
 
-    expect(fn () => app(CreateTask::class)->handle('Hello', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php'))
-        ->toThrow(RuntimeException::class, 'FILES_INVALID');
-    expect(Task::count())->toBe(0);
+    $task = app(CreateTask::class)->handle('Hello', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+
+    expect($task->paths)->toBe(['app/Greeting.php']);
 });
 
 it('rejects an automatically included test that escapes the workspace', function (): void {

@@ -99,10 +99,12 @@
             <p class="hint" id="prompt-help">Name the behavior and how the required test should verify the result. Limit 1000 UTF-8 bytes.</p>
             <label for="nickname">Task nickname, optional</label><input id="nickname" name="nickname" maxlength="64" value="{{ old('nickname') }}" placeholder="health-check">
             <label for="workspace">Workspace directory</label><input id="workspace" name="workspace" required value="{{ old('workspace', base_path()) }}">
-            <label for="paths">Other files Molly may change, optional</label><textarea id="paths" name="paths" aria-describedby="paths-help">{{ old('paths') }}</textarea>
-            <p class="hint" id="paths-help">One repository-relative path per line. Molly includes the required test automatically.</p>
+            <label for="paths">Files Molly may change</label><textarea id="paths" name="paths" aria-describedby="paths-help">{{ old('paths') }}</textarea>
+            <p class="hint" id="paths-help">One repository-relative path per line. Do not include the required Pest test.</p>
             <label for="test_path">Required Pest test file</label><input id="test_path" name="test_path" required value="{{ old('test_path') }}" aria-describedby="test-help">
-            <p class="hint" id="test-help">A PHP file under tests/. Selecting the test permits test edits.</p>
+            <p class="hint" id="test-help">A PHP file under tests/. The implementation writer cannot change this test unless you opt in below.</p>
+            <label><input type="checkbox" name="allow_test_edits" value="1" @checked(old('allow_test_edits'))> Allow this task to edit the required Pest test</label>
+            <p class="hint">This weaker trust model is not the default. The journal records the choice.</p>
             <div class="actions"><button type="submit">Save task from plan</button></div>
         </form>
     </section>
