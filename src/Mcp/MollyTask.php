@@ -21,6 +21,7 @@ use Sifrious\Molly\Actions\ImportGitHubIssue;
 use Sifrious\Molly\Actions\InspectTask;
 use Sifrious\Molly\Actions\LinkTaskThread;
 use Sifrious\Molly\Actions\ListTasks;
+use Sifrious\Molly\Actions\LockProtectedTest;
 use Sifrious\Molly\Actions\NameTask;
 use Sifrious\Molly\Actions\PublishGitHubIssueStatus;
 use Sifrious\Molly\Actions\QueueTask;
@@ -32,15 +33,15 @@ use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Actions\StopTask;
 
 #[Name('molly_task')]
-#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. import_github reads GitHub using the host gh login. comment, approve, pr_opened, and merged require approve=true and never start an agent. pr_body, pr_opened, merged, and handoff print or record evidence; they do not open or merge pull requests or create worktrees.')]
+#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. import_github reads GitHub using the host gh login. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent. lock_test freezes the Pest digest after a test-authoring task. pr_body, pr_opened, merged, and handoff print or record evidence; they do not open or merge pull requests or create worktrees.')]
 #[IsDestructive]
 class MollyTask extends Tool
 {
     public function handle(Request $request): Response|ResponseFactory
     {
         $data = $request->validate([
-            'operation' => ['required', 'in:list,show,create,from_plan,start,retry,stop,show_run,import_github,comment,approve,pr_body,pr_opened,merged,handoff,name,link_thread,advice'],
-            'id' => ['required_if:operation,show,start,retry,stop,show_run,comment,approve,pr_body,pr_opened,merged,handoff,name,link_thread,advice', 'string', 'max:100'],
+            'operation' => ['required', 'in:list,show,create,from_plan,start,retry,stop,show_run,import_github,comment,approve,lock_test,pr_body,pr_opened,merged,handoff,name,link_thread,advice'],
+            'id' => ['required_if:operation,show,start,retry,stop,show_run,comment,approve,lock_test,pr_body,pr_opened,merged,handoff,name,link_thread,advice', 'string', 'max:100'],
             'nickname' => ['required_if:operation,name', 'string', 'max:64'],
             'thread' => ['required_if:operation,link_thread', 'string', 'max:38'],
             'plan_id' => ['required_if:operation,from_plan', 'string', 'max:100'],
@@ -51,7 +52,8 @@ class MollyTask extends Tool
             'test_path' => ['required_if:operation,create,from_plan,import_github', 'string', 'max:4096'],
             'allow_test_edits' => ['sometimes', 'boolean'],
             'issue_url' => ['required_if:operation,import_github', 'string', 'max:2048'],
-            'approve' => ['required_if:operation,comment,approve,pr_opened,merged', 'boolean'],
+            'approve' => ['required_if:operation,comment,approve,lock_test,pr_opened,merged', 'boolean'],
+            'reason' => ['sometimes', 'string', 'max:512'],
             'close' => ['sometimes', 'boolean'],
             'url' => ['required_if:operation,pr_opened', 'string', 'max:2048'],
             'sha' => ['required_if:operation,merged', 'string', 'max:40'],
@@ -71,6 +73,7 @@ class MollyTask extends Tool
                 'import_github' => ['task' => app(ImportGitHubIssue::class)->handle($data['issue_url'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
                 'comment' => app(PublishGitHubIssueStatus::class)->handle($data['id'], (bool) ($data['approve'] ?? false), (bool) ($data['close'] ?? false)),
                 'approve' => app(ApproveTask::class)->handle($data['id'], (bool) ($data['approve'] ?? false)),
+                'lock_test' => app(LockProtectedTest::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['paths'] ?? [], $data['reason'] ?? 'Human approved the Pest test as the locked acceptance test.'),
                 'pr_body' => app(ComposePullRequestBody::class)->handle($data['id'], (bool) ($data['close'] ?? false)),
                 'pr_opened' => app(RecordPullRequestOpened::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['url'] ?? ''),
                 'merged' => app(RecordMerged::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['sha'] ?? ''),
@@ -107,7 +110,7 @@ class MollyTask extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'operation' => $schema->string()->enum(['list', 'show', 'create', 'from_plan', 'start', 'retry', 'stop', 'show_run', 'import_github', 'comment', 'approve', 'pr_body', 'pr_opened', 'merged', 'handoff', 'name', 'link_thread', 'advice'])->description('advice checks limits and may request optional TypeSafe evaluation. It saves advice but does not start or retry work. comment, approve, pr_opened, and merged require approve=true and never start an agent or open a pull request.')->required(),
+            'operation' => $schema->string()->enum(['list', 'show', 'create', 'from_plan', 'start', 'retry', 'stop', 'show_run', 'import_github', 'comment', 'approve', 'lock_test', 'pr_body', 'pr_opened', 'merged', 'handoff', 'name', 'link_thread', 'advice'])->description('advice checks limits and may request optional TypeSafe evaluation. It saves advice but does not start or retry work. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent or open a pull request. lock_test freezes the Pest digest after a test-authoring task.')->required(),
             'id' => $schema->string()->description('Task nickname or UUID, or a run UUID for show_run.'),
             'nickname' => $schema->string()->description('Optional nickname when saving a task; required for name. Unique, 1 to 64 letters, digits, or hyphens, starting with a letter.'),
             'thread' => $schema->string()->description('Amp thread ID beginning with T-, required for link_thread. Records a user association without starting work.'),
@@ -118,7 +121,8 @@ class MollyTask extends Tool
             'test_path' => $schema->string()->description('Required PHP test file under tests/. It is read-only unless allow_test_edits is true.'),
             'allow_test_edits' => $schema->boolean()->description('Explicit weaker trust model that lets the same writer change the required Pest test. Default false.'),
             'issue_url' => $schema->string()->description('HTTPS github.com issue URL; required for import_github.'),
-            'approve' => $schema->boolean()->description('Required true for comment, approve, pr_opened, and merged. Molly never posts or records those events without this flag.'),
+            'approve' => $schema->boolean()->description('Required true for comment, approve, lock_test, pr_opened, and merged. Molly never posts or records those events without this flag.'),
+            'reason' => $schema->string()->description('Why the Pest digest is locked; used by lock_test. Maximum 512 bytes.'),
             'close' => $schema->boolean()->description('Include closing language only after required checks pass. Molly still does not merge.'),
             'url' => $schema->string()->description('HTTPS github.com pull request URL; required for pr_opened. Molly records the URL and does not open the pull request.'),
             'sha' => $schema->string()->description('40-character merge commit SHA; required for merged. Molly records the SHA and does not merge.'),

@@ -89,10 +89,33 @@ class ExportTaskJournal
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
             '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
+            ...$this->testLockLines($task),
             ...$this->issueLines($task),
             ...$this->lifecycleSummary($task), '',
             $this->quote($task->prompt), '',
         ];
+    }
+
+    /** @return list<string> */
+    private function testLockLines(Task $task): array
+    {
+        $lock = $task->source['test_lock'] ?? null;
+        if (! is_array($lock) || ! is_string($lock['after_digest'] ?? null)) {
+            return [];
+        }
+
+        $lines = ['- Locked test digest: '.$this->escape($lock['after_digest'])];
+        if (is_string($lock['before_digest'] ?? null)) {
+            $lines[] = '- Previous test digest: '.$this->escape($lock['before_digest']);
+        }
+        if (is_string($lock['approved_by'] ?? null)) {
+            $lines[] = '- Test lock approved by: '.$this->escape($lock['approved_by']);
+        }
+        if (is_string($lock['reason'] ?? null)) {
+            $lines[] = '- Test lock reason: '.$this->escape($lock['reason']);
+        }
+
+        return $lines;
     }
 
     /** @return list<string> */
@@ -233,6 +256,7 @@ MARKDOWN;
             '- Required test: '.$this->escape($task->test_path),
             '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
             '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
+            ...$this->testLockLines($task),
             ...$this->issueLines($task),
             ...$this->lifecycleSummary($task), '',
             '## Requested work', '', $this->quote($task->prompt), '',

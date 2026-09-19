@@ -57,6 +57,9 @@ it('keeps unknown newer event types inspectable without changing display status'
 it('derives display status from known events instead of a stored status field', function () {
     $log = new LifecycleLog;
     $log->record(lifecycleEvent(LifecycleEventType::Created, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null));
+    $log->record(lifecycleEvent(LifecycleEventType::TestLocked, '99999999-9999-4999-8999-999999999999'));
+    expect($log->displayStatus(ContractFixtures::TASK_ID))->toBe(DisplayStatus::Pending);
+
     $log->record(lifecycleEvent(LifecycleEventType::WorkspacePrepared, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'));
     $log->record(lifecycleEvent(LifecycleEventType::AgentStarted, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'));
     $log->record(lifecycleEvent(LifecycleEventType::ApprovalRequested, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'));

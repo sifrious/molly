@@ -15,6 +15,7 @@ enum LifecycleEventType: string
     case VerificationFinished = 'verification_finished';
     case RetryScheduled = 'retry_scheduled';
     case ApprovalRequested = 'approval_requested';
+    case TestLocked = 'test_locked';
     case ApprovalResolved = 'approval_resolved';
     case PullRequestOpened = 'pull_request_opened';
     case Merged = 'merged';

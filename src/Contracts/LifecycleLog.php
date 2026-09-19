@@ -52,7 +52,8 @@ final class LifecycleLog
             }
 
             $status = match ($type) {
-                LifecycleEventType::Created => DisplayStatus::Pending,
+                LifecycleEventType::Created,
+                LifecycleEventType::TestLocked => DisplayStatus::Pending,
                 LifecycleEventType::WorkspacePrepared => DisplayStatus::Preparing,
                 LifecycleEventType::DispatchRequested,
                 LifecycleEventType::AgentStarted,

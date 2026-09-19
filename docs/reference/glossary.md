@@ -25,6 +25,7 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | Term | Meaning |
 | --- | --- |
 | Protected test | The required Pest file whose SHA-256 digest is locked before implementation. Changing it fails the run. |
+| Test lock | Human approval of a Pest digest after a test-authoring task. The next run cannot edit that file. |
 | Failure action | What Molly does after a verifier does not pass: retry, fail, or warn. Policy and action stay separate fields. |
 | Verification | The required Pest execution and JUnit evidence for the selected test file. A model statement is not verification. |
 | Tarpit review | Seven model checks for unnecessary complexity in the supplied before-and-after files. It cannot override failed tests. |

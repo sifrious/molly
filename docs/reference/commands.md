@@ -26,6 +26,7 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:doctor` | Checks whether the selected workspace and provider are ready. |
 | `php artisan molly:bloom-contract TASK` | Prints the versioned task contract for an existing Bloom workspace and writes `.molly/bloom-contract.json`. Does not create a worktree. |
 | `php artisan molly:approve TASK --approve` | Records human approval after required checks pass. Does not open a pull request. |
+| `php artisan molly:lock-test TASK --approve` | Locks the Pest digest after a test-authoring task and drops that file from the writer scope. |
 | `php artisan molly:comment TASK --approve` | Posts or updates a GitHub issue comment after explicit approval. |
 | `php artisan molly:pr-body TASK` | Prints a pull request body that links the issue, acceptance test, and evidence. Does not open a pull request. |
 | `php artisan molly:pr-opened TASK --url URL --approve` | Records that a human opened a pull request. Does not open one. |

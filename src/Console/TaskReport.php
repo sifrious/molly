@@ -29,6 +29,13 @@ class TaskReport
         if ($task->test_digest) {
             note('Approved test digest: '.$task->test_digest);
         }
+        $lock = is_array($task->source['test_lock'] ?? null) ? $task->source['test_lock'] : [];
+        if (is_string($lock['after_digest'] ?? null)) {
+            note('Locked test digest: '.$lock['after_digest']);
+            if (is_string($lock['approved_by'] ?? null)) {
+                note('Test lock approved by: '.$lock['approved_by']);
+            }
+        }
         if (($inspection['issue_url'] ?? null) !== null) {
             note('GitHub issue: '.$inspection['issue_url']);
         }

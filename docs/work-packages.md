@@ -19,7 +19,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | --- | --- | --- |
 | MOL-WP-01 | Versioned task, run, target, outcome, handoff, and lifecycle contracts | Contract types exist. BloomCore decodes the same JSON |
 | MOL-WP-02 | Bloom workspace, diff, approval, and PR loop | Headless contract export writes `.molly/bloom-contract.json`. BloomCore binds that file to the selected workspace, shows a Molly inspector tab, and refuses Create or Merge until approval. Bloom still opens the PR through its existing agent strip. The macOS app has not been built in this orb |
-| MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist; Bloom test-author approval remains |
+| MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist. `molly:lock-test --approve` freezes a test-authoring digest, records who approved it, and drops the Pest file from the writer scope |
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |
 | MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline. Completed runs store immutable receipts. Pest cannot pass with zero assertions or a successful process plus failing JUnit |
 | MOL-WP-06 | GitHub issue to Pest to PR traceability | Import is idempotent. Approved comments, PR bodies, and recorded PR or merge events exist. Molly still does not open or merge a pull request |
