@@ -72,6 +72,7 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | Orb | A planned remote execution environment whose identity Molly does not currently verify. |
 | Execution target | The place where work executes. Current Molly task execution is local; remote target selection is planned. |
 | Handoff | A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge. |
+| Bloom contract | Versioned JSON Molly writes to `.molly/bloom-contract.json`. Bloom binds it to the selected workspace and does not create another worktree. |
 | Recorded pull request | A human-opened GitHub pull request URL stored after `molly:pr-opened --approve`. Molly does not open the pull request. |
 | Recorded merge | A 40-character merge commit SHA stored after `molly:merged --approve`. Molly does not merge. |
 | Project graph | Local SQLite relationships among tasks, tests, files, attempts, pull requests, commits, and blockers. Separate from Laravel documentation knowledge. |

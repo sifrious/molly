@@ -174,8 +174,8 @@ Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest a
 These are not finished yet:
 
 - Verified Orb identity and remote execution selection
-- Bloom-owned task UI, diffs, and pull requests
-- GitHub pull request opening and merge
+- Bloom still asks its agent to open and merge GitHub pull requests after Molly records approval
+- A compiled Bloom macOS app. This Linux orb cannot run `swift test`
 - Visual Bloom preview display
 - Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, NativePHP, and tarpit notes
 

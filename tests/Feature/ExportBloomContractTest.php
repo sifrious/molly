@@ -26,7 +26,8 @@ it('exports a versioned task contract Bloom can bind to an existing workspace', 
         ->and($contract->protectedPaths)->toBe(['tests/GreetingTest.php'])
         ->and($contract->approval->beforePullRequest)->toBeTrue()
         ->and($contract->approval->beforeMerge)->toBeTrue()
-        ->and($contract->toArray()['schema'])->toBe(TaskContract::SCHEMA);
+        ->and($contract->toArray()['schema'])->toBe(TaskContract::SCHEMA)
+        ->and(File::get($workspace.'/.molly/bloom-contract.json'))->toBe($contract->toJson());
 
     $exit = Artisan::call('molly:bloom-contract', [
         'task' => $task->id,
@@ -39,7 +40,8 @@ it('exports a versioned task contract Bloom can bind to an existing workspace', 
 
     expect($exit)->toBe(0)
         ->and($payload['bloom_workspace_id'])->toBe($bloomWorkspaceId)
-        ->and($payload['protected_paths'])->toBe(['tests/GreetingTest.php']);
+        ->and($payload['protected_paths'])->toBe(['tests/GreetingTest.php'])
+        ->and(TaskContract::fromJson(File::get($workspace.'/.molly/bloom-contract.json'))->bloomWorkspaceId)->toBe($bloomWorkspaceId);
 
     File::deleteDirectory($workspace);
 });

@@ -9,16 +9,16 @@ Use this page to track Molly's alpha work without Linear. The IDs match GitHub b
 
 Inspected Molly `main` at handoff: `ef7f234f8985d43b278a71a7bac9525d4ce29e56`.
 
-Inspected Bloom `main` at handoff: `e03dd1387af7f3f4ae3b7731b8d4fa0843dd2372`. Bloom has no Molly integration yet. Bloom owns worktrees, diffs, agent sessions, and pull requests. Molly owns the small-task contract, protected tests, verifiers, and evidence.
+Inspected Bloom `main` at handoff: `e03dd1387af7f3f4ae3b7731b8d4fa0843dd2372`. BloomCore now decodes Molly's task contract, binds it to the selected workspace, and gates Create and Merge until recorded approval. The Linux orb cannot compile the Swift app. Bloom still owns worktrees, diffs, agent sessions, and GitHub turns.
 
-Protected tests are now the default. Writer and Pest isolation exists on hosts with Landlock and user/network namespaces. Amp thread observations are still not Orb execution. Bloom still has no Molly adapter.
+Protected tests are now the default. Writer and Pest isolation exists on hosts with Landlock and user/network namespaces. Amp thread observations are still not Orb execution.
 
 ## Status
 
 | ID | Work | Status |
 | --- | --- | --- |
-| MOL-WP-01 | Versioned task, run, target, outcome, handoff, and lifecycle contracts | Contract types exist; Bloom adapter not started |
-| MOL-WP-02 | Bloom workspace, diff, approval, and PR loop | Headless contract export, molly:approve, molly:pr-opened, and molly:merged exist. Bloom adapter, diffs, and PR opening remain |
+| MOL-WP-01 | Versioned task, run, target, outcome, handoff, and lifecycle contracts | Contract types exist. BloomCore decodes the same JSON |
+| MOL-WP-02 | Bloom workspace, diff, approval, and PR loop | Headless contract export writes `.molly/bloom-contract.json`. BloomCore binds that file to the selected workspace, shows a Molly inspector tab, and refuses Create or Merge until approval. Bloom still opens the PR through its existing agent strip. The macOS app has not been built in this orb |
 | MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist; Bloom test-author approval remains |
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |
 | MOL-WP-05 | Explicit verifier failure actions and retry rules | Failure actions are recorded; retry restores the recorded baseline. Completed runs store immutable receipts. Pest cannot pass with zero assertions or a successful process plus failing JUnit |
