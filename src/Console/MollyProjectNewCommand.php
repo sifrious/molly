@@ -17,6 +17,7 @@ class MollyProjectNewCommand extends Command
         {--force : Replace a non-empty target directory}
         {--no-composer : Skip Composer create-project and require (tests / scaffold)}
         {--no-migrate : Skip migrations}
+        {--no-graphs : Skip knowledge graph bootstrap}
         {--json : Print JSON only}';
 
     protected $description = 'Create a new Laravel project and initialize Molly (same service Bloom uses)';
@@ -38,6 +39,7 @@ class MollyProjectNewCommand extends Command
                 },
                 runComposer: ! $this->option('no-composer'),
                 runMigrations: ! $this->option('no-migrate'),
+                bootstrapGraphs: ! $this->option('no-graphs'),
             );
 
             $payload = [

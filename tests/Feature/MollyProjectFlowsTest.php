@@ -44,6 +44,7 @@ it('initializes an existing Laravel app without overwriting env or existing moll
         name: 'Example App',
         runComposerRequire: false,
         runMigrations: false,
+        bootstrapGraphs: false,
     );
 
     expect($result['project']->name)->toBe('Example App')
@@ -69,6 +70,7 @@ it('refuses a non-laravel directory', function (): void {
         path: $empty,
         runComposerRequire: false,
         runMigrations: false,
+        bootstrapGraphs: false,
     ))->toThrow(RuntimeException::class, 'PROJECT_NOT_LARAVEL');
 
     File::deleteDirectory($empty);
@@ -85,6 +87,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
         name: 'Fresh',
         runComposer: false,
         runMigrations: false,
+        bootstrapGraphs: false,
     );
 
     expect($result['project']->source)->toBe('new')
@@ -97,6 +100,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
 
 it('exposes init and list over artisan with shared registry state', function (): void {
     $exit = Artisan::call('molly:project-init', [
+        '--no-graphs' => true,
         'path' => $this->laravelRoot,
         '--name' => 'Via CLI',
         '--no-composer' => true,

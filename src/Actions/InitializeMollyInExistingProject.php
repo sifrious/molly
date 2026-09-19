@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
@@ -24,13 +25,14 @@ final class InitializeMollyInExistingProject
 
     /**
      * @param  (callable(string, string): void)|null  $progress
-     * @return array{project: MollyProject, created: array{metadata: bool, gitignore: bool, config: bool, migrated: bool}, steps: list<string>}
+     * @return array{project: MollyProject, created: array{metadata: bool, gitignore: bool, config: bool, migrated: bool}, steps: list<string>, graphs: ?array{ok: bool, manifest_path: string, units: list<array<string, mixed>>, laravel_exact: string}}
      */
     public function handle(
         string $path,
         ?string $name = null,
         bool $runComposerRequire = true,
         bool $runMigrations = true,
+        bool $bootstrapGraphs = true,
         ?callable $progress = null,
     ): array {
         $progress ??= static function (string $step, string $message): void {};
@@ -103,6 +105,25 @@ final class InitializeMollyInExistingProject
             }
         }
 
+        $graphs = null;
+        if ($bootstrapGraphs) {
+            $note('graphs', 'Bootstrapping version-pinned knowledge graphs');
+            $graphs = (new BootstrapProjectKnowledgeGraphs)->handle(
+                $root,
+                function (string $step, string $message) use ($note): void {
+                    $note('graphs:'.$step, $message);
+                },
+            );
+            $note(
+                'graphs',
+                $graphs['ok']
+                    ? 'Knowledge graphs ready (Laravel '.$graphs['laravel_exact'].')'
+                    : 'Knowledge graphs finished with retryable failures — see .molly/graphs/manifest.json',
+            );
+        } else {
+            $note('graphs', 'Skipped knowledge graph bootstrap');
+        }
+
         return [
             'project' => $project,
             'created' => [
@@ -112,6 +133,7 @@ final class InitializeMollyInExistingProject
                 'migrated' => $migrated,
             ],
             'steps' => $steps,
+            'graphs' => $graphs,
         ];
     }
 

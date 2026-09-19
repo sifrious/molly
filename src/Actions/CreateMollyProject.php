@@ -31,6 +31,7 @@ final class CreateMollyProject
         ?callable $progress = null,
         bool $runComposer = true,
         bool $runMigrations = true,
+        bool $bootstrapGraphs = true,
     ): array {
         $progress ??= static function (string $step, string $message): void {};
         $steps = [];
@@ -78,6 +79,16 @@ final class CreateMollyProject
                     'require' => ['laravel/framework' => '^12.0'],
                 ], JSON_PRETTY_PRINT)."\n");
             }
+            if (! is_file($path.'/composer.lock')) {
+                File::put($path.'/composer.lock', json_encode([
+                    'packages' => [[
+                        'name' => 'laravel/framework',
+                        'version' => 'v12.0.0',
+                    ]],
+                    'packages-dev' => [],
+                ], JSON_PRETTY_PRINT)."
+");
+            }
         }
 
         $result = $this->initialize->handle(
@@ -85,6 +96,7 @@ final class CreateMollyProject
             name: $name,
             runComposerRequire: $runComposer,
             runMigrations: $runMigrations,
+            bootstrapGraphs: $bootstrapGraphs,
             progress: function (string $step, string $message) use ($note): void {
                 $note($step, $message);
             },

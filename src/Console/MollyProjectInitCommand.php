@@ -16,6 +16,7 @@ class MollyProjectInitCommand extends Command
         {--name= : Display name}
         {--no-composer : Do not run composer require}
         {--no-migrate : Skip migrations}
+        {--no-graphs : Skip knowledge graph bootstrap}
         {--json : Print JSON only}';
 
     protected $description = 'Add Molly to an existing Laravel project without overwriting unrelated config';
@@ -31,6 +32,7 @@ class MollyProjectInitCommand extends Command
                 name: $this->option('name') !== null ? (string) $this->option('name') : null,
                 runComposerRequire: ! $this->option('no-composer'),
                 runMigrations: ! $this->option('no-migrate'),
+                bootstrapGraphs: ! $this->option('no-graphs'),
                 progress: $this->option('json') ? null : function (string $step, string $message): void {
                     note('['.$step.'] '.$message);
                 },
@@ -41,6 +43,7 @@ class MollyProjectInitCommand extends Command
                 'project' => $result['project']->toArray(),
                 'created' => $result['created'],
                 'steps' => $result['steps'],
+                'graphs' => $result['graphs'],
             ];
 
             if ($this->option('json')) {
