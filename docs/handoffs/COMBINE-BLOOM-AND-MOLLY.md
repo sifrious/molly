@@ -14,7 +14,7 @@ The Bloom Swift adapter already exists. Copy it. Do not design it. Do not regene
 | Question | Answer |
 | --- | --- |
 | Do I need to build the Swift adapter? | No. It is already written. |
-| Where is it? | [docs/handoffs/bloom-adapter/](bloom-adapter/) in this Molly repository |
+| Where is it? | [docs/handoffs/bloom-adapter/](bloom-adapter/README.md) in this Molly repository |
 | What do I do with it? | Clone Spatie Bloom, copy those files in, apply `bloom-ui.patch`, then run `swift test` on a Mac |
 | What is still unfinished? | Installing that copy into a Bloom checkout, compiling Bloom Dev.app, and proving the end-to-end loop on macOS |
 
@@ -60,7 +60,7 @@ Recorded 2026-09-19.
 - `gh repo fork spatie/bloom` failed HTTP 403. Token OAuth scopes were empty. There is no `sifrious/bloom`
 - Do not invent a fork. Do not push to Spatie
 
-The unpublished adapter lived in `/home/user/workspace/repos/bloom` and was never committed there. A copy is in this repository under [docs/handoffs/bloom-adapter](bloom-adapter/).
+The unpublished adapter lived in `/home/user/workspace/repos/bloom` and was never committed there. A copy is in this repository under [docs/handoffs/bloom-adapter](bloom-adapter/README.md).
 
 ## First actions
 
@@ -296,13 +296,13 @@ Do not start Orb dispatch, Packagist, or a docs site in this handoff.
 
 Molly:
 
-- [src/Actions/ExportBloomContract.php](../../src/Actions/ExportBloomContract.php)
-- [src/Contracts/TaskContract.php](../../src/Contracts/TaskContract.php)
-- [src/Contracts/LifecycleLog.php](../../src/Contracts/LifecycleLog.php)
-- [src/Actions/LockProtectedTest.php](../../src/Actions/LockProtectedTest.php)
-- [src/Actions/ApproveTask.php](../../src/Actions/ApproveTask.php)
+- [src/Actions/ExportBloomContract.php](https://github.com/sifrious/molly/blob/main/src/Actions/ExportBloomContract.php)
+- [src/Contracts/TaskContract.php](https://github.com/sifrious/molly/blob/main/src/Contracts/TaskContract.php)
+- [src/Contracts/LifecycleLog.php](https://github.com/sifrious/molly/blob/main/src/Contracts/LifecycleLog.php)
+- [src/Actions/LockProtectedTest.php](https://github.com/sifrious/molly/blob/main/src/Actions/LockProtectedTest.php)
+- [src/Actions/ApproveTask.php](https://github.com/sifrious/molly/blob/main/src/Actions/ApproveTask.php)
 - [docs/work-packages.md](../work-packages.md)
-- [AGENTS.md](../../AGENTS.md)
+- [AGENTS.md](https://github.com/sifrious/molly/blob/main/AGENTS.md)
 
 Bloom snapshot:
 

@@ -14,12 +14,41 @@ final class Sandbox
     /** @var list<string> */
     public const ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ', 'TERM', 'PWD', 'TMPDIR'];
 
+    private ?bool $available = null;
+
     public function available(): bool
     {
-        return Landlock::abi() !== null
-            && function_exists('pcntl_unshare')
-            && defined('CLONE_NEWUSER')
-            && defined('CLONE_NEWNET');
+        if ($this->available !== null) {
+            return $this->available;
+        }
+
+        if (Landlock::abi() === null
+            || ! function_exists('pcntl_unshare')
+            || ! function_exists('proc_open')
+            || ! defined('CLONE_NEWUSER')
+            || ! defined('CLONE_NEWNET')) {
+            return $this->available = false;
+        }
+
+        try {
+            $process = proc_open(
+                [PHP_BINARY, '-r', 'exit(@pcntl_unshare(CLONE_NEWUSER | CLONE_NEWNET) ? 0 : 1);'],
+                [
+                    0 => ['file', '/dev/null', 'r'],
+                    1 => ['file', '/dev/null', 'w'],
+                    2 => ['file', '/dev/null', 'w'],
+                ],
+                $pipes,
+            );
+        } catch (\Throwable) {
+            return $this->available = false;
+        }
+
+        if (! is_resource($process)) {
+            return $this->available = false;
+        }
+
+        return $this->available = proc_close($process) === 0;
     }
 
     public function allowUnsafe(): bool

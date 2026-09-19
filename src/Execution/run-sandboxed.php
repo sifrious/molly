@@ -34,13 +34,13 @@ if (! is_array($policy) || ! is_string($policy['workspace'] ?? null) || ! is_arr
     exit(2);
 }
 
-if (function_exists('pcntl_unshare')) {
-    if (defined('CLONE_NEWUSER')) {
-        pcntl_unshare(CLONE_NEWUSER);
-    }
-    if (! ($policy['network'] ?? false) && defined('CLONE_NEWNET')) {
-        pcntl_unshare(CLONE_NEWNET);
-    }
+$namespaceFlags = defined('CLONE_NEWUSER') ? CLONE_NEWUSER : 0;
+if (! ($policy['network'] ?? false) && defined('CLONE_NEWNET')) {
+    $namespaceFlags |= CLONE_NEWNET;
+}
+if (! function_exists('pcntl_unshare') || $namespaceFlags === 0 || ! @pcntl_unshare($namespaceFlags)) {
+    fwrite(STDERR, "SANDBOX_NAMESPACE_UNAVAILABLE\n");
+    exit(2);
 }
 
 $paths = [];
