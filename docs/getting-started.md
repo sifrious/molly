@@ -69,7 +69,19 @@ Add this to the project's `.gitignore`:
 
 Molly uses `.molly/` for local locks, journals, and the optional Laravel knowledge database.
 
-## 3. Pick an agent
+## 3. Optional: scaffold the greeting demo
+
+After install, you can create the tiny first task without answering prompts:
+
+```bash
+php artisan molly:demo
+```
+
+This writes `app/Greeting.php` and `tests/Feature/GreetingTest.php` when they are missing, saves task `demo-greeting`, and prints the next doctor / start / Bloom-contract steps. It does not create a Bloom worktree.
+
+Then continue with `molly:doctor` and `molly:start demo-greeting`, or use interactive `molly:create` below for your own task.
+
+## 4. Pick an agent
 
 Molly supports Amp and local Ollama. The same file limits and verification rules apply to both.
 
@@ -99,7 +111,7 @@ amp mcp doctor molly
 
 Amp owns its login credentials. Molly stores the provider choice, not your Amp password or token.
 
-## 4. Check Molly's setup
+## 5. Check Molly's setup
 
 Run:
 
@@ -124,7 +136,7 @@ If your PHP build does not have `posix_setsid` and `posix_kill`, set this in `co
 
 Then clear configuration and run `molly:doctor` again.
 
-## 5. Create a first task
+## 6. Create a first task
 
 Run:
 
@@ -149,7 +161,7 @@ Start it:
 php artisan molly:start health-check
 ```
 
-## 6. Read the result before accepting it
+## 7. Read the result before accepting it
 
 Molly prints a run ID. Inspect the saved task, the run, and your Git working tree:
 

@@ -55,6 +55,7 @@ php artisan molly:doctor
 When Molly prints `Molly is ready.`, create your first task:
 
 ```bash
+php artisan molly:demo                   # Optional first greeting task
 php artisan molly:create
 php artisan molly:start TASK_NAME
 ```

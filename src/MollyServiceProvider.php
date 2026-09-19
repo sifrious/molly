@@ -19,6 +19,7 @@ use Sifrious\Molly\Console\MollyCheckCommand;
 use Sifrious\Molly\Console\MollyCommentCommand;
 use Sifrious\Molly\Console\MollyConnectionsCommand;
 use Sifrious\Molly\Console\MollyCreateCommand;
+use Sifrious\Molly\Console\MollyDemoCommand;
 use Sifrious\Molly\Console\MollyDecideCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
 use Sifrious\Molly\Console\MollyHandoffCommand;
@@ -69,7 +70,7 @@ class MollyServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
-                MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
+                MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyDemoCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
                 MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
