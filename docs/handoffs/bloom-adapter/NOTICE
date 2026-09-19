@@ -1,0 +1,5 @@
+The Swift files in this directory are a snapshot of unpublished Bloom adapter work.
+
+Bloom is MIT licensed. Copyright Spatie bvba. See https://github.com/spatie/bloom/blob/main/LICENSE.md.
+
+These files are not Bloom itself. They are the Molly-side copy of uncommitted work that lived in a local clone of spatie/bloom at e03dd1387af7f3f4ae3b7731b8d4fa0843dd2372. Apply them onto a fresh Bloom checkout. Do not treat this folder as a Bloom fork or as Molly runtime.

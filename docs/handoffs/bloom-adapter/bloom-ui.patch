@@ -1,0 +1,194 @@
+diff --git a/Sources/Bloom/State/WorkspaceModel.swift b/Sources/Bloom/State/WorkspaceModel.swift
+index 8fe4cf0..16fd5e3 100644
+--- a/Sources/Bloom/State/WorkspaceModel.swift
++++ b/Sources/Bloom/State/WorkspaceModel.swift
+@@ -90,7 +90,16 @@ final class WorkspaceModel {
+     private var chosenInspectorTab: InspectorTab = .changes
+ 
+     /// The tabs the strip may draw for this workspace, and the one it is showing.
+-    var availableInspectorTabs: [InspectorTab] { InspectorTab.available(for: pullRequest) }
++    var availableInspectorTabs: [InspectorTab] {
++        InspectorTab.available(for: pullRequest, molly: mollyTask)
++    }
++
++    /// A Molly task bound to this worktree, or nil when this workspace is not running one.
++    ///
++    /// Read off `.molly/bloom-contract.json` and `.molly/lifecycle.jsonl`. Bloom does not
++    /// keep a second copy in SQLite: the worktree is the source, and a failed attempt stays
++    /// reviewable here because the files stay here.
++    private(set) var mollyTask: MollyTaskSnapshot?
+ 
+     private var rememberedHistoryCommit: BranchCommit? {
+         guard let lastHistoryCommit, branchCommits.canOffer(.commit(lastHistoryCommit)) else { return nil }
+@@ -376,6 +385,19 @@ final class WorkspaceModel {
+         self.app = app
+         self.setupOutput = workspace.setupLog
+         refreshSettings()
++        refreshMolly()
++    }
++
++    /// Re-read Molly's contract and lifecycle from this worktree.
++    func refreshMolly() {
++        let loaded = MollyWorktreeFiles.loadSnapshot(workspace: workspace)
++        if mollyTask != loaded { mollyTask = loaded }
++    }
++
++    /// Records human approval for the bound Molly task. Does not open a pull request.
++    func approveMolly() throws {
++        guard let snapshot = mollyTask else { return }
++        mollyTask = try MollyApproval.record(snapshot, in: workspace.path)
+     }
+ 
+     /// What this workspace's repository asks for: the setup script, the run scripts, the rest of
+diff --git a/Sources/Bloom/Views/Inspector/InspectorView.swift b/Sources/Bloom/Views/Inspector/InspectorView.swift
+index 988cc3c..cdb3667 100644
+--- a/Sources/Bloom/Views/Inspector/InspectorView.swift
++++ b/Sources/Bloom/Views/Inspector/InspectorView.swift
+@@ -86,6 +86,11 @@ struct InspectorView: View {
+             InspectorToolbar(model: model)
+                 .overlay(alignment: .bottom) { Hairline() }
+ 
++            if let molly = model.mollyTask, model.inspectorTab != .molly {
++                MollyStatusBand(snapshot: molly)
++                Hairline()
++            }
++
+             // What the list below is measured from, when it is not measured from everything.
+             //
+             // Under the tab row because it is a fact about the pane beneath it. On both file tabs
+@@ -154,6 +159,8 @@ struct InspectorView: View {
+             ChangesBrowser(model: model)
+         case .checks:
+             ChecksView(model: model)
++        case .molly:
++            MollyTaskView(model: model)
+         }
+     }
+ }
+diff --git a/Sources/Bloom/Views/Inspector/PullRequestBar.swift b/Sources/Bloom/Views/Inspector/PullRequestBar.swift
+index b0d1c75..f854b96 100644
+--- a/Sources/Bloom/Views/Inspector/PullRequestBar.swift
++++ b/Sources/Bloom/Views/Inspector/PullRequestBar.swift
+@@ -126,11 +126,20 @@ struct PullRequestBar: View {
+ 
+     /// Message requests stay available during a turn. Continue and Archive still read the
+     /// workspace-wide busy signal, shared with the sidebar through `AppModel.isRunning`.
++    ///
++    /// A bound Molly task adds a second gate: Create and Merge wait for recorded human
++    /// approval. The strip is still Bloom's; Molly only refuses the press.
+     private var branchActions: BranchActionAvailability {
+-        .mayActOnBranch(
++        let busy = BranchActionAvailability.mayActOnBranch(
+             isAgentBusy: app.isRunning(model.workspace),
+             pullRequest: model.pullRequest
+         )
++        guard let molly = model.mollyTask else { return busy }
++        return MollyPullRequestGate.decide(
++            status: molly.status,
++            approval: molly.contract.approval,
++            hasPullRequest: model.pullRequest != nil
++        ).combined(with: busy, hasPullRequest: model.pullRequest != nil)
+     }
+ 
+     /// Whether the branch has anything on it. The inspector's own list first, because it is the
+@@ -165,6 +174,7 @@ struct PullRequestBar: View {
+         var maxAge = WorkspaceModel.pullRequestArrivalMaxAge
+         while !Task.isCancelled {
+             await model.refreshPullRequest(maxAge: maxAge)
++            model.refreshMolly()
+             maxAge = .zero
+             try? await Task.sleep(for: Self.pollInterval)
+         }
+diff --git a/Sources/BloomCore/Presentation/InspectorTab.swift b/Sources/BloomCore/Presentation/InspectorTab.swift
+index 36d7f38..dbf734a 100644
+--- a/Sources/BloomCore/Presentation/InspectorTab.swift
++++ b/Sources/BloomCore/Presentation/InspectorTab.swift
+@@ -11,6 +11,8 @@ public enum InspectorTab: String, Hashable, CaseIterable, Sendable {
+     case changes = "Changes"
+     case history = "History"
+     case checks = "Checks"
++    /// A Molly task bound to this workspace. Last, so its arrival cannot move Checks.
++    case molly = "Molly"
+ 
+     /// The pane a selection falls back to when the tab it names is not on offer.
+     ///
+@@ -22,13 +24,20 @@ public enum InspectorTab: String, Hashable, CaseIterable, Sendable {
+ 
+     /// The tabs worth drawing for a workspace, in the order the strip draws them.
+     ///
+-    /// Checks is the only conditional one, and it is deliberately **last**. A segmented control
+-    /// sizes each segment to its own label and lays them out from the leading edge, so a tab
+-    /// appended at the end arrives without moving the three before it: a pull request landing
++    /// Checks and Molly are the conditional ones, and both are deliberately **last**. A segmented
++    /// control sizes each segment to its own label and lays them out from the leading edge, so a
++    /// tab appended at the end arrives without moving the three before it: a pull request landing
+     /// mid-session cannot shift a segment out from under a click already on its way to it, and
+-    /// neither can one going away.
+-    public static func available(for pullRequest: PullRequest?) -> [InspectorTab] {
+-        allCases.filter { $0 != .checks || hasChecks(pullRequest) }
++    /// neither can one going away. Molly is after Checks for the same reason: a bound task must
++    /// not shove the Checks segment sideways.
++    public static func available(
++        for pullRequest: PullRequest?,
++        molly: MollyTaskSnapshot? = nil
++    ) -> [InspectorTab] {
++        var tabs = allCases.filter { $0 != .checks && $0 != .molly }
++        if hasChecks(pullRequest) { tabs.append(.checks) }
++        if molly != nil { tabs.append(.molly) }
++        return tabs
+     }
+ 
+     /// Whether GitHub has reported a check run worth a tab of its own.
+diff --git a/Tests/BloomCoreTests/InspectorTabTests.swift b/Tests/BloomCoreTests/InspectorTabTests.swift
+index 52177ed..29f2e10 100644
+--- a/Tests/BloomCoreTests/InspectorTabTests.swift
++++ b/Tests/BloomCoreTests/InspectorTabTests.swift
+@@ -44,6 +44,15 @@ struct InspectorTabTests {
+         #expect(InspectorTab.available(for: open) == [.allFiles, .changes, .history, .checks])
+     }
+ 
++    @Test("a bound Molly task adds a last segment without moving Checks")
++    func mollyIsLast() throws {
++        let open = pullRequest(checks: .passing, summary: "1 check passed")
++        let molly = try MollyContractFixtures.snapshot()
++        let tabs = InspectorTab.available(for: open, molly: molly)
++        #expect(tabs == [.allFiles, .changes, .history, .checks, .molly])
++        #expect(InspectorTab.available(for: open).prefix(4) == tabs.prefix(4))
++    }
++
+     @Test("a merged pull request keeps its checks, because they are still there to read")
+     func mergedKeepsChecks() {
+         var merged = pullRequest(checks: .passing, summary: "12 checks passed")
+@@ -52,8 +61,9 @@ struct InspectorTabTests {
+     }
+ 
+     /// The tab has to arrive at the end of the strip or its arrival moves the three segments before
+-    /// it, which is a click landing somewhere the reader did not aim it.
+-    @Test("Checks is always the last segment")
++    /// it, which is a click landing somewhere the reader did not aim it. Molly is after Checks for
++    /// the same reason.
++    @Test("Checks is last until a Molly task is bound")
+     func checksIsLast() {
+         let open = pullRequest(checks: .passing, summary: "1 check passed")
+         #expect(InspectorTab.available(for: open).last == .checks)
+@@ -62,12 +72,19 @@ struct InspectorTabTests {
+ 
+     // MARK: - What happens to the selection
+ 
+-    @Test("a selection that is still on offer is left alone", arguments: InspectorTab.allCases)
++    @Test("a selection that is still on offer is left alone", arguments: [
++        InspectorTab.allFiles, .changes, .history, .checks,
++    ])
+     func selectionSurvives(_ tab: InspectorTab) {
+         let open = pullRequest(checks: .failing, summary: "1 required check failed")
+         #expect(InspectorTab.resolve(tab, available: InspectorTab.available(for: open)) == tab)
+     }
+ 
++    @Test("Molly selected, then the contract goes, falls back to Changes")
++    func mollyFallsBack() {
++        #expect(InspectorTab.resolve(.molly, available: InspectorTab.available(for: nil)) == .changes)
++    }
++
+     @Test("Checks selected, then the pull request goes, falls back to Changes")
+     func checksFallsBack() {
+         #expect(InspectorTab.resolve(.checks, available: InspectorTab.available(for: nil)) == .changes)
