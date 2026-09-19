@@ -78,7 +78,7 @@ class DecideRunCompletion
     private function pestState(array $verification): VerificationState
     {
         $state = VerificationState::fromObserved($verification['status'] ?? null);
-        if ($state === VerificationState::Pass && (int) ($verification['assertions'] ?? 0) < 1) {
+        if ($state === VerificationState::Pass && ((int) ($verification['assertions'] ?? 0) < 1 || ($verification['identified_required_test'] ?? false) !== true)) {
             return VerificationState::Fail;
         }
 

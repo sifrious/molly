@@ -191,7 +191,7 @@ it('records human approval through MCP without opening a pull request', function
     $scope = mcpTaskScope();
     $task = app(CreateTask::class)->handle('Return Hello.', $scope['workspace'], $scope['paths'], $scope['test_path']);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
     $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
         'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']),
         'findings' => [],
@@ -216,7 +216,7 @@ it('records an opened pull request and merge through MCP without opening GitHub'
     $scope = mcpTaskScope();
     $task = app(CreateTask::class)->handle('Return Hello.', $scope['workspace'], $scope['paths'], $scope['test_path']);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
     $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
         'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']),
         'findings' => [],

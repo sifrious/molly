@@ -81,6 +81,7 @@ Common reasons:
 | `test_process_failed` | The Pest process exited unsuccessfully. |
 | `junit_missing` / `junit_invalid` | Molly cannot trust the recorded test evidence. |
 | `no_assertions` | Pest ran a test file but recorded zero assertions. |
+| `false_green` | JUnit recorded a pass that did not identify the required test file. |
 
 Do not weaken assertions just to make a retry pass.
 

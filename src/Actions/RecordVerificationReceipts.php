@@ -71,6 +71,7 @@ final class RecordVerificationReceipts
                 'errors' => $report['verification']['errors'] ?? null,
                 'skipped' => $report['verification']['skipped'] ?? null,
                 'reason' => $report['verification']['reason'] ?? null,
+                'identified_required_test' => $report['verification']['identified_required_test'] ?? null,
                 'junit_digest' => $this->fileDigest($report['verification']['junit'] ?? null),
             ],
             'tarpit' => [

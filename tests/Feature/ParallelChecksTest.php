@@ -79,7 +79,7 @@ if ($mode === 'missing_junit') {
     exit(0);
 }
 $junit = $argv[array_search('--log-junit', $argv, true) + 1];
-file_put_contents($junit, '<testsuite tests="1" assertions="2"><testcase name="proof" assertions="2"/></testsuite>');
+file_put_contents($junit, '<testsuite tests="1" assertions="2" file="tests/ExampleTest.php"><testcase name="proof" assertions="2" file="tests/ExampleTest.php"/></testsuite>');
 PHPPEST);
 
     return $directory;

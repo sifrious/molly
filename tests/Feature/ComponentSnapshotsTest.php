@@ -144,7 +144,7 @@ it('retains task context and run snapshots when later workspace edits occur', fu
         return snapshotProposal();
     });
     snapshotChecks();
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
 
     $run = app(RunTask::class)->handle($task->prompt, $task->workspace, $task->paths, $task->test_path, taskId: $task->id);
     $report = $run->report;
@@ -174,7 +174,7 @@ it('runs older tasks without inventing a task creation snapshot', function () {
     $task = Task::create(['prompt' => 'Show the completed state.', 'workspace' => $this->workspace, 'paths' => ['resources/views/components/status.blade.php'], 'test_path' => 'tests/StatusTest.php']);
     ChangeWriter::fake([snapshotProposal()])->preventStrayPrompts();
     snapshotChecks();
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
 
     $run = app(RunTask::class)->handle($task->prompt, $task->workspace, $task->paths, $task->test_path, taskId: $task->id);
 
@@ -197,7 +197,7 @@ it('reports unchanged selected components when a non-component file changes', fu
     ];
     ChangeWriter::fake([$proposal])->preventStrayPrompts();
     snapshotChecks();
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
 
     $run = app(RunTask::class)->handle('Keep the status component.', $this->workspace, ['resources/views/components/status.blade.php', 'app/Status.php'], 'tests/StatusTest.php');
 
@@ -227,7 +227,7 @@ it('reports unknown final components when the final workspace capture fails', fu
         File::delete($this->workspace.'/resources/views/components/status.blade.php');
         File::makeDirectory($this->workspace.'/resources/views/components/status.blade.php');
 
-        return ['status' => 'passed', 'tests' => 1, 'assertions' => 1];
+        return ['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true];
     });
 
     $run = app(RunTask::class)->handle('Show the completed state.', $this->workspace, ['resources/views/components/status.blade.php'], 'tests/StatusTest.php');

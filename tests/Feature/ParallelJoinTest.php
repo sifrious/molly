@@ -19,7 +19,7 @@ it('requires both parallel branches and their evidence before completing a run',
         'status' => 'passed', 'finished_at' => '2026-09-17T12:00:01Z', 'result_ref' => '/evidence/'.$kind.'.json',
     ], ['verification', 'review']);
     $results = [
-        'verification' => ['status' => 'passed', 'tests' => 1, 'assertions' => 1],
+        'verification' => ['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true],
         'review' => ['checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => []],
         'branches' => $branches,
     ];

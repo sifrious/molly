@@ -38,7 +38,7 @@ function prepareTaskExecution(string $verification = 'passed'): void
     test()->mock(GenerateChanges::class)->shouldReceive('handle')->once()->andReturn([
         'summary' => 'Return Hello.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']],
     ]);
-    test()->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => $verification, 'tests' => 1, 'assertions' => 1]);
+    test()->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => $verification, 'tests' => 1, 'assertions' => 1, 'identified_required_test' => $verification === 'passed']);
     test()->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
         'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => [],
     ]);
@@ -91,7 +91,7 @@ it('sends bounded diagnostics from the latest attempt while preserving task scop
     ];
     $old = Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => $report]);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'ok', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
     $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
         'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => [],
     ]);

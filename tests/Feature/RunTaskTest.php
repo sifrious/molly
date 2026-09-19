@@ -69,7 +69,7 @@ it('saves the active phase and completed measurements before requesting model ch
             return $prompt === 'Return Hello.' && $test === 'tests/GreetingTest.php';
         })->andReturn(mollyProposalFixture());
     TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
 
     $run = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', previousAttempt: $previous);
 
@@ -80,7 +80,7 @@ it('persists completion only after tests and the complete review pass', function
     ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
     TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
     measureMollyFixture();
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
 
     $run = runMollyFixture();
 

@@ -32,7 +32,7 @@ it('restores the recorded baseline before a retry instead of starting from lefto
     }
     TarpitReviewer::fake([['checks' => $checks, 'findings' => []]])->preventStrayPrompts();
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
     $this->mock(GenerateChanges::class)->shouldReceive('handle')->once()->andReturnUsing(function () {
         expect(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;');
 

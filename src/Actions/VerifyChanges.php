@@ -62,7 +62,7 @@ class VerifyChanges
             return [...$report, 'reason' => 'test_process_failed', 'output' => $exception->getMessage()];
         }
 
-        $counts = $this->readEvidence($junit);
+        $counts = $this->readEvidence($junit, $workspace, $testPath);
         $report = [...$report, ...$counts];
 
         $reason = match (true) {
@@ -72,6 +72,7 @@ class VerifyChanges
             $report['skipped'] > 0 => 'tests_skipped_or_incomplete',
             $report['assertions'] === 0 => 'no_assertions',
             ! $successful => 'test_process_failed',
+            ($report['identified_required_test'] ?? false) !== true => 'false_green',
             default => null,
         };
 
@@ -90,9 +91,9 @@ class VerifyChanges
     }
 
     /**
-     * @return array{reason: string}|array{tests: int, assertions: int, failures: int, errors: int, skipped: int}
+     * @return array{reason: string}|array{tests: int, assertions: int, failures: int, errors: int, skipped: int, identified_required_test: bool}
      */
-    private function readEvidence(string $path): array
+    private function readEvidence(string $path, string $workspace, string $testPath): array
     {
         clearstatcache(true, $path);
         if (is_link($path)) {
@@ -124,7 +125,67 @@ class VerifyChanges
             return ['reason' => 'junit_invalid'];
         }
 
-        return $counts;
+        return [...$counts, 'identified_required_test' => $this->identifiesRequiredTest($xpath, $workspace, $testPath)];
+    }
+
+    private function identifiesRequiredTest(DOMXPath $xpath, string $workspace, string $testPath): bool
+    {
+        $required = str_replace('\\', '/', $testPath);
+        $workspace = rtrim(str_replace('\\', '/', $workspace), '/');
+        $absolute = $workspace.'/'.ltrim($required, '/');
+        $directory = is_dir($absolute);
+        $names = $this->expectedTestNames($required);
+
+        foreach ($xpath->query('//testcase | //testsuite') as $node) {
+            $file = str_replace('\\', '/', $node->getAttribute('file'));
+            $class = str_replace('\\', '/', str_replace('.', '/', $node->getAttribute('class') !== '' ? $node->getAttribute('class') : $node->getAttribute('classname')));
+            if ($this->matchesRequiredPath($file, $required, $absolute, $directory, $names)
+                || $this->matchesRequiredClass($class, $names, $directory)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function expectedTestNames(string $required): array
+    {
+        $base = preg_replace('/\.php$/i', '', basename($required)) ?? basename($required);
+        $names = [$base];
+        if (str_ends_with($base, 'Test') && strlen($base) > 4) {
+            $names[] = substr($base, 0, -4);
+        }
+
+        return $names;
+    }
+
+    /** @param  list<string>  $names */
+    private function matchesRequiredPath(string $file, string $required, string $absolute, bool $directory, array $names): bool
+    {
+        if ($file === '') {
+            return false;
+        }
+
+        $path = explode('::', $file, 2)[0];
+        if ($path === $required || $path === $absolute || str_ends_with($path, '/'.$required)) {
+            return true;
+        }
+        if ($directory && (str_starts_with($path, $absolute.'/') || str_starts_with($path, rtrim($required, '/').'/'))) {
+            return true;
+        }
+
+        return ! str_contains($path, '/') && ($directory || in_array($path, $names, true));
+    }
+
+    /** @param  list<string>  $names */
+    private function matchesRequiredClass(string $class, array $names, bool $directory): bool
+    {
+        if ($class === '') {
+            return false;
+        }
+
+        return $directory || in_array(basename($class), $names, true);
     }
 
     /**

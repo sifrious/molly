@@ -40,9 +40,9 @@ it('verifies fresh JUnit counts and runs Pest with separate arguments and a time
     $this->workspace = mollyVerificationWorkspace();
     $testPath = 'tests/a file; echo unsafe.php';
     config(['molly.test_timeout' => 42]);
-    Process::fake(function (PendingProcess $process) {
+    Process::fake(function (PendingProcess $process) use ($testPath) {
         $path = $process->command[array_search('--log-junit', $process->command, true) + 1];
-        file_put_contents($path, '<testsuites><testsuite tests="2"><testsuite tests="2"><testcase assertions="1"/><testcase assertions="3"/></testsuite></testsuite></testsuites>');
+        file_put_contents($path, '<testsuites><testsuite tests="2" file="'.$testPath.'"><testsuite tests="2" file="'.$testPath.'"><testcase assertions="1" file="'.$testPath.'"/><testcase assertions="3" file="'.$testPath.'"/></testsuite></testsuite></testsuites>');
 
         return Process::result(output: '2 tests passed');
     });
@@ -84,6 +84,40 @@ it('fails without usable complete JUnit evidence', function (?string $xml, strin
     'entity declaration' => ['<!DOCTYPE testsuite [<!ENTITY test "unsafe">]><testsuite tests="0"/>', 'junit_invalid'],
 ]);
 
+it('fails when JUnit records a pass that did not run the required test file', function (string $xml): void {
+    $this->workspace = mollyVerificationWorkspace();
+    Process::fake(function (PendingProcess $process) use ($xml) {
+        file_put_contents($process->command[array_search('--log-junit', $process->command, true) + 1], $xml);
+
+        return Process::result(output: 'OK');
+    });
+
+    $result = app(VerifyChanges::class)->handle($this->workspace, 'tests/ExampleTest.php', $this->workspace.'/evidence');
+
+    expect($result)->toMatchArray(['status' => 'failed', 'reason' => 'false_green', 'identified_required_test' => false]);
+})->with([
+    'unrelated passing file' => '<testsuite tests="1" file="tests/OtherTest.php"><testcase assertions="1" file="tests/OtherTest.php" class="OtherTest"/></testsuite>',
+    'missing file identity' => '<testsuite tests="1"><testcase assertions="1"/></testsuite>',
+    'prefix spoof' => '<testsuite tests="1" file="tests.other/ExampleTest.php"><testcase assertions="1" file="tests.other/ExampleTest.php"/></testsuite>',
+    'class spoof' => '<testsuite tests="1" file="Other"><testcase assertions="1" file="Other::Result" class="OtherTest" classname="OtherTest"/></testsuite>',
+]);
+
+it('accepts JUnit evidence that names the required test file', function (string $xml): void {
+    $this->workspace = mollyVerificationWorkspace();
+    Process::fake(function (PendingProcess $process) use ($xml) {
+        file_put_contents($process->command[array_search('--log-junit', $process->command, true) + 1], $xml);
+
+        return Process::result(output: 'OK');
+    });
+
+    $result = app(VerifyChanges::class)->handle($this->workspace, 'tests/ExampleTest.php', $this->workspace.'/evidence');
+
+    expect($result)->toMatchArray(['status' => 'passed', 'identified_required_test' => true]);
+})->with([
+    'relative path' => '<testsuite tests="1" file="tests/ExampleTest.php"><testcase assertions="1" file="tests/ExampleTest.php"/></testsuite>',
+    'pest class identity' => '<testsuite name="ExampleTest" file="Example" tests="1"><testcase name="Result" file="Example::Result" class="ExampleTest" classname="ExampleTest" assertions="1"/></testsuite>',
+]);
+
 it('fails when Pest exits successfully despite failing JUnit counts', function (): void {
     $this->workspace = mollyVerificationWorkspace();
     Process::fake(function (PendingProcess $process) {
@@ -100,7 +134,7 @@ it('fails when Pest exits successfully despite failing JUnit counts', function (
 it('fails when Pest exits unsuccessfully despite passing report counts', function (): void {
     $this->workspace = mollyVerificationWorkspace();
     Process::fake(function (PendingProcess $process) {
-        file_put_contents($process->command[array_search('--log-junit', $process->command, true) + 1], '<testsuite tests="1"><testcase assertions="1"/></testsuite>');
+        file_put_contents($process->command[array_search('--log-junit', $process->command, true) + 1], '<testsuite tests="1" file="tests"><testcase assertions="1" file="tests"/></testsuite>');
 
         return Process::result(errorOutput: 'A warning failed the run', exitCode: 1);
     });
@@ -129,6 +163,9 @@ it('runs the actual Pest binary and records real verification evidence', functio
 
     expect($result['status'])->toBe($status, $result['output']);
     expect($result['tests'])->toBe(1);
+    if ($status === 'passed') {
+        expect($result['identified_required_test'])->toBeTrue();
+    }
 })->with([
     'passing' => ['$this->assertSame(2, 1 + 1);', 'passed'],
     'failing' => ['$this->assertSame(3, 1 + 1);', 'failed'],

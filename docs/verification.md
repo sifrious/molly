@@ -51,6 +51,7 @@ These prevent completion:
 - an empty test file
 - a test file that runs but records zero assertions
 - a Pest process that exits successfully while JUnit records failures
+- JUnit evidence that does not name the required test file
 
 A completed or failed run also writes immutable verification receipts under `.molly/receipts/{run-id}/`. Each receipt stores verifier name, state, policy, failure action, evidence digest, and timestamps. Receipts do not replace Pest. Rewriting a receipt file does not change the saved run.
 

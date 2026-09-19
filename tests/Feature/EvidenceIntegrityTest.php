@@ -103,7 +103,7 @@ it('refuses completion when review evidence names a file outside the actual run 
         'summary' => 'Add the example.', 'files' => [['path' => 'app/Example.php', 'content' => '<?php return true;']],
     ]);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'ok', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
     $checks = array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'The function uses existing code.']);
     $checks['F']['status'] = 'findings';
     $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
