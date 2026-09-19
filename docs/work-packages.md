@@ -17,7 +17,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 
 | ID | Work | Status |
 | --- | --- | --- |
-| MOL-WP-01 | Versioned task, run, target, outcome, handoff, and lifecycle contracts | Contract types exist. BloomCore decodes the same JSON |
+| MOL-WP-01 | Versioned task, run, target, outcome, handoff, and lifecycle contracts | Contract types exist. PHP unit tests pin the task contract and Pest failure JSON to the Bloom Swift fixtures in `docs/handoffs/bloom-adapter/` |
 | MOL-WP-02 | Bloom workspace, diff, approval, and PR loop | Headless contract export writes `.molly/bloom-contract.json`. An unpublished BloomCore adapter binds that file to the selected workspace, shows a Molly inspector tab, and refuses Create or Merge until approval. The adapter snapshot and next-agent instructions live in [docs/handoffs/COMBINE-BLOOM-AND-MOLLY.md](handoffs/COMBINE-BLOOM-AND-MOLLY.md). Bloom still opens the PR through its existing agent strip. The macOS app has not been built in this orb |
 | MOL-WP-03 | Protected acceptance tests | Default protection and hash gates exist. `molly:lock-test --approve` freezes a test-authoring digest, records who approved it, and drops the Pest file from the writer scope |
 | MOL-WP-04 | Writer and verifier sandboxes | Landlock plus network namespace exist; Pest still runs PHP; unsafe override is local-only |

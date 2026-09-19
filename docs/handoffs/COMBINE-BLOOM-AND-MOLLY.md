@@ -188,7 +188,7 @@ MCP `lock_test`, `approve`, `pr_opened`, and `merged` require `approve=true`.
 
 ## What Molly already shipped. Do not redo
 
-- WP-01 versioned contracts. Duplicate event IDs ignored. Unknown events inspectable
+- WP-01 versioned contracts. Duplicate event IDs ignored. Unknown events inspectable. PHP tests pin task-contract and Pest-failure JSON to `MollyContractFixtures.swift`
 - WP-03 protected Pest default. `--allow-test-edits` is explicit and weaker. `molly:lock-test --approve` freezes digest
 - WP-04 Landlock plus namespaces. `molly.sandbox.allow_unsafe` is local-only
 - WP-05 `failure_action`. Retry restores `.molly/baselines/{taskId}.json`. Immutable receipts. False-green: JUnit must name the required test file or matching class

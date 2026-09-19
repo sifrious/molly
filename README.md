@@ -171,7 +171,7 @@ Reference:
 
 ## What is current and what is planned
 
-Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI, journals, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes.
+Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI with a project graph page, journals, Git-tracked decisions, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes. Pest fails a passing JUnit report that does not name the required test.
 
 These are not finished yet:
 

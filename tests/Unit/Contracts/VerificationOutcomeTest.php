@@ -9,6 +9,16 @@ it('round-trips a verification outcome', function () {
     expect(VerificationOutcome::fromJson($outcome->toJson())->toArray())->toBe($outcome->toArray());
 });
 
+it('matches the Bloom Swift Pest failure fixture byte for byte', function () {
+    $swift = file_get_contents(dirname(__DIR__, 3).'/docs/handoffs/bloom-adapter/Tests/BloomCoreTests/MollyContractFixtures.swift');
+    expect($swift)->not->toBeFalse();
+    expect(preg_match('/static let pestFailJSON = """\s*(.+?)\s*"""/s', $swift, $matches))->toBe(1);
+    $expected = str_replace('\\(digest)', ContractFixtures::DIGEST, $matches[1]);
+
+    expect(ContractFixtures::outcome()->toJson())->toBe($expected)
+        ->and(VerificationOutcome::fromJson($expected)->toArray())->toBe(ContractFixtures::outcome()->toArray());
+});
+
 it('keeps outcome state, policy, and failure action as separate fields', function () {
     $outcome = ContractFixtures::outcome();
 

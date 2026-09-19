@@ -28,6 +28,7 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | Test lock | Human approval of a Pest digest after a test-authoring task. The next run cannot edit that file. |
 | Failure action | What Molly does after a verifier does not pass: retry, fail, or warn. Policy and action stay separate fields. |
 | Verification | The required Pest execution and JUnit evidence for the selected test file. A model statement is not verification. |
+| False green | A passing JUnit report that did not identify the required Pest file or matching class. Molly fails the run with `false_green`. |
 | Tarpit review | Seven model checks for unnecessary complexity in the supplied before-and-after files. It cannot override failed tests. |
 | Finding | A Tarpit issue with a check, file, line, problem, recommendation, classification, and severity. |
 | Essential complexity | Complexity required by the current requirement. |

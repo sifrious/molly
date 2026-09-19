@@ -24,3 +24,21 @@ it('rejects an Orb request without a target id', function () {
     expect(fn () => TaskContract::fromArray($data))
         ->toThrow(InvalidArgumentException::class, 'An Orb execution target needs a target_id.');
 });
+
+it('matches the Bloom Swift task contract fixture byte for byte', function () {
+    $swift = file_get_contents(dirname(__DIR__, 3).'/docs/handoffs/bloom-adapter/Tests/BloomCoreTests/MollyContractFixtures.swift');
+    expect($swift)->not->toBeFalse();
+    expect(preg_match('/static let contractJSON = """\s*(.+?)\s*"""/s', $swift, $matches))->toBe(1);
+    $expected = strtr($matches[1], [
+        '\\(taskID)' => ContractFixtures::TASK_ID,
+        '\\(workspaceID)' => ContractFixtures::WORKSPACE_ID,
+        '\\(workspacePath)' => '/tmp/bloom/molly-workspace',
+        '\\(branch)' => 'bloom/hello',
+        '\\(sha)' => ContractFixtures::SHA,
+        '\\(testID)' => ContractFixtures::TEST_ID,
+        '\\(digest)' => ContractFixtures::DIGEST,
+    ]);
+
+    expect(ContractFixtures::task()->toJson())->toBe($expected)
+        ->and(TaskContract::fromJson($expected)->toArray())->toBe(ContractFixtures::task()->toArray());
+});
