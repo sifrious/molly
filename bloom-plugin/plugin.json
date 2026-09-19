@@ -1,0 +1,14 @@
+{
+  "id": "sifrious.molly",
+  "name": "Molly",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "nav": [
+    {
+      "id": "molly.home",
+      "title": "Molly",
+      "systemImage": "leaf"
+    }
+  ],
+  "entry": "molly.home"
+}

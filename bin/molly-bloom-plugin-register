@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Registers Molly's Bloom plugin manifest into Application Support and enables it.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$ROOT/bloom-plugin/plugin.json"
+DEST_DIR="${HOME}/Library/Application Support/Bloom/Plugins/sifrious.molly"
+ENABLED="${HOME}/Library/Application Support/Bloom/Plugins/enabled.json"
+mkdir -p "$DEST_DIR"
+cp "$SRC" "$DEST_DIR/plugin.json"
+python3 - <<'PY'
+import json, os, pathlib
+path = pathlib.Path(os.path.expanduser("~/Library/Application Support/Bloom/Plugins/enabled.json"))
+path.parent.mkdir(parents=True, exist_ok=True)
+ids = []
+if path.exists():
+    ids = json.loads(path.read_text())
+if "sifrious.molly" not in ids:
+    ids.append("sifrious.molly")
+path.write_text(json.dumps(sorted(set(ids)), indent=2) + "\n")
+print(f"enabled {path}")
+PY
+echo "Installed Molly plugin manifest to $DEST_DIR"
