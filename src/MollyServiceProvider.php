@@ -40,6 +40,9 @@ use Sifrious\Molly\Console\MollyRetryCommand;
 use Sifrious\Molly\Console\MollyReviewCommitCommand;
 use Sifrious\Molly\Console\MollyRunCommand;
 use Sifrious\Molly\Console\MollySetupCommand;
+use Sifrious\Molly\Console\MollyProjectsCommand;
+use Sifrious\Molly\Console\MollyProjectInitCommand;
+use Sifrious\Molly\Console\MollyProjectNewCommand;
 use Sifrious\Molly\Console\MollyShowCommand;
 use Sifrious\Molly\Console\MollyStartCommand;
 use Sifrious\Molly\Console\MollyStopCommand;
@@ -75,6 +78,7 @@ class MollyServiceProvider extends ServiceProvider
                 MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
+                MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class,
                 MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
