@@ -7,7 +7,22 @@ title: Handoff. Clone Bloom and finish the Molly loop
 
 Read this page first. Do not wait for Linear. Do not ask for Linear. Do not import Burdgen.
 
-You are taking over Molly's Bloom integration. The previous orb finished Molly-only work on Linux. It could not compile Bloom. It could not fork Spatie's Bloom. Your job is to clone Bloom, apply the unpublished adapter, and make one advertised workflow:
+## Do not write a new Swift adapter
+
+The Bloom Swift adapter already exists. Copy it. Do not design it. Do not regenerate it from Molly PHP.
+
+| Question | Answer |
+| --- | --- |
+| Do I need to build the Swift adapter? | No. It is already written. |
+| Where is it? | [docs/handoffs/bloom-adapter/](bloom-adapter/) in this Molly repository |
+| What do I do with it? | Clone Spatie Bloom, copy those files in, apply `bloom-ui.patch`, then run `swift test` on a Mac |
+| What is still unfinished? | Installing that copy into a Bloom checkout, compiling Bloom Dev.app, and proving the end-to-end loop on macOS |
+
+If you start a new `MollyTaskContract.swift` from scratch, you are doing the wrong work.
+
+The snapshot is unpublished Spatie-side work against Bloom `e03dd1387af7f3f4ae3b7731b8d4fa0843dd2372`. It is not on github.com/spatie/bloom. It is not a Bloom fork. It is not Molly runtime. Apply it onto a Bloom checkout.
+
+You are taking over Molly's Bloom integration. The previous Linux orb finished Molly-only work. It could not compile Bloom. It could not fork Spatie's Bloom. Your job is to apply the existing adapter and make one advertised workflow:
 
 A small Laravel task starts in Bloom, runs in Bloom's existing workspace, permits only bounded edits, protects its Pest test, verifies the result, records evidence, shows the diff, waits for human approval, then Bloom opens the pull request.
 
@@ -33,16 +48,8 @@ Recorded 2026-09-19.
 - Remote: https://github.com/sifrious/molly
 - Amp project: `user_01KYQ9PY7RMGMM0Y47X2VCKEDT/molly`
 - Previous source thread: [T-01a0b313-e496-75af-9aa0-d068653fa12d](https://ampcode.com/threads/T-01a0b313-e496-75af-9aa0-d068653fa12d)
-- Local HEAD when this handoff was written: `f647b1fad272b888c9000fe4a0b9b647ebdd3f79`
-- `origin/main` at that moment: `88fde59a008d324a7c373a5c0177a172112cd31c`
-
-Three local commits may still be unpushed. Fetch first. If they are missing on origin, they are:
-
-1. `ae0058a` Show a local project graph in the web UI
-2. `249356d` Fail Pest evidence that did not run the required test
-3. `f647b1f` Record Git-tracked decisions in docs/decisions
-
-Do not force-push. Do not push unless Mary asks in your thread.
+- Molly `origin/main` now includes the adapter snapshot. Fetch before you start. Look for commit `93be2b7` Snapshot the Bloom adapter for the next agent, then `4c444e4` Pin PHP contracts to the Bloom Swift fixtures
+- Do not force-push. Do not push Molly unless Mary asks in your thread
 
 ### Bloom
 
@@ -57,8 +64,10 @@ The unpublished adapter lived in `/home/user/workspace/repos/bloom` and was neve
 
 ## First actions
 
-1. Fetch Molly. Confirm whether `f647b1f` is on origin. If not, it is local-only from the previous orb.
-2. Clone Bloom onto a Mac runner:
+You need a Mac. Linux cannot compile Bloom.
+
+1. Fetch Molly `main`. Confirm `docs/handoffs/bloom-adapter/Sources/BloomCore/Molly/MollyTaskContract.swift` exists. If it does not, you fetched the wrong commit.
+2. Clone Bloom onto that Mac:
 
    ```bash
    git clone https://github.com/spatie/bloom.git
@@ -66,26 +75,24 @@ The unpublished adapter lived in `/home/user/workspace/repos/bloom` and was neve
    git checkout e03dd1387af7f3f4ae3b7731b8d4fa0843dd2372
    ```
 
-3. Copy the adapter files from Molly's `docs/handoffs/bloom-adapter/` onto that checkout. Keep Spatie copyright. Keep Bloom's own layout.
-4. Apply `docs/handoffs/bloom-adapter/bloom-ui.patch` from the Bloom repo root.
-5. Run BloomCore tests on macOS. The Linux orb could not run `swift test`.
+3. Copy the existing adapter. Do not rewrite the Swift.
+4. Apply `bloom-ui.patch` from the Bloom repo root.
+5. Run BloomCore tests. The Linux orb could not run `swift test`.
 6. Keep Molly and Bloom as separate git remotes.
 
 ## How to apply the snapshot
 
-From the Bloom checkout:
+From the Bloom checkout. Create the Molly directory first, then copy, then patch.
 
 ```bash
 MOLLY=/path/to/molly
-cp "$MOLLY"/docs/handoffs/bloom-adapter/Sources/BloomCore/Molly/*.swift Sources/BloomCore/Molly/
 mkdir -p Sources/BloomCore/Molly
+cp "$MOLLY"/docs/handoffs/bloom-adapter/Sources/BloomCore/Molly/*.swift Sources/BloomCore/Molly/
 cp "$MOLLY"/docs/handoffs/bloom-adapter/Sources/Bloom/Views/Inspector/MollyTaskView.swift Sources/Bloom/Views/Inspector/
 cp "$MOLLY"/docs/handoffs/bloom-adapter/Tests/BloomCoreTests/MollyAdapterTests.swift Tests/BloomCoreTests/
 cp "$MOLLY"/docs/handoffs/bloom-adapter/Tests/BloomCoreTests/MollyContractFixtures.swift Tests/BloomCoreTests/
 git apply "$MOLLY"/docs/handoffs/bloom-adapter/bloom-ui.patch
 ```
-
-Create `Sources/BloomCore/Molly/` before the copy if it does not exist.
 
 Snapshot contents:
 
@@ -276,7 +283,7 @@ Work that can run on Linux, in Molly:
 - Headless Bloom-contract export, approval, lock-test, PR body
 - Docs for the Bloom path once the Mac proof exists
 
-Work that needs macOS:
+Work that needs macOS. Apply the existing adapter. Do not rewrite it:
 
 - Apply the adapter
 - `swift test` for MollyAdapterTests and InspectorTabTests
