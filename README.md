@@ -11,6 +11,27 @@ Molly asks an AI agent for the code change, then checks the result before it can
 
 ## Start here
 
+### No Laravel app yet?
+
+One copy-paste path creates a fresh app, installs Molly, and scaffolds the greeting demo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo | bash
+```
+
+Or download the script and choose a folder:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo -o molly-demo
+bash molly-demo ~/molly-demo
+```
+
+That writes only under the chosen directory (default `~/molly-demo`). It refuses a path that already exists and is not empty unless you pass `--force`. It does not install Bloom or call cloud.
+
+Then open that folder in Bloom with **Open existing branch…**, run `php artisan molly:doctor`, and `php artisan molly:start demo-greeting`.
+
+### Already have a Laravel project?
+
 You need PHP 8.3 or later, Laravel 12 or 13, Pest 4, and a working database connection.
 
 Install Molly in a Laravel project:

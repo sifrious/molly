@@ -16,6 +16,7 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | Command | What it does |
 | --- | --- |
 | `php artisan molly:demo` | Scaffolds the greeting helper demo and saves task `demo-greeting`. Does not call the model or create a Bloom worktree. |
+| `bin/molly-demo` | Zero-to-demo bash installer: new Laravel app → Molly → `molly:demo`. Prefer this when you have no Laravel project yet. |
 | `php artisan molly:create` | Saves a pending task. Does not call the model. |
 | `php artisan molly:start TASK` | Starts a pending task in the current terminal. |
 | `php artisan molly:tasks` | Lists saved tasks. |

@@ -79,5 +79,8 @@
             "/pint.json",
             "/testbench.yaml"
         ]
-    }
+    },
+    "bin": [
+        "bin/molly-demo"
+    ]
 }

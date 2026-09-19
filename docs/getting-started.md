@@ -7,6 +7,26 @@ title: Getting started
 
 Use this page to install Molly and complete one small task from the command line.
 
+## No Laravel app yet?
+
+If you do not already have a Laravel project, use the demo installer. It is one Terminal copy-paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo | bash
+```
+
+That creates `~/molly-demo` (or a path you pass), installs Laravel + Molly, runs `php artisan molly:demo`, and prints the next doctor / start / Bloom steps. It refuses a non-empty existing path unless you pass `--force`. It does not install Bloom or call cloud.
+
+When the installer finishes, open the folder in Bloom with **Open existing branch…**, then:
+
+```bash
+cd ~/molly-demo
+php artisan molly:doctor
+php artisan molly:start demo-greeting
+```
+
+## Already have a Laravel project?
+
 You should finish with three things: `molly:doctor` passes, Molly can create a task, and you know where to read the test evidence before accepting a change.
 
 ## 1. Check the Laravel project
