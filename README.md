@@ -133,6 +133,8 @@ php artisan molly:project:query TASK_UUID
 
 Read [Project graph](docs/project-graph.md) for node types and limits. The local web interface can show the same snapshot when it is enabled.
 
+Record a Git-tracked decision with `php artisan molly:decide`. Molly writes `docs/decisions/` and does not commit the file.
+
 ## Local web interface
 
 Molly also has a local browser interface for saved tasks and run evidence. It is disabled by default and has no login.

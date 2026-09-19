@@ -45,6 +45,7 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | Task journal | Markdown export for one task at `.molly/journal/TASK_UUID.md`. |
 | Project journal | `.molly/JOURNAL.md`, a generated view of saved tasks and attempts in one workspace. |
 | Project glossary | `.molly/GLOSSARY.md`, including a Molly-managed section plus space for project-specific terms. |
+| Project decision | A Git-tracked Markdown record under `docs/decisions/`. It is project memory, not run evidence. |
 
 ## Agents and providers
 

@@ -32,6 +32,7 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:pr-opened TASK --url URL --approve` | Records that a human opened a pull request. Does not open one. |
 | `php artisan molly:merged TASK --sha SHA --approve` | Records that a human merged a pull request. Does not merge. |
 | `php artisan molly:handoff TASK --from UUID --to UUID` | Prints a handoff envelope for a child Bloom workspace. Does not create a worktree. |
+| `php artisan molly:decide --title=... --body=...` | Writes a Git-tracked decision under `docs/decisions/`. Does not start an agent or commit the file. |
 
 `TASK` accepts either a nickname or task UUID. `RUN_ID` is a run UUID.
 
@@ -171,6 +172,13 @@ php artisan molly:advice TASK
 ```
 
 `molly:journal` exports saved evidence. `molly:advice` explains the next allowed action and never executes it.
+
+```bash
+php artisan molly:decide --title="Keep Pest required" --body="Pest remains the hard completion gate."
+php artisan molly:decide --workspace=/path/to/workspace --title="Protect Pest tests" --body="The writer cannot edit the locked test." --task=health-check
+```
+
+`molly:decide` writes `docs/decisions/YYYY-MM-DD-title.md` in the named workspace. Repeat the same title and body on the same day to leave the file unchanged. Molly does not commit the file.
 
 ## Amp thread connections
 

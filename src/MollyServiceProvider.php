@@ -19,6 +19,7 @@ use Sifrious\Molly\Console\MollyCheckCommand;
 use Sifrious\Molly\Console\MollyCommentCommand;
 use Sifrious\Molly\Console\MollyConnectionsCommand;
 use Sifrious\Molly\Console\MollyCreateCommand;
+use Sifrious\Molly\Console\MollyDecideCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
 use Sifrious\Molly\Console\MollyHandoffCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
@@ -71,7 +72,7 @@ class MollyServiceProvider extends ServiceProvider
                 MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
                 MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
-                MollyJournalCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
+                MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
                 MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {

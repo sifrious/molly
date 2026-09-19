@@ -66,6 +66,16 @@ Molly writes them with restrictive local permissions and adds an ignore rule ins
 
 Already tracked files stay tracked, so keep `.molly/` ignored in your project.
 
+## Architectural decisions
+
+Molly can write a short decision record under `docs/decisions/` in the named workspace:
+
+```bash
+php artisan molly:decide --title="Keep Pest required" --body="Pest remains the hard completion gate."
+```
+
+That file is project memory. Commit it if the repository should keep it. Molly does not commit it for you. It is not a journal, and it does not start an agent.
+
 ## Next
 
 - [Manage tasks](tasks.md)
