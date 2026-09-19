@@ -130,6 +130,39 @@ final class Graph
         );
     }
 
+    /**
+     * Bounded workspace overview. Blockers and tasks come first so missing
+     * verification stays visible when the snapshot is truncated.
+     *
+     * @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>, truncated: bool}
+     */
+    public function overview(string $namespace, string $version, int $limit = 40): array
+    {
+        if ($limit < 1 || $limit > 40) {
+            throw new RuntimeException('KNOWLEDGE_LIMIT_INVALID: Limit must be between 1 and 40.');
+        }
+
+        $database = $this->connection();
+        $statement = $database->prepare('SELECT * FROM nodes WHERE namespace = :namespace AND version = :version ORDER BY CASE type WHEN \'blocker\' THEN 0 WHEN \'task\' THEN 1 WHEN \'run\' THEN 2 WHEN \'acceptance_test\' THEN 3 ELSE 4 END, type, label, id');
+        $statement->execute(compact('namespace', 'version'));
+        $rows = $statement->fetchAll();
+        $truncated = count($rows) > $limit;
+        $chosen = array_slice($rows, 0, $limit);
+        $included = array_fill_keys(array_column($chosen, 'id'), true);
+        $edgeStatement = $database->prepare('SELECT * FROM edges WHERE namespace = :namespace AND version = :version ORDER BY relation, id');
+        $edgeStatement->execute(compact('namespace', 'version'));
+        $edges = array_values(array_filter(
+            $edgeStatement->fetchAll(),
+            fn (array $edge): bool => isset($included[$edge['from_node_id']], $included[$edge['to_node_id']]),
+        ));
+
+        return [
+            'nodes' => $this->withSources($database, 'node_sources', 'node_id', $chosen),
+            'edges' => $this->withSources($database, 'edge_sources', 'edge_id', $edges, true),
+            'truncated' => $truncated,
+        ];
+    }
+
     /** @return array{sources: int, nodes: int, edges: int} */
     public function counts(string $namespace, string $version): array
     {

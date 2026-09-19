@@ -22,7 +22,7 @@
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
-<header><nav aria-label="Molly"><a href="{{ route('molly.tasks.index') }}">Molly tasks</a><a href="{{ route('molly.plans.index') }}">Plans</a><a href="{{ route('molly.tasks.create') }}">Create task</a></nav></header>
+<header><nav aria-label="Molly"><a href="{{ route('molly.tasks.index') }}">Molly tasks</a><a href="{{ route('molly.plans.index') }}">Plans</a><a href="{{ route('molly.graph') }}">Project graph</a><a href="{{ route('molly.tasks.create') }}">Create task</a></nav></header>
 <main id="content">
     @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<div class="notice errors" role="alert"><h2>Check the request</h2><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

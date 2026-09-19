@@ -137,7 +137,7 @@ php artisan molly:project:query TASK_UUID
 php artisan molly:project:query pest --relation=blocked_by
 ```
 
-The project graph is separate from Laravel and NativePHP knowledge. It is rebuilt from saved tasks and attempts in the named workspace.
+The project graph is separate from Laravel and NativePHP knowledge. It is rebuilt from saved tasks and attempts in the named workspace. The local web interface shows the same snapshot at `/molly/graph`.
 
 ## GitHub issue import
 

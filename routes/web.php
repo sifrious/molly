@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Sifrious\Molly\Http\LocalUi;
 use Sifrious\Molly\Http\PlanController;
+use Sifrious\Molly\Http\ProjectGraphController;
 use Sifrious\Molly\Http\RunController;
 use Sifrious\Molly\Http\TaskAdviceController;
 use Sifrious\Molly\Http\TaskConnectionController;
@@ -10,6 +11,7 @@ use Sifrious\Molly\Http\TaskController;
 
 Route::middleware(['web', LocalUi::class])->prefix(config('molly.ui.prefix', 'molly'))->name('molly.')->group(function (): void {
     Route::get('/', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('/graph', [ProjectGraphController::class, 'show'])->name('graph');
     Route::get('/guide', [PlanController::class, 'guide'])->name('guide');
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('/plans/{plan}/suggest', [PlanController::class, 'suggest'])->name('plans.suggest');

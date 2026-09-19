@@ -131,7 +131,7 @@ php artisan molly:project:index
 php artisan molly:project:query TASK_UUID
 ```
 
-Read [Project graph](docs/project-graph.md) for node types and limits.
+Read [Project graph](docs/project-graph.md) for node types and limits. The local web interface can show the same snapshot when it is enabled.
 
 ## Local web interface
 

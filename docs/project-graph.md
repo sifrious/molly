@@ -45,12 +45,18 @@ Nodes include:
 - the workspace
 - imported GitHub issues when present
 
-Relationships include `implements`, `verified_by`, `changes`, `runs_in`, `blocked_by`, and `produced`.
+Relationships include `implements`, `verified_by`, `changes`, `runs_in`, `blocked_by`, `approved_by`, and `produced`.
 
-Tarpit findings and required verifier failures stay evidence. They are not rewritten as vague task labels such as "needs work".
+Locked Pest tests appear as approval nodes. Tarpit findings and required verifier failures stay evidence. They are not rewritten as vague task labels such as "needs work".
+
+## Inspect it in the browser
+
+When the local web interface is enabled, open `/molly/graph` and choose the workspace. The page rebuilds the same graph, lists verification blockers first, and stops at 40 nodes.
+
+This is a local Molly page. It is not Bloom's inspector.
 
 ## What it does not do
 
 The graph is read-only. It does not merge, open a pull request, or change verifier policy.
 
-A visual Bloom view is still planned. The Artisan commands are the current inspection path.
+A visual Bloom view is still planned. Artisan commands and the local Molly page are the current inspection paths.

@@ -45,6 +45,16 @@ class IndexProjectGraph
                 'writable' => (bool) $task->allow_test_edits,
             ]);
             $this->edge($edges, 'verified_by', $taskNode, $testNode, $source);
+            $lock = $task->source['test_lock'] ?? null;
+            if (is_array($lock) && is_string($lock['after_digest'] ?? null)) {
+                $lockNode = $this->node($nodes, 'approval', $task->id.':test_lock', 'Locked Pest test', $source, [
+                    'after_digest' => $lock['after_digest'],
+                    'before_digest' => $lock['before_digest'] ?? null,
+                    'approved_by' => $lock['approved_by'] ?? null,
+                    'reason' => $lock['reason'] ?? null,
+                ]);
+                $this->edge($edges, 'approved_by', $testNode, $lockNode, $source);
+            }
             foreach ($task->paths as $path) {
                 $fileNode = $this->node($nodes, 'file', $path, $path, $source);
                 $this->edge($edges, 'changes', $taskNode, $fileNode, $source);

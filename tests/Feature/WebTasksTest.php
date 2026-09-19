@@ -27,6 +27,9 @@ beforeEach(function () {
 
 afterEach(function () {
     File::deleteDirectory($this->workspace);
+    if (isset($this->knowledgeDatabase)) {
+        File::delete($this->knowledgeDatabase);
+    }
 });
 
 function webMollyTask(): Task
@@ -202,6 +205,40 @@ it('summarizes review evidence and compares recorded measurements before process
         ->assertSee('Owned diff before and after')->assertSee('Code lines')->assertSee('<td>18</td>', false)->assertSee('<td>12</td>', false)->assertSee('<td>0</td>', false)
         ->assertSee('Line counts do not measure design quality.')->assertSee('old-hash')->assertSee('new-hash')
         ->assertSee('File contents are not stored in this report.')->assertSee('<summary>Full measurement data as JSON</summary>', false);
+});
+
+it('renders the project graph from saved records without starting a run', function () {
+    $this->knowledgeDatabase = sys_get_temp_dir().'/molly-web-graph-'.Str::uuid().'.sqlite';
+    config()->set('molly.knowledge.database', $this->knowledgeDatabase);
+    $task = webMollyTask();
+    $task->update(['nickname' => 'health-check']);
+    $task->runs()->create([
+        'prompt' => $task->prompt,
+        'workspace' => $task->workspace,
+        'status' => 'failed',
+        'report' => [
+            'verification_outcomes' => [
+                'pest' => ['state' => 'FAIL', 'policy' => 'required', 'failure_action' => 'retry'],
+            ],
+            'completion_blockers' => ['pest'],
+        ],
+    ]);
+
+    $this->get('/molly/graph?workspace='.urlencode($this->workspace))
+        ->assertOk()
+        ->assertSee('Project graph')
+        ->assertSee('health-check')
+        ->assertSee('pest blocked completion')
+        ->assertSee('This page rebuilds the graph from saved records.')
+        ->assertDontSee('<script>alert(1)</script>', false);
+    expect(Run::query()->where('status', 'running')->count())->toBe(0);
+});
+
+it('returns workspace errors on the project graph without executing a task', function () {
+    $this->get('/molly/graph?workspace=/missing-molly-workspace')
+        ->assertOk()
+        ->assertSee('WORKSPACE_INVALID')
+        ->assertSee('for="workspace"', false);
 });
 
 it('keeps absent evidence distinct from zero measurements', function () {

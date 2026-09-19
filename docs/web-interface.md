@@ -63,6 +63,12 @@ Saving creates a pending task. Starting it queues execution.
 
 A queued request is not the same as a completed run. The queue worker must pick up the job first.
 
+## Inspect the project graph
+
+Choose **Project graph** and provide the workspace path. Molly rebuilds saved task, test, attempt, and blocker relationships for that directory. The page does not start an agent.
+
+Verification blockers are listed first. The snapshot stops at 40 nodes.
+
 ## Read a run
 
 The run page shows the same saved evidence as the CLI:
