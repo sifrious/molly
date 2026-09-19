@@ -7,15 +7,16 @@ DEST_DIR="${HOME}/Library/Application Support/Bloom/Plugins/sifrious.molly"
 ENABLED="${HOME}/Library/Application Support/Bloom/Plugins/enabled.json"
 mkdir -p "$DEST_DIR"
 cp "$SRC" "$DEST_DIR/plugin.json"
-python3 - <<'PY'
+PLUGIN_ID="sifrious.molly" ENABLED_PATH="$ENABLED" python3 - <<'PY'
 import json, os, pathlib
-path = pathlib.Path(os.path.expanduser("~/Library/Application Support/Bloom/Plugins/enabled.json"))
+path = pathlib.Path(os.environ["ENABLED_PATH"])
 path.parent.mkdir(parents=True, exist_ok=True)
+plugin_id = os.environ["PLUGIN_ID"]
 ids = []
 if path.exists():
     ids = json.loads(path.read_text())
-if "sifrious.molly" not in ids:
-    ids.append("sifrious.molly")
+if plugin_id not in ids:
+    ids.append(plugin_id)
 path.write_text(json.dumps(sorted(set(ids)), indent=2) + "\n")
 print(f"enabled {path}")
 PY
