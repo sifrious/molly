@@ -8,6 +8,7 @@ use RuntimeException;
 use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Agents\LocalOllama;
+use Sifrious\Molly\Verification\PestTestAuthoring;
 
 class GenerateChanges
 {
@@ -63,6 +64,9 @@ class GenerateChanges
             }
             if (! array_key_exists($file['path'], $files)) {
                 throw new RuntimeException('GENERATION_INVALID: The model proposed a file outside the allowed paths.');
+            }
+            if ($allowTestEdits && $file['path'] === $testPath) {
+                app(PestTestAuthoring::class)->assertAcceptable($file['content']);
             }
         }
 

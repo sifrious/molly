@@ -144,3 +144,43 @@ it('rejects incomplete or contradictory review output', function (string $defect
     expect(fn () => app(ReviewChanges::class)->handle('Task', [], ['src/Greeting.php' => '<?php']))
         ->toThrow(RuntimeException::class, 'REVIEW_INVALID');
 })->with(['missing check', 'blank evidence', 'missing finding', 'unknown file', 'bad line', 'essential blocker', 'hidden finding']);
+
+it('rejects inlined product code when allow_test_edits authors the Pest file', function (): void {
+    Http::preventStrayRequests();
+    $bad = file_get_contents(dirname(__DIR__).'/Fixtures/test-authoring/bad-inlined-home-counter.php');
+    ChangeWriter::fake([[
+        'summary' => 'Author the home counter test.',
+        'files' => [['path' => 'tests/Feature/HomeCounterTest.php', 'content' => $bad]],
+    ]])->preventStrayPrompts();
+
+    expect(fn () => app(GenerateChanges::class)->handle(
+        'Author acceptance for the home counter with login and logout.',
+        ['tests/Feature/HomeCounterTest.php' => '<?php'],
+        'tests/Feature/HomeCounterTest.php',
+        allowTestEdits: true,
+    ))->toThrow(RuntimeException::class, 'TEST_AUTHORING_INVALID');
+});
+
+it('accepts an app-scoped Pest Feature file when allow_test_edits authors the test', function (): void {
+    Http::preventStrayRequests();
+    $good = file_get_contents(dirname(__DIR__).'/Fixtures/test-authoring/good-home-counter.pest.php');
+    $proposal = [
+        'summary' => 'Author app-scoped Pest coverage for the home counter.',
+        'files' => [['path' => 'tests/Feature/HomeCounterTest.php', 'content' => $good]],
+    ];
+    ChangeWriter::fake([$proposal])->preventStrayPrompts();
+
+    $result = app(GenerateChanges::class)->handle(
+        'Author acceptance for the home counter with login and logout.',
+        ['tests/Feature/HomeCounterTest.php' => '<?php'],
+        'tests/Feature/HomeCounterTest.php',
+        allowTestEdits: true,
+    );
+
+    expect($result)->toBe($proposal);
+    ChangeWriter::assertPrompted(function (AgentPrompt $prompt): bool {
+        $payload = json_decode($prompt->prompt, true);
+
+        return $payload['protected_test']['writable'] === true;
+    });
+});
