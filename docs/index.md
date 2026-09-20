@@ -7,13 +7,14 @@ title: Molly documentation
 
 Molly helps you give an AI agent a small Laravel task, limit the files it may edit, and require real test evidence before the task can complete.
 
-If this is your first time here, start with [Getting started](getting-started.md). Do not start with the reference pages.
+If this is your first time here, start with [Getting started](getting-started.md) or the [Ollama QuickStart](ollama-quickstart.md). Do not start with the reference pages.
 
 ## Pick what you want to do
 
 | I want to... | Read this |
 | --- | --- |
 | Install Molly and run one small task | [Getting started](getting-started.md) |
+| Local Ollama QuickStart (no paid AI) | [QuickStart: Ollama](ollama-quickstart.md) |
 | Create, start, retry, stop, or inspect tasks | [Manage tasks](tasks.md) |
 | Understand why a run passed or failed | [Verification](verification.md) |
 | Fix a setup or execution problem | [Troubleshooting](troubleshooting.md) |

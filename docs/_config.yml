@@ -25,6 +25,8 @@ navigation:
         url: /
       - title: Getting started
         url: /getting-started.html
+      - title: QuickStart — Ollama
+        url: /ollama-quickstart.html
       - title: Tasks and retries
         url: /tasks.html
       - title: Planning

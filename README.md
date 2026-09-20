@@ -9,6 +9,26 @@ Molly asks an AI agent for the code change, then checks the result before it can
 
 > Molly is still in early development. There is no tagged alpha release yet. The install command below uses `dev-main`.
 
+## QuickStart: Ollama
+
+Recommended local path — **no paid AI account**. Full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
+
+```bash
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:dev-main
+php artisan vendor:publish --tag=molly-config
+php artisan migrate
+ollama pull qwen2.5-coder:7b
+php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan config:clear
+php artisan molly:doctor
+php artisan molly:run "Add a health endpoint" --file=routes/web.php --test=tests/Feature/ExampleTest.php
+```
+
+Or scaffold the greeting demo: `php artisan molly:demo` then `php artisan molly:start demo-greeting`.
+
+`qwen2.5-coder:7b` is a starter suggestion (roughly ~8 GB RAM). Any installed local Ollama model works via `MOLLY_LOCAL_MODEL`. Molly will not silently fall back to a hosted provider if Ollama is missing.
+
 ## Start here
 
 ### No Laravel app yet?

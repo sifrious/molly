@@ -14,7 +14,7 @@ class MollyDoctorCommand extends Command
 {
     protected $signature = 'molly:doctor {--workspace= : Workspace containing Pest} {--json : Print JSON only}';
 
-    protected $description = 'Check local models, run history, Pest, sandbox, and Clever';
+    protected $description = 'Check Ollama readiness, Pest, run history, sandbox, and Clever without printing secrets';
 
     public function handle(CheckEnvironment $check): int
     {
@@ -25,7 +25,7 @@ class MollyDoctorCommand extends Command
         } else {
             intro('Check Molly');
             $result = spin($run, 'Checking local requirements');
-            table(['Check', 'Status', 'Details'], array_map(fn (array $row): array => [$row['name'], $row['status'], $row['message']], $result['checks']));
+            table(['Check', 'Status', 'Code', 'Details'], array_map(fn (array $row): array => [$row['name'], $row['status'], $row['code'], $row['message']], $result['checks']));
             outro($result['ready'] ? 'Molly is ready.' : 'Resolve the failed checks before running a task.');
         }
 

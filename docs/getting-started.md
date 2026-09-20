@@ -7,6 +7,8 @@ title: Getting started
 
 Use this page to install Molly and complete one small task from the command line.
 
+Prefer local Ollama with no paid account? Use the dedicated [QuickStart: Ollama](ollama-quickstart.md) copy-paste path first.
+
 ## No Laravel app yet?
 
 If you do not already have a Laravel project, use the demo installer. It is one Terminal copy-paste:

@@ -22,6 +22,8 @@ Molly does not silently switch providers when one fails.
 
 ## Set up Ollama
 
+For the full copy-paste QuickStart (install → doctor → first task → troubleshoot), see [QuickStart: Ollama](ollama-quickstart.md).
+
 Start Ollama and install a model, then save the exact model name:
 
 ```bash

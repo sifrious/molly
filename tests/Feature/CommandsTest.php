@@ -363,3 +363,39 @@ it('reports a missing nickname migration before creating tasks', function (): vo
         $migration->up();
     }
 });
+
+it('distinguishes missing model from unreachable Ollama in doctor messages', function (): void {
+    Http::preventStrayRequests();
+    Http::fake(['127.0.0.1:11434/api/tags' => Http::response(['models' => [['name' => 'other:latest']]])]);
+    config([
+        'molly.agent' => 'ollama',
+        'molly.model' => 'starter-model',
+        'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
+        'molly.timeout' => 30,
+    ]);
+
+    $checks = array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], null, 'code');
+
+    expect($checks['ollama_reachable']['status'])->toBe('passed')
+        ->and($checks['model_missing']['status'])->toBe('failed')
+        ->and($checks['model_missing']['message'])->toContain('ollama pull starter-model')
+        ->and($checks['model_missing']['message'])->toContain('different from connection refused');
+});
+
+it('labels unreachable Ollama separately from config and missing-model failures', function (): void {
+    Http::fake(['*' => Http::failedConnection()]);
+    config([
+        'molly.agent' => 'ollama',
+        'molly.model' => 'starter-model',
+        'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
+        'molly.timeout' => 30,
+    ]);
+
+    $codes = array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], 'code');
+    $checks = array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], null, 'code');
+
+    expect($codes)->toContain('ollama_unreachable')
+        ->and($codes)->not->toContain('model_missing')
+        ->and($checks['ollama_unreachable']['message'])->toContain('http://127.0.0.1:11434')
+        ->and($checks['ollama_unreachable']['message'])->toContain('different from a missing model');
+});

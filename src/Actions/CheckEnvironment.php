@@ -76,10 +76,16 @@ class CheckEnvironment
             try {
                 LocalOllama::validate();
                 $valid = true;
-                $add('Local provider and model', true, 'ollama_configured', 'Laravel AI uses the local Ollama model '.$model.'.');
+                $add('Local provider and model', true, 'ollama_configured', 'Laravel AI is configured for local Ollama model '.$model.' at '.$url.'.');
+                $add('Configured endpoint', true, 'ollama_endpoint', 'Base URL: '.$url.' (loopback HTTP; no API key required for local QuickStart).');
             } catch (Throwable) {
                 $code = $model === '' ? 'model_not_configured' : (str_contains($model, 'cloud') ? 'model_not_local' : 'ollama_config_invalid');
-                $add('Local provider and model', false, $code, 'Set a local MOLLY_LOCAL_MODEL, an Ollama driver, a loopback HTTP URL, and a positive integer molly.timeout.');
+                $message = match ($code) {
+                    'model_not_configured' => 'Set MOLLY_LOCAL_MODEL (or run `php artisan molly:setup --agent=ollama --model=...`) to a name from `ollama list`.',
+                    'model_not_local' => 'MOLLY_LOCAL_MODEL looks like a cloud model name. Choose a local Ollama model instead.',
+                    default => 'Ollama QuickStart config is invalid. Use driver=ollama, an HTTP loopback URL such as http://127.0.0.1:11434, MOLLY_LOCAL_MODEL, and a positive molly.timeout. Non-loopback or HTTPS Ollama URLs are refused for the local path.',
+                };
+                $add('Local provider and model', false, $code, $message);
             }
 
             if ($valid) {
@@ -87,17 +93,29 @@ class CheckEnvironment
                     $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
                     $models = $response->json('models');
                     if (! $response->successful() || ! is_array($models)) {
-                        $add('Ollama', false, 'ollama_response_invalid', 'Ollama did not return a valid model list.');
+                        $add('Ollama', false, 'ollama_response_invalid', 'Ollama at '.$url.' responded, but the model list was invalid. Check the Ollama version and URL path.');
                     } else {
-                        $add('Ollama', true, 'ollama_reachable', 'Ollama is responding.');
+                        $add('Ollama', true, 'ollama_reachable', 'Ollama is reachable at '.$url.'.');
                         if ($model !== '') {
                             $names = array_column($models, 'name');
                             $installed = in_array($model, $names, true) || in_array($model.':latest', $names, true);
-                            $add('Installed model', $installed, $installed ? 'model_ready' : 'model_missing', $installed ? 'The requested model is installed.' : 'Ollama does not have the requested model: '.$model);
+                            $add(
+                                'Installed model',
+                                $installed,
+                                $installed ? 'model_ready' : 'model_missing',
+                                $installed
+                                    ? 'Configured model '.$model.' is installed in Ollama.'
+                                    : 'Ollama is reachable, but model '.$model.' is not installed. This is different from connection refused. Run: ollama pull '.$model,
+                            );
                         }
                     }
                 } catch (Throwable) {
-                    $add('Ollama', false, 'ollama_unreachable', 'Molly could not reach Ollama. Start Ollama and try again.');
+                    $add(
+                        'Ollama',
+                        false,
+                        'ollama_unreachable',
+                        'Could not reach Ollama at '.$url.'. Start Ollama (`ollama serve`) or fix ai.providers.ollama.url / OLLAMA_URL. Unreachable is different from a missing model.',
+                    );
                 }
             }
         }

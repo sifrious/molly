@@ -37,8 +37,10 @@ Common doctor codes:
 | `parallel_process_groups_unavailable` | Install POSIX support or set `parallel_checks` to `false`. |
 | `model_not_configured` | Set `MOLLY_LOCAL_MODEL` to a model from `ollama list`. |
 | `model_not_local` | Choose a local model instead of a cloud model name. |
-| `ollama_unreachable` | Start Ollama and check `OLLAMA_URL`. |
-| `model_missing` | Pull the configured model or correct the model name. |
+| `ollama_unreachable` | Start Ollama (`ollama serve`) and check `OLLAMA_URL` / `ai.providers.ollama.url`. Unreachable is **not** the same as a missing model. |
+| `model_missing` | Ollama is up; pull the configured model (`ollama pull …`) or fix `MOLLY_LOCAL_MODEL`. |
+| `ollama_config_invalid` | Use loopback HTTP + Ollama driver + local model + positive `molly.timeout`. |
+| `ollama_endpoint` | Informational: shows the configured base URL (no secrets). |
 | `clever_disabled` | Use local/testing or remove an explicit false override. |
 | `clever_unavailable` | Check the package install and application logs. |
 
