@@ -42,8 +42,13 @@ Dated notes from MME-5350 acceptance on Mary’s Mac Studio (`molly-v01-fresh` /
 ### Pest wording vs what installers ship
 
 - Older QuickStart copy said **Pest 4**. On Laravel 13 with Herd, `laravel new … --pest` can install **Pest 5.x** (observed Pest 5.2.1).
-- Plain `composer create-project laravel/laravel` ships PHPUnit only; you must add Pest yourself (`composer require pestphp/pest:^4 …` still resolves Pest 4.x today, or accept Pest 5 from `laravel new --pest`).
-- Molly’s `pest_ready` check cares that Pest is present, not a hard-coded major.
+- Plain `composer create-project laravel/laravel` ships **PHPUnit only**. Add Pest yourself, then init:
+  ```bash
+  composer require pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --dev --with-all-dependencies
+  ./vendor/bin/pest --init   # may prompt to star Pest on GitHub (answer no for non-interactive / CI)
+  ```
+  Pinning `^4` still resolves Pest 4.x today. `laravel new … --pest` on Laravel 13/Herd may instead ship **Pest 5.x** (observed 5.2.1) — both satisfy Molly’s `pest_ready` check (presence, not a hard-coded major).
+- `php artisan pest:install` is not defined on Pest 4/5 Laravel plugin installs; use `./vendor/bin/pest --init`.
 
 ### macOS / hosts without Landlock + namespaces
 
@@ -66,6 +71,8 @@ php artisan molly:start demo-greeting
 ```
 
 Config key: `molly.sandbox.allow_unsafe` (env `MOLLY_SANDBOX_ALLOW_UNSAFE`, truthy). Opt-in only; omitted from the default copy-paste block on purpose.
+
+If a prior `molly:start` failed (for example sandbox), the task may be `failed` and `molly:start` returns `TASK_NOT_PENDING`. Use `php artisan molly:retry TASK_NAME` after enabling the override — do not hand-edit the demo greeting.
 
 ## Out of scope tonight
 
