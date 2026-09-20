@@ -66,3 +66,7 @@ A real connector should be tested against reconnects, delayed events, stale obse
 CLI, MCP, and web should report the same underlying evidence once those interfaces exist.
 
 Until that work lands, do not describe current Amp thread observations as verified Orb execution.
+
+## Local agent-bus claims (v0.1-narrow)
+
+Molly claims work items through a local database lease (`LocalAgentBus`). Two workers racing for the same task produce one valid claim. Expired leases are recovered into a failed/retryable state without a hosted coordinator. Queue delivery of `StartSavedTask` is unique per task start/retry key so duplicate jobs do not double-succeed.

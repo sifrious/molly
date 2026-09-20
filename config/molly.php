@@ -8,6 +8,11 @@ return [
     'max_files' => 8,
     'max_file_bytes' => 65536,
     'max_attempts' => 3,
+
+    'agent_bus' => [
+        'lease_seconds' => 120,
+        'worker_id' => null,
+    ],
     'parallel_checks' => true,
     'verification' => [
         'pest' => 'required',

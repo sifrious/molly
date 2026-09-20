@@ -14,7 +14,7 @@ class Task extends Model
 
     protected $table = 'molly_tasks';
 
-    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'test_digest', 'allow_test_edits', 'status', 'source', 'stop_requested_at', 'context_snapshot', 'journal_status'];
+    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'test_digest', 'allow_test_edits', 'status', 'source', 'stop_requested_at', 'context_snapshot', 'journal_status', 'worker_id', 'claimed_at', 'lease_expires_at', 'heartbeat_at', 'attempt_number', 'idempotency_key', 'parent_run_id'];
 
     protected $attributes = ['status' => 'pending'];
 
@@ -52,7 +52,7 @@ class Task extends Model
 
     protected function casts(): array
     {
-        return ['paths' => 'array', 'allow_test_edits' => 'boolean', 'source' => 'array', 'stop_requested_at' => 'datetime', 'context_snapshot' => 'array', 'journal_status' => 'array'];
+        return ['paths' => 'array', 'allow_test_edits' => 'boolean', 'source' => 'array', 'stop_requested_at' => 'datetime', 'context_snapshot' => 'array', 'journal_status' => 'array', 'claimed_at' => 'datetime', 'lease_expires_at' => 'datetime', 'heartbeat_at' => 'datetime', 'attempt_number' => 'integer'];
     }
 
     public function runs(): HasMany

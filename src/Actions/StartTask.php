@@ -7,6 +7,7 @@ use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Verification\PestAssertionHints;
 use Sifrious\Molly\Workspace;
 use Throwable;
@@ -18,6 +19,7 @@ class StartTask
         private RefreshProjectJournal $journal,
         private RestoreTaskBaseline $baseline,
         private RecordLifecycleEvent $lifecycle,
+        private LocalAgentBus $bus,
     ) {}
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
@@ -30,38 +32,21 @@ class StartTask
 
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);
-            $this->claim($task, $retry);
+            $workerId = $this->workerId();
+            $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
+            $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
             $this->journal->handle($task->refresh());
 
-            return $this->execute($task, $progress, $retry);
+            return $this->execute($task->refresh(), $progress, $retry, $workerId);
         });
     }
 
-    private function claim(Task $task, bool $retry): void
-    {
-        $allowed = $retry ? ['failed', 'stopped'] : ['pending'];
-        $stateError = $retry
-            ? 'TASK_NOT_RETRYABLE: Only failed or stopped tasks can be retried.'
-            : 'TASK_NOT_PENDING: Start a pending task or retry a failed or stopped task.';
-        if (! in_array($task->status, $allowed, true)) {
-            throw new RuntimeException($stateError);
-        }
-        $limit = config('molly.max_attempts', 3);
-        if (! is_int($limit) || $limit < 1 || $limit > 10) {
-            throw new RuntimeException('ATTEMPT_LIMIT_INVALID: Set molly.max_attempts to an integer from 1 to 10.');
-        }
-        if ($task->runs()->count() >= $limit) {
-            throw new RuntimeException('ATTEMPT_LIMIT_REACHED: This task has used its allowed attempts.');
-        }
-        if (Task::whereKey($task->id)->whereIn('status', $allowed)->update(['status' => 'running', 'stop_requested_at' => null]) !== 1) {
-            throw new RuntimeException($stateError);
-        }
-    }
-
-    private function execute(Task $task, ?Closure $progress, bool $retry): Run
+    private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId): Run
     {
         $id = $task->id;
         try {
+            $this->bus->heartbeat($id, $workerId);
+
             if ($retry) {
                 $this->baseline->handle($task);
                 $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
@@ -114,9 +99,21 @@ class StartTask
             );
             throw $exception;
         } finally {
+            $this->bus->clearClaim($task->refresh());
             $this->journal->handle($task->refresh());
         }
     }
+
+    private function workerId(): string
+    {
+        $configured = config('molly.agent_bus.worker_id');
+        if (is_string($configured) && trim($configured) !== '') {
+            return $configured;
+        }
+
+        return gethostname().':'.getmypid();
+    }
+
 
     /** @return array<string, mixed>|null */
     private function previousAttempt(Task $task): ?array
