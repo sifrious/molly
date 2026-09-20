@@ -161,3 +161,14 @@ Failed runs may leave applied edits in the workspace. Molly does not commit them
 - [Troubleshooting](troubleshooting.md)
 - [Manage tasks](tasks.md)
 - [Configuration](reference/configuration.md)
+
+## False-green detection (opt-in)
+
+When `molly.false_green.enabled` is true, Molly runs a bounded negative-control probe after Pest:
+
+1. Temporarily replace a selected production file with a throwing stub.
+2. Re-run the required Pest file.
+3. Restore the original file before the next mutation (canonical workspace must match).
+
+If the test stays green, the `false_green` verifier fails and blocks completion. If the test fails under mutation, the probe passes. Timeouts and probe errors are `REVIEW_REQUIRED` / inconclusive — never treated as PASS. Budgets: `max_mutations` and `timeout_seconds`.
+
