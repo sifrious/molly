@@ -27,6 +27,10 @@ navigation:
         url: /getting-started.html
       - title: QuickStart — Ollama
         url: /ollama-quickstart.html
+      - title: v0.1 QUICKSTART
+        url: /v0.1/QUICKSTART.html
+      - title: v0.1 FRICTION
+        url: /v0.1/FRICTION.html
       - title: Tasks and retries
         url: /tasks.html
       - title: Planning

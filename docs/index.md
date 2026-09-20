@@ -14,7 +14,7 @@ If this is your first time here, start with [Getting started](getting-started.md
 | I want to... | Read this |
 | --- | --- |
 | Install Molly and run one small task | [Getting started](getting-started.md) |
-| Local Ollama QuickStart (no paid AI) | [QuickStart: Ollama](ollama-quickstart.md) |
+| Local Ollama QuickStart (no paid AI) | [v0.1 QUICKSTART](v0.1/QUICKSTART.md) · [FRICTION](v0.1/FRICTION.md) · [full](ollama-quickstart.md) |
 | Create, start, retry, stop, or inspect tasks | [Manage tasks](tasks.md) |
 | Understand why a run passed or failed | [Verification](verification.md) |
 | Fix a setup or execution problem | [Troubleshooting](troubleshooting.md) |
