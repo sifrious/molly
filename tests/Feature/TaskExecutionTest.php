@@ -121,6 +121,45 @@ it('sends bounded diagnostics from the latest attempt while preserving task scop
     });
 });
 
+it('adds Livewire assertForbidden assertion hints to retry diagnostics', function (): void {
+    Http::preventStrayRequests();
+    $task = savedExecutionTask();
+    $task->update(['status' => 'failed']);
+    $forbiddenOutput = json_encode([
+        'tool' => 'pest',
+        'result' => 'failed',
+        'failures' => [[
+            'test' => 'it_does_not_give_guests_an_operational_counter',
+            'message' => "Expected response status code [403] but received 200.\nFailed asserting that 200 is identical to 403.",
+        ]],
+    ], JSON_THROW_ON_ERROR);
+    $report = [
+        'verification' => ['status' => 'failed', 'tests' => 8, 'failures' => 1, 'output' => $forbiddenOutput, 'reason' => 'tests_failed'],
+        'review' => ['findings' => []],
+    ];
+    $old = Run::create(['task_id' => $task->id, 'prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => $report]);
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'ok', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
+    $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
+        'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']), 'findings' => [],
+    ]);
+    ChangeWriter::fake([['summary' => 'Deny guest increment.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']]]])->preventStrayPrompts();
+
+    $run = app(RetryTask::class)->handle($task->id);
+
+    expect($run->status)->toBe('completed');
+    ChangeWriter::assertPrompted(function (AgentPrompt $prompt) use ($old): bool {
+        $payload = json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR);
+        $evidence = $payload['previous_attempt'];
+        expect($evidence['run_id'])->toBe($old->id)
+            ->and($evidence['assertion_hints'])->toHaveCount(1)
+            ->and($evidence['assertion_hints'][0]['pattern'])->toBe('livewire_assert_forbidden')
+            ->and($evidence['assertion_hints'][0]['hint'])->toContain('abort(403)');
+
+        return true;
+    });
+});
+
 it('limits retries without starting another model call', function () {
     $task = savedExecutionTask();
     $task->update(['status' => 'failed']);

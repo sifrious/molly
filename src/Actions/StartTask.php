@@ -7,6 +7,7 @@ use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Verification\PestAssertionHints;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -159,6 +160,21 @@ class StartTask
         }
         if (is_string($report['error'] ?? null)) {
             $evidence['error'] = $this->boundedText($report['error'], 512);
+        }
+
+        $output = is_string($report['verification']['output'] ?? null)
+            ? $report['verification']['output']
+            : null;
+        foreach (app(PestAssertionHints::class)->handle($output) as $hint) {
+            $summary = [];
+            foreach (['pattern' => 64, 'hint' => 512] as $key => $limit) {
+                if (is_string($hint[$key] ?? null)) {
+                    $summary[$key] = $this->boundedText($hint[$key], $limit);
+                }
+            }
+            if ($summary !== []) {
+                $evidence['assertion_hints'][] = $summary;
+            }
         }
 
         return $evidence;
