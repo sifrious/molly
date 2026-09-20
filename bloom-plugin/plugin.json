@@ -1,8 +1,8 @@
 {
   "id": "sifrious.molly",
-  "name": "Molly",
   "version": "0.1.0",
   "apiVersion": 1,
+  "name": "Molly",
   "nav": [
     {
       "id": "molly.home",
@@ -18,6 +18,11 @@
       "id": "molly.conversations",
       "title": "Conversations",
       "systemImage": "bubble.left.and.bubble.right"
+    },
+    {
+      "id": "molly.settings",
+      "title": "Molly Settings",
+      "systemImage": "gearshape"
     }
   ],
   "entry": "molly.home"

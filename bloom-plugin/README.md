@@ -19,3 +19,5 @@ so the file `plugin.json` sits at:
 Enable with `enabled.json` listing `"sifrious.molly"`, or use `bin/molly-bloom-plugin-register`.
 
 Bloom hosts nav + SwiftUI through its plugin registry. Molly owns domain state; this package only declares the surface.
+
+Nav ids: `molly.home` (entry) and `molly.settings` (Molly Settings / gearshape), matching Bloom `MollyPluginRegistration`.
