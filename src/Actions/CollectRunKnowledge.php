@@ -2,11 +2,30 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Sifrious\Molly\Knowledge\ContextPack;
 use Sifrious\Molly\Knowledge\LaravelVersion;
 use Throwable;
 
 final class CollectRunKnowledge
 {
+    /** @var array<string, string> */
+    private const NEEDLES = [
+        'validat' => 'Validation',
+        'queue' => 'Queue',
+        'job' => 'Queue',
+        'route' => 'Route',
+        'routing' => 'Route',
+        'pest' => 'Pest',
+        'phpunit' => 'Pest',
+        'test' => 'Pest',
+        'container' => 'Container',
+        'inject' => 'Container',
+        'eloquent' => 'Eloquent',
+        'model' => 'Eloquent',
+        'event' => 'Events',
+        'listener' => 'Events',
+    ];
+
     public function __construct(
         private QueryKnowledgeGraph $query,
         private LaravelVersion $versions,
@@ -18,23 +37,65 @@ final class CollectRunKnowledge
      */
     public function handle(string $prompt, array $files, string $testPath): array
     {
+        return $this->pack($prompt, $files, $testPath)->toArray();
+    }
+
+    /**
+     * @param  array<string, string|null>  $files
+     */
+    public function pack(string $prompt, array $files, string $testPath): ContextPack
+    {
+        $filePaths = array_values(array_map('strval', array_keys($files)));
+        $queryBase = [
+            'prompt_digest' => hash('sha256', $prompt),
+            'files' => $filePaths,
+            'test_path' => $testPath,
+            'needles' => [],
+            'concepts' => [],
+        ];
+
         try {
             $version = $this->versions->current();
         } catch (Throwable $exception) {
-            return $this->unavailable($exception->getMessage());
+            return new ContextPack(
+                'unavailable',
+                null,
+                $queryBase,
+                [],
+                $exception->getMessage(),
+            );
         }
 
-        $concepts = $this->concepts($prompt, $files, $testPath);
-        $neighborhoods = [];
+        [$concepts, $needles, $reasons] = $this->selectConcepts($prompt, $files, $testPath);
+        $query = [...$queryBase, 'needles' => $needles, 'concepts' => $concepts];
+
+        if ($concepts === []) {
+            return new ContextPack(
+                'empty',
+                $version,
+                $query,
+                [],
+                'No useful Laravel graph concepts matched the task inputs. Queue context is not injected by default.',
+            );
+        }
+
+        $items = [];
         foreach ($concepts as $concept) {
             try {
                 $result = $this->query->handle($concept, $version, depth: 1, limit: 8);
             } catch (Throwable $exception) {
-                return $this->unavailable($exception->getMessage(), $version, $concepts);
+                return new ContextPack(
+                    'unavailable',
+                    $version,
+                    $query,
+                    [],
+                    $exception->getMessage(),
+                );
             }
 
-            $neighborhoods[] = [
+            $items[] = [
                 'concept' => $concept,
+                'selection_reason' => $reasons[$concept],
                 'matched' => $result['nodes'] !== [],
                 'truncated' => $result['truncated'],
                 'nodes' => array_map(fn (array $node): array => [
@@ -48,53 +109,54 @@ final class CollectRunKnowledge
                     'to' => $edge['to'] ?? null,
                 ], $result['edges']),
                 'sources' => $this->sources($result),
+                'provenance' => [
+                    'namespace' => $result['namespace'] ?? 'laravel',
+                    'version' => $result['version'] ?? $version,
+                    'concept' => $concept,
+                    'depth' => 1,
+                    'limit' => 8,
+                ],
             ];
         }
 
-        return [
-            'status' => 'advisory',
-            'version' => $version,
-            'concepts' => $concepts,
-            'neighborhoods' => $neighborhoods,
-            'reason' => 'Bounded Laravel graph context. It cannot change allowed files, the protected test, or completion.',
-        ];
+        return new ContextPack(
+            'advisory',
+            $version,
+            $query,
+            $items,
+            'Bounded Laravel graph context. It cannot change allowed files, the protected test, or completion.',
+        );
     }
 
     /**
      * @param  array<string, string|null>  $files
-     * @return list<string>
+     * @return array{0: list<string>, 1: list<string>, 2: array<string, string>}
      */
-    private function concepts(string $prompt, array $files, string $testPath): array
+    private function selectConcepts(string $prompt, array $files, string $testPath): array
     {
         $haystack = strtolower($prompt.' '.implode(' ', array_keys($files)).' '.$testPath);
         $candidates = [];
-        foreach ([
-            'validat' => 'Validation',
-            'queue' => 'Queue',
-            'job' => 'Queue',
-            'route' => 'Route',
-            'routing' => 'Route',
-            'pest' => 'Pest',
-            'phpunit' => 'Pest',
-            'test' => 'Pest',
-            'container' => 'Container',
-            'inject' => 'Container',
-            'eloquent' => 'Eloquent',
-            'model' => 'Eloquent',
-            'event' => 'Events',
-            'listener' => 'Events',
-        ] as $needle => $concept) {
-            if (str_contains($haystack, $needle)) {
+        $needles = [];
+        $reasons = [];
+
+        foreach (self::NEEDLES as $needle => $concept) {
+            if (! str_contains($haystack, $needle)) {
+                continue;
+            }
+            $needles[] = $needle;
+            if (! isset($candidates[$concept])) {
                 $candidates[$concept] = true;
+                $reasons[$concept] = 'Matched needle "'.$needle.'" in task prompt, allowed files, or test path.';
+            } else {
+                $reasons[$concept] .= ' Also matched "'.$needle.'".';
             }
         }
 
-        $concepts = array_keys($candidates);
-        if ($concepts === []) {
-            $concepts = ['Queue'];
-        }
+        $concepts = array_slice(array_keys($candidates), 0, 3);
+        $needles = array_values(array_unique($needles));
+        $reasons = array_intersect_key($reasons, array_flip($concepts));
 
-        return array_slice($concepts, 0, 3);
+        return [$concepts, $needles, $reasons];
     }
 
     /**
@@ -115,20 +177,5 @@ final class CollectRunKnowledge
         }
 
         return array_slice(array_values($seen), 0, 8);
-    }
-
-    /**
-     * @param  list<string>  $concepts
-     * @return array<string, mixed>
-     */
-    private function unavailable(string $reason, ?string $version = null, array $concepts = []): array
-    {
-        return [
-            'status' => 'unavailable',
-            'version' => $version,
-            'concepts' => $concepts,
-            'neighborhoods' => [],
-            'reason' => $reason,
-        ];
     }
 }

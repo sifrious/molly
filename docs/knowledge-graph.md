@@ -145,3 +145,15 @@ The project graph is separate work. It reuses the small graph records without mi
 - [Agents and MCP](agents.md)
 - [Command reference](reference/commands.md)
 - [Configuration](reference/configuration.md)
+
+
+## JIT context pack
+
+Agent runs receive a versioned `ContextPack` (`molly.context_pack.v1`) built from task needles — not a raw graph dump and not a default Queue neighborhood.
+
+```bash
+php artisan molly:knowledge:pack "Validate the queued greeting route." --file=routes/web.php --test=tests/GreetingTest.php --json
+```
+
+The pack records query inputs, selected concepts, deterministic selection reasons, provenance, and empty/unavailable statuses when nothing useful matches. It remains advisory: it cannot widen allowed files, change a protected test, or declare completion.
+

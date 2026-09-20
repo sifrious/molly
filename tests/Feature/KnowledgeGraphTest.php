@@ -288,3 +288,92 @@ it('does not require a Burdgen package at runtime', function () {
     expect($packages)->not->toContain('sifrious/burdgen')
         ->and(implode(' ', $packages))->not->toContain('burdgen');
 });
+
+it('builds a stable ContextPack DTO with selection reasons and no fabricated queue default', function () {
+    $withQueue = app(CollectRunKnowledge::class)->pack(
+        'Validate the queued greeting route.',
+        ['app/Greeting.php' => null, 'routes/web.php' => null],
+        'tests/GreetingTest.php',
+    )->toArray();
+
+    expect($withQueue['schema'])->toBe(\Sifrious\Molly\Knowledge\ContextPack::SCHEMA)
+        ->and($withQueue['status'])->toBeIn(['advisory', 'unavailable'])
+        ->and($withQueue['query']['concepts'])->toContain('Validation', 'Queue', 'Route')
+        ->and($withQueue['items'])->not->toBeEmpty()
+        ->and($withQueue['items'][0])->toHaveKeys(['concept', 'selection_reason', 'provenance', 'matched', 'truncated', 'nodes', 'edges', 'sources']);
+
+    foreach ($withQueue['items'] as $item) {
+        expect($item['selection_reason'])->toContain('Matched needle');
+    }
+
+    $unrelated = app(CollectRunKnowledge::class)->pack(
+        'Return a plain greeting string.',
+        ['app/Greeting.php' => null],
+        'tests/GreetingTest.php',
+    )->toArray();
+
+    // "test" needle in GreetingTest.php selects Pest — Queue must not appear merely as a global default.
+    expect($unrelated['concepts'])->not->toContain('Queue')
+        ->and($unrelated['query']['concepts'])->not->toContain('Queue');
+});
+
+it('returns an empty ContextPack when no needles match and does not invent Queue', function () {
+    $pack = app(CollectRunKnowledge::class)->pack(
+        'Say hello to the stranger.',
+        ['app/Greeting.php' => null],
+        'resources/views/home.blade.php',
+    )->toArray();
+
+    expect($pack['status'])->toBeIn(['empty', 'unavailable'])
+        ->and($pack['concepts'])->toBe([])
+        ->and($pack['items'])->toBe([])
+        ->and($pack['query']['needles'])->toBe([])
+        ->and($pack['concepts'])->not->toContain('Queue');
+});
+
+it('reproduces the same ContextPack for identical inputs against the same graph snapshot', function () {
+    $prompt = 'Dispatch a queued job for the greeting.';
+    $files = ['app/Jobs/SendGreeting.php' => null];
+    $test = 'tests/Feature/SendGreetingTest.php';
+
+    $first = app(CollectRunKnowledge::class)->pack($prompt, $files, $test)->toArray();
+    $second = app(CollectRunKnowledge::class)->pack($prompt, $files, $test)->toArray();
+
+    expect($first['query'])->toBe($second['query'])
+        ->and($first['concepts'])->toBe($second['concepts'])
+        ->and(array_column($first['items'], 'selection_reason'))->toBe(array_column($second['items'], 'selection_reason'))
+        ->and(array_column($first['items'], 'concept'))->toBe(array_column($second['items'], 'concept'));
+});
+
+it('enforces the neighborhood node limit on ContextPack items', function () {
+    $pack = app(CollectRunKnowledge::class)->pack(
+        'Work the queue job retry path.',
+        ['app/Jobs/Example.php' => null],
+        'tests/Feature/ExampleTest.php',
+    )->toArray();
+
+    if ($pack['status'] !== 'advisory') {
+        expect($pack['status'])->toBeIn(['empty', 'unavailable']);
+
+        return;
+    }
+
+    foreach ($pack['items'] as $item) {
+        expect(count($item['nodes']))->toBeLessThanOrEqual(8)
+            ->and($item['provenance']['limit'])->toBe(8);
+    }
+});
+
+it('prints ContextPack debug details through molly:knowledge:pack', function () {
+    $exit = Artisan::call('molly:knowledge:pack', [
+        'prompt' => 'Validate the queued greeting route.',
+        '--file' => ['app/Greeting.php', 'routes/web.php'],
+        '--test' => 'tests/GreetingTest.php',
+        '--json' => true,
+    ]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($exit)->toBe(0)
+        ->and($payload['schema'])->toBe(\Sifrious\Molly\Knowledge\ContextPack::SCHEMA)
+        ->and($payload['query']['needles'])->not->toBeEmpty()
+        ->and($payload['concepts'])->toContain('Queue');
+});
