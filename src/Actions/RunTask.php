@@ -9,6 +9,7 @@ use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Actions\ResolveEffectiveRunConfig;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Workspace;
@@ -51,11 +52,17 @@ class RunTask
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest): Run {
             $before = $files->read($paths);
+            $taskRow = $taskId === null ? null : Task::find($taskId);
+            $overrides = is_array($taskRow?->context_snapshot['settings_overrides'] ?? null)
+                ? $taskRow->context_snapshot['settings_overrides']
+                : [];
+            $effectiveConfig = app(ResolveEffectiveRunConfig::class)->handle($overrides);
             $run = Run::create([
                 'prompt' => $prompt,
                 'task_id' => $taskId,
                 'workspace' => $files->path,
                 'status' => 'running',
+                'effective_config' => $effectiveConfig,
                 'report' => [
                     'scope' => $paths,
                     'protected_test' => [

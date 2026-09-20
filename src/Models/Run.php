@@ -12,7 +12,7 @@ class Run extends Model
 
     protected $table = 'molly_runs';
 
-    protected $fillable = ['task_id', 'prompt', 'workspace', 'status', 'report'];
+    protected $fillable = ['task_id', 'prompt', 'workspace', 'status', 'report', 'effective_config'];
 
     public function task(): BelongsTo
     {
@@ -21,6 +21,6 @@ class Run extends Model
 
     protected function casts(): array
     {
-        return ['report' => 'array'];
+        return ['report' => 'array', 'effective_config' => 'array'];
     }
 }

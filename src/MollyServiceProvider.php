@@ -46,6 +46,8 @@ use Sifrious\Molly\Console\MollyProjectNewCommand;
 use Sifrious\Molly\Console\MollyGraphsBootstrapCommand;
 use Sifrious\Molly\Console\MollyGraphsRetryCommand;
 use Sifrious\Molly\Console\MollyInspectCommand;
+use Sifrious\Molly\Console\MollySettingsCommand;
+use Sifrious\Molly\Console\MollySettingsSetCommand;
 use Sifrious\Molly\Console\MollyShowCommand;
 use Sifrious\Molly\Console\MollyReceiptCommand;
 use Sifrious\Molly\Console\MollyStartCommand;
@@ -82,7 +84,7 @@ class MollyServiceProvider extends ServiceProvider
                 MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
                 MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
                 MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
-                MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class,
+                MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
                 MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);
             if ($this->app->make(Clever::class)->enabled()) {
                 $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);

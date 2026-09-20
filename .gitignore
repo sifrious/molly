@@ -11,3 +11,4 @@
 /docs/.jekyll-cache/
 /docs/.jekyll-metadata
 /build/
+vendor/
