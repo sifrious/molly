@@ -11,7 +11,7 @@ Longer narrative: [QuickStart — Ollama](../ollama-quickstart.md). Friction not
 
 ## Copy-paste
 
-From a Laravel 12/13 app with Pest 4 and a working database:
+From a Laravel 12/13 app with Pest and a working database (`laravel new --pest` may ship Pest 5.x on Laravel 13):
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
@@ -41,6 +41,7 @@ php artisan molly:start TASK_NAME
 - No Ollama API key is required for local HTTP.
 - Molly does **not** silently fall back to a hosted provider when Ollama fails.
 - Doctor codes that matter tonight: `ollama_unreachable` (daemon/URL) vs `model_missing` (daemon up, model not pulled).
+- Hosts without a Landlock sandbox (including macOS) fail doctor with `sandbox_unavailable` — see [FRICTION](FRICTION.md). Default QuickStart does **not** enable `MOLLY_SANDBOX_ALLOW_UNSAFE`.
 
 ## Next
 

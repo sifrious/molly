@@ -24,7 +24,7 @@ Doctor never prints API keys or account secrets.
 ## Install friction
 
 - No Packagist tag yet — use Composer VCS + `sifrious/molly:dev-main`.
-- Need PHP 8.3+, Laravel 12/13, Pest 4, working DB before `molly:doctor` can go green.
+- Need PHP 8.3+, Laravel 12/13, Pest, working DB before `molly:doctor` can go green.
 - After `.env` / config edits: `php artisan config:clear` then `molly:doctor`.
 
 ## Runtime friction
@@ -34,6 +34,38 @@ Doctor never prints API keys or account secrets.
 - **Structured output / tools**: prefer a coder model; Molly still applies and verifies edits itself.
 - **Orb / LAN Ollama**: out of tonight’s MVP. Local QuickStart stays loopback; see execution-target docs as they land.
 - **Hosted fallback**: opt-in only via explicit agent/profile setup (for example Amp). Failure of Ollama fails closed.
+
+## 2026-09-20 — Phase 7 fresh-install (Mac Studio)
+
+Dated notes from MME-5350 acceptance on Mary’s Mac Studio (`molly-v01-fresh` / Herd PHP 8.4).
+
+### Pest wording vs what installers ship
+
+- Older QuickStart copy said **Pest 4**. On Laravel 13 with Herd, `laravel new … --pest` can install **Pest 5.x** (observed Pest 5.2.1).
+- Plain `composer create-project laravel/laravel` ships PHPUnit only; you must add Pest yourself (`composer require pestphp/pest:^4 …` still resolves Pest 4.x today, or accept Pest 5 from `laravel new --pest`).
+- Molly’s `pest_ready` check cares that Pest is present, not a hard-coded major.
+
+### macOS / hosts without Landlock + namespaces
+
+| Code / message | When |
+| --- | --- |
+| Doctor `sandbox_unavailable` | Host cannot supply writer/verifier sandbox (no Landlock + user/network namespaces). Common on macOS. |
+| Start: `SANDBOX_UNAVAILABLE: Molly cannot isolate the writer and Pest verifier on this host. Do not run the safe workflow here.` | `molly:start` after doctor fails the sandbox check. |
+| Doctor `sandbox_unsafe_override` | You explicitly opted into unsafe mode (below). |
+
+**Default QuickStart stays safe-sandbox.** Do **not** set the override for untrusted repos or shared machines.
+
+Trusted local Studio recovery only (proof / known-good machine):
+
+```bash
+# .env
+MOLLY_SANDBOX_ALLOW_UNSAFE=1
+php artisan config:clear
+php artisan molly:doctor   # expect sandbox_unsafe_override, not sandbox_unavailable
+php artisan molly:start demo-greeting
+```
+
+Config key: `molly.sandbox.allow_unsafe` (env `MOLLY_SANDBOX_ALLOW_UNSAFE`, truthy). Opt-in only; omitted from the default copy-paste block on purpose.
 
 ## Out of scope tonight
 
