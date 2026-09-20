@@ -12,6 +12,7 @@ use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Actions\ResolveEffectiveRunConfig;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
+use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -28,6 +29,7 @@ class RunTask
         private CaptureComponentPreview $preview,
         private RecordLifecycleEvent $lifecycle,
         private RecordVerificationReceipts $receipts,
+        private FalseGreenVerifier $falseGreen,
     ) {}
 
     /** @param list<string> $paths */
@@ -164,6 +166,19 @@ class RunTask
             }
             if (! $allowTestEdits && is_string($testDigest)) {
                 $workspace->assertProtectedTestUnchanged($testPath, $testDigest);
+            }
+
+            if ((bool) config('molly.false_green.enabled', false)) {
+                $this->checkpoint($shouldStop, $recordProgress, 'Probing for false-green Pest results');
+                $report['false_green'] = $this->falseGreen->handle(
+                    $workspace->path,
+                    $testPath,
+                    array_keys($before),
+                    $evidence.'/false-green',
+                );
+                if ($workspace->read(array_keys($before)) !== $after) {
+                    throw new RuntimeException('WORKSPACE_CHANGED: False-green probes left the workspace dirty.');
+                }
             }
 
             $decision = $this->decideCompletion->handle($report, $after);

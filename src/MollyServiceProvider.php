@@ -2,6 +2,8 @@
 
 namespace Sifrious\Molly;
 
+use Sifrious\Molly\Actions\DetectFalseGreen;
+use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Mcp\Facades\Mcp;
 use Livewire\Livewire;
@@ -62,6 +64,7 @@ class MollyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(FalseGreenVerifier::class, DetectFalseGreen::class);
         $this->mergeConfigFrom(__DIR__.'/../config/molly.php', 'molly');
         $this->mergeConfigFrom(__DIR__.'/../config/molly-complexity.php', 'molly-complexity');
     }

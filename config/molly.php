@@ -18,11 +18,18 @@ return [
         'pest' => 'required',
         'tarpit' => 'required',
         'parallel_join' => 'required',
+        'false_green' => 'required',
     ],
     'verification_actions' => [
         'pest' => 'retry',
         'tarpit' => 'retry',
         'parallel_join' => 'retry',
+        'false_green' => 'fail',
+    ],
+    'false_green' => [
+        'enabled' => env('MOLLY_FALSE_GREEN', false),
+        'max_mutations' => 2,
+        'timeout_seconds' => 30,
     ],
     'sandbox' => [
         'allow_unsafe' => env('MOLLY_SANDBOX_ALLOW_UNSAFE', false),

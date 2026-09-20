@@ -79,6 +79,14 @@ final class RecordVerificationReceipts
                 'findings' => $report['review']['findings'] ?? null,
                 'reason' => $report['review']['reason'] ?? null,
             ],
+            'false_green' => [
+                'status' => $report['false_green']['status'] ?? null,
+                'conclusion' => $report['false_green']['conclusion'] ?? null,
+                'test_path' => $report['false_green']['test_path'] ?? null,
+                'probes' => $report['false_green']['probes'] ?? null,
+                'reason' => $report['false_green']['reason'] ?? null,
+                'budgets' => $report['false_green']['budgets'] ?? null,
+            ],
             'parallel_join' => [
                 'branches' => array_map(fn (array $branch): array => [
                     'kind' => $branch['kind'] ?? null,
@@ -100,6 +108,7 @@ final class RecordVerificationReceipts
         return match ($name) {
             'pest' => is_string($report['verification']['junit'] ?? null) ? $report['verification']['junit'] : null,
             'parallel_join' => 'branches',
+            'false_green' => 'false_green.probes',
             default => null,
         };
     }

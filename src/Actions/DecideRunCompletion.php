@@ -47,14 +47,10 @@ class DecideRunCompletion
             ];
         }
 
-        $decision = $this->completion->evaluate($checks);
-        foreach ($decision['outcomes'] as $name => $outcome) {
-            $decision['outcomes'][$name]['failure_action'] = $checks[$name]['failure_action']->value;
-        }
+        $this->includeFalseGreen($checks, $report);
 
-        return $decision;
+        return $this->decide($checks);
     }
-
 
     /**
      * Build verification outcomes when a run stops or fails before the normal completion decision.
@@ -86,12 +82,61 @@ class DecideRunCompletion
             ];
         }
 
+        $this->includeFalseGreen($checks, $report);
+
+        return $this->decide($checks);
+    }
+
+    /**
+     * @param  array<string, array{state: VerificationState, policy: VerifierPolicy, failure_action: FailureAction}>  $checks
+     * @param  array<string, mixed>  $report
+     */
+    private function includeFalseGreen(array &$checks, array $report): void
+    {
+        if (! array_key_exists('false_green', $report) && ! (bool) config('molly.false_green.enabled', false)) {
+            return;
+        }
+
+        $checks['false_green'] = [
+            'state' => $this->falseGreenState(is_array($report['false_green'] ?? null) ? $report['false_green'] : null),
+            'policy' => $this->policy('false_green'),
+            'failure_action' => $this->failureAction('false_green', FailureAction::Fail),
+        ];
+    }
+
+    /**
+     * @param  array<string, array{state: VerificationState, policy: VerifierPolicy, failure_action: FailureAction}>  $checks
+     * @return array{completed: bool, outcomes: array<string, array{state: string, policy: string, failure_action: string}>, blockers: list<string>}
+     */
+    private function decide(array $checks): array
+    {
         $decision = $this->completion->evaluate($checks);
         foreach ($decision['outcomes'] as $name => $outcome) {
             $decision['outcomes'][$name]['failure_action'] = $checks[$name]['failure_action']->value;
         }
 
         return $decision;
+    }
+
+    /** @param  array<string, mixed>|null  $probe */
+    private function falseGreenState(?array $probe): VerificationState
+    {
+        if ($probe === null) {
+            return VerificationState::NotRun;
+        }
+
+        $state = VerificationState::tryFrom((string) ($probe['state'] ?? ''));
+        if ($state !== null) {
+            return $state;
+        }
+
+        return match ($probe['status'] ?? null) {
+            'meaningful' => VerificationState::Pass,
+            'false_green' => VerificationState::Fail,
+            'inconclusive' => VerificationState::ReviewRequired,
+            'not_run' => VerificationState::NotRun,
+            default => VerificationState::ReviewRequired,
+        };
     }
 
     /** @param  array<string, mixed>  $report */
