@@ -11,7 +11,7 @@ Molly asks an AI agent for the code change, then checks the result before it can
 
 ## QuickStart: Ollama
 
-Recommended local path — **no paid AI account**. v0.1: [docs/v0.1/QUICKSTART.md](docs/v0.1/QUICKSTART.md) · [FRICTION](docs/v0.1/FRICTION.md) · full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
+Recommended local path — **no paid AI account**. v0.1: [docs/v0.1/QUICKSTART.md](docs/v0.1/QUICKSTART.md) · [FRICTION](docs/v0.1/FRICTION.md) · [WALKTHROUGH](docs/v0.1/WALKTHROUGH.md) · full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly

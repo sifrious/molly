@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Regenerate docs/v0.1/walkthrough/*.png from a running Molly local UI.
+# Requires Google Chrome on macOS (headless). No API keys; loopback only.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="$ROOT/docs/v0.1/walkthrough"
+BASE="${1:-${MOLLY_WALKTHROUGH_BASE_URL:-http://127.0.0.1:8765}}"
+CHROME="${MOLLY_WALKTHROUGH_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+TASK_ID="${MOLLY_WALKTHROUGH_TASK_ID:-}"
+RUN_ID="${MOLLY_WALKTHROUGH_RUN_ID:-}"
+
+if [[ ! -x "$CHROME" ]]; then
+  echo "Chrome not found at: $CHROME" >&2
+  echo "Set MOLLY_WALKTHROUGH_CHROME to your Chrome binary." >&2
+  exit 1
+fi
+
+mkdir -p "$OUT"
+
+shot() {
+  local name="$1" path="$2"
+  local url="${BASE%/}${path}"
+  echo "→ $name  $url"
+  "$CHROME" --headless=new --disable-gpu --window-size=1280,900 \
+    --screenshot="$OUT/$name.png" "$url" 2>/dev/null
+}
+
+# Always capture list + create (no secrets).
+shot 01-tasks-index /molly
+shot 04-task-create /molly/tasks/create
+
+if [[ -n "$TASK_ID" ]]; then
+  shot 02-task-demo-greeting "/molly/tasks/${TASK_ID}"
+else
+  echo "Skip 02-task-demo-greeting (set MOLLY_WALKTHROUGH_TASK_ID)" >&2
+fi
+
+if [[ -n "$RUN_ID" ]]; then
+  shot 03-run-show "/molly/runs/${RUN_ID}"
+else
+  echo "Skip 03-run-show (set MOLLY_WALKTHROUGH_RUN_ID)" >&2
+fi
+
+echo "Wrote PNGs under $OUT"
+ls -la "$OUT"/*.png

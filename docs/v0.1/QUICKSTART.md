@@ -7,7 +7,7 @@ title: v0.1 QuickStart — Ollama
 
 Tonight’s Molly v0.1 local path: **Ollama on loopback**, no paid AI account.
 
-Longer narrative: [QuickStart — Ollama](../ollama-quickstart.md). Friction notes: [FRICTION](FRICTION.md).
+Longer narrative: [QuickStart — Ollama](../ollama-quickstart.md). Friction notes: [FRICTION](FRICTION.md). Screenshot walk-through: [WALKTHROUGH](WALKTHROUGH.md).
 
 ## Copy-paste
 
@@ -48,3 +48,4 @@ php artisan molly:start TASK_NAME
 1. Read task evidence: `php artisan molly:task demo-greeting` / `php artisan molly:show RUN_ID --verbose`
 2. Change model: pull another local tag, re-run `molly:setup --agent=ollama --model=…`, then `molly:doctor`
 3. If doctor fails, see [FRICTION](FRICTION.md) and [Troubleshooting](../troubleshooting.md)
+4. UI screenshots: [WALKTHROUGH](WALKTHROUGH.md) (`./bin/molly-docs-walkthrough`)
