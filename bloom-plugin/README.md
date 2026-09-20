@@ -1,23 +1,19 @@
-# Molly Bloom plugin
+# Molly Bloom plugin drop
 
-Manifest Bloom's generic plugin host discovers after install.
+- `plugin.json` — manifest (id `sifrious.molly`, nav ids `molly.home|tasks|conversations|settings`)
+- `Surfaces.bundle` — SwiftUI factories implementing Bloom `PluginSurfaceProviding`
+  (Info.plist `BloomPluginSurfaceProvider` = `MollySurfaceProvider`)
 
-## Install path
+Install into Bloom Application Support:
 
-Copy this folder to:
-
-```text
-~/Library/Application Support/Bloom/Plugins/sifrious.molly/
+```bash
+./bin/molly-bloom-plugin-register
 ```
 
-so the file `plugin.json` sits at:
+Rebuild the committed bundle after BloomPluginAPI API changes:
 
-```text
-~/Library/Application Support/Bloom/Plugins/sifrious.molly/plugin.json
+```bash
+export BLOOM_ROOT=/path/to/sifrious/bloom   # tip with BloomPluginAPI
+cd "$BLOOM_ROOT" && swift build -c release --target BloomPluginAPI
+./bloom-plugin/Surfaces/build-bundle.sh
 ```
-
-Enable with `enabled.json` listing `"sifrious.molly"`, or use `bin/molly-bloom-plugin-register`.
-
-Bloom hosts nav + SwiftUI through its plugin registry. Molly owns domain state; this package only declares the surface.
-
-Nav ids: `molly.home` (entry) and `molly.settings` (Molly Settings / gearshape), matching Bloom `MollyPluginRegistration`.

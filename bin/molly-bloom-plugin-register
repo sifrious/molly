@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
-# Registers Molly's Bloom plugin manifest into Application Support and enables it.
+# Registers Molly's Bloom plugin manifest + Surfaces.bundle into Application Support and enables it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/bloom-plugin/plugin.json"
+SRC_MANIFEST="$ROOT/bloom-plugin/plugin.json"
+SRC_SURFACES="$ROOT/bloom-plugin/Surfaces.bundle"
 DEST_DIR="${HOME}/Library/Application Support/Bloom/Plugins/sifrious.molly"
 ENABLED="${HOME}/Library/Application Support/Bloom/Plugins/enabled.json"
+
+if [[ ! -f "$SRC_MANIFEST" ]]; then
+  echo "Missing $SRC_MANIFEST" >&2
+  exit 1
+fi
+if [[ ! -d "$SRC_SURFACES" ]]; then
+  echo "Missing $SRC_SURFACES — run bloom-plugin/Surfaces/build-bundle.sh first" >&2
+  exit 1
+fi
+
 mkdir -p "$DEST_DIR"
-cp "$SRC" "$DEST_DIR/plugin.json"
+cp "$SRC_MANIFEST" "$DEST_DIR/plugin.json"
+rm -rf "$DEST_DIR/Surfaces.bundle"
+cp -R "$SRC_SURFACES" "$DEST_DIR/Surfaces.bundle"
+
 PLUGIN_ID="sifrious.molly" ENABLED_PATH="$ENABLED" python3 - <<'PY'
 import json, os, pathlib
 path = pathlib.Path(os.environ["ENABLED_PATH"])
@@ -20,4 +34,7 @@ if plugin_id not in ids:
 path.write_text(json.dumps(sorted(set(ids)), indent=2) + "\n")
 print(f"enabled {path}")
 PY
-echo "Installed Molly plugin manifest to $DEST_DIR"
+
+echo "Installed Molly plugin manifest + Surfaces.bundle to $DEST_DIR"
+ls -la "$DEST_DIR"
+ls -la "$DEST_DIR/Surfaces.bundle/Contents/MacOS/"

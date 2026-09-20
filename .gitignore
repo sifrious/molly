@@ -12,3 +12,8 @@
 /docs/.jekyll-metadata
 /build/
 vendor/
+
+# Molly Bloom Surfaces build scratch
+bloom-plugin/Surfaces/.build-direct/
+bloom-plugin/Surfaces/.build/
+bloom-plugin/Surfaces/.swiftpm/
