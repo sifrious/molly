@@ -23,4 +23,4 @@ Retry and stop stay on Molly domain actions (`molly:retry`, `molly:stop`).
 
 ## Bloom
 
-Nav ids: `molly.tasks`, `molly.runs`, `molly.conversations` — thin adapters over `molly:inspect`.
+Nav ids: `molly.tasks`, `molly.conversations` — thin adapters over `molly:inspect`. Runs open as detail sheets from a task (same inspect payload); no separate `molly.runs` nav for v0.1.

@@ -8,6 +8,16 @@
       "id": "molly.home",
       "title": "Molly",
       "systemImage": "leaf"
+    },
+    {
+      "id": "molly.tasks",
+      "title": "Tasks",
+      "systemImage": "checklist"
+    },
+    {
+      "id": "molly.conversations",
+      "title": "Conversations",
+      "systemImage": "bubble.left.and.bubble.right"
     }
   ],
   "entry": "molly.home"
