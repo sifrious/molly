@@ -47,6 +47,7 @@ use Sifrious\Molly\Console\MollyGraphsBootstrapCommand;
 use Sifrious\Molly\Console\MollyGraphsRetryCommand;
 use Sifrious\Molly\Console\MollyInspectCommand;
 use Sifrious\Molly\Console\MollyShowCommand;
+use Sifrious\Molly\Console\MollyReceiptCommand;
 use Sifrious\Molly\Console\MollyStartCommand;
 use Sifrious\Molly\Console\MollyStopCommand;
 use Sifrious\Molly\Console\MollyTaskCommand;
@@ -75,7 +76,7 @@ class MollyServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class,
+            $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class, MollyReceiptCommand::class,
                 MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyDemoCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
                 MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
                 MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,

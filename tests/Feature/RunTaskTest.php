@@ -204,3 +204,29 @@ it('rejects invalid task input before creating a run', function (string $prompt,
     'missing test' => ['Return Hello.', ''],
     'application file as test' => ['Return Hello.', 'app/Greeting.php'],
 ]);
+
+it('finalizes NOT_RUN receipts when a run stops before verification', function () {
+    config(['molly.parallel_checks' => false]);
+
+    $run = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        shouldStop: fn (): bool => true,
+    );
+
+    expect($run->status)->toBe('stopped')
+        ->and($run->report['terminated_before_completion'] ?? null)->toBeTrue()
+        ->and($run->report['verification_outcomes']['pest']['state'])->toBe('NOT_RUN')
+        ->and($run->report['verification_outcomes']['tarpit']['state'])->toBe('NOT_RUN')
+        ->and($run->report['verification_outcomes']['pest']['policy'])->toBe('required')
+        ->and($run->report['verification_outcomes']['tarpit']['policy'])->toBe('required');
+
+    $pestReceipt = $this->workspace.'/.molly/receipts/'.$run->id.'/pest.json';
+    $tarpitReceipt = $this->workspace.'/.molly/receipts/'.$run->id.'/tarpit.json';
+    expect(is_file($pestReceipt))->toBeTrue()
+        ->and(is_file($tarpitReceipt))->toBeTrue()
+        ->and(File::get($pestReceipt))->toContain('"state":"NOT_RUN"')
+        ->and(File::get($tarpitReceipt))->toContain('"state":"NOT_RUN"');
+});

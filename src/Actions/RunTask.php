@@ -184,6 +184,15 @@ class RunTask
                 $report['snapshots']['after'] = ['status' => 'unavailable', 'reason' => 'SNAPSHOT_CAPTURE_FAILED: '.$captureFailure->getMessage()];
                 $report['components'] = ['status' => 'unavailable', 'reason' => 'The final workspace could not be read. Component changes are unknown.'];
             }
+            try {
+                $decision = $this->decideCompletion->forTerminated($report);
+                $report['verification_outcomes'] = $decision['outcomes'];
+                $report['completion_blockers'] = $decision['blockers'];
+                $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
+                $report['terminated_before_completion'] = true;
+            } catch (Throwable $receiptFailure) {
+                $report['receipt_error'] = $receiptFailure->getMessage();
+            }
             $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
         }
 

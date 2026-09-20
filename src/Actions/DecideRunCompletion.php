@@ -55,6 +55,81 @@ class DecideRunCompletion
         return $decision;
     }
 
+
+    /**
+     * Build verification outcomes when a run stops or fails before the normal completion decision.
+     * Verifiers that never produced evidence are recorded as NOT_RUN (never omitted).
+     *
+     * @param  array<string, mixed>  $report
+     * @return array{completed: bool, outcomes: array<string, array{state: string, policy: string, failure_action: string}>, blockers: list<string>}
+     */
+    public function forTerminated(array $report): array
+    {
+        $checks = [
+            'pest' => [
+                'state' => $this->pestTerminatedState($report),
+                'policy' => $this->policy('pest'),
+                'failure_action' => $this->failureAction('pest', FailureAction::Retry),
+            ],
+            'tarpit' => [
+                'state' => $this->tarpitTerminatedState($report),
+                'policy' => $this->policy('tarpit'),
+                'failure_action' => $this->failureAction('tarpit', FailureAction::Retry),
+            ],
+        ];
+
+        if (($report['mode'] ?? null) === 'parallel') {
+            $checks['parallel_join'] = [
+                'state' => $this->parallelJoinTerminatedState($report),
+                'policy' => $this->policy('parallel_join'),
+                'failure_action' => $this->failureAction('parallel_join', FailureAction::Retry),
+            ];
+        }
+
+        $decision = $this->completion->evaluate($checks);
+        foreach ($decision['outcomes'] as $name => $outcome) {
+            $decision['outcomes'][$name]['failure_action'] = $checks[$name]['failure_action']->value;
+        }
+
+        return $decision;
+    }
+
+    /** @param  array<string, mixed>  $report */
+    private function pestTerminatedState(array $report): VerificationState
+    {
+        if (! is_array($report['verification'] ?? null)) {
+            return VerificationState::NotRun;
+        }
+
+        return $this->pestState($report['verification']);
+    }
+
+    /** @param  array<string, mixed>  $report */
+    private function tarpitTerminatedState(array $report): VerificationState
+    {
+        $review = $report['review'] ?? null;
+        if (! is_array($review) || ! isset($review['checks']) || ! is_array($review['checks'])) {
+            return VerificationState::NotRun;
+        }
+
+        return $this->review->passed($review, null)
+            ? VerificationState::Pass
+            : VerificationState::Fail;
+    }
+
+    /** @param  array<string, mixed>  $report */
+    private function parallelJoinTerminatedState(array $report): VerificationState
+    {
+        $branches = $report['branches'] ?? null;
+        if (! is_array($branches) || $branches === []) {
+            return VerificationState::NotRun;
+        }
+
+        return $this->branchesPassed($branches)
+            ? VerificationState::Pass
+            : VerificationState::Fail;
+    }
+
     /** @param list<array<string, mixed>> $branches */
     private function branchesPassed(array $branches): bool
     {

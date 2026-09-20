@@ -35,6 +35,21 @@ php artisan molly:show RUN_ID --json
 
 Reading a report does not execute the model again.
 
+## Read verification receipts
+
+Every completed or terminated run finalizes immutable JSON receipts under `.molly/receipts/<run-id>/`.
+
+```bash
+php artisan molly:receipt RUN_ID
+php artisan molly:receipt RUN_ID --workspace=/path/to/repo
+php artisan molly:receipt RUN_ID --json
+```
+
+Receipts record verifier name, state (`PASS` / `FAIL` / `REVIEW_REQUIRED` / `NOT_RUN`), policy, failure action, evidence digest, and timestamps. Reading them does not rerun Pest, Tarpit, or the model.
+
+A run that stops or fails before the normal completion decision still gets receipts. Verifiers that never executed appear as `NOT_RUN` rather than being omitted. Finalized receipt files are append-only for that run id; a retry creates a new run id and a new receipt directory.
+
+
 The verbose report is the best place to diagnose a failure because it includes test output, review findings, measurement details, and execution branch metadata.
 
 ## Pest verification
