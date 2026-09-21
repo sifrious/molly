@@ -14,7 +14,8 @@ Prefer local Ollama with no paid account? Use the dedicated [QuickStart: Ollama]
 If you do not already have a Laravel project, use the demo installer. It is one Terminal copy-paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo | bash
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
+chmod +x molly-demo && ./molly-demo
 ```
 
 That creates `~/molly-demo` (or a path you pass), installs Laravel + Molly, runs `php artisan molly:demo`, and prints the next doctor / start / Bloom steps. It refuses a non-empty existing path unless you pass `--force`. It does not install Bloom or call cloud.
@@ -76,7 +77,7 @@ From the Laravel project root:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main
+composer require --dev sifrious/molly:^0.1.1
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```

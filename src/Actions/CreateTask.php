@@ -32,8 +32,9 @@ class CreateTask
 
         $reference = $this->bindWorkspace->handle($workspace);
         $reference->assertAvailableForExecution();
-        // Keep the caller path for metadata; Workspace realpaths for file IO.
+        // Normalize trailing "/." and similar; persist realpath as observed metadata.
         $files = new Workspace($workspace);
+        $workspace = $files->path;
 
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
         $testDigest = $files->testDigest($testPath);

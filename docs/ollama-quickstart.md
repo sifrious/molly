@@ -17,7 +17,7 @@ From a Laravel 12/13 app with Pest 4:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main
+composer require --dev sifrious/molly:^0.1.1
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ollama pull qwen2.5-coder:7b

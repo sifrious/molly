@@ -7,15 +7,15 @@ Molly is a development tool for Laravel. Give it one small coding task, tell it 
 
 Molly asks an AI agent for the code change, then checks the result before it can complete the task.
 
-> Molly is still in early development. There is no tagged alpha release yet. The install command below uses `dev-main`.
+> Molly v0.1.x is tagged. Prefer `composer require sifrious/molly:^0.1.1` (Packagist when listed; otherwise public GitHub VCS).
 
 ## QuickStart: Ollama
 
-Recommended local path — **no paid AI account**. v0.1: [docs/v0.1/QUICKSTART.md](docs/v0.1/QUICKSTART.md) · [FRICTION](docs/v0.1/FRICTION.md) · [WALKTHROUGH](docs/v0.1/WALKTHROUGH.md) · full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
+Recommended local path — **no paid AI account**. v0.1: [docs/v0.1/QUICKSTART.md · [Release gates](docs/v0.1/RELEASE-GATES.md)](docs/v0.1/QUICKSTART.md) · [FRICTION](docs/v0.1/FRICTION.md) · [WALKTHROUGH](docs/v0.1/WALKTHROUGH.md) · full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main
+composer require --dev sifrious/molly:^0.1.1
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ollama pull qwen2.5-coder:7b
@@ -36,13 +36,16 @@ Or scaffold the greeting demo: `php artisan molly:demo` then `php artisan molly:
 One copy-paste path creates a fresh app, installs Molly, and scaffolds the greeting demo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo | bash
+# Prefer a release-tagged script (no pipe-to-main):
+# curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
+# shasum -a 256 molly-demo  # compare to release notes checksum when published
+# chmod +x molly-demo && ./molly-demo
 ```
 
 Or download the script and choose a folder:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/main/bin/molly-demo -o molly-demo
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
 bash molly-demo ~/molly-demo
 ```
 
@@ -58,7 +61,7 @@ Install Molly in a Laravel project:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main
+composer require --dev sifrious/molly:^0.1.1
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
@@ -213,7 +216,7 @@ Reference:
 
 ## What is current and what is planned
 
-Current `dev-main` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI with a project graph page, journals, Git-tracked decisions, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes. Pest fails a passing JUnit report that does not name the required test.
+Current `v0.1.x` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI with a project graph page, journals, Git-tracked decisions, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes. Pest fails a passing JUnit report that does not name the required test.
 
 These are not finished yet:
 

@@ -1,5 +1,6 @@
 /vendor/
-/composer.lock
+# composer.lock is committed for maintainer/CI; still excluded from package archive
+# /composer.lock
 /.amp/portals/*
 /.phpunit.cache/
 /.phpunit.result.cache

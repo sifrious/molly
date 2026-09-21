@@ -39,6 +39,7 @@ config([
     'cache.default' => 'array',
     'logging.default' => 'single',
     'logging.channels.single.path' => $root.'/storage/logs/runtime.log',
+    'molly.sandbox.allow_unsafe' => true,
     'molly.model' => 'queue-fixture-model',
     'molly.parallel_checks' => true,
     'molly.timeout' => 5,

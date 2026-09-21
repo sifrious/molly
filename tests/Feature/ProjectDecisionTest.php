@@ -24,7 +24,7 @@ it('writes a Git-tracked decision without starting a task', function () {
         'health-check',
     );
 
-    $path = $this->workspace.'/docs/decisions/2026-09-19-protect-pest-tests.md';
+    $path = (realpath($this->workspace) ?: $this->workspace).'/docs/decisions/2026-09-19-protect-pest-tests.md';
     expect($result)->toBe(['path' => $path, 'title' => 'Protect Pest tests', 'created' => true])
         ->and(File::get($path))->toContain('# Protect Pest tests', 'Date: 2026-09-19', 'Status: accepted', 'Task: health-check', 'The implementation writer cannot edit the locked acceptance test.')
         ->and(File::get($path))->not->toContain('.molly/');

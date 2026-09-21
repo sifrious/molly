@@ -15,7 +15,7 @@ Screenshots: `docs/v0.1/walkthrough/*.png` (no secrets; loopback UI only).
 
 ## 1. Install
 
-From a Laravel 12/13 app with Pest and a working database, follow the [QUICKSTART copy-paste](QUICKSTART.md). Composer VCS + `sifrious/molly:dev-main`, publish config, migrate, pull a local Ollama model, `molly:setup`, `config:clear`.
+From a Laravel 12/13 app with Pest and a working database, follow the [QUICKSTART copy-paste](QUICKSTART.md). Composer tagged `sifrious/molly:^0.1.1` (Packagist or public VCS), publish config, migrate, pull a local Ollama model, `molly:setup`, `config:clear`.
 
 ## 2. Doctor
 

@@ -61,6 +61,6 @@ The model does not get to declare its own work correct. A passing review never t
 
 ## Current scope
 
-These docs describe the current `dev-main` build. No alpha release is tagged yet.
+These docs describe the tagged v0.1.x line.
 
 The Laravel knowledge graph currently covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate namespace. Bundled tarpit notes live in a separate namespace and are not a quality score. The project graph covers saved Molly records in one workspace and has a local web page at `/molly/graph`. BloomCore now binds a Molly contract to the selected workspace and waits for approval before the pull request strip. Remote Orb identity remains unfinished. Visual previews are optional and advisory.

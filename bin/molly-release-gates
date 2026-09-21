@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Mac-local release gates for sifrious/molly (MME-5399).
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PHP="${PHP_BINARY:-$(command -v php)}"
+echo "==> PHP: $($PHP -v | head -1)"
+echo "==> composer validate --strict"
+composer validate --strict
+echo "==> composer install (locked)"
+composer install --no-interaction --prefer-dist
+echo "==> composer audit --locked"
+composer audit --locked
+echo "==> package tests"
+./vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
+echo "==> archive inspect"
+composer archive --format=zip --file=/tmp/molly-release-archive
+unzip -l /tmp/molly-release-archive.zip | head -40
+if unzip -l /tmp/molly-release-archive.zip | grep -q 'composer.lock'; then
+  echo "FAIL: composer.lock must stay out of the package archive" >&2
+  exit 1
+fi
+echo "OK: lock excluded from archive"
+echo "ALL GATES PASSED on $($PHP -r 'echo PHP_VERSION;')"

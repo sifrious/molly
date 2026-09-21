@@ -32,11 +32,14 @@ jobs:
           tools: composer:v2
 
       - name: Validate Composer metadata
-        run: composer validate --strict --no-check-lock
+        run: composer validate --strict
 
       - name: Install package and test dependencies
         timeout-minutes: 8
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit locked dependencies
+        run: composer audit --locked
 
       - name: Run package tests
         timeout-minutes: 5

@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
-# Molly zero-to-demo installer (MME-5294).
-# Creates a fresh Laravel app, installs Molly, and runs molly:demo.
-# Does not install Bloom, call cloud, or touch paths outside the target directory.
+# Molly zero-to-demo installer.
+# Creates a fresh Laravel app, installs a tagged sifrious/molly release, runs molly:demo.
 set -euo pipefail
 
+MOLLY_CONSTRAINT="${MOLLY_CONSTRAINT:-^0.1.1}"
+
 usage() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: molly-demo [TARGET_DIR] [--force]
 
-Creates a new Laravel project, installs sifrious/molly, and scaffolds the
-demo-greeting task with php artisan molly:demo.
+Creates a new Laravel project, installs sifrious/molly (${MOLLY_CONSTRAINT}),
+and scaffolds demo-greeting with php artisan molly:demo.
+
+Environment:
+  MOLLY_CONSTRAINT   Composer constraint (default: ^0.1.1)
 
 Arguments:
   TARGET_DIR   Directory for the new app (default: ~/molly-demo)
-  --force      Allow TARGET_DIR when it already exists and is not empty
+  --force      Allow non-empty TARGET_DIR (deletes it first)
   -h, --help   Show this help
 
-Requirements: PHP 8.3+, Composer, network access to packagist and GitHub.
+Requirements: PHP 8.3+, Composer. Prefers Packagist; falls back to public GitHub VCS tags.
 EOF
 }
 
@@ -24,13 +28,8 @@ TARGET=""
 FORCE=0
 for arg in "$@"; do
   case "$arg" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --force)
-      FORCE=1
-      ;;
+    -h|--help) usage; exit 0 ;;
+    --force) FORCE=1 ;;
     -*)
       echo "Unknown option: $arg" >&2
       usage >&2
@@ -48,17 +47,10 @@ for arg in "$@"; do
 done
 
 TARGET=${TARGET:-"$HOME/molly-demo"}
-# Expand ~ if quoted oddly
 TARGET=${TARGET/#\~/$HOME}
 
-if ! command -v php >/dev/null 2>&1; then
-  echo "PHP is required (8.3 or later)." >&2
-  exit 1
-fi
-if ! command -v composer >/dev/null 2>&1; then
-  echo "Composer is required." >&2
-  exit 1
-fi
+command -v php >/dev/null || { echo "PHP is required (8.3 or later)." >&2; exit 1; }
+command -v composer >/dev/null || { echo "Composer is required." >&2; exit 1; }
 
 if [[ -e "$TARGET" ]]; then
   if [[ ! -d "$TARGET" ]]; then
@@ -67,7 +59,7 @@ if [[ -e "$TARGET" ]]; then
   fi
   if [[ -n "$(ls -A "$TARGET" 2>/dev/null || true)" ]]; then
     if [[ "$FORCE" -ne 1 ]]; then
-      echo "Refusing: $TARGET exists and is not empty. Pass --force to replace it (deletes that directory first)." >&2
+      echo "Refusing: $TARGET exists and is not empty. Pass --force to replace it." >&2
       exit 1
     fi
     echo "Removing existing non-empty $TARGET because --force was set …"
@@ -77,16 +69,31 @@ fi
 
 echo "Creating Laravel app at $TARGET …"
 composer create-project laravel/laravel "$TARGET" --no-interaction
-
 cd "$TARGET"
 
-echo "Installing Pest 4 (Molly needs it) …"
+# Molly binds revision identity from Git — ensure the new app is a checkout.
+if [[ ! -d .git ]]; then
+  git init
+  git config user.email "molly-demo@sifrious.invalid"
+  git config user.name "Molly Demo"
+  git add -A
+  git commit -m "Initial Molly demo app" --quiet
+fi
+
+echo "Installing Pest (Molly needs it) …"
 composer config allow-plugins.pestphp/pest-plugin true
 composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies --no-interaction
 
-echo "Installing Molly from GitHub …"
-composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main --no-interaction
+echo "Installing Molly ${MOLLY_CONSTRAINT} …"
+code=$(curl -fsSL -o /dev/null -w "%{http_code}" "https://packagist.org/packages/sifrious/molly.json" || true)
+if [[ "$code" == "200" ]]; then
+  echo "Using Packagist …"
+  composer require --dev "sifrious/molly:${MOLLY_CONSTRAINT}" --no-interaction
+else
+  echo "Packagist not listing sifrious/molly yet — using public GitHub VCS tag …"
+  composer config repositories.molly vcs https://github.com/sifrious/molly
+  composer require --dev "sifrious/molly:${MOLLY_CONSTRAINT}" --no-interaction
+fi
 
 echo "Publishing Molly config and migrating …"
 php artisan vendor:publish --tag=molly-config --no-interaction
@@ -100,12 +107,11 @@ cat <<EOF
 Molly demo is ready in:
   $TARGET
 
-Next steps (plain language):
+Next steps:
 1. Open this folder in Bloom with “Open existing branch…” (Molly does not create a Bloom worktree).
 2. Check setup:  php artisan molly:doctor
 3. Start the demo: php artisan molly:start demo-greeting
-   Or print a Bloom contract after Bloom gives you workspace/branch/base-sha:
-   php artisan molly:bloom-contract demo-greeting --workspace-id=… --branch=… --base-sha=…
 
+Installed constraint: ${MOLLY_CONSTRAINT}
 No cloud was called. No Bloom install was added.
 EOF

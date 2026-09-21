@@ -23,7 +23,7 @@ Doctor never prints API keys or account secrets.
 
 ## Install friction
 
-- No Packagist tag yet — use Composer VCS + `sifrious/molly:dev-main`.
+- Packagist listing may lag — until listed, use Composer VCS + tagged `sifrious/molly:^0.1.1` (never `dev-main` for release proofs).
 - Need PHP 8.3+, Laravel 12/13, Pest, working DB before `molly:doctor` can go green.
 - After `.env` / config edits: `php artisan config:clear` then `molly:doctor`.
 

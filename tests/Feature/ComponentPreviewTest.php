@@ -36,7 +36,7 @@ it('records a local preview digest when a renderer command produces an image', f
         ->and($result['fixture'])->toBe('after')
         ->and($result['digest'])->toHaveLength(64)
         ->and($result['path'])->toBeFile()
-        ->and($result['path'])->toStartWith($this->workspace.'/.molly/previews/');
+        ->and($result['path'])->toStartWith((realpath($this->workspace) ?: $this->workspace).'/.molly/previews/');
 });
 
 it('keeps visual evidence advisory on the task creation snapshot', function () {

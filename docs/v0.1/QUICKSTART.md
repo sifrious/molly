@@ -15,7 +15,7 @@ From a Laravel 12/13 app with Pest and a working database (`laravel new --pest` 
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:dev-main
+composer require --dev sifrious/molly:^0.1.1
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ollama pull qwen2.5-coder:7b
@@ -35,7 +35,7 @@ php artisan molly:start TASK_NAME
 
 ## Notes
 
-- `dev-main` via Composer VCS is intentional until a tagged alpha exists (MME-5337).
+- Prefer tagged `^0.1.1`. Until Packagist lists the package: `composer config repositories.molly vcs https://github.com/sifrious/molly` then require the tag.
 - `qwen2.5-coder:7b` is a starter suggestion (~8 GB RAM class), not a hard-coded contract. Override with `--model=` / `MOLLY_LOCAL_MODEL`.
 - Default Ollama URL: `http://127.0.0.1:11434`. Local QuickStart refuses non-loopback / HTTPS Ollama URLs.
 - No Ollama API key is required for local HTTP.
