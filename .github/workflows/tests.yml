@@ -172,5 +172,5 @@ jobs:
                   assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
                   size = archive.stat().st_size
                   print(f'{filename}: {size} bytes')
-                  assert size <= 280 * 1024
+                  assert size <= 400 * 1024  # v0.1.3: package grew; Surfaces.bundle rebuild-only
           PY

@@ -80,7 +80,9 @@
             "/AGENTS.md",
             "/phpunit.xml",
             "/pint.json",
-            "/testbench.yaml"
+            "/testbench.yaml",
+            "/bloom-plugin/Surfaces.bundle",
+            "/bloom-plugin/Surfaces/.build"
         ]
     },
     "bin": [

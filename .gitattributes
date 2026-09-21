@@ -1,9 +1,19 @@
+# Lean package / git archives (MME-5412 follow → v0.1.3)
+/composer.lock export-ignore
+/tests export-ignore
 /.github export-ignore
 /.agents export-ignore
+/build export-ignore
+/_site export-ignore
 /docs export-ignore
-/tests export-ignore
-/phpunit.xml export-ignore
 /AGENTS.md export-ignore
-/.gitignore export-ignore
-/.gitattributes export-ignore
+/phpunit.xml export-ignore
 /pint.json export-ignore
+/testbench.yaml export-ignore
+/.phpunit.cache export-ignore
+/.pest export-ignore
+/.env export-ignore
+/.env.* export-ignore
+/.molly export-ignore
+/bloom-plugin/Surfaces.bundle export-ignore
+/vendor export-ignore
