@@ -114,6 +114,14 @@ jobs:
           composer require --dev 'sifrious/molly:@dev' --no-interaction --prefer-dist --no-progress
           php artisan vendor:publish --tag=molly-config --no-interaction
           php artisan migrate --no-interaction
+          # Fresh create-project trees may lack .git; Molly binds revision identity from Git.
+          if [ ! -d .git ] && [ ! -f .git ]; then
+            git init
+            git config user.email "molly-ci@sifrious.invalid"
+            git config user.name "Molly CI"
+            git add -A
+            git commit -m "ci consumer fixture" --quiet
+          fi
 
       - name: Create and read a saved task without a model
         timeout-minutes: 2

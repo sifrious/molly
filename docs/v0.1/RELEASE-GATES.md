@@ -21,3 +21,7 @@ Mac-local preferred evidence: `./bin/molly-release-gates`.
 ## PHP matrix
 
 Herd Studio may only have one PHP line; run 8.3–8.5 via CI Actions (SHA-pinned) or additional local PHP builds when available. Push-to-main remains the portfolio CI gate; Actions red/billing is not a product blocker.
+
+## PHP platform for lock resolution
+
+`composer.json` sets `config.platform.php` to `8.3.26` so `composer.lock` resolves for the lowest supported PHP line. Re-run `composer update` under that platform (or with the config present) before releasing. Do not lock Symfony packages that require PHP >=8.4 while advertising `^8.3`.

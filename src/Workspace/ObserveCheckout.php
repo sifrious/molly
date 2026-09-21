@@ -19,11 +19,9 @@ final class ObserveCheckout
 
         $gitDir = $real.'/.git';
         if (! file_exists($gitDir)) {
-            if (function_exists('app') && app()->environment('testing')) {
-                $this->initEphemeralGit($real);
-            } else {
-                throw new RuntimeException('WORKSPACE_GIT_MISSING: Molly requires a Git checkout to bind revision identity.');
-            }
+            // Fresh composer create-project apps may lack .git; mint a local checkout
+            // so revision identity can bind. Paths remain metadata, never IDs.
+            $this->initEphemeralGit($real);
         }
 
         $gitRoot = $real;
@@ -82,12 +80,12 @@ final class ObserveCheckout
     private function initEphemeralGit(string $path): void
     {
         $this->git($path, ['init'], allowFail: false);
-        $this->git($path, ['config', 'user.email', 'molly-tests@sifrious.invalid'], allowFail: false);
-        $this->git($path, ['config', 'user.name', 'Molly Tests'], allowFail: false);
-        if (! is_file($path.'/README.molly-fixture')) {
-            file_put_contents($path.'/README.molly-fixture', "Molly test fixture\n");
+        $this->git($path, ['config', 'user.email', 'molly-bind@sifrious.invalid'], allowFail: false);
+        $this->git($path, ['config', 'user.name', 'Molly Bind'], allowFail: false);
+        if (! is_file($path.'/README.molly-bind')) {
+            file_put_contents($path.'/README.molly-bind', "Molly bind checkout\n");
         }
         $this->git($path, ['add', '-A'], allowFail: false);
-        $this->git($path, ['commit', '-m', 'molly-test-fixture'], allowFail: false);
+        $this->git($path, ['commit', '-m', 'molly-bind-checkout'], allowFail: false);
     }
 }
