@@ -49,3 +49,8 @@ php artisan molly:start TASK_NAME
 2. Change model: pull another local tag, re-run `molly:setup --agent=ollama --model=…`, then `molly:doctor`
 3. If doctor fails, see [FRICTION](FRICTION.md) and [Troubleshooting](../troubleshooting.md)
 4. UI screenshots: [WALKTHROUGH](WALKTHROUGH.md) (`./bin/molly-docs-walkthrough`)
+
+## Architecture notes
+
+- [Stacks boundary map](STACKS-BOUNDARY.md) (MME-5352)
+- [Identity internalization](IDENTITY-INTERNALIZATION.md)
