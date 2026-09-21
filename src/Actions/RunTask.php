@@ -14,6 +14,7 @@ use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Throwable;
 
 class RunTask
@@ -59,10 +60,21 @@ class RunTask
                 ? $taskRow->context_snapshot['settings_overrides']
                 : [];
             $effectiveConfig = app(ResolveEffectiveRunConfig::class)->handle($overrides);
+            $identity = $this->runIdentity($taskRow, $files->path);
             $run = Run::create([
                 'prompt' => $prompt,
                 'task_id' => $taskId,
                 'workspace' => $files->path,
+                'project_id' => $identity['project_id'],
+                'workspace_id' => $identity['workspace_id'],
+                'repository_id' => $identity['repository_id'],
+                'repository_remote_identity' => $identity['repository_remote_identity'],
+                'checkout_id' => $identity['checkout_id'],
+                'checkout_kind' => $identity['checkout_kind'],
+                'base_sha' => $identity['base_sha'],
+                'branch' => $identity['branch'],
+                'bloom_workspace_id' => $identity['bloom_workspace_id'],
+                'identity_status' => $identity['identity_status'],
                 'status' => 'running',
                 'effective_config' => $effectiveConfig,
                 'report' => [
@@ -287,5 +299,40 @@ class RunTask
         if (! in_array($measurement['status'] ?? null, ['ok', 'skipped'], true)) {
             throw new RuntimeException('CLEVER_UNAVAILABLE: '.($measurement['reason'] ?? 'Clever did not produce a usable report.'));
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function runIdentity(?Task $task, string $path): array
+    {
+        if ($task !== null && $task->identity_status === 'bound' && is_string($task->workspace_id) && $task->workspace_id !== '') {
+            return [
+                'project_id' => $task->project_id,
+                'workspace_id' => $task->workspace_id,
+                'repository_id' => $task->repository_id,
+                'repository_remote_identity' => $task->repository_remote_identity,
+                'checkout_id' => $task->checkout_id,
+                'checkout_kind' => $task->checkout_kind,
+                'base_sha' => $task->base_sha,
+                'branch' => $task->branch,
+                'bloom_workspace_id' => $task->bloom_workspace_id,
+                'identity_status' => 'bound',
+            ];
+        }
+
+        $reference = app(BindWorkspaceReference::class)->handle($path);
+        $reference->assertAvailableForExecution();
+
+        return [
+            'project_id' => $reference->project->id,
+            'workspace_id' => $reference->workspace->id,
+            'repository_id' => $reference->repositoryId,
+            'repository_remote_identity' => $reference->repositoryRemoteIdentity,
+            'checkout_id' => $reference->checkoutId,
+            'checkout_kind' => $reference->checkoutKind,
+            'base_sha' => $reference->head->sha,
+            'branch' => $reference->branch,
+            'bloom_workspace_id' => $reference->bloomWorkspaceId,
+            'identity_status' => 'bound',
+        ];
     }
 }

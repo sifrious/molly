@@ -8,6 +8,7 @@ use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\BindWorkspaceReference;
 
 class CreateTask
 {
@@ -16,6 +17,7 @@ class CreateTask
         private RestoreTaskBaseline $baseline,
         private CaptureComponentPreview $preview,
         private RecordLifecycleEvent $lifecycle,
+        private BindWorkspaceReference $bindWorkspace,
     ) {}
 
     /**
@@ -28,6 +30,9 @@ class CreateTask
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
         }
 
+        $reference = $this->bindWorkspace->handle($workspace);
+        $reference->assertAvailableForExecution();
+        // Keep the caller path for metadata; Workspace realpaths for file IO.
         $files = new Workspace($workspace);
 
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
@@ -52,7 +57,17 @@ class CreateTask
             $task = Task::create([
                 'nickname' => $nickname,
                 'prompt' => $prompt,
-                'workspace' => $files->path,
+                'workspace' => $workspace,
+                'project_id' => $reference->project->id,
+                'workspace_id' => $reference->workspace->id,
+                'repository_id' => $reference->repositoryId,
+                'repository_remote_identity' => $reference->repositoryRemoteIdentity,
+                'checkout_id' => $reference->checkoutId,
+                'checkout_kind' => $reference->checkoutKind,
+                'base_sha' => $reference->head->sha,
+                'branch' => $reference->branch,
+                'bloom_workspace_id' => $reference->bloomWorkspaceId,
+                'identity_status' => 'bound',
                 'paths' => $paths,
                 'test_path' => $testPath,
                 'test_digest' => $testDigest,

@@ -14,7 +14,7 @@ class Task extends Model
 
     protected $table = 'molly_tasks';
 
-    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'test_digest', 'allow_test_edits', 'status', 'source', 'stop_requested_at', 'context_snapshot', 'journal_status', 'worker_id', 'claimed_at', 'lease_expires_at', 'heartbeat_at', 'attempt_number', 'idempotency_key', 'parent_run_id'];
+    protected $fillable = ['nickname', 'prompt', 'workspace', 'paths', 'test_path', 'test_digest', 'allow_test_edits', 'status', 'source', 'stop_requested_at', 'context_snapshot', 'journal_status', 'worker_id', 'claimed_at', 'lease_expires_at', 'heartbeat_at', 'attempt_number', 'idempotency_key', 'parent_run_id', 'project_id', 'workspace_id', 'repository_id', 'repository_remote_identity', 'checkout_id', 'checkout_kind', 'base_sha', 'branch', 'bloom_workspace_id', 'identity_status'];
 
     protected $attributes = ['status' => 'pending'];
 
