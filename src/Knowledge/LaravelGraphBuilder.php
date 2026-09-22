@@ -2,6 +2,7 @@
 
 namespace Sifrious\Molly\Knowledge;
 
+use ReflectionClass;
 use RuntimeException;
 
 /**
@@ -61,6 +62,106 @@ final class LaravelGraphBuilder
         $this->edges[$edge->id()] = $edge;
 
         return $edge;
+    }
+
+    public function assertGuideTitleHasLaravelMajor(string $title, string $guideLabel): void
+    {
+        if (! preg_match('/Laravel \d+ /', $title)) {
+            throw new RuntimeException('KNOWLEDGE_DOC_INVALID: The bundled '.$guideLabel.' guide needs a Laravel major version in its title.');
+        }
+    }
+
+    /** @return list<array{title: string, slug: string, level: int}> */
+    public function parseSections(string $content): array
+    {
+        preg_match_all('/^(#{2,4})\s+(.+)$/m', $content, $matches, PREG_SET_ORDER);
+
+        return array_map(fn (array $match): array => [
+            'title' => trim($match[2]),
+            'slug' => strtolower(preg_replace('/[^a-z0-9]+/i', '-', trim($match[2])) ?? ''),
+            'level' => strlen($match[1]),
+        ], $matches);
+    }
+
+    public function retrievedAt(string $content): ?string
+    {
+        return preg_match('/Retrieved (\d{4}-\d{2}-\d{2})\./', $content, $matches) ? $matches[1] : null;
+    }
+
+    /**
+     * Reflect an installed class/interface/trait into a framework_source + symbol node.
+     *
+     * @return array{node: GraphNode, source: GraphSource}
+     */
+    public function addReflectedSymbol(string $class): array
+    {
+        if (! class_exists($class) && ! interface_exists($class) && ! trait_exists($class)) {
+            throw new RuntimeException("KNOWLEDGE_SYMBOL_MISSING: {$class} is not installed.");
+        }
+
+        $reflection = new ReflectionClass($class);
+        $file = $reflection->getFileName();
+        if (! is_string($file) || ! is_file($file)) {
+            throw new RuntimeException("KNOWLEDGE_SYMBOL_SOURCE_MISSING: {$class} has no readable source file.");
+        }
+
+        $type = match (true) {
+            $reflection->isInterface() => 'interface',
+            $reflection->isTrait() => 'trait',
+            default => 'class',
+        };
+
+        $source = $this->addSource(new GraphSource(
+            $this->namespace,
+            $this->version,
+            'framework_source',
+            $class,
+            $class,
+            $file,
+            $this->version,
+            hash_file('sha256', $file) ?: null,
+            ['symbol' => $class, 'installed_version' => $this->version],
+        ));
+
+        $node = $this->addNode(
+            $type,
+            $class,
+            $reflection->getShortName(),
+            [$source->id()],
+            [
+                'symbol' => $class,
+                'start_line' => $reflection->getStartLine(),
+                'end_line' => $reflection->getEndLine(),
+                'digest' => $source->digest,
+            ],
+        );
+
+        return ['node' => $node, 'source' => $source];
+    }
+
+    /**
+     * @return array{node: GraphNode, source: GraphSource}
+     */
+    public function addReflectedMethod(string $class, string $method): array
+    {
+        $symbol = $this->addReflectedSymbol($class);
+        if (! method_exists($class, $method)) {
+            throw new RuntimeException("KNOWLEDGE_SYMBOL_MISSING: {$class}::{$method} is not installed.");
+        }
+        $reflection = (new ReflectionClass($class))->getMethod($method);
+        $node = $this->addNode(
+            'method',
+            $class.'::'.$method,
+            $method,
+            [$symbol['source']->id()],
+            [
+                'symbol' => $class.'::'.$method,
+                'start_line' => $reflection->getStartLine(),
+                'end_line' => $reflection->getEndLine(),
+            ],
+        );
+
+        return ['node' => $node, 'source' => $symbol['source']];
     }
 
     /**
