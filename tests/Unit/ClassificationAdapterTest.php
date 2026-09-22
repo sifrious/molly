@@ -68,6 +68,6 @@ it('uses Laravel AI decide when Jev is enabled but never upgrades a failed run',
         ->and($run->fresh()->status)->toBe('failed');
 
     Classification::assertClassified(fn (ClassificationPrompt $prompt): bool =>
-        $prompt->asks('decision') && $prompt->provider !== null
+        $prompt->asks('decision') && $prompt->contains('failed')
     );
 });
