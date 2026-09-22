@@ -65,30 +65,92 @@ class MollyTask extends Tool
         ]);
         try {
             $result = match ($data['operation']) {
-                'list' => ['tasks' => app(ListTasks::class)->handle($data['limit'] ?? 20)->toArray()],
-                'show' => $this->show($data['id']),
-                'show_run' => ['run' => (app(ShowRun::class)->handle($data['id']) ?? throw new RuntimeException('RUN_NOT_FOUND: No run matches this ID.'))->toArray()],
-                'create' => ['task' => app(CreateTask::class)->handle($data['prompt'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
-                'from_plan' => ['task' => app(CreateTaskFromPlan::class)->handle($data['plan_id'], $data['prompt'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
-                'import_github' => ['task' => app(ImportGitHubIssue::class)->handle($data['issue_url'], $data['workspace'], $data['paths'] ?? [], $data['test_path'], nickname: $data['nickname'] ?? null, allowTestEdits: (bool) ($data['allow_test_edits'] ?? false))->toArray()],
-                'comment' => app(PublishGitHubIssueStatus::class)->handle($data['id'], (bool) ($data['approve'] ?? false), (bool) ($data['close'] ?? false)),
-                'approve' => app(ApproveTask::class)->handle($data['id'], (bool) ($data['approve'] ?? false)),
-                'lock_test' => app(LockProtectedTest::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['paths'] ?? [], $data['reason'] ?? 'Human approved the Pest test as the locked acceptance test.'),
-                'pr_body' => app(ComposePullRequestBody::class)->handle($data['id'], (bool) ($data['close'] ?? false)),
-                'pr_opened' => app(RecordPullRequestOpened::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['url'] ?? ''),
-                'merged' => app(RecordMerged::class)->handle($data['id'], (bool) ($data['approve'] ?? false), $data['sha'] ?? ''),
-                'handoff' => ['handoff' => app(HandOffTask::class)->handle($data['id'], $data['from_workspace_id'], $data['to_workspace_id'], $data['next_action'] ?? 'implement', $data['context'] ?? 'Implement the locked acceptance test without changing protected files.')->toArray()],
-                'name' => ['task' => app(NameTask::class)->handle($data['id'], $data['nickname'])->toArray()],
-                'link_thread' => ['association' => app(LinkTaskThread::class)->handle($data['id'], $data['thread'])],
-                'advice' => ['advice' => app(RecommendTaskNextStep::class)->handle($data['id'])],
-                'start', 'retry' => ['task' => app(QueueTask::class)->handle($data['id'], $data['operation'] === 'retry')->toArray(), 'queued' => true],
-                'stop' => ['task' => app(StopTask::class)->handle($data['id'])->toArray()],
+                'list', 'show', 'show_run' => $this->dispatchRead($data),
+                'create', 'from_plan', 'import_github' => $this->dispatchCreate($data),
+                'comment', 'approve', 'lock_test', 'pr_body', 'pr_opened', 'merged', 'stop' => $this->dispatchLifecycle($data),
+                'handoff', 'name', 'link_thread' => $this->dispatchHandoff($data),
+                'advice' => $this->dispatchAdvice($data),
+                'start', 'retry' => $this->dispatchQueue($data),
             };
 
             return Response::structured($result);
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchRead(array $data): array
+    {
+        return match ($data['operation']) {
+            'list' => ['tasks' => app(ListTasks::class)->handle($data['limit'] ?? 20)->toArray()],
+            'show' => $this->show($data['id']),
+            'show_run' => ['run' => (app(ShowRun::class)->handle($data['id']) ?? throw new RuntimeException('RUN_NOT_FOUND: No run matches this ID.'))->toArray()],
+        };
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchCreate(array $data): array
+    {
+        $paths = $data['paths'] ?? [];
+        $nickname = $data['nickname'] ?? null;
+        $allowTestEdits = (bool) ($data['allow_test_edits'] ?? false);
+
+        return match ($data['operation']) {
+            'create' => ['task' => app(CreateTask::class)->handle($data['prompt'], $data['workspace'], $paths, $data['test_path'], nickname: $nickname, allowTestEdits: $allowTestEdits)->toArray()],
+            'from_plan' => ['task' => app(CreateTaskFromPlan::class)->handle($data['plan_id'], $data['prompt'], $data['workspace'], $paths, $data['test_path'], nickname: $nickname, allowTestEdits: $allowTestEdits)->toArray()],
+            'import_github' => ['task' => app(ImportGitHubIssue::class)->handle($data['issue_url'], $data['workspace'], $paths, $data['test_path'], nickname: $nickname, allowTestEdits: $allowTestEdits)->toArray()],
+        };
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchLifecycle(array $data): array
+    {
+        $approve = (bool) ($data['approve'] ?? false);
+
+        return match ($data['operation']) {
+            'comment' => app(PublishGitHubIssueStatus::class)->handle($data['id'], $approve, (bool) ($data['close'] ?? false)),
+            'approve' => app(ApproveTask::class)->handle($data['id'], $approve),
+            'lock_test' => app(LockProtectedTest::class)->handle($data['id'], $approve, $data['paths'] ?? [], $data['reason'] ?? 'Human approved the Pest test as the locked acceptance test.'),
+            'pr_body' => app(ComposePullRequestBody::class)->handle($data['id'], (bool) ($data['close'] ?? false)),
+            'pr_opened' => app(RecordPullRequestOpened::class)->handle($data['id'], $approve, $data['url'] ?? ''),
+            'merged' => app(RecordMerged::class)->handle($data['id'], $approve, $data['sha'] ?? ''),
+            'stop' => ['task' => app(StopTask::class)->handle($data['id'])->toArray()],
+        };
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchHandoff(array $data): array
+    {
+        return match ($data['operation']) {
+            'handoff' => ['handoff' => app(HandOffTask::class)->handle($data['id'], $data['from_workspace_id'], $data['to_workspace_id'], $data['next_action'] ?? 'implement', $data['context'] ?? 'Implement the locked acceptance test without changing protected files.')->toArray()],
+            'name' => ['task' => app(NameTask::class)->handle($data['id'], $data['nickname'])->toArray()],
+            'link_thread' => ['association' => app(LinkTaskThread::class)->handle($data['id'], $data['thread'])],
+        };
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchAdvice(array $data): array
+    {
+        return ['advice' => app(RecommendTaskNextStep::class)->handle($data['id'])];
+    }
+
+    /** @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dispatchQueue(array $data): array
+    {
+        return ['task' => app(QueueTask::class)->handle($data['id'], $data['operation'] === 'retry')->toArray(), 'queued' => true];
     }
 
     /** @return array{task: array<string, mixed>, display_status: string, linked_pr: array{url: string, number: int|null, merge_sha: string|null}|null, issue_url: string|null} */
