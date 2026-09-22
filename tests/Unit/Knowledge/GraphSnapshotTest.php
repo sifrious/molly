@@ -47,3 +47,20 @@ it('rejects edges without endpoints', function () {
     expect(fn () => new GraphSnapshot('laravel', '12', [$source], [$from], [$edge]))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_EDGE_INVALID:');
 });
+
+it('round-trips toArray/fromArray without shape drift', function () {
+    $source = snapSource();
+    $from = new GraphNode('laravel', '12', 'concept', 'a', 'A', [$source->id()], ['k' => 1]);
+    $to = new GraphNode('laravel', '12', 'concept', 'b', 'B', [$source->id()]);
+    $edge = new GraphEdge('laravel', '12', 'related', $from->id(), $to->id(), [$source->id()]);
+    $original = new GraphSnapshot('laravel', '12', [$source], [$from, $to], [$edge]);
+
+    $hydrated = GraphSnapshot::fromArray($original->toArray());
+
+    expect($hydrated->toArray())->toBe($original->toArray());
+});
+
+it('rejects incomplete cached snapshots', function () {
+    expect(fn () => GraphSnapshot::fromArray(['namespace' => 'laravel']))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_SNAPSHOT_INVALID:');
+});
