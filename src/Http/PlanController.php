@@ -25,7 +25,7 @@ class PlanController
 
     public function suggest(string $plan, ShowPlan $show, SuggestPlanReview $suggest): RedirectResponse
     {
-        abort_unless(config('molly.jev.enabled', true) === true && config('molly.typesafe.enabled') === true && is_string(config('molly.typesafe.api_key')) && trim(config('molly.typesafe.api_key')) !== '', 403);
+        abort_unless(config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '', 403);
         $record = $show->handle($plan);
         abort_if($record === null, 404);
         $suggest->handle($record);
@@ -76,7 +76,7 @@ class PlanController
         return view('molly::plan', [
             'plan' => $record,
             'tasks' => Task::where('source->plan_id', $record->id)->latest()->get(),
-            'canSuggest' => config('molly.jev.enabled', true) === true && config('molly.typesafe.enabled') === true && is_string(config('molly.typesafe.api_key')) && trim(config('molly.typesafe.api_key')) !== '',
+            'canSuggest' => config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '',
             'steps' => $guide->steps(),
             'nextStep' => $record->nextStep(),
             'sources' => $guide->sourcesFor($record->description, $record->answers ?? []),
