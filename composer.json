@@ -14,7 +14,7 @@
         "illuminate/process": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
         "illuminate/validation": "^12.0|^13.0",
-        "laravel/ai": "1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484",
+        "laravel/ai": "1.x-dev",
         "laravel/mcp": "^1.0",
         "laravel/prompts": "^0.3.24",
         "livewire/flux": "^2.20",
