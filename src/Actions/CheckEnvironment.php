@@ -12,6 +12,11 @@ use Throwable;
 
 class CheckEnvironment
 {
+    public function __construct(
+        private Sandbox $sandbox,
+        private Clever $clever,
+    ) {}
+
     /** @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>} */
     public function handle(string $workspace): array
     {
@@ -37,7 +42,7 @@ class CheckEnvironment
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
 
-        $sandbox = app(Sandbox::class);
+        $sandbox = $this->sandbox;
         $available = $sandbox->available();
         $unsafe = $sandbox->allowUnsafe();
         $add(
@@ -121,7 +126,7 @@ class CheckEnvironment
         }
 
         try {
-            $enabled = app(Clever::class)->enabled();
+            $enabled = $this->clever->enabled();
             $add('Clever', $enabled, $enabled ? 'clever_ready' : 'clever_disabled', $enabled ? 'Bundled Clever measurements are enabled.' : 'Enable molly-complexity.enabled outside production to measure complexity.');
         } catch (Throwable) {
             $add('Clever', false, 'clever_unavailable', 'Molly could not load the bundled Clever measurements.');
