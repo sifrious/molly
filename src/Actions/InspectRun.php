@@ -9,8 +9,8 @@ use Sifrious\Molly\Models\Run;
 final class InspectRun
 {
     public function __construct(
-        private ConversationStore $conversations = new ConversationStore,
-        private EnsureRunConversation $ensureConversation = new EnsureRunConversation,
+        private ConversationStore $conversations,
+        private EnsureRunConversation $ensureConversation,
     ) {}
 
     /**
