@@ -20,6 +20,7 @@ final class DetectLaravelAiClassification
 
     public function adapter(): string
     {
+        // Boolean decide adapter activates only when the macro is registered.
         if ($this->supportsDecide()) {
             return 'laravel-ai.decide';
         }
@@ -40,9 +41,17 @@ final class DetectLaravelAiClassification
         return InstalledVersions::getPrettyVersion('laravel/ai');
     }
 
+    /**
+     * Independent boolean capability: Str::hasMacro('decide') only.
+     * Never infer from package version, package presence, or structured-agent support.
+     */
     public function supportsDecide(): bool
     {
-        return class_exists(Str::class) && Str::hasMacro('decide');
+        if (! class_exists(Str::class)) {
+            return false;
+        }
+
+        return Str::hasMacro('decide');
     }
 
     /**
