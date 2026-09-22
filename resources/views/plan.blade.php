@@ -6,11 +6,11 @@
 @if($canSuggest)
     <form method="post" action="{{ route('molly.plans.suggest', $plan->id) }}">
         @csrf
-        <p>Ask Jev which Tarpit question deserves attention. This sends the plan, answers, and bundled source excerpts to TypeSafe. It does not change your answers or approve a task.</p>
-        <button type="submit">Ask Jev for a Tarpit suggestion</button>
+        <p>Ask for a bounded Jev classification through Laravel AI. Molly sends only this plan, its answers, and bundled source excerpts. The suggestion does not edit your answers, approve a task, or override Pest, Tarpit, retries, or completion.</p>
+        <button type="submit">Ask for a Tarpit suggestion</button>
     </form>
 @else
-    <p>Jev suggestions are not configured. Guided review works offline.</p>
+    <p>Jev classification is off or not configured (<code>MOLLY_JEV_ENABLED</code> defaults to false). Guided review works offline with no classification request.</p>
 @endif
 @if($plan->suggestion)
     <section aria-labelledby="suggestion-heading">
