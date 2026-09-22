@@ -15,3 +15,16 @@ it('injects Sandbox into VerifyChanges without service location', function () {
     $source = file_get_contents(dirname(__DIR__, 3).'/src/Actions/VerifyChanges.php');
     expect($source)->not->toContain('app(Sandbox::class)');
 });
+
+it('keeps Pest process execution separate from JUnit evidence parsing', function () {
+    $reflection = new ReflectionClass(VerifyChanges::class);
+
+    expect($reflection->hasMethod('executePestProcess'))->toBeTrue()
+        ->and($reflection->getMethod('executePestProcess')->isPrivate())->toBeTrue()
+        ->and($reflection->hasMethod('readEvidence'))->toBeTrue()
+        ->and($reflection->getMethod('readEvidence')->isPrivate())->toBeTrue();
+
+    $source = file_get_contents(dirname(__DIR__, 3).'/src/Actions/VerifyChanges.php');
+    expect($source)->toContain('$this->executePestProcess(')
+        ->and($source)->toContain('$this->readEvidence(');
+});

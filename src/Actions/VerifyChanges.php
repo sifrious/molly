@@ -32,36 +32,12 @@ class VerifyChanges
             return [...$report, 'reason' => 'evidence_directory_unwritable'];
         }
 
-        try {
-            $timeout = max(1, min(3600, (int) config('molly.test_timeout', 120)));
-            $env = $this->workspaceEnvironment();
-            if ($this->sandbox->available() && ! $this->sandbox->allowUnsafe()) {
-                $sandboxed = $this->sandbox->run(
-                    $workspace,
-                    [$evidenceDirectory],
-                    $command,
-                    $evidenceDirectory,
-                    $timeout,
-                    $env,
-                );
-                $report['output'] = $sandboxed['output'].$sandboxed['error'];
-                $successful = ! $sandboxed['timed_out'] && $sandboxed['exit_code'] === 0;
-                if ($sandboxed['timed_out']) {
-                    return [...$report, 'reason' => 'test_timeout'];
-                }
-            } else {
-                $result = Process::path($workspace)
-                    ->env($env)
-                    ->timeout($timeout)
-                    ->run($command);
-                $report['output'] = $result->output().$result->errorOutput();
-                $successful = $result->successful();
-            }
-        } catch (ProcessTimedOutException $exception) {
-            return [...$report, 'reason' => 'test_timeout', 'output' => $exception->result->output().$exception->result->errorOutput()];
-        } catch (Throwable $exception) {
-            return [...$report, 'reason' => 'test_process_failed', 'output' => $exception->getMessage()];
+        $execution = $this->executePestProcess($workspace, $command, $evidenceDirectory);
+        if (($execution['reason'] ?? null) !== null) {
+            return [...$report, 'output' => $execution['output'], 'reason' => $execution['reason']];
         }
+        $report['output'] = $execution['output'];
+        $successful = $execution['successful'];
 
         $counts = $this->readEvidence($junit, $workspace, $testPath);
         $report = [...$report, ...$counts];
@@ -78,6 +54,56 @@ class VerifyChanges
         };
 
         return $reason === null ? [...$report, 'status' => 'passed'] : [...$report, 'reason' => $reason];
+    }
+
+    /**
+     * @param  list<string>  $command
+     * @return array{output: string, successful: bool, reason?: string}
+     */
+    private function executePestProcess(string $workspace, array $command, string $evidenceDirectory): array
+    {
+        try {
+            $timeout = max(1, min(3600, (int) config('molly.test_timeout', 120)));
+            $env = $this->workspaceEnvironment();
+            if ($this->sandbox->available() && ! $this->sandbox->allowUnsafe()) {
+                $sandboxed = $this->sandbox->run(
+                    $workspace,
+                    [$evidenceDirectory],
+                    $command,
+                    $evidenceDirectory,
+                    $timeout,
+                    $env,
+                );
+                $output = $sandboxed['output'].$sandboxed['error'];
+                if ($sandboxed['timed_out']) {
+                    return ['output' => $output, 'successful' => false, 'reason' => 'test_timeout'];
+                }
+
+                return ['output' => $output, 'successful' => $sandboxed['exit_code'] === 0];
+            }
+
+            $result = Process::path($workspace)
+                ->env($env)
+                ->timeout($timeout)
+                ->run($command);
+
+            return [
+                'output' => $result->output().$result->errorOutput(),
+                'successful' => $result->successful(),
+            ];
+        } catch (ProcessTimedOutException $exception) {
+            return [
+                'output' => $exception->result->output().$exception->result->errorOutput(),
+                'successful' => false,
+                'reason' => 'test_timeout',
+            ];
+        } catch (Throwable $exception) {
+            return [
+                'output' => $exception->getMessage(),
+                'successful' => false,
+                'reason' => 'test_process_failed',
+            ];
+        }
     }
 
     /** @return array<string, false> */
