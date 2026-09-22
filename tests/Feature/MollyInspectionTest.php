@@ -5,7 +5,8 @@ use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\EnsureRunConversation;
 use Sifrious\Molly\Actions\InspectRun;
 use Sifrious\Molly\Actions\InspectTaskChain;
-use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Actions\ShowConversation;
+use Sifrious\Molly\Conversations\ConversationStore;
 use Sifrious\Molly\Models\Task;
 
 beforeEach(function (): void {
@@ -57,7 +58,7 @@ it('inspects a task with run and conversation links both ways', function (): voi
         ->and($runInspection['verification']['status'])->toBe('failed');
 
     $conversationId = $chain['conversation_ids'][0];
-    $conversation = app(\Sifrious\Molly\Actions\ShowConversation::class)->handle($conversationId);
+    $conversation = app(ShowConversation::class)->handle($conversationId);
     expect($conversation['task_ids'])->toContain($task->id)
         ->and($conversation['run_ids'])->toContain($run->id)
         ->and($conversation['messages'])->not->toBeEmpty()
@@ -83,7 +84,7 @@ it('keeps conversation messages ordered with provenance', function (): void {
         ],
     ]);
 
-    $conversation = (new EnsureRunConversation)->handle($run);
+    $conversation = (new EnsureRunConversation(app(ConversationStore::class)))->handle($run);
     $roles = array_column($conversation->messages, 'role');
     expect($roles[0])->toBe('user')
         ->and($conversation->messages[0]['provenance']['kind'])->toBe('prompt')
