@@ -288,7 +288,7 @@ it('writes an empty project journal without creating database records', function
 
     expect($result['task_count'])->toBe(0)
         ->and($result['attempt_count'])->toBe(0)
-        ->and(File::get($result['journal_path']))->toContain('No saved tasks or attempts in this workspace.')
+        ->and(File::get($result['journal_path']))->toContain('No tasks recorded.')
         ->and(Task::count())->toBe(0);
 });
 

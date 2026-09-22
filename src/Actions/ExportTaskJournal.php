@@ -36,7 +36,7 @@ class ExportTaskJournal
         $root = (new Workspace($task->workspace))->path;
         $directory = $root.'/.molly/journal';
         $path = $directory.'/'.$task->id.'.md';
-        $markdown = $this->render($task);
+        $markdown = $this->journalRenderer->renderTask($this->taskPayload($task));
         $this->prepareDirectory($root);
         $this->write($root, $path, $markdown);
 
@@ -61,47 +61,81 @@ class ExportTaskJournal
             $right['model']->created_at?->toISOString(), $right['number'] > 0, $right['model']->id,
         ]);
 
-        $lines = ['# Project journal', '',
-            'Saved tasks and attempts appear in creation order. Each entry shows its current saved status and update time. This is not a complete history of lifecycle transitions.', '',
-            'The host database remains the source of truth. Export again to refresh this file.', '',
-        ];
+        $payloads = [];
         foreach ($entries as $entry) {
-            $lines = [...$lines, ...$this->projectEntry($entry['task'], $entry['model'], $entry['number'])];
+            $payloads[] = $this->projectEntryPayload($entry['task'], $entry['model'], $entry['number']);
         }
-        if ($entries === []) {
-            $lines[] = 'No saved tasks or attempts in this workspace.';
-        }
+
         $journalPath = $root.'/.molly/JOURNAL.md';
         $glossaryPath = $root.'/.molly/GLOSSARY.md';
         $this->prepareDirectory($root);
         $this->updateGlossary($root, $glossaryPath);
-        $this->write($root, $journalPath, implode("\n", $lines)."\n");
+        $this->write($root, $journalPath, $this->journalRenderer->renderProject($payloads));
 
         return ['journal_path' => $journalPath, 'glossary_path' => $glossaryPath, 'task_count' => $tasks->count(), 'attempt_count' => count($entries) - $tasks->count()];
     }
 
-    /** @return list<string> */
-    private function projectEntry(Task $task, Task|Run $record, int $number): array
+    /** @return array<string, mixed> */
+    private function projectEntryPayload(Task $task, Task|Run $record, int $number): array
     {
-        $identity = ['- Task UUID: '.$this->escape($task->id), '- Nickname: '.$this->escape($task->nickname ?? 'Unnamed')];
         if ($record instanceof Run) {
-            $lines = $this->attempt($record, $number);
-            $lines[0] = '## Attempt '.$number;
-
-            return [...array_slice($lines, 0, 2), ...$identity, ...array_slice($lines, 2)];
+            return [
+                'kind' => 'attempt',
+                'number' => $number,
+                'task_id' => $task->id,
+                'nickname' => $task->nickname ?? 'Unnamed',
+                'run' => $this->runPayload($record),
+            ];
         }
 
-        return ['## Task created', '', ...$identity,
-            '- Status: '.$this->escape($task->status),
-            '- Created: '.$this->escape($task->created_at?->toIso8601String()),
-            '- Updated: '.$this->escape($task->updated_at?->toIso8601String()),
-            '- Required test: '.$this->escape($task->test_path),
-            '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
-            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
-            ...$this->testLockLines($task),
-            ...$this->issueLines($task),
-            ...$this->lifecycleSummary($task), '',
-            $this->quote($task->prompt), '',
+        return [
+            'kind' => 'task',
+            'id' => $task->id,
+            'nickname' => $task->nickname ?? 'Unnamed',
+            'status' => $task->status,
+            'created_at' => $task->created_at?->toIso8601String(),
+            'updated_at' => $task->updated_at?->toIso8601String(),
+            'test_path' => $task->test_path,
+            'allow_test_edits' => (bool) $task->allow_test_edits,
+            'test_digest' => $task->test_digest ?? 'none',
+            'test_lock_lines' => $this->testLockLines($task),
+            'issue_lines' => $this->issueLines($task),
+            'lifecycle_lines' => $this->lifecycleSummary($task),
+            'prompt' => $task->prompt,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function taskPayload(Task $task): array
+    {
+        return [
+            'id' => $task->id,
+            'nickname' => $task->nickname ?? 'Unnamed',
+            'status' => $task->status,
+            'created_at' => $task->created_at?->toIso8601String(),
+            'updated_at' => $task->updated_at?->toIso8601String(),
+            'stop_requested_at' => $task->stop_requested_at?->toIso8601String() ?? 'No',
+            'test_path' => $task->test_path,
+            'allow_test_edits' => (bool) $task->allow_test_edits,
+            'test_digest' => $task->test_digest ?? 'none',
+            'test_lock_lines' => $this->testLockLines($task),
+            'issue_lines' => $this->issueLines($task),
+            'lifecycle_lines' => $this->lifecycleSummary($task),
+            'prompt' => $task->prompt,
+            'paths' => array_values($task->paths ?? []),
+            'runs' => $task->runs->map(fn (Run $run): array => $this->runPayload($run))->all(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function runPayload(Run $run): array
+    {
+        return [
+            'id' => $run->id,
+            'status' => $run->status,
+            'created_at' => $run->created_at?->toIso8601String(),
+            'updated_at' => $run->updated_at?->toIso8601String(),
+            'report' => is_array($run->report) ? $run->report : [],
         ];
     }
 
@@ -113,15 +147,16 @@ class ExportTaskJournal
             return [];
         }
 
-        $lines = ['- Locked test digest: '.$this->escape($lock['after_digest'])];
+        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $lines = ['- Locked test digest: '.$escape($lock['after_digest'])];
         if (is_string($lock['before_digest'] ?? null)) {
-            $lines[] = '- Previous test digest: '.$this->escape($lock['before_digest']);
+            $lines[] = '- Previous test digest: '.$escape($lock['before_digest']);
         }
         if (is_string($lock['approved_by'] ?? null)) {
-            $lines[] = '- Test lock approved by: '.$this->escape($lock['approved_by']);
+            $lines[] = '- Test lock approved by: '.$escape($lock['approved_by']);
         }
         if (is_string($lock['reason'] ?? null)) {
-            $lines[] = '- Test lock reason: '.$this->escape($lock['reason']);
+            $lines[] = '- Test lock reason: '.$escape($lock['reason']);
         }
 
         return $lines;
@@ -135,18 +170,19 @@ class ExportTaskJournal
             return [];
         }
 
-        $lines = ['- GitHub issue: '.$this->escape($source['issue_url'])];
+        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $lines = ['- GitHub issue: '.$escape($source['issue_url'])];
         if (is_string($source['issue_digest'] ?? null)) {
-            $lines[] = '- Issue digest: '.$this->escape($source['issue_digest']);
+            $lines[] = '- Issue digest: '.$escape($source['issue_digest']);
         }
         if (is_string($source['github_comment_url'] ?? null)) {
-            $lines[] = '- GitHub comment: '.$this->escape($source['github_comment_url']);
+            $lines[] = '- GitHub comment: '.$escape($source['github_comment_url']);
         }
         $linked = $source['linked_pr'] ?? null;
         if (is_array($linked) && is_string($linked['url'] ?? null)) {
-            $lines[] = '- Recorded pull request: '.$this->escape($linked['url']);
+            $lines[] = '- Recorded pull request: '.$escape($linked['url']);
             if (is_string($linked['merge_sha'] ?? null)) {
-                $lines[] = '- Recorded merge SHA: '.$this->escape($linked['merge_sha']);
+                $lines[] = '- Recorded merge SHA: '.$escape($linked['merge_sha']);
             }
         }
 
@@ -162,9 +198,10 @@ class ExportTaskJournal
             return [];
         }
 
-        $lines = ['- Display status: '.$this->escape($log->displayStatus($task->id)->value)];
+        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $lines = ['- Display status: '.$escape($log->displayStatus($task->id)->value)];
         foreach ($events as $event) {
-            $lines[] = '- Lifecycle: '.$this->escape($this->lifecycleLine($event));
+            $lines[] = '- Lifecycle: '.$escape($this->lifecycleLine($event));
         }
 
         return $lines;
@@ -185,46 +222,11 @@ class ExportTaskJournal
         return $line;
     }
 
-    private function glossary(): string
-    {
-        return <<<'MARKDOWN'
-## Molly terms
-
-Molly updates this marked section with the project journal. Add project-specific definitions outside the section.
-
-- Task: A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.
-- Nickname: An optional readable task reference. Commands also accept the task UUID.
-- Attempt: One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.
-- Verification: The recorded Pest result and counts. A skipped or missing check is not a pass.
-- Tarpit review: Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.
-- Accidental complexity: A finding whose removal preserves the required behavior. A blocking finding prevents completion.
-- Clever measurements: Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.
-- Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.
-- Recorded pull request: A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.
-- Recorded merge: A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.
-- Handoff: A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.
-
-The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.
-
-MARKDOWN;
-    }
-
     private function updateGlossary(string $root, string $path): void
     {
         $existing = $this->readExisting($path);
-        $start = '<!-- molly:glossary:start -->';
-        $end = '<!-- molly:glossary:end -->';
-        $section = $start."\n".$this->glossary().$end;
-        $contents = $existing ?? "# Project glossary\n";
-        if (str_contains($contents, $start) || str_contains($contents, $end)) {
-            if (substr_count($contents, $start) !== 1 || substr_count($contents, $end) !== 1 || strpos($contents, $end) < strpos($contents, $start)) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: The Molly glossary section markers are incomplete or repeated. Repair the markers before exporting.');
-            }
-            $contents = substr_replace($contents, $section, strpos($contents, $start), strpos($contents, $end) + strlen($end) - strpos($contents, $start));
-        } else {
-            $contents .= "\n".$section."\n";
-        }
-        if ($contents !== $existing) {
+        $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '');
+        if ($contents !== ($existing ?? '')) {
             $this->write($root, $path, $contents, $existing === null ? false : hash('sha256', $existing));
         }
     }
@@ -249,186 +251,6 @@ MARKDOWN;
         } catch (Throwable $exception) {
             throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not read an existing journal support file.', previous: $exception);
         }
-    }
-
-    private function render(Task $task): string
-    {
-        $lines = [
-            '# Task journal', '',
-            'This file is a snapshot of saved evidence. The host database remains the source of truth. Export again to refresh it.', '',
-            '- Task UUID: '.$this->escape($task->id),
-            '- Nickname: '.$this->escape($task->nickname ?? 'Unnamed'),
-            '- Status: '.$this->escape($task->status),
-            '- Created: '.$this->escape($task->created_at?->toIso8601String()),
-            '- Updated: '.$this->escape($task->updated_at?->toIso8601String()),
-            '- Stop requested: '.$this->escape($task->stop_requested_at?->toIso8601String() ?? 'No'),
-            '- Required test: '.$this->escape($task->test_path),
-            '- Test protection: '.($task->allow_test_edits ? 'writable for this task' : 'protected'),
-            '- Approved test digest: '.$this->escape($task->test_digest ?? 'none'),
-            ...$this->testLockLines($task),
-            ...$this->issueLines($task),
-            ...$this->lifecycleSummary($task), '',
-            '## Requested work', '', $this->quote($task->prompt), '',
-            '## Editable files', '',
-        ];
-        foreach ($task->paths ?? [] as $path) {
-            $lines[] = '- '.$this->escape($path);
-        }
-        $lines = [...$lines, '', '## Attempts', ''];
-        if ($task->runs->isEmpty()) {
-            $lines[] = 'No attempts recorded.';
-        }
-        foreach ($task->runs as $index => $run) {
-            $lines = [...$lines, ...$this->attempt($run, $index + 1)];
-        }
-
-        return implode("\n", $lines)."\n";
-    }
-
-    /** @return list<string> */
-    private function attempt(Run $run, int $number): array
-    {
-        $report = $run->report ?? [];
-        $lines = [
-            '### Attempt '.$number, '',
-            '- Run UUID: '.$this->escape($run->id),
-            '- Status: '.$this->escape($run->status),
-            '- Created: '.$this->escape($run->created_at?->toIso8601String()),
-            '- Updated: '.$this->escape($run->updated_at?->toIso8601String()), '',
-        ];
-        foreach (['summary' => 'Summary', 'error' => 'Failure', 'stop_reason' => 'Stop reason'] as $key => $label) {
-            if (is_string($report[$key] ?? null) && $report[$key] !== '') {
-                $lines = [...$lines, $label.':', '', $this->quote($report[$key]), ''];
-            }
-        }
-
-        return [...$lines,
-            ...$this->verification($report['verification'] ?? []),
-            ...$this->receipts($report['verification_receipts'] ?? []),
-            ...$this->review($report['review'] ?? []),
-            ...$this->measurements($report),
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $verification
-     * @return list<string>
-     */
-    private function verification(array $verification): array
-    {
-        $lines = ['#### Pest verification', '', '- Status: '.$this->escape($verification['status'] ?? null)];
-        foreach (['tests', 'assertions', 'failures', 'errors', 'skipped'] as $key) {
-            $lines[] = '- '.ucfirst($key).': '.$this->escape($verification[$key] ?? null);
-        }
-        foreach (['reason', 'error'] as $key) {
-            if (is_string($verification[$key] ?? null)) {
-                $lines = [...$lines, '', $this->quote($verification[$key])];
-            }
-        }
-
-        return [...$lines, ''];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $receipts
-     * @return list<string>
-     */
-    private function receipts(array $receipts): array
-    {
-        if ($receipts === []) {
-            return [];
-        }
-
-        $lines = ['#### Verification receipts', ''];
-        foreach ($receipts as $receipt) {
-            $lines[] = '- '.$this->escape($receipt['verifier'] ?? null).': '.$this->escape($receipt['state'] ?? null).' / '.$this->escape($receipt['evidence_digest'] ?? null);
-        }
-
-        return [...$lines, ''];
-    }
-
-    /**
-     * @param  array<string, mixed>  $review
-     * @return list<string>
-     */
-    private function review(array $review): array
-    {
-        $lines = ['#### Tarpit review', '', '- Status: '.$this->escape($review['status'] ?? (isset($review['checks']) ? 'See checks below' : null)), ''];
-        foreach (range('A', 'G') as $code) {
-            $check = $review['checks'][$code] ?? [];
-            $lines[] = '- '.$code.': '.$this->escape($check['status'] ?? null);
-            if (is_string($check['evidence'] ?? null)) {
-                $lines = [...$lines, '', $this->quote($check['evidence']), ''];
-            }
-        }
-        foreach (['reason', 'error'] as $key) {
-            if (is_string($review[$key] ?? null)) {
-                $lines = [...$lines, '', $this->quote($review[$key]), ''];
-            }
-        }
-        foreach ($review['findings'] ?? [] as $finding) {
-            $lines = [...$lines, '',
-                'Finding '.$this->escape($finding['code'] ?? null).': '.$this->escape($finding['severity'] ?? null).' / '.$this->escape($finding['classification'] ?? null),
-                '- File: '.$this->escape($finding['path'] ?? null).':'.$this->escape($finding['line'] ?? null), '',
-                $this->quote($finding['problem'] ?? null), '',
-                'Suggested change:', '', $this->quote($finding['recommendation'] ?? null), '',
-            ];
-        }
-        if (isset($review['findings']) && $review['findings'] === []) {
-            $lines = [...$lines, '', 'No findings recorded.'];
-        }
-
-        return [...$lines, ''];
-    }
-
-    /**
-     * @param  array<string, mixed>  $report
-     * @return list<string>
-     */
-    private function measurements(array $report): array
-    {
-        $lines = ['#### Clever measurements', '', 'Measurements are separate from Tarpit findings. Lower counts alone do not prove a simpler design.', ''];
-        foreach (['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label) {
-            $measurement = $report[$key] ?? [];
-            $lines[] = '- '.$label.': '.$this->escape($measurement['status'] ?? null);
-            if (is_string($measurement['reason'] ?? null)) {
-                $lines = [...$lines, '', $this->quote($measurement['reason']), ''];
-            }
-            foreach ($measurement['probes'] ?? [] as $probe) {
-                $lines[] = '- '.$this->escape($probe['name'] ?? $probe['key'] ?? null).': '.$this->escape($probe['status'] ?? null);
-                foreach ($probe['metrics'] ?? [] as $name => $value) {
-                    if (is_numeric($value) || is_bool($value)) {
-                        $lines[] = '  - '.$this->escape(str_replace('_', ' ', $name)).': '.$this->escape($value);
-                    }
-                }
-                if (is_string($probe['skip_reason'] ?? null)) {
-                    $lines = [...$lines, '', $this->quote($probe['skip_reason']), ''];
-                }
-            }
-        }
-
-        return [...$lines, ''];
-    }
-
-    private function escape(mixed $value): string
-    {
-        if (! is_scalar($value)) {
-            return 'Not recorded';
-        }
-        $text = is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value;
-        $text = preg_replace('/[\x00-\x1F\x7F]/', ' ', $text);
-        $text = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-        return preg_replace('/([\\\\`*_{}\[\]()#+.!|>~-])/', '\\\\$1', $text);
-    }
-
-    private function quote(mixed $value): string
-    {
-        if (! is_string($value)) {
-            return '> Not recorded';
-        }
-
-        return implode("\n", array_map(fn (string $line): string => '> '.$this->escape($line), preg_split('/\R/', $value)));
     }
 
     private function write(string $root, string $path, string $markdown, string|false|null $expectedHash = null): void
