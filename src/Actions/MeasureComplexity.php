@@ -7,6 +7,8 @@ use Throwable;
 
 class MeasureComplexity
 {
+    public function __construct(private Clever $clever) {}
+
     /**
      * @return array{status: string, probes: list<array<string, mixed>>, reason?: string, report?: string, detail?: string}
      */
@@ -22,15 +24,14 @@ class MeasureComplexity
 
         try {
             config(['molly-complexity.root' => $workspace, 'molly-complexity.report.path' => $reportPath]);
-            $clever = app(Clever::class);
 
-            if (! $clever->enabled()) {
+            if (! $this->clever->enabled()) {
                 return ['status' => 'unavailable', 'probes' => [], 'reason' => 'clever_disabled'];
             }
 
             $probes = [];
 
-            foreach ($clever->scan() as $result) {
+            foreach ($this->clever->scan() as $result) {
                 $probes[] = $result->toArray();
             }
 
