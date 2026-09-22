@@ -8,7 +8,7 @@ use Sifrious\Molly\Settings\SettingsStore;
 
 final class UpdateMollySettings
 {
-    public function __construct(private SettingsStore $store = new SettingsStore) {}
+    public function __construct(private SettingsStore $store) {}
 
     /**
      * @param  array<string, mixed>  $overrides
