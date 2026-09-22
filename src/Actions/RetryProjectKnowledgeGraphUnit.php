@@ -7,7 +7,7 @@ use RuntimeException;
 /** Re-run a single graph bootstrap unit from the project manifest. */
 final class RetryProjectKnowledgeGraphUnit
 {
-    public function __construct(private BootstrapProjectKnowledgeGraphs $bootstrap = new BootstrapProjectKnowledgeGraphs) {}
+    public function __construct(private BootstrapProjectKnowledgeGraphs $bootstrap) {}
 
     /**
      * @param  (callable(string, string): void)|null  $progress
