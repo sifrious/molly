@@ -101,17 +101,21 @@ Molly also attaches a small `laravel_knowledge` neighborhood to implementation p
 
 Read [Laravel knowledge](knowledge-graph.md) for current scope and limits.
 
-## Optional TypeSafe evaluation
+## Optional Jev classification through Laravel AI
 
-TypeSafe is optional and disabled by default. When you explicitly enable it, Molly can send selected evidence for:
+Jev classification is optional and off by default (`MOLLY_JEV_ENABLED=false`). When disabled, Molly never opens a classification request and never upgrades a Pest, Tarpit, retry, or completion decision.
+
+When you explicitly enable Jev, Molly borrows Laravel AI's classification seam (not a Molly-owned TypeSafe HTTP client) for selected, bounded evidence:
 
 - plan suggestions
 - failed-task advice
 - PHP commit review
 
-TypeSafe does not replace Pest or Tarpit, and it cannot make a failed run pass.
+Inputs stay bounded to the evidence Molly already collected for that call. Provider credentials and transport belong to Laravel AI (`ai.providers.typesafe` / `TYPESAFE_API_KEY`), not a second Molly transport stack. Molly records the real provider provenance returned by Laravel AI.
 
-See [Configuration](reference/configuration.md#typesafe) for the settings.
+Jev cannot replace Pest or Tarpit, cannot widen retries, and cannot make a failed run pass. Agents must not invent flags, env overrides, or MCP tools that bypass `MOLLY_JEV_ENABLED` or those deterministic gates.
+
+See [Configuration](reference/configuration.md#jev-and-typesafe) for the settings.
 
 ## Review a PHP commit
 
@@ -120,7 +124,7 @@ php artisan molly:review-commit HEAD
 php artisan molly:review-commit --staged --json
 ```
 
-This reads a bounded PHP diff, runs Git's whitespace check, and optionally requests TypeSafe evaluation. It does not run tests, edit files, or create a commit.
+This reads a bounded PHP diff, runs Git's whitespace check, and optionally requests Jev classification through Laravel AI when that gate is enabled. It does not run tests, edit files, or create a commit.
 
 ## Current limits
 
