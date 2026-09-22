@@ -42,6 +42,9 @@ return [
         'url' => env('MOLLY_PREVIEW_URL'),
         'viewport' => env('MOLLY_PREVIEW_VIEWPORT', '1280x720'),
     ],
+    'jev' => [
+        'enabled' => env('MOLLY_JEV_ENABLED', true),
+    ],
     'typesafe' => [
         'enabled' => false,
         'api_key' => env('TYPESAFE_API_KEY'),

@@ -12,6 +12,10 @@ final class ResolveClassificationAdapter
 
     public function handle(): ClassificationAdapter
     {
-        return $this->detect->supportsStructuredAgents() ? $this->laravelAi : $this->fallback;
+        if (config('molly.jev.enabled', true) !== true) {
+            return $this->fallback;
+        }
+
+        return $this->detect->supportsDecide() ? $this->laravelAi : $this->fallback;
     }
 }
