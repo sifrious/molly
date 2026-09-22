@@ -5,7 +5,7 @@ namespace Sifrious\Molly\Journal;
 use RuntimeException;
 
 /** Validate and atomically replace private journal files and Molly support files. */
-final class JournalWriter
+class JournalWriter
 {
     public function ensureDirectory(string $path): void
     {

@@ -2,7 +2,6 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEvent;
@@ -227,90 +226,39 @@ class ExportTaskJournal
         $existing = $this->readExisting($path);
         $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '');
         if ($contents !== ($existing ?? '')) {
-            $this->write($root, $path, $contents, $existing === null ? false : hash('sha256', $existing));
+            $this->journalWriter->replaceFile($path, $contents, $existing === null ? false : hash('sha256', $existing));
         }
     }
 
     private function prepareDirectory(string $root): void
     {
-        $this->ensureDirectory($root.'/.molly');
-        $path = $root.'/.molly/.gitignore';
-        $existing = $this->readExisting($path);
-        $lines = explode("\n", rtrim($existing ?? '', "\r\n"));
-        if (end($lines) !== '*') {
-            $contents = ($existing ?? '').($existing !== null && ! str_ends_with($existing, "\n") ? "\n" : '')."*\n";
-            $this->write($root, $path, $contents, $existing === null ? false : hash('sha256', $existing));
-        }
+        $this->journalWriter->prepareMollyDirectory($root);
     }
 
     private function readExisting(string $path): ?string
     {
-        $this->validateFile($path);
+        $this->journalWriter->validateFile($path);
         try {
-            return is_file($path) ? File::get($path) : null;
+            if (! is_file($path)) {
+                return null;
+            }
+            $contents = file_get_contents($path);
+            if ($contents === false) {
+                throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not read an existing journal support file.');
+            }
+
+            return $contents;
         } catch (Throwable $exception) {
+            if ($exception instanceof RuntimeException && str_starts_with($exception->getMessage(), 'JOURNAL_')) {
+                throw $exception;
+            }
             throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not read an existing journal support file.', previous: $exception);
         }
     }
 
     private function write(string $root, string $path, string $markdown, string|false|null $expectedHash = null): void
     {
-        $this->ensureDirectory($root.'/.molly');
-        $this->ensureDirectory(dirname($path));
-        $this->validateFile($path);
-        $temporary = @tempnam(dirname($path), '.journal-');
-        if ($temporary === false) {
-            throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create the journal file.');
-        }
-
-        try {
-            if (dirname($temporary) !== dirname($path) || File::put($temporary, $markdown) !== strlen($markdown)) {
-                throw new RuntimeException('The journal could not be written in full.');
-            }
-            $this->validateDirectory($root.'/.molly');
-            $this->validateDirectory(dirname($path));
-            $this->validateFile($path);
-            if ($expectedHash !== null && (is_file($path) ? @hash_file('sha256', $path) : false) !== $expectedHash) {
-                throw new RuntimeException('The existing file changed during export.');
-            }
-            if (! File::move($temporary, $path)) {
-                throw new RuntimeException('The journal could not be replaced.');
-            }
-        } catch (Throwable $exception) {
-            throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not save the journal. The task and its attempts are unchanged.', previous: $exception);
-        } finally {
-            if (is_file($temporary) && ! is_link($temporary)) {
-                @unlink($temporary);
-            }
-        }
-    }
-
-    private function ensureDirectory(string $path): void
-    {
-        clearstatcache(true, $path);
-        if (is_link($path) || (file_exists($path) && ! is_dir($path))) {
-            throw new RuntimeException('JOURNAL_PATH_INVALID: Journal directories must be real directories, not links or files.');
-        }
-        if (! is_dir($path) && ! @mkdir($path, 0700) && ! is_dir($path)) {
-            throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create the journal directory.');
-        }
-        $this->validateDirectory($path);
-    }
-
-    private function validateDirectory(string $path): void
-    {
-        clearstatcache(true, $path);
-        if (is_link($path) || ! is_dir($path) || realpath($path) !== $path) {
-            throw new RuntimeException('JOURNAL_PATH_INVALID: Journal directories must remain inside the workspace without links.');
-        }
-    }
-
-    private function validateFile(string $path): void
-    {
-        clearstatcache(true, $path);
-        $stat = @lstat($path);
-        if ($stat !== false && (($stat['mode'] & 0170000) !== 0100000 || $stat['nlink'] !== 1)) {
-            throw new RuntimeException('JOURNAL_PATH_INVALID: The journal destination must be a regular file without links.');
-        }
+        $this->journalWriter->ensureDirectory($root.'/.molly');
+        $this->journalWriter->replaceFile($path, $markdown, $expectedHash);
     }
 }

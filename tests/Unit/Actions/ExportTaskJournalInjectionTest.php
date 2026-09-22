@@ -32,3 +32,14 @@ it('delegates Markdown rendering and glossary copy to JournalRenderer', function
         ->and($reflection->hasMethod('projectEntryPayload'))->toBeTrue()
         ->and($reflection->hasMethod('runPayload'))->toBeTrue();
 });
+
+it('delegates journal writes and path validation to JournalWriter', function () {
+    $action = app(ExportTaskJournal::class);
+    $reflection = new ReflectionClass($action);
+    foreach (['ensureDirectory', 'validateDirectory', 'validateFile'] as $gone) {
+        expect($reflection->hasMethod($gone))->toBeFalse();
+    }
+    $write = $reflection->getMethod('write');
+    $write->setAccessible(true);
+    expect($reflection->hasMethod('prepareDirectory'))->toBeTrue();
+});

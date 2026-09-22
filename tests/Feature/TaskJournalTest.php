@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -8,6 +7,7 @@ use Sifrious\Molly\Actions\ExportTaskJournal;
 use Sifrious\Molly\Actions\NameTask;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Journal\JournalWriter;
 use Sifrious\Molly\Models\Task;
 
 beforeEach(function (): void {
@@ -223,14 +223,20 @@ it('rejects a directory or hard link at the journal destination', function (bool
     }
 })->with(['hard link' => true, 'directory' => false]);
 
-it('preserves the previous journal and saved records when a write cannot finish', function (string $operation): void {
+it('preserves the previous journal and saved records when a write cannot finish', function (): void {
     $task = journalTask(['status' => 'running']);
     $run = $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'running', 'report' => []]);
     $initial = app(ExportTaskJournal::class)->handle($task->id);
     $original = File::get($initial['path']);
     $taskBefore = $task->fresh()->getRawOriginal();
     $runBefore = $run->fresh()->getRawOriginal();
-    File::partialMock()->shouldReceive($operation)->once()->andReturn($operation === 'put' ? 0 : false);
+    $real = app(JournalWriter::class);
+    $this->mock(JournalWriter::class, function ($mock) use ($real): void {
+        $mock->shouldReceive('prepareMollyDirectory')->andReturnUsing(fn (string $root) => $real->prepareMollyDirectory($root));
+        $mock->shouldReceive('ensureDirectory')->andReturnUsing(fn (string $path) => $real->ensureDirectory($path));
+        $mock->shouldReceive('validateFile')->andReturnUsing(fn (string $path) => $real->validateFile($path));
+        $mock->shouldReceive('replaceFile')->once()->andThrow(new RuntimeException('JOURNAL_WRITE_FAILED: The journal could not be written in full.'));
+    });
 
     $exit = Artisan::call('molly:journal', ['task' => 'health-check', '--json' => true]);
     $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
@@ -243,7 +249,7 @@ it('preserves the previous journal and saved records when a write cannot finish'
         ->and(scandir(dirname($initial['path'])))->toBe(['.', '..', $task->id.'.md'])
         ->and($task->fresh()->getRawOriginal())->toBe($taskBefore)
         ->and($run->fresh()->getRawOriginal())->toBe($runBefore);
-})->with(['partial write' => 'put', 'failed rename' => 'move']);
+});
 
 it('rebuilds a project chronology without duplicating entries or including another workspace', function (): void {
     $this->travelTo('2026-09-17 10:00:00');
@@ -306,16 +312,24 @@ it('rejects linked project artifacts without overwriting their targets', functio
 
 it('keeps the previous project journal and task state when replacement fails', function (): void {
     $task = journalTask(['status' => 'running']);
-    $exporter = app(ExportTaskJournal::class);
-    $initial = $exporter->forWorkspace($this->journalWorkspace);
+    $initial = app(ExportTaskJournal::class)->forWorkspace($this->journalWorkspace);
     $original = File::get($initial['journal_path']);
     $before = $task->fresh()->getRawOriginal();
-    $filesystem = new Filesystem;
-    File::partialMock()->shouldReceive('move')->andReturnUsing(function (string $from, string $to) use ($filesystem, $initial): bool {
-        return $to === $initial['journal_path'] ? false : $filesystem->move($from, $to);
+    $real = app(JournalWriter::class);
+    $journalPath = $initial['journal_path'];
+    $this->mock(JournalWriter::class, function ($mock) use ($real, $journalPath): void {
+        $mock->shouldReceive('prepareMollyDirectory')->andReturnUsing(fn (string $root) => $real->prepareMollyDirectory($root));
+        $mock->shouldReceive('ensureDirectory')->andReturnUsing(fn (string $path) => $real->ensureDirectory($path));
+        $mock->shouldReceive('validateFile')->andReturnUsing(fn (string $path) => $real->validateFile($path));
+        $mock->shouldReceive('replaceFile')->andReturnUsing(function (string $path, string $contents, string|false|null $expectedHash = null) use ($real, $journalPath): void {
+            if ($path === $journalPath) {
+                throw new RuntimeException('JOURNAL_WRITE_FAILED: The journal could not be replaced.');
+            }
+            $real->replaceFile($path, $contents, $expectedHash);
+        });
     });
 
-    expect(fn () => $exporter->forWorkspace($this->journalWorkspace))->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED');
+    expect(fn () => app(ExportTaskJournal::class)->forWorkspace($this->journalWorkspace))->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED');
 
     expect(File::get($initial['journal_path']))->toBe($original)
         ->and(scandir($this->journalWorkspace.'/.molly'))->toBe(['.', '..', '.gitignore', 'GLOSSARY.md', 'JOURNAL.md'])
@@ -371,13 +385,17 @@ it('preserves a glossary edited during export instead of replacing the new conte
     mkdir($this->journalWorkspace.'/.molly', 0700);
     $path = $this->journalWorkspace.'/.molly/GLOSSARY.md';
     File::put($path, '# Initial glossary');
-    $filesystem = new Filesystem;
-    File::partialMock()->shouldReceive('put')->andReturnUsing(function (string $temporary, string $contents) use ($filesystem, $path): int|bool {
-        if (str_contains($contents, '<!-- molly:glossary:start -->')) {
-            $filesystem->put($path, '# Concurrent glossary edit');
-        }
-
-        return $filesystem->put($temporary, $contents);
+    $real = app(JournalWriter::class);
+    $this->mock(JournalWriter::class, function ($mock) use ($real, $path): void {
+        $mock->shouldReceive('prepareMollyDirectory')->andReturnUsing(fn (string $root) => $real->prepareMollyDirectory($root));
+        $mock->shouldReceive('ensureDirectory')->andReturnUsing(fn (string $dir) => $real->ensureDirectory($dir));
+        $mock->shouldReceive('validateFile')->andReturnUsing(fn (string $file) => $real->validateFile($file));
+        $mock->shouldReceive('replaceFile')->andReturnUsing(function (string $file, string $contents, string|false|null $expectedHash = null) use ($real, $path): void {
+            if ($file === $path && is_string($expectedHash) && str_contains($contents, '<!-- molly:glossary:start -->')) {
+                file_put_contents($path, '# Concurrent glossary edit');
+            }
+            $real->replaceFile($file, $contents, $expectedHash);
+        });
     });
 
     expect(fn () => app(ExportTaskJournal::class)->forWorkspace($this->journalWorkspace))->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED');
