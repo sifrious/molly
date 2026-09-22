@@ -60,3 +60,28 @@ it('classifies incompatible schema versions', function () {
     expect(fn () => GraphManifest::load($root))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_MANIFEST_INCOMPATIBLE:');
 });
+
+it('replaces one unit by id while preserving untouched order and dropping skipped', function () {
+    $manifest = GraphManifest::fromArray([
+        'schema_version' => 1,
+        'units' => [
+            ['id' => 'laravel', 'status' => 'ready'],
+            ['id' => 'nativephp', 'status' => 'failed'],
+            ['id' => 'skip-me', 'status' => 'skipped'],
+        ],
+    ]);
+
+    $next = $manifest->withReplacedUnit(['id' => 'nativephp', 'status' => 'ready']);
+
+    expect($next->units)->toHaveCount(2)
+        ->and($next->units[0]['id'])->toBe('laravel')
+        ->and($next->units[1]['status'])->toBe('ready')
+        ->and($next->allReady())->toBeTrue();
+});
+
+it('rejects skipped replacement units', function () {
+    $manifest = GraphManifest::fromArray(['schema_version' => 1, 'units' => [['id' => 'laravel', 'status' => 'ready']]]);
+
+    expect(fn () => $manifest->withReplacedUnit(['id' => 'x', 'status' => 'skipped']))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_MANIFEST_INVALID:');
+});

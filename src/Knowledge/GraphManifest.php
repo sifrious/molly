@@ -137,6 +137,71 @@ final class GraphManifest
         return is_string($value) ? $value : null;
     }
 
+    /**
+     * Replace or insert one unit by id; drop skipped placeholders; preserve order of untouched units.
+     *
+     * @param  array<string, mixed>  $unit
+     */
+    public function withReplacedUnit(array $unit): self
+    {
+        if (! isset($unit['id']) || ! is_string($unit['id']) || $unit['id'] === '') {
+            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: A unit replacement requires a string id.');
+        }
+        if (($unit['status'] ?? null) === 'skipped') {
+            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Skipped placeholders cannot replace a unit.');
+        }
+
+        $byId = [];
+        $order = [];
+        foreach ($this->units as $existing) {
+            if (! is_array($existing) || ! isset($existing['id']) || ! is_string($existing['id'])) {
+                continue;
+            }
+            if (($existing['status'] ?? null) === 'skipped') {
+                continue;
+            }
+            $byId[$existing['id']] = $existing;
+            $order[] = $existing['id'];
+        }
+
+        if (! isset($byId[$unit['id']])) {
+            $order[] = $unit['id'];
+        }
+        $byId[$unit['id']] = $unit;
+
+        $units = [];
+        foreach ($order as $id) {
+            $units[] = $byId[$id];
+        }
+
+        return new self(
+            schemaVersion: $this->schemaVersion,
+            projectPath: $this->projectPath,
+            lockPath: $this->lockPath,
+            lockHash: $this->lockHash,
+            laravelExact: $this->laravelExact,
+            laravelMajor: $this->laravelMajor,
+            packages: $this->packages,
+            units: $units,
+            updatedAt: $this->updatedAt,
+            path: $this->path,
+        );
+    }
+
+    public function allReady(): bool
+    {
+        if ($this->units === []) {
+            return false;
+        }
+        foreach ($this->units as $unit) {
+            if (! is_array($unit) || ($unit['status'] ?? null) !== 'ready') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
