@@ -62,3 +62,22 @@ it('fails compare-and-swap when the expected hash does not match', function () {
     expect(fn () => $writer->replaceFile($path, "two\n", 'deadbeef'))
         ->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED:');
 });
+
+it('prepares .molly and appends ignore star without overwriting user lines', function () {
+    $root = realpath(sys_get_temp_dir()).'/molly-journal-support-'.uniqid('', true);
+    $writer = new JournalWriter;
+    $writer->ensureDirectory($root);
+    $writer->prepareMollyDirectory($root);
+
+    $gitignore = $root.'/.molly/.gitignore';
+    expect(is_dir($root.'/.molly'))->toBeTrue()
+        ->and(file_get_contents($gitignore))->toBe("*\n");
+
+    file_put_contents($gitignore, "notes.md\n");
+    $writer->prepareMollyDirectory($root);
+    expect(file_get_contents($gitignore))->toBe("notes.md\n*\n");
+
+    $before = file_get_contents($gitignore);
+    $writer->prepareMollyDirectory($root);
+    expect(file_get_contents($gitignore))->toBe($before);
+});

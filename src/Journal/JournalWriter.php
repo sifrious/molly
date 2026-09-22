@@ -4,7 +4,7 @@ namespace Sifrious\Molly\Journal;
 
 use RuntimeException;
 
-/** Validate and atomically replace private journal files. */
+/** Validate and atomically replace private journal files and Molly support files. */
 final class JournalWriter
 {
     public function ensureDirectory(string $path): void
@@ -91,5 +91,32 @@ final class JournalWriter
                 @unlink($temporary);
             }
         }
+    }
+
+    /** Ensure `.molly` exists privately and the local ignore rule is present without clobbering user lines. */
+    public function prepareMollyDirectory(string $root): void
+    {
+        $directory = rtrim($root, '/').'/.molly';
+        $this->ensureDirectory($directory);
+        $gitignore = $directory.'/.gitignore';
+        $existing = null;
+        if (is_file($gitignore)) {
+            $this->validateFile($gitignore);
+            $existing = file_get_contents($gitignore);
+            if ($existing === false) {
+                throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not read an existing journal support file.');
+            }
+        } else {
+            $this->validateFile($gitignore);
+        }
+
+        $lines = explode("\n", rtrim($existing ?? '', "\r\n"));
+        if (end($lines) === '*') {
+            return;
+        }
+
+        $contents = ($existing ?? '').($existing !== null && ! str_ends_with($existing, "\n") ? "\n" : '')."*\n";
+        $expected = $existing === null ? false : hash('sha256', $existing);
+        $this->replaceFile($gitignore, $contents, $expected);
     }
 }
