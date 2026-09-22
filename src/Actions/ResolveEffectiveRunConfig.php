@@ -12,7 +12,7 @@ use Sifrious\Molly\Settings\SettingsStore;
  */
 final class ResolveEffectiveRunConfig
 {
-    public function __construct(private SettingsStore $store = new SettingsStore) {}
+    public function __construct(private SettingsStore $store) {}
 
     /**
      * @param  array<string, mixed>  $taskOverrides
