@@ -10,6 +10,7 @@ use RuntimeException;
  *
  * Entries are keyed by namespace + package + exact version. A different version never hits.
  * Cached graph records are hydrated through GraphSnapshot; malformed payloads miss.
+ * Writes stage JSON in the same directory, verify complete bytes, set private perms, then rename.
  */
 final class GraphCache
 {
@@ -94,12 +95,36 @@ final class GraphCache
         }
 
         $path = $this->path($namespace, $package, $exactVersion);
-        File::ensureDirectoryExists(dirname($path), 0700);
-        $mask = umask(0077);
+        $directory = dirname($path);
+        File::ensureDirectoryExists($directory, 0700);
+        @chmod($directory, 0700);
+
+        $json = json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+        $temporary = $directory.'/.graph-cache-'.bin2hex(random_bytes(8)).'.tmp';
+        $handle = @fopen($temporary, 'xb');
+        if ($handle === false) {
+            throw new RuntimeException('KNOWLEDGE_CACHE_WRITE_FAILED: Molly could not stage the graph cache entry.');
+        }
+
         try {
-            File::put($path, json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+            $written = @fwrite($handle, $json);
+            @fclose($handle);
+            $handle = null;
+            if ($written !== strlen($json)) {
+                throw new RuntimeException('KNOWLEDGE_CACHE_WRITE_FAILED: The graph cache entry could not be written in full.');
+            }
+            @chmod($temporary, 0600);
+            if (! @rename($temporary, $path)) {
+                throw new RuntimeException('KNOWLEDGE_CACHE_WRITE_FAILED: The graph cache entry could not be replaced atomically.');
+            }
+            @chmod($path, 0600);
         } finally {
-            umask($mask);
+            if (is_resource($handle)) {
+                @fclose($handle);
+            }
+            if (is_file($temporary) && ! is_link($temporary)) {
+                @unlink($temporary);
+            }
         }
     }
 
