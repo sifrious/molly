@@ -12,7 +12,7 @@ final class ResolveClassificationAdapter
 
     public function handle(): ClassificationAdapter
     {
-        if (config('molly.jev.enabled', true) !== true) {
+        if (config('molly.jev.enabled', false) !== true) {
             return $this->fallback;
         }
 
