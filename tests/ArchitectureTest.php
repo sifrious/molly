@@ -1,5 +1,14 @@
 <?php
 
+use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\VerifyChanges;
+use Sifrious\Molly\Contracts\DisplayStatus;
+use Sifrious\Molly\Contracts\JsonDocument;
+use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Tests\TestCase;
+
+uses(TestCase::class);
+
 arch('application actions do not depend on transport or presentation')
     ->expect('Sifrious\Molly\Actions')
     ->not->toUse([
@@ -55,3 +64,15 @@ arch('cross-repository contracts do not depend on transport or presentation')
         'Laravel\Prompts',
         'Livewire',
     ]);
+
+it('resolves collaborator-bearing actions from the Laravel container', function () {
+    foreach ([CreateTask::class, VerifyChanges::class] as $action) {
+        expect(app($action))->toBeInstanceOf($action);
+    }
+});
+
+it('does not ban direct construction of contract values outside the container', function () {
+    expect(DisplayStatus::Pending->value)->toBe('pending')
+        ->and(LifecycleEventType::Created->value)->toBe('created')
+        ->and(JsonDocument::encode(['schema' => 'test', 'ok' => true]))->toContain('"ok":true');
+});
