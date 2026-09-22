@@ -9,12 +9,15 @@ use Throwable;
 
 class RecommendTaskNextStep
 {
-    public function __construct(private EvaluateWithTypeSafe $evaluator) {}
+    public function __construct(
+        private EvaluateWithTypeSafe $evaluator,
+        private ShowTask $showTask,
+    ) {}
 
     /** @return array<string, mixed> */
     public function handle(string $reference): array
     {
-        $task = app(ShowTask::class)->handle($reference)
+        $task = $this->showTask->handle($reference)
             ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
         $run = $task->runs->last();
         $advice = $this->deterministic($task, $run);
@@ -31,7 +34,7 @@ class RecommendTaskNextStep
                 $evaluation = ['status' => 'unavailable', 'reason' => 'provider_unavailable'];
             }
             $evaluation['duration_ms'] = (int) round((hrtime(true) - $started) / 1_000_000);
-            $current = app(ShowTask::class)->handle($task->id)
+            $current = $this->showTask->handle($task->id)
                 ?? throw new RuntimeException('TASK_NOT_FOUND: The task was removed while Molly requested advice.');
             $latest = $current->runs->last();
             $advice = $this->deterministic($current, $latest);
@@ -49,7 +52,7 @@ class RecommendTaskNextStep
         if ($run !== null && in_array($run->status, ['completed', 'failed', 'stopped'], true)) {
             $advice['persisted'] = $this->save($run, $advice);
             if (! $advice['persisted']) {
-                $current = app(ShowTask::class)->handle($task->id)
+                $current = $this->showTask->handle($task->id)
                     ?? throw new RuntimeException('TASK_NOT_FOUND: The task was removed before Molly saved advice.');
                 $advice = $this->deterministic($current, $current->runs->last());
                 $advice['status'] = 'fallback';
