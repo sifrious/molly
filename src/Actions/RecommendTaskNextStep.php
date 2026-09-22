@@ -50,17 +50,32 @@ class RecommendTaskNextStep
             $run = $latest;
         }
         if ($run !== null && in_array($run->status, ['completed', 'failed', 'stopped'], true)) {
-            $advice['persisted'] = $this->save($run, $advice);
-            if (! $advice['persisted']) {
-                $current = $this->showTask->handle($task->id)
-                    ?? throw new RuntimeException('TASK_NOT_FOUND: The task was removed before Molly saved advice.');
-                $advice = $this->deterministic($current, $current->runs->last());
-                $advice['status'] = 'fallback';
-                $advice['fallback'] = true;
-                $advice['provider']['reason'] = 'evidence_changed';
-                $advice['reason'] .= ' Saved evidence changed before advice could be stored. Request advice again to review the current evidence.';
-            }
+            $advice = $this->persistAdviceWithEvidenceRecheck($task, $run, $advice);
         }
+
+        return $advice;
+    }
+
+    /**
+     * Persist advice under optimistic lock; recompute deterministic fallback if evidence changed.
+     *
+     * @param  array<string, mixed>  $advice
+     * @return array<string, mixed>
+     */
+    private function persistAdviceWithEvidenceRecheck(Task $task, Run $run, array $advice): array
+    {
+        $advice['persisted'] = $this->save($run, $advice);
+        if ($advice['persisted']) {
+            return $advice;
+        }
+
+        $current = $this->showTask->handle($task->id)
+            ?? throw new RuntimeException('TASK_NOT_FOUND: The task was removed before Molly saved advice.');
+        $advice = $this->deterministic($current, $current->runs->last());
+        $advice['status'] = 'fallback';
+        $advice['fallback'] = true;
+        $advice['provider']['reason'] = 'evidence_changed';
+        $advice['reason'] .= ' Saved evidence changed before advice could be stored. Request advice again to review the current evidence.';
 
         return $advice;
     }
