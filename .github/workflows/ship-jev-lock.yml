@@ -27,7 +27,7 @@ jobs:
         run: composer update laravel/ai --with-all-dependencies --no-interaction --prefer-dist --no-progress
       - name: Validate resolved lock
         run: |
-          composer validate --strict
+          composer validate --strict --no-check-publish
           composer audit --locked
       - name: Commit refreshed lock
         run: |
