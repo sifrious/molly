@@ -140,10 +140,16 @@ Also see [Troubleshooting](troubleshooting.md).
 
 Molly **does not** silently fall back to a paid provider when Ollama fails. Hosted / Amp paths require explicit `molly:setup --agent=amp` (or equivalent profile policy). If Ollama is down, doctor fails closed until you fix local readiness or you intentionally switch agents.
 
+## 11. Optional Jev classification (advanced; off by default)
+
+Local agent execution does **not** require a hosted credential and does **not** enable Laravel AI classification / TypeSafe. `MOLLY_JEV_ENABLED` defaults to `false`, so Molly opens no classification request during this QuickStart.
+
+Keep that gate off for the local path. Enabling Jev is a separate advanced step (`MOLLY_JEV_ENABLED=true` plus Laravel AI TypeSafe credentials) documented in [Configuration](reference/configuration.md#jev-and-typesafe). Jev stays advisory: it cannot override Pest, Tarpit, bounded retries, or completion authority.
+
 ## Boundaries (short)
 
 - **Molly** — task scope, Pest/Tarpit verification, receipts, completion gate.
-- **Laravel AI** — provider transport to Ollama.
+- **Laravel AI** — provider transport to Ollama (and optional classification when Jev is explicitly enabled).
 - **Bloom** — optional desktop/workspace host, not the model.
 - **Orb** — optional local execution target advertising capabilities.
-- **TypeSafe / Jev** — optional advisory evaluation, not required for QuickStart.
+- **Jev / TypeSafe** — optional advanced classification path; off by default and not part of QuickStart.
