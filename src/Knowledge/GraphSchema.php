@@ -12,6 +12,41 @@ final class GraphSchema
 
     public const METADATA_KEY = 'schema_version';
 
+    /** Busy wait budget for local readers/builders contending on the isolated SQLite file. */
+    public const BUSY_TIMEOUT_MS = 5000;
+
+    /**
+     * Journal mode for the local knowledge database.
+     * WAL lets builders and readers coexist without long exclusive locks on one machine.
+     */
+    public const JOURNAL_MODE = 'WAL';
+
+    public function configureConnection(PDO $database): void
+    {
+        $database->exec('PRAGMA foreign_keys = ON');
+        $database->exec('PRAGMA busy_timeout = '.self::BUSY_TIMEOUT_MS);
+        $database->exec('PRAGMA journal_mode = '.self::JOURNAL_MODE);
+    }
+
+    /** Verify recorded schema is present and supported before queries or replacement writes. */
+    public function assertCompatible(PDO $database): void
+    {
+        $current = $this->recordedVersion($database);
+        if ($current === null) {
+            throw new RuntimeException('KNOWLEDGE_SCHEMA_MISSING: Knowledge database has no schema_version metadata.');
+        }
+        if ($current > self::VERSION) {
+            throw new RuntimeException(
+                'KNOWLEDGE_SCHEMA_UNSUPPORTED: Knowledge database schema '.$current.' is newer than Molly supports ('.self::VERSION.').'
+            );
+        }
+        if ($current < self::VERSION) {
+            throw new RuntimeException(
+                'KNOWLEDGE_SCHEMA_STALE: Knowledge database schema '.$current.' must be migrated to '.self::VERSION.' before use.'
+            );
+        }
+    }
+
     /** Full DDL applied once per connection (tables, indexes, FKs, metadata). */
     public function ddl(): string
     {
