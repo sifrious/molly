@@ -12,7 +12,7 @@ use Sifrious\Molly\Models\Run;
  */
 final class EnsureRunConversation
 {
-    public function __construct(private ConversationStore $store = new ConversationStore) {}
+    public function __construct(private ConversationStore $store) {}
 
     public function handle(Run $run): Conversation
     {
@@ -66,7 +66,7 @@ final class EnsureRunConversation
         $messages = [];
         $seq = 0;
 
-        $push = function (string $role, string $body, string $kind, ?string $ref = null) use (&$messages, &$seq, $run, $at): void {
+        $push = function (string $role, string $body, string $kind, ?string $ref = null) use (&$messages, &$seq, $at): void {
             $body = trim($body);
             if ($body === '') {
                 return;
