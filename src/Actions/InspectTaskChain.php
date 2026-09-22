@@ -12,14 +12,11 @@ use Sifrious\Molly\Models\Task;
 final class InspectTaskChain
 {
     public function __construct(
-        private ?ShowTask $show = null,
-        private ?InspectTask $inspect = null,
-        private ConversationStore $conversations = new ConversationStore,
-        private EnsureRunConversation $ensureConversation = new EnsureRunConversation,
-    ) {
-        $this->show ??= new ShowTask;
-        $this->inspect ??= app(InspectTask::class);
-    }
+        private ConversationStore $conversations,
+        private EnsureRunConversation $ensureConversation,
+        private ShowTask $show,
+        private InspectTask $inspect,
+    ) {}
 
     /**
      * @return array<string, mixed>
