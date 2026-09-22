@@ -7,7 +7,7 @@ use Sifrious\Molly\Settings\SettingsStore;
 
 final class GetMollySettings
 {
-    public function __construct(private SettingsStore $store = new SettingsStore) {}
+    public function __construct(private SettingsStore $store) {}
 
     /**
      * @return array{schema_version: int, defaults: array<string, mixed>, settings: array<string, mixed>, path: string}
