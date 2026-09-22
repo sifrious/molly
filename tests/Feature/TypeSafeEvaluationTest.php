@@ -11,6 +11,10 @@ use Sifrious\Molly\Actions\SuggestPlanReview;
 use Sifrious\Molly\PlanningGuide;
 
 beforeEach(function (): void {
+    if (! class_exists(Classification::class) || ! class_exists(Choice::class) || ! class_exists(ChoiceAnswer::class)) {
+        $this->markTestSkipped('Live Jev classification requires the optional Laravel AI 1.x capability.');
+    }
+
     config([
         'molly.jev.enabled' => true,
         'ai.providers.typesafe.key' => 'test-key',
