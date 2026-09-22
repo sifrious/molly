@@ -92,32 +92,65 @@ class MollyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->bootMcp();
+        $this->bootPackageResources();
+        $this->bootLivewire();
+        $this->bootConsole();
+    }
+
+    private function bootMcp(): void
+    {
         if ($this->app->environment('local', 'testing')) {
             Mcp::local('molly', MollyServer::class);
         }
+    }
+
+    private function bootPackageResources(): void
+    {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'molly');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+    }
+
+    private function bootLivewire(): void
+    {
         if ($this->app->bound('livewire.finder')) {
             Livewire::component('molly-run-status', RunStatus::class);
         }
+    }
 
-        if ($this->app->runningInConsole()) {
-            $this->commands([MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class, MollyReceiptCommand::class,
-                MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyDemoCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
-                MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
-                MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
-                MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
-                MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
-                MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
-                MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class]);
-            if ($this->app->make(Clever::class)->enabled()) {
-                $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
-            }
-            $this->publishes([
-                __DIR__.'/../config/molly.php' => config_path('molly.php'),
-                __DIR__.'/../config/molly-complexity.php' => config_path('molly-complexity.php'),
-            ], 'molly-config');
+    private function bootConsole(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
         }
+
+        $this->registerCommands();
+        $this->publishConfig();
+    }
+
+    private function registerCommands(): void
+    {
+        $this->commands([
+            MollyCheckCommand::class, MollyRunCommand::class, MollyDoctorCommand::class, MollyShowCommand::class, MollyReceiptCommand::class,
+            MollyBloomContractCommand::class, MollyApproveCommand::class, MollyLockTestCommand::class, MollyCreateCommand::class, MollyDemoCommand::class, MollyTasksCommand::class, MollyTaskCommand::class,
+            MollyStartCommand::class, MollyRetryCommand::class, MollyStopCommand::class, MollyImportCommand::class, MollyCommentCommand::class,
+            MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
+            MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
+            MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
+            MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
+            MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
+        ]);
+        if ($this->app->make(Clever::class)->enabled()) {
+            $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
+        }
+    }
+
+    private function publishConfig(): void
+    {
+        $this->publishes([
+            __DIR__.'/../config/molly.php' => config_path('molly.php'),
+            __DIR__.'/../config/molly-complexity.php' => config_path('molly-complexity.php'),
+        ], 'molly-config');
     }
 }
