@@ -102,11 +102,11 @@ Molly policy for enabled Jev stays under `molly.jev`:
 
 When enabled, Jev can support explicit planning suggestions, task advice, and commit review through Laravel AI classification. It cannot bypass tests, Tarpit blockers, or attempt limits. Configure one provider stack only: Laravel AI TypeSafe plus `molly.jev` policy — never both a Molly `typesafe` client and Laravel AI.
 
-### Tagged Laravel AI compatibility
+### Laravel AI compatibility
 
-Ship Jev against a **tagged** `laravel/ai` release that includes the public classification / TypeSafe provider seam from [laravel/ai#1049](https://github.com/laravel/ai/pull/1049) (merged 2026-09-21). As of this writing, the newest published tag is `v0.11.2` (2026-09-03), which **does not** yet contain that seam — wait for the next tagged release that includes the merge, then pin Molly's Composer constraint to that tag or a caret range that selects it.
+Molly currently pins Laravel AI's `1.x` development line to the exact commit that merged [laravel/ai#1049](https://github.com/laravel/ai/pull/1049): `f0a5d4f3c5bddda7c8975eb79e92d62811197484`. This keeps the unreleased dependency reproducible instead of floating at branch HEAD while allowing Jev to ship now.
 
-Do not instruct hosts to require a `dev-` branch, a PR ref, or an untagged VCS override for production installs. Until a qualifying tag exists, leave `MOLLY_JEV_ENABLED` at its default `false`. On older supported `laravel/ai` versions that lack the seam, Molly keeps the gate closed, performs no classification request, and stays on deterministic Pest / Tarpit / retry / completion behavior.
+`MOLLY_JEV_ENABLED` still defaults to `false`. Enabling it is an explicit opt-in; deterministic Pest, Tarpit, retry and completion gates remain authoritative.
 
 ## Complexity measurements
 
