@@ -3,34 +3,51 @@
 use Illuminate\Events\Dispatcher;
 use Sifrious\Molly\Knowledge\LaravelEventsGraph;
 
-it('builds the events graph through LaravelGraphBuilder with Dispatcher source', function () {
-    $graph = app(LaravelEventsGraph::class)->build('12');
+it('proves events graph compatibility after LaravelGraphBuilder migration', function () {
+    $first = app(LaravelEventsGraph::class)->build('12');
+    $second = app(LaravelEventsGraph::class)->build('12');
 
-    $keys = collect($graph['nodes'])->pluck('key')->all();
-    expect($keys)->toContain('events')
-        ->and($keys)->toContain('docs:events#introduction')
-        ->and($keys)->toContain(Dispatcher::class);
+    expect($first['sources'])->toEqual($second['sources'])
+        ->and($first['nodes'])->toEqual($second['nodes'])
+        ->and($first['edges'])->toEqual($second['edges']);
 
-    $events = collect($graph['nodes'])->firstWhere('key', 'events');
-    $introduction = collect($graph['nodes'])->firstWhere('key', 'docs:events#introduction');
-    $dispatcher = collect($graph['nodes'])->firstWhere('key', Dispatcher::class);
-    $version = collect($graph['nodes'])->firstWhere('type', 'version');
+    $nodeByKey = collect($first['nodes'])->keyBy('key');
+    expect($nodeByKey->keys()->all())->toContain('events')
+        ->and($nodeByKey->keys()->all())->toContain('docs:events#introduction')
+        ->and($nodeByKey->keys()->all())->toContain(Dispatcher::class);
 
-    expect(collect($graph['edges'])->map(fn ($edge) => [
+    expect($nodeByKey['events']->label)->toBe('Events');
+
+    $version = collect($first['nodes'])->firstWhere('type', 'version');
+    $edgeTypes = collect($first['edges'])->map(fn ($edge) => [
         'relation' => $edge->relation,
         'from' => $edge->from,
         'to' => $edge->to,
-    ]))->toContain([
+    ]);
+
+    expect($edgeTypes)->toContain([
         'relation' => 'contains',
         'from' => $version->id(),
-        'to' => $events->id(),
+        'to' => $nodeByKey['events']->id(),
     ])->toContain([
         'relation' => 'documented_in',
-        'from' => $events->id(),
-        'to' => $introduction->id(),
+        'from' => $nodeByKey['events']->id(),
+        'to' => $nodeByKey['docs:events#introduction']->id(),
     ])->toContain([
         'relation' => 'uses',
-        'from' => $events->id(),
-        'to' => $dispatcher->id(),
+        'from' => $nodeByKey['events']->id(),
+        'to' => $nodeByKey[Dispatcher::class]->id(),
     ]);
+
+    expect(collect($first['sources'])->map->id()->unique()->count())->toBe(count($first['sources']));
+    expect(collect($first['nodes'])->map->id()->unique()->count())->toBe(count($first['nodes']));
+    expect(collect($first['edges'])->map->id()->unique()->count())->toBe(count($first['edges']));
+
+    $docSource = collect($first['sources'])->firstWhere('key', 'events');
+    $reflected = collect($first['sources'])->firstWhere('key', Dispatcher::class);
+    expect($docSource->digest)->not->toBeEmpty()
+        ->and($reflected)->not->toBeNull()
+        ->and($reflected->type)->toBe('framework_source')
+        ->and($reflected->digest)->not->toBeEmpty()
+        ->and($reflected->location)->not->toBeEmpty();
 });
