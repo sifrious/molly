@@ -21,3 +21,16 @@ it('injects AmpResponse and PestTestAuthoring into GenerateChanges without servi
     expect($source)->not->toContain('app(AmpResponse::class)')
         ->and($source)->not->toContain('app(PestTestAuthoring::class)');
 });
+
+it('keeps provider acquisition separate from proposal validation', function () {
+    $reflection = new ReflectionClass(GenerateChanges::class);
+
+    expect($reflection->hasMethod('acquireProposal'))->toBeTrue()
+        ->and($reflection->hasMethod('validateProposal'))->toBeTrue()
+        ->and($reflection->getMethod('acquireProposal')->isPrivate())->toBeTrue()
+        ->and($reflection->getMethod('validateProposal')->isPrivate())->toBeTrue();
+
+    $handle = file_get_contents(dirname(__DIR__, 3).'/src/Actions/GenerateChanges.php');
+    expect($handle)->toContain('return $this->validateProposal(')
+        ->and($handle)->toContain('$this->acquireProposal($input)');
+});

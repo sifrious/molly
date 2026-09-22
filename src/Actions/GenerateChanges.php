@@ -37,17 +37,41 @@ class GenerateChanges
             'tarpit_knowledge' => $this->tarpit->handle($prompt, $files, $testPath),
             ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
         ], JSON_THROW_ON_ERROR);
+
+        return $this->validateProposal(
+            $this->acquireProposal($input),
+            $files,
+            $testPath,
+            $allowTestEdits,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function acquireProposal(string $input): array
+    {
         if (config('molly.agent', 'ollama') === 'amp') {
-            $result = $this->amp->prompt(new ChangeWriter, $input);
-        } elseif (config('molly.agent', 'ollama') === 'ollama') {
+            return $this->amp->prompt(new ChangeWriter, $input);
+        }
+
+        if (config('molly.agent', 'ollama') === 'ollama') {
             LocalOllama::validate();
             $response = ChangeWriter::make()->prompt(
                 $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
             );
-            $result = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
-        } else {
-            throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');
+
+            return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
         }
+
+        throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @param  array<string, string|null>  $files
+     * @return array{summary: string, files: list<array{path: string, content: string}>}
+     */
+    private function validateProposal(array $result, array $files, string $testPath, bool $allowTestEdits): array
+    {
         $validator = Validator::make($result, [
             'summary' => ['required', 'string'],
             'files' => ['required', 'array', 'list', 'min:1'],
