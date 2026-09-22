@@ -88,19 +88,19 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
+Provider credentials and base URL belong to Laravel AI — configure `ai.providers.typesafe` (secret: `TYPESAFE_API_KEY`). Do not set a second Molly HTTP transport. Former `molly.typesafe.*` transport keys (`enabled`, `api_key`, and a fixed Molly-owned endpoint) are removed; Molly no longer publishes them.
+
+Molly policy for enabled Jev stays under `molly.jev`:
+
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `molly.jev.enabled` | `false` | Single default-off Jev gate. Environment: `MOLLY_JEV_ENABLED`. Non-true values keep every Jev-backed path closed. |
-| `molly.typesafe.enabled` | `false` | Explicit opt-in for TypeSafe requests. |
-| `molly.typesafe.api_key` | `null` | Secret from `TYPESAFE_API_KEY`. Never commit it. |
-| `molly.typesafe.model` | `jev-latest` | Requested evaluator model. |
-| `molly.typesafe.confidence_threshold` | `0.8` | Lower-confidence results become `needs_review`. |
-| `molly.typesafe.timeout` | `30` | Request timeout, allowed range 1 through 120 seconds. |
-| `molly.typesafe.instructions` | Built-in task advice question | Instructions used for eligible failed-task advice. |
+| `molly.jev.model` | `jev-latest` | Evaluator model name passed through Laravel AI. |
+| `molly.jev.confidence_threshold` | `0.8` | Lower-confidence results become `needs_review`. |
+| `molly.jev.timeout` | `30` | Request timeout, allowed range 1 through 120 seconds. |
+| `molly.jev.instructions` | Built-in task advice question | Instructions used for eligible failed-task advice. |
 
-The endpoint is fixed at `https://api.typesafe.ai/v1/systemone`.
-
-TypeSafe can support explicit planning suggestions, task advice, and commit review. It cannot bypass tests, Tarpit blockers, or attempt limits.
+When enabled, Jev can support explicit planning suggestions, task advice, and commit review through Laravel AI classification. It cannot bypass tests, Tarpit blockers, or attempt limits. Configure one provider stack only: Laravel AI TypeSafe plus `molly.jev` policy — never both a Molly `typesafe` client and Laravel AI.
 
 ## Complexity measurements
 
@@ -147,7 +147,7 @@ CLI `molly:start` runs in the current terminal and does not need a queue worker.
 | `MOLLY_UI_ENABLED` | Enable local web routes |
 | `MOLLY_COMPLEXITY_ENABLED` | Optional complexity-measurement override |
 | `MOLLY_JEV_ENABLED` | Single default-off Jev gate (`false` unless set true) |
-| `TYPESAFE_API_KEY` | Secret key for explicitly enabled TypeSafe evaluation |
+| `TYPESAFE_API_KEY` | Laravel AI TypeSafe provider secret (`ai.providers.typesafe`) |
 | `OLLAMA_URL` | Local Ollama endpoint |
 | `APP_ENV` | Host Laravel environment, normally `local` for Molly |
 | `APP_NAME` | Host application name used in some reports |
