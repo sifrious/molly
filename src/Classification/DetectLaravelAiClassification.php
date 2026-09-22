@@ -9,10 +9,23 @@ use Laravel\Ai\Responses\StructuredAgentResponse;
 
 final class DetectLaravelAiClassification
 {
+    /** Future/current FQCNs probed as strings so missing classes never fatal on autoload. */
+    private const CLASSIFICATION = 'Laravel\\Ai\\Classification';
+
+    private const CHOICE = 'Laravel\\Ai\\Choice';
+
+    private const CHOICE_ANSWER = 'Laravel\\Ai\\ChoiceAnswer';
+
+    private const LAB = 'Laravel\\Ai\\Enums\\Lab';
+
     public function adapter(): string
     {
         if ($this->supportsDecide()) {
             return 'laravel-ai.decide';
+        }
+
+        if ($this->supportsChoice()) {
+            return 'laravel-ai.choice';
         }
 
         return 'molly.fallback';
@@ -32,9 +45,55 @@ final class DetectLaravelAiClassification
         return class_exists(Str::class) && Str::hasMacro('decide');
     }
 
+    /**
+     * Choice capability: Classification + Choice + ChoiceAnswer + Lab::TypeSafe together.
+     * Package presence or structured-agent support alone is not enough.
+     */
+    public function supportsChoice(): bool
+    {
+        if (! $this->classAvailable(self::CLASSIFICATION)
+            || ! $this->classAvailable(self::CHOICE)
+            || ! $this->classAvailable(self::CHOICE_ANSWER)
+            || ! $this->labHasTypeSafe()) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function supportsStructuredAgents(): bool
     {
         return interface_exists(HasStructuredOutput::class)
             && class_exists(StructuredAgentResponse::class);
+    }
+
+    private function classAvailable(string $class): bool
+    {
+        try {
+            return class_exists($class) || interface_exists($class);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function labHasTypeSafe(): bool
+    {
+        if (! enum_exists(self::LAB)) {
+            return false;
+        }
+
+        try {
+            /** @var class-string<\UnitEnum> $lab */
+            $lab = self::LAB;
+            foreach ($lab::cases() as $case) {
+                if ($case->name === 'TypeSafe' || (is_string($case->value ?? null) && strcasecmp((string) $case->value, 'typesafe') === 0)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return false;
     }
 }
