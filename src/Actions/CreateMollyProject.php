@@ -16,8 +16,8 @@ use Sifrious\Molly\Projects\ProjectRegistry;
 final class CreateMollyProject
 {
     public function __construct(
-        private InitializeMollyInExistingProject $initialize = new InitializeMollyInExistingProject,
-        private ProjectRegistry $registry = new ProjectRegistry,
+        private InitializeMollyInExistingProject $initialize,
+        private ProjectRegistry $registry,
     ) {}
 
     /**
@@ -86,8 +86,8 @@ final class CreateMollyProject
                         'version' => 'v12.0.0',
                     ]],
                     'packages-dev' => [],
-                ], JSON_PRETTY_PRINT)."
-");
+                ], JSON_PRETTY_PRINT).'
+');
             }
         }
 
