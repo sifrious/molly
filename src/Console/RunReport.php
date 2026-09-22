@@ -20,6 +20,20 @@ class RunReport
             note($report['summary']);
         }
         $this->showBranches($report, $verbose);
+        $this->showRequiredChecks($report);
+        $this->showChanges($report);
+        $this->showSnapshots($report, $verbose);
+        $this->showVerification($report, $verbose);
+        $this->showTarpit($report);
+        $this->showMeasurements($report, $verbose);
+        $this->showAdvice($report);
+        $this->showErrors($report);
+        $this->showOutcome($run->status);
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showRequiredChecks(array $report): void
+    {
         table(['Required check', 'Result'], [
             ['Pest', $report['verification']['status'] ?? 'Not run'],
             ['Tarpit review', $report['review']['status'] ?? (isset($report['review']['checks']) ? 'See findings below' : 'Not run')],
@@ -33,10 +47,21 @@ class RunReport
                 }
             }
         }
-        if (! empty($report['changes'])) {
-            table(['Changed file', 'Status'], array_map(fn (array $change): array => [$change['path'], $change['status'] ?? 'changed'], $report['changes']));
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showChanges(array $report): void
+    {
+        if (empty($report['changes'])) {
+            return;
         }
-        $this->showSnapshots($report, $verbose);
+
+        table(['Changed file', 'Status'], array_map(fn (array $change): array => [$change['path'], $change['status'] ?? 'changed'], $report['changes']));
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showVerification(array $report, bool $verbose): void
+    {
         $verification = $report['verification'] ?? [];
         if (($verification['status'] ?? null) === 'passed') {
             $tests = $verification['tests'] ?? 0;
@@ -46,6 +71,11 @@ class RunReport
         if (! empty($verification['output']) && (($verification['status'] ?? null) !== 'passed' || $verbose)) {
             note($verification['output']);
         }
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showTarpit(array $report): void
+    {
         foreach ($report['review']['checks'] ?? [] as $key => $check) {
             note('Tarpit '.$key.' / '.$check['status']);
             note($check['evidence']);
@@ -55,16 +85,31 @@ class RunReport
             note($finding['problem']);
             note('Suggested change: '.$finding['recommendation']);
         }
-        $this->showMeasurements($report, $verbose);
-        if (isset($report['advice'])) {
-            note('Saved next-step advice / '.($report['advice']['recorded_at'] ?? 'Time not recorded'));
-            note($report['advice']['reason'] ?? 'Read the saved advice in the JSON report.');
-            note('Advice describes the state when requested. Task commands check the current state again.');
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showAdvice(array $report): void
+    {
+        if (! isset($report['advice'])) {
+            return;
         }
+
+        note('Saved next-step advice / '.($report['advice']['recorded_at'] ?? 'Time not recorded'));
+        note($report['advice']['reason'] ?? 'Read the saved advice in the JSON report.');
+        note('Advice describes the state when requested. Task commands check the current state again.');
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showErrors(array $report): void
+    {
         if (! empty($report['error'])) {
             error($this->describe($report['error']));
         }
-        outro(match ($run->status) {
+    }
+
+    private function showOutcome(string $status): void
+    {
+        outro(match ($status) {
             'completed' => 'Task completed. Review the changed files before committing.',
             'running' => 'Run is marked running. An interrupted run may still have this status.',
             'stopped' => 'Task stopped. Review any applied changes before retrying.',
