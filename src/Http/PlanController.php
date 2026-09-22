@@ -13,6 +13,7 @@ use Sifrious\Molly\Actions\CreateTaskFromPlan;
 use Sifrious\Molly\Actions\ListPlans;
 use Sifrious\Molly\Actions\ShowPlan;
 use Sifrious\Molly\Actions\SuggestPlanReview;
+use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\PlanningGuide;
 
@@ -23,9 +24,9 @@ class PlanController
         return view('molly::plans', ['plans' => $list->handle()]);
     }
 
-    public function suggest(string $plan, ShowPlan $show, SuggestPlanReview $suggest): RedirectResponse
+    public function suggest(string $plan, ShowPlan $show, SuggestPlanReview $suggest, DetectLaravelAiClassification $detect): RedirectResponse
     {
-        abort_unless(config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '', 403);
+        abort_unless($detect->supportsChoice() && config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '', 403);
         $record = $show->handle($plan);
         abort_if($record === null, 404);
         $suggest->handle($record);
@@ -68,7 +69,7 @@ class PlanController
         return redirect()->route('molly.plans.show', $plan->id)->with('status', 'Plan saved. No task has started.');
     }
 
-    public function show(string $plan, ShowPlan $show, PlanningGuide $guide): View
+    public function show(string $plan, ShowPlan $show, PlanningGuide $guide, DetectLaravelAiClassification $detect): View
     {
         $record = $show->handle($plan);
         abort_if($record === null, 404);
@@ -76,7 +77,7 @@ class PlanController
         return view('molly::plan', [
             'plan' => $record,
             'tasks' => Task::where('source->plan_id', $record->id)->latest()->get(),
-            'canSuggest' => config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '',
+            'canSuggest' => $detect->supportsChoice() && config('molly.jev.enabled', false) === true && is_string(config('ai.providers.typesafe.key')) && trim(config('ai.providers.typesafe.key')) !== '',
             'steps' => $guide->steps(),
             'nextStep' => $record->nextStep(),
             'sources' => $guide->sourcesFor($record->description, $record->answers ?? []),
