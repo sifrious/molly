@@ -67,6 +67,9 @@ class EvaluateWithTypeSafe
     private function evaluate(array $state, string $question, array $criteria, mixed $instructions, bool $valid): array
     {
         $config = config('molly.typesafe', []);
+        if (config('molly.jev.enabled', true) !== true) {
+            return ['status' => 'disabled', $question => null, 'confidence' => null, 'answers' => [], 'reason' => 'jev_disabled', 'provider' => 'typesafe', 'model' => is_string($config['model'] ?? null) ? $config['model'] : null];
+        }
         $model = $config['model'] ?? null;
         $result = ['status' => 'needs_review', $question => $question === 'focus' ? null : 'needs_review', 'confidence' => null, 'answers' => [], 'reason' => 'invalid_config', 'provider' => 'typesafe', 'model' => is_string($model) ? $model : null];
         if (($config['enabled'] ?? false) === false) {
