@@ -2,8 +2,11 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Classification\Choice;
+use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
+use Throwable;
 
 class EvaluateWithTypeSafe
 {
@@ -20,7 +23,7 @@ class EvaluateWithTypeSafe
             'needs_review' => 'A person must inspect ambiguous or insufficient evidence.',
         ];
 
-        return $this->evaluate($state, 'next_action', $criteria, config('molly.typesafe.instructions'),
+        return $this->evaluate($state, 'next_action', $criteria, config('molly.jev.instructions'),
             is_string($state['prompt'] ?? null) && is_array($state['verification'] ?? null) && is_array($state['review'] ?? null));
     }
 
@@ -66,21 +69,25 @@ class EvaluateWithTypeSafe
      */
     private function evaluate(array $state, string $question, array $criteria, mixed $instructions, bool $valid): array
     {
-        $config = config('molly.typesafe', []);
-        if (config('molly.jev.enabled', true) !== true) {
-            return ['status' => 'disabled', $question => null, 'confidence' => null, 'answers' => [], 'reason' => 'jev_disabled', 'provider' => 'typesafe', 'model' => is_string($config['model'] ?? null) ? $config['model'] : null];
-        }
+        $config = config('molly.jev', []);
         $model = $config['model'] ?? null;
-        $result = ['status' => 'needs_review', $question => $question === 'focus' ? null : 'needs_review', 'confidence' => null, 'answers' => [], 'reason' => 'invalid_config', 'provider' => 'typesafe', 'model' => is_string($model) ? $model : null];
-        if (($config['enabled'] ?? false) === false) {
-            return array_replace($result, ['status' => 'disabled', $question => null, 'reason' => 'disabled']);
+        $result = [
+            'status' => 'needs_review',
+            $question => $question === 'focus' ? null : 'needs_review',
+            'confidence' => null,
+            'answers' => [],
+            'reason' => 'invalid_config',
+            'provider' => 'typesafe',
+            'model' => is_string($model) ? $model : null,
+        ];
+
+        if (($config['enabled'] ?? false) !== true) {
+            return array_replace($result, ['status' => 'disabled', $question => null, 'reason' => 'jev_disabled']);
         }
 
         $threshold = $config['confidence_threshold'] ?? null;
         $timeout = $config['timeout'] ?? null;
-        $key = $config['api_key'] ?? null;
-        if (($config['enabled'] ?? null) !== true || ! is_string($key) || trim($key) === '' || preg_match('/[\r\n]/', $key)
-            || ! is_string($model) || trim($model) === '' || strlen($model) > 128
+        if (! is_string($model) || trim($model) === '' || strlen($model) > 128
             || ! $this->probability($threshold) || ! is_int($timeout) || $timeout < 1 || $timeout > 120
             || ! is_string($instructions) || trim($instructions) === '' || strlen($instructions) > 4096) {
             return $result;
@@ -92,46 +99,48 @@ class EvaluateWithTypeSafe
         }
 
         try {
-            $response = Http::withToken($key)->acceptJson()->timeout($timeout)->connectTimeout(min($timeout, 10))
-                ->withoutRedirecting()->post('https://api.typesafe.ai/v1/systemone', [
-                    'model' => $model, 'state' => $state,
-                    'questions' => [$question => ['type' => 'choice', 'instructions' => $instructions, 'criteria' => $criteria]],
-                ]);
-        } catch (ConnectionException) {
-            return array_replace($result, ['reason' => 'connection_failed']);
-        }
-        if (! $response->successful()) {
+            $response = Classification::of($state)
+                ->question($question, new Choice($instructions, $criteria))
+                ->timeout($timeout)
+                ->classify(provider: Lab::TypeSafe, model: $model);
+        } catch (Throwable) {
             return array_replace($result, ['reason' => 'provider_error']);
         }
-        $body = $response->json();
-        if (! is_array($body) || ! is_array($body['answers'] ?? null) || ! is_string($body['model'] ?? null)) {
-            return array_replace($result, ['reason' => 'invalid_response']);
-        }
-        if (! array_key_exists($question, $body['answers'])) {
-            return array_replace($result, ['reason' => 'missing_answer']);
-        }
-        $answer = $body['answers'][$question];
-        if (! is_array($answer) || ($answer['type'] ?? null) !== 'choice'
-            || ! is_string($answer['choice'] ?? null) || ! array_key_exists($answer['choice'], $criteria)
-            || ! $this->probability($answer['confidence'] ?? null) || ! is_array($answer['probabilities'] ?? null)
-            || count($answer['probabilities']) !== count($criteria)) {
+
+        $answer = $response[$question] ?? null;
+        if (! $answer instanceof ChoiceAnswer || ! array_key_exists($answer->choice, $criteria)
+            || ! $this->probability($answer->confidence) || count($answer->probabilities) !== count($criteria)) {
             return array_replace($result, ['reason' => 'invalid_answer']);
         }
+
         foreach ($criteria as $option => $description) {
-            if (! $this->probability($answer['probabilities'][$option] ?? null)) {
+            if (! $this->probability($answer->probabilities[$option] ?? null)) {
                 return array_replace($result, ['reason' => 'invalid_answer']);
             }
         }
-        if (abs(array_sum($answer['probabilities']) - 1) > 0.01
-            || $answer['probabilities'][$answer['choice']] < max($answer['probabilities'])) {
+
+        if (abs(array_sum($answer->probabilities) - 1) > 0.01
+            || $answer->probabilities[$answer->choice] < max($answer->probabilities)) {
             return array_replace($result, ['reason' => 'invalid_answer']);
         }
-        $result = array_replace($result, ['model' => $body['model'], 'confidence' => (float) $answer['confidence'], 'answers' => [$question => $answer]]);
-        if ($answer['confidence'] < $threshold) {
+
+        $confidence = (float) $answer->confidence;
+        $result = array_replace($result, [
+            'model' => $response->meta->model ?? $model,
+            'confidence' => $confidence,
+            'answers' => [$question => [
+                'type' => 'choice',
+                'choice' => $answer->choice,
+                'confidence' => $confidence,
+                'probabilities' => $answer->probabilities,
+            ]],
+        ]);
+
+        if ($confidence < $threshold) {
             return array_replace($result, ['reason' => 'low_confidence']);
         }
 
-        return array_replace($result, ['status' => 'evaluated', $question => $answer['choice'], 'reason' => 'evaluated']);
+        return array_replace($result, ['status' => 'evaluated', $question => $answer->choice, 'reason' => 'evaluated']);
     }
 
     private function probability(mixed $value): bool
