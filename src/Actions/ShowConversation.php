@@ -7,7 +7,7 @@ use Sifrious\Molly\Conversations\ConversationStore;
 
 final class ShowConversation
 {
-    public function __construct(private ConversationStore $store = new ConversationStore) {}
+    public function __construct(private ConversationStore $store) {}
 
     /**
      * @return array<string, mixed>
