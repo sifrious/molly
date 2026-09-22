@@ -32,13 +32,28 @@ final class DetectLaravelAiClassification
         return 'molly.fallback';
     }
 
+    /**
+     * Composer pretty version for journal provenance only.
+     * Returns null when metadata is missing. Never used as a capability check —
+     * adapter selection stays feature-based (decide macro / choice probes).
+     */
     public function version(): ?string
     {
-        if (! class_exists(InstalledVersions::class) || ! InstalledVersions::isInstalled('laravel/ai')) {
+        if (! class_exists(InstalledVersions::class)) {
             return null;
         }
 
-        return InstalledVersions::getPrettyVersion('laravel/ai');
+        try {
+            if (! InstalledVersions::isInstalled('laravel/ai')) {
+                return null;
+            }
+
+            $pretty = InstalledVersions::getPrettyVersion('laravel/ai');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_string($pretty) && $pretty !== '' ? $pretty : null;
     }
 
     /**

@@ -24,8 +24,9 @@ it('reports composer pretty version or null without using version as capability'
     $detect = new DetectLaravelAiClassification;
     $version = $detect->version();
 
-    expect($version === null || is_string($version))->toBeTrue()
-        ->and($detect->supportsChoice())->toBeFalse();
+    expect($version === null || (is_string($version) && $version !== ''))->toBeTrue()
+        ->and($detect->supportsChoice())->toBeFalse()
+        ->and($detect->supportsDecide())->toBe(Str::hasMacro('decide'));
 });
 
 it('treats the decide macro as an independent boolean capability', function () {
@@ -51,5 +52,25 @@ it('treats the decide macro as an independent boolean capability', function () {
     // Cleanup: remove only our test macro when the suite started without one.
     if (! $hadDecide) {
         Str::flushMacros();
+    }
+});
+
+it('journals can record version while selection stays feature-based', function () {
+    $detect = new DetectLaravelAiClassification;
+    $version = $detect->version();
+
+    // Pretty version may be present for provenance…
+    expect($version === null || (is_string($version) && $version !== ''))->toBeTrue();
+
+    // …but adapter selection never uses version text.
+    $adapter = $detect->adapter();
+    expect(in_array($adapter, ['laravel-ai.decide', 'laravel-ai.choice', 'molly.fallback'], true))->toBeTrue();
+
+    if ($version !== null) {
+        expect($detect->supportsDecide())->toBe(Str::hasMacro('decide'))
+            ->and($detect->supportsChoice())->toBeFalse(); // v0.11.2 has no Choice stack
+        if (! Str::hasMacro('decide')) {
+            expect($adapter)->toBe('molly.fallback');
+        }
     }
 });
