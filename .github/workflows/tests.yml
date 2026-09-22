@@ -174,3 +174,34 @@ jobs:
                   print(f'{filename}: {size} bytes')
                   assert size <= 400 * 1024  # v0.1.3: package grew; Surfaces.bundle rebuild-only
           PY
+
+
+  jev:
+    name: Jev / Laravel AI 1.x
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Install stable Molly baseline
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Opt this root package into Laravel AI 1.x
+        run: composer require 'laravel/ai:1.x-dev@dev' --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Prove live Jev capability
+        run: vendor/bin/pest tests/Feature/TypeSafeEvaluationTest.php tests/Unit/ClassificationAdapterTest.php --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
+
+      - name: Run full package suite with Laravel AI 1.x
+        run: vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
