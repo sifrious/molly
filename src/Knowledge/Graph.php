@@ -10,7 +10,10 @@ final class Graph
 {
     private ?PDO $connection = null;
 
-    public function __construct(private ?string $database = null) {}
+    public function __construct(
+        private GraphSchema $schema,
+        private ?string $database = null,
+    ) {}
 
     /**
      * Replace one namespace and version with a complete snapshot.
@@ -197,10 +200,9 @@ final class Graph
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
-        $schema = new GraphSchema;
-        $schema->configureConnection($this->connection);
-        $schema->migrate($this->connection);
-        $schema->assertCompatible($this->connection);
+        $this->schema->configureConnection($this->connection);
+        $this->schema->migrate($this->connection);
+        $this->schema->assertCompatible($this->connection);
 
         return $this->connection;
     }

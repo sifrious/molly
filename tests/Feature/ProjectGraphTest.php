@@ -9,6 +9,7 @@ use Sifrious\Molly\Actions\InspectProjectGraph;
 use Sifrious\Molly\Actions\QueryProjectGraph;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphNode;
+use Sifrious\Molly\Knowledge\GraphSchema;
 use Sifrious\Molly\Knowledge\GraphSource;
 
 beforeEach(function () {
@@ -93,7 +94,7 @@ it('lists blockers before other nodes in a bounded workspace overview', function
 });
 
 it('marks a workspace overview truncated after forty nodes', function () {
-    $graph = new Graph($this->knowledgeDatabase);
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
     $source = new GraphSource('project', 'overview', 'workspace', 'root', 'Overview', 'root', null, 'digest');
     $nodes = [];
     for ($index = 0; $index < 41; $index++) {

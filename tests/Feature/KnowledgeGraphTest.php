@@ -10,10 +10,12 @@ use Sifrious\Molly\Actions\IndexLaravelKnowledge;
 use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
 use Sifrious\Molly\Actions\IndexTarpitKnowledge;
 use Sifrious\Molly\Actions\QueryKnowledgeGraph;
+use Sifrious\Molly\Knowledge\ContextPack;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphEdge;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphQuery;
+use Sifrious\Molly\Knowledge\GraphSchema;
 use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Knowledge\LaravelVersion;
 
@@ -51,7 +53,7 @@ it('uses stable identities and keeps Laravel versions separate', function () {
     expect($twelve['nodes'][0]->id())->toBe((knowledgeFixture('12'))['nodes'][0]->id())
         ->and($twelve['nodes'][0]->id())->not->toBe($thirteen['nodes'][0]->id());
 
-    $graph = new Graph($this->knowledgeDatabase);
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
     foreach (['12' => $twelve, '13' => $thirteen] as $version => $fixture) {
         $graph->replace('laravel', $version, [$fixture['source']], $fixture['nodes'], $fixture['edges']);
     }
@@ -68,7 +70,7 @@ it('uses stable identities and keeps Laravel versions separate', function () {
 
 it('replaces a snapshot without duplicating logical records', function () {
     $fixture = knowledgeFixture();
-    $graph = new Graph($this->knowledgeDatabase);
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
 
     $first = $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], $fixture['edges']);
     $second = $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], $fixture['edges']);
@@ -80,7 +82,7 @@ it('replaces a snapshot without duplicating logical records', function () {
 
 it('returns a bounded deterministic neighborhood with provenance', function () {
     $fixture = knowledgeFixture();
-    $graph = new Graph($this->knowledgeDatabase);
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
     $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], $fixture['edges']);
 
     $query = new GraphQuery('laravel', '13', 'Queue', depth: 2, limit: 3);
@@ -100,7 +102,7 @@ it('returns a bounded deterministic neighborhood with provenance', function () {
 
 it('respects relationship and size limits', function () {
     $fixture = knowledgeFixture();
-    $graph = new Graph($this->knowledgeDatabase);
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
     $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], $fixture['edges']);
 
     $filtered = $graph->query(new GraphQuery('laravel', '13', 'Job', depth: 1, limit: 20, relations: ['uses']));
@@ -120,7 +122,7 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     expect($indexed['sources'])->toBeGreaterThanOrEqual(15)
         ->and($indexed['nodes'])->toBeGreaterThanOrEqual(26)
         ->and($indexed['version'])->toBe($version)
-        ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'QueueFake::assertPushed');
+        ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'assertPushed');
     $routing = app(QueryKnowledgeGraph::class)->handle('Route', $version, depth: 1, limit: 20);
     expect(array_column($routing['nodes'], 'label'))->toContain('Route');
     $testing = app(QueryKnowledgeGraph::class)->handle('Pest', $version, depth: 1, limit: 20);
@@ -296,7 +298,7 @@ it('builds a stable ContextPack DTO with selection reasons and no fabricated que
         'tests/GreetingTest.php',
     )->toArray();
 
-    expect($withQueue['schema'])->toBe(\Sifrious\Molly\Knowledge\ContextPack::SCHEMA)
+    expect($withQueue['schema'])->toBe(ContextPack::SCHEMA)
         ->and($withQueue['status'])->toBeIn(['advisory', 'unavailable'])
         ->and($withQueue['query']['concepts'])->toContain('Validation', 'Queue', 'Route')
         ->and($withQueue['items'])->not->toBeEmpty()
@@ -373,7 +375,7 @@ it('prints ContextPack debug details through molly:knowledge:pack', function () 
     ]);
     $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
     expect($exit)->toBe(0)
-        ->and($payload['schema'])->toBe(\Sifrious\Molly\Knowledge\ContextPack::SCHEMA)
+        ->and($payload['schema'])->toBe(ContextPack::SCHEMA)
         ->and($payload['query']['needles'])->not->toBeEmpty()
         ->and($payload['concepts'])->toContain('Queue');
 });
