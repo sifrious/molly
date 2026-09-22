@@ -11,6 +11,8 @@ use Sifrious\Molly\Agents\TarpitReviewer;
 
 class ReviewChanges
 {
+    public function __construct(private AmpResponse $ampResponse) {}
+
     /**
      * @param  array<string, string|null>  $before
      * @param  array<string, string>  $after
@@ -20,7 +22,7 @@ class ReviewChanges
     {
         $input = json_encode(['task' => $prompt, 'before' => $before, 'after' => $after], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {
-            $result = app(AmpResponse::class)->prompt(new TarpitReviewer, $input);
+            $result = $this->ampResponse->prompt(new TarpitReviewer, $input);
         } elseif (config('molly.agent', 'ollama') === 'ollama') {
             LocalOllama::validate();
             $response = TarpitReviewer::make()->prompt(
