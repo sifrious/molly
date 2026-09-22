@@ -9,7 +9,6 @@ use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Run;
-use Sifrious\Molly\Actions\ResolveEffectiveRunConfig;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
@@ -31,6 +30,9 @@ class RunTask
         private RecordLifecycleEvent $lifecycle,
         private RecordVerificationReceipts $receipts,
         private FalseGreenVerifier $falseGreen,
+        private Sandbox $sandbox,
+        private ResolveEffectiveRunConfig $resolveEffectiveRunConfig,
+        private BindWorkspaceReference $bindWorkspaceReference,
     ) {}
 
     /** @param list<string> $paths */
@@ -41,7 +43,7 @@ class RunTask
         }
 
         $files = new Workspace($workspace);
-        app(Sandbox::class)->refuseSafeWorkflow();
+        $this->sandbox->refuseSafeWorkflow();
         $task = $taskId === null ? null : Task::find($taskId);
         $allowTestEdits = (bool) ($task?->allow_test_edits);
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
@@ -59,7 +61,7 @@ class RunTask
             $overrides = is_array($taskRow?->context_snapshot['settings_overrides'] ?? null)
                 ? $taskRow->context_snapshot['settings_overrides']
                 : [];
-            $effectiveConfig = app(ResolveEffectiveRunConfig::class)->handle($overrides);
+            $effectiveConfig = $this->resolveEffectiveRunConfig->handle($overrides);
             $identity = $this->runIdentity($taskRow, $files->path);
             $run = Run::create([
                 'prompt' => $prompt,
@@ -239,7 +241,7 @@ class RunTask
      */
     private function applyProposal(Workspace $workspace, array $edits, array $before, string $evidence): void
     {
-        $sandbox = app(Sandbox::class);
+        $sandbox = $this->sandbox;
         if ($sandbox->available() && ! $sandbox->allowUnsafe()) {
             $sandbox->apply($workspace->path, $edits, array_keys($before), $evidence);
 
@@ -319,7 +321,7 @@ class RunTask
             ];
         }
 
-        $reference = app(BindWorkspaceReference::class)->handle($path);
+        $reference = $this->bindWorkspaceReference->handle($path);
         $reference->assertAvailableForExecution();
 
         return [
