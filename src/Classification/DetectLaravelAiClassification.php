@@ -12,9 +12,9 @@ final class DetectLaravelAiClassification
     /** Future/current FQCNs probed as strings so missing classes never fatal on autoload. */
     private const CLASSIFICATION = 'Laravel\\Ai\\Classification';
 
-    private const CHOICE = 'Laravel\\Ai\\Choice';
+    private const CHOICE = 'Laravel\\Ai\\Classification\\Choice';
 
-    private const CHOICE_ANSWER = 'Laravel\\Ai\\ChoiceAnswer';
+    private const CHOICE_ANSWER = 'Laravel\\Ai\\Responses\\Data\\ChoiceAnswer';
 
     private const LAB = 'Laravel\\Ai\\Enums\\Lab';
 
