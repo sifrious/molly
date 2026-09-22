@@ -57,3 +57,44 @@ it('fails when a symbol is missing', function () {
     expect(fn () => $builder->addReflectedSymbol('Definitely\\Missing\\Symbol'))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_SYMBOL_MISSING:');
 });
+
+it('preserves graph identities across sections symbols digests and ordering', function () {
+    $builder = new LaravelGraphBuilder('laravel', '12');
+    $sections = $builder->parseSections("## Zero Configuration Resolution\n\n### Nested Detail\n");
+    expect($sections[0]['slug'])->toContain('zero')
+        ->and($sections[0]['level'])->toBe(2)
+        ->and($sections[1]['level'])->toBe(3);
+
+    $doc = $builder->addSource(new GraphSource(
+        'laravel', '12', 'documentation', 'container', 'Laravel 12 Container',
+        'docs/container.md', '12', 'abc',
+        ['retrieved_at' => $builder->retrievedAt('Retrieved 2026-09-21.')],
+    ));
+    expect($doc->metadata['retrieved_at'])->toBe('2026-09-21');
+
+    $symbol = $builder->addReflectedSymbol(GraphSource::class);
+    expect($symbol['node']->type)->toBe('class')
+        ->and($symbol['node']->metadata['start_line'])->toBeInt()
+        ->and($symbol['node']->metadata['end_line'])->toBeInt()
+        ->and($symbol['source']->digest)->toBeString()
+        ->and($symbol['node']->sourceIds)->toBe([$symbol['source']->id()]);
+
+    $method = $builder->addReflectedMethod(GraphSource::class, 'id');
+    expect($method['node']->type)->toBe('method')
+        ->and($method['node']->metadata['start_line'])->toBeLessThanOrEqual($method['node']->metadata['end_line']);
+
+    $builder->addNode('concept', 'z-last', 'Z', [$doc->id()]);
+    $builder->addNode('concept', 'a-first', 'A', [$doc->id()]);
+    $final = $builder->finalize();
+    $ids = array_map(fn ($node) => $node->id(), $final['nodes']);
+    $sorted = $ids;
+    sort($sorted);
+    expect($ids)->toBe($sorted);
+
+    expect(fn () => $builder->addReflectedSymbol('Missing\\Symbol\\Here'))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_SYMBOL_MISSING:');
+
+    $foreign = new LaravelGraphBuilder('other', '12');
+    expect(fn () => $foreign->addSource(new GraphSource('laravel', '12', 'documentation', 'x', 'X')))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_SCOPE_INVALID:');
+});
