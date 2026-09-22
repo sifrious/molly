@@ -2,12 +2,12 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
-use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
@@ -21,7 +21,7 @@ use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
  */
 final class InitializeMollyInExistingProject
 {
-    public function __construct(private ProjectRegistry $registry = new ProjectRegistry) {}
+    public function __construct(private ProjectRegistry $registry) {}
 
     /**
      * @param  (callable(string, string): void)|null  $progress
@@ -199,7 +199,7 @@ final class InitializeMollyInExistingProject
     private function migrate(string $root): void
     {
         if ($this->sameApplication($root)) {
-            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            Artisan::call('migrate', ['--force' => true]);
 
             return;
         }
