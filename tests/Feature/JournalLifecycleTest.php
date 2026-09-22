@@ -251,3 +251,37 @@ it('leaves unrelated tasks unchanged when a project refresh names an unknown tas
         ->and($task->fresh()->getRawOriginal())->toBe($before)
         ->and(File::get($task->journal_status['journal_path']))->toBe($journal);
 });
+
+it('proves lifecycle journal refresh stays byte-compatible with private permissions', function (): void {
+    $task = lifecycleTask();
+    // First refresh stabilizes lifecycle summary lines written after create.
+    $task = app(RefreshProjectJournal::class)->handle($task->fresh());
+    $journalPath = $task->journal_status['journal_path'];
+    $glossaryPath = $task->journal_status['glossary_path'];
+    $original = File::get($journalPath);
+    $glossary = File::get($glossaryPath);
+    $before = $task->fresh()->getRawOriginal();
+    unset($before['journal_status']);
+    $checkedAt = $task->journal_status['checked_at'];
+
+    $this->travel(1)->minute();
+    $refreshed = app(RefreshProjectJournal::class)->handle($task->fresh());
+    $after = $refreshed->fresh()->getRawOriginal();
+    unset($after['journal_status']);
+
+    expect(File::get($journalPath))->toBe($original)
+        ->and(File::get($glossaryPath))->toBe($glossary)
+        ->and($refreshed->journal_status['status'])->toBe('written')
+        ->and($refreshed->journal_status['journal_path'])->toBe($journalPath)
+        ->and($refreshed->journal_status['glossary_path'])->toBe($glossaryPath)
+        ->and($refreshed->journal_status['checked_at'])->not->toBe($checkedAt)
+        ->and(fileperms($this->journalWorkspace.'/.molly') & 0777)->toBe(0700)
+        ->and(fileperms($journalPath) & 0777)->toBe(0600)
+        ->and(fileperms($glossaryPath) & 0777)->toBe(0600)
+        ->and(fileperms($this->journalWorkspace.'/.molly/.gitignore') & 0777)->toBe(0600)
+        ->and(scandir($this->journalWorkspace.'/.molly'))->toContain('.gitignore', 'GLOSSARY.md', 'JOURNAL.md')
+        ->and(collect(scandir($this->journalWorkspace.'/.molly'))->filter(fn ($name) => str_ends_with($name, '.tmp'))->all())->toBe([])
+        ->and($glossary)->toContain('<!-- molly:glossary:start -->', '<!-- molly:glossary:end -->')
+        ->and($after)->toBe($before)
+        ->and($refreshed->status)->toBe('pending');
+});

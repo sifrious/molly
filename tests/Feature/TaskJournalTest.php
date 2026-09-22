@@ -403,3 +403,93 @@ it('preserves a glossary edited during export instead of replacing the new conte
     expect(File::get($path))->toBe('# Concurrent glossary edit')
         ->and(scandir($this->journalWorkspace.'/.molly'))->toBe(['.', '..', '.gitignore', 'GLOSSARY.md']);
 });
+
+it('proves journal output and security remain byte-compatible after JournalWriter migration', function (): void {
+    $this->travelTo('2026-09-17 10:00:00');
+    $task = journalTask([
+        'status' => 'failed',
+        'prompt' => "<script>alert('xss')</script>\n[link](javascript:alert(1))",
+        'source' => [
+            'token' => 'source-secret',
+            'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+            'linked_pr' => [
+                'url' => 'https://github.com/sifrious/molly/pull/12',
+                'merge_sha' => 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            ],
+        ],
+        'context_snapshot' => ['files' => ['routes/web.php' => 'snapshot-source-secret']],
+    ]);
+    File::put($this->journalWorkspace.'/.env', 'PROVIDER_API_KEY=environment-secret');
+    $run = $task->runs()->create([
+        'prompt' => $task->prompt,
+        'workspace' => $task->workspace,
+        'status' => 'failed',
+        'report' => [
+            'error' => 'VERIFICATION_FAILED: The required test did not pass.',
+            'verification' => [
+                'status' => 'failed',
+                'tests' => 1,
+                'assertions' => 1,
+                'failures' => 1,
+                'errors' => 0,
+                'skipped' => 0,
+                'reason' => 'An assertion failed.',
+                'output' => 'full-output-secret',
+            ],
+            'files' => [['content' => 'full-source-secret']],
+            'provider' => ['api_key' => 'provider-secret'],
+        ],
+    ]);
+    app(RecordLifecycleEvent::class)->handle($this->journalWorkspace, LifecycleEventType::Created, $task->id);
+    app(RecordLifecycleEvent::class)->handle($this->journalWorkspace, LifecycleEventType::Merged, $task->id, null, [
+        'url' => 'https://github.com/sifrious/molly/pull/12',
+        'sha' => 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'merged' => false,
+    ]);
+
+    $exporter = app(ExportTaskJournal::class);
+    $firstTask = $exporter->handle($task->id);
+    $firstProject = $exporter->forWorkspace($this->journalWorkspace);
+    $taskMarkdown = File::get($firstTask['path']);
+    $projectMarkdown = File::get($firstProject['journal_path']);
+    $glossaryMarkdown = File::get($firstProject['glossary_path']);
+    $taskBefore = $task->fresh()->getRawOriginal();
+    $runBefore = $run->fresh()->getRawOriginal();
+
+    $secondTask = $exporter->handle($task->id);
+    $secondProject = $exporter->forWorkspace($this->journalWorkspace);
+
+    expect($secondTask)->toBe($firstTask)
+        ->and($secondProject)->toBe($firstProject)
+        ->and(File::get($secondTask['path']))->toBe($taskMarkdown)
+        ->and(File::get($secondProject['journal_path']))->toBe($projectMarkdown)
+        ->and(File::get($secondProject['glossary_path']))->toBe($glossaryMarkdown)
+        ->and(fileperms($this->journalWorkspace.'/.molly') & 0777)->toBe(0700)
+        ->and(fileperms($this->journalWorkspace.'/.molly/journal') & 0777)->toBe(0700)
+        ->and(fileperms($firstTask['path']) & 0777)->toBe(0600)
+        ->and(fileperms($firstProject['journal_path']) & 0777)->toBe(0600)
+        ->and(fileperms($firstProject['glossary_path']) & 0777)->toBe(0600)
+        ->and(fileperms($this->journalWorkspace.'/.molly/.gitignore') & 0777)->toBe(0600)
+        ->and(scandir($this->journalWorkspace.'/.molly'))->toContain('.gitignore', 'GLOSSARY.md', 'JOURNAL.md', 'journal', 'lifecycle.jsonl')
+        ->and(collect(scandir($this->journalWorkspace.'/.molly'))->filter(fn ($name) => str_ends_with($name, '.tmp') || str_starts_with($name, '.graph-cache-'))->all())->toBe([])
+        ->and(scandir($this->journalWorkspace.'/.molly/journal'))->toBe(['.', '..', $task->id.'.md'])
+        ->and($glossaryMarkdown)->toContain('<!-- molly:glossary:start -->', '<!-- molly:glossary:end -->', 'Task:', 'Attempt:', 'Recorded pull request:', 'Recorded merge:')
+        ->and($taskMarkdown)->toContain('Recorded pull request: https://github\\.com/sifrious/molly/pull/12')
+        ->toContain('Lifecycle: merged https://github\\.com/sifrious/molly/pull/12 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+        ->not->toContain('source-secret', 'snapshot-source-secret', 'environment-secret', 'full-output-secret', 'full-source-secret', 'provider-secret', '<script', $this->journalWorkspace)
+        ->and(Str::markdown($taskMarkdown))->toContain($run->id, '<blockquote>', '&lt;script&gt;')
+        ->and($task->fresh()->getRawOriginal())->toBe($taskBefore)
+        ->and($run->fresh()->getRawOriginal())->toBe($runBefore);
+
+    app(NameTask::class)->handle($task->id, 'compat-renamed');
+    $renamed = $exporter->handle('compat-renamed');
+    $renamedProject = $exporter->forWorkspace($this->journalWorkspace);
+
+    expect($renamed['path'])->toBe($firstTask['path'])
+        ->and(glob($this->journalWorkspace.'/.molly/journal/*.md'))->toBe([$firstTask['path']])
+        ->and(Str::markdown(File::get($renamed['path'])))->toContain('compat-renamed', $run->id)
+        ->not->toContain('health-check')
+        ->and(Str::markdown(File::get($renamedProject['journal_path'])))->toContain('compat-renamed', $run->id)
+        ->not->toContain('health-check')
+        ->and($run->fresh()->task_id)->toBe($task->id);
+});
