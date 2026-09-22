@@ -75,3 +75,11 @@ it('builds the initial run report from one leased task snapshot', function () {
     expect($nullReport['snapshots']['task_creation'])->toBeNull()
         ->and($nullReport['protected_test']['writable'])->toBeTrue();
 });
+
+it('exposes named success and terminated finalization helpers on RunTask', function () {
+    $reflection = new ReflectionClass(RunTask::class);
+    expect($reflection->hasMethod('persistSuccessfulCompletion'))->toBeTrue()
+        ->and($reflection->hasMethod('persistTerminatedFinalization'))->toBeTrue()
+        ->and($reflection->getMethod('persistSuccessfulCompletion')->isPrivate())->toBeTrue()
+        ->and($reflection->getMethod('persistTerminatedFinalization')->isPrivate())->toBeTrue();
+});

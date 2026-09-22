@@ -182,40 +182,10 @@ class RunTask
             }
 
             $decision = $this->decideCompletion->handle($report, $after);
-            $report['verification_outcomes'] = $decision['outcomes'];
-            $report['completion_blockers'] = $decision['blockers'];
-            $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
-            $classification = $this->classify->handle([
-                'run_id' => $run->id,
-                'verification' => $report['verification'] ?? [],
-                'review' => $report['review'] ?? [],
-            ]);
-            $report['classification'] = [...$classification->toArray(), 'advisory' => true];
-
             $this->checkpoint($shouldStop, null, 'Completing the run');
-            $this->recordSnapshot($report, $workspace, $before, $after);
-            $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
+            $this->persistSuccessfulCompletion($run, $report, $decision, $workspace, $before, $after);
         } catch (Throwable $exception) {
-            $report['error'] = $exception->getMessage();
-            try {
-                $observed = $workspace->read(array_keys($before));
-                $report['changes'] = $workspace->changes($before, $observed);
-                $this->recordSnapshot($report, $workspace, $before, $observed);
-            } catch (Throwable $captureFailure) {
-                $report['changes_unavailable'] = true;
-                $report['snapshots']['after'] = ['status' => 'unavailable', 'reason' => 'SNAPSHOT_CAPTURE_FAILED: '.$captureFailure->getMessage()];
-                $report['components'] = ['status' => 'unavailable', 'reason' => 'The final workspace could not be read. Component changes are unknown.'];
-            }
-            try {
-                $decision = $this->decideCompletion->forTerminated($report);
-                $report['verification_outcomes'] = $decision['outcomes'];
-                $report['completion_blockers'] = $decision['blockers'];
-                $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
-                $report['terminated_before_completion'] = true;
-            } catch (Throwable $receiptFailure) {
-                $report['receipt_error'] = $receiptFailure->getMessage();
-            }
-            $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
+            $this->persistTerminatedFinalization($run, $report, $exception, $workspace, $before);
         }
 
         return $run->fresh();
@@ -225,6 +195,55 @@ class RunTask
      * @param  list<array{path: string, content: string}>  $edits
      * @param  array<string, ?string>  $before
      */
+    /**
+     * @param  array<string, mixed>  $report
+     * @param  array{completed: bool, outcomes: mixed, blockers: mixed}  $decision
+     * @param  array<string, ?string>  $before
+     * @param  array<string, ?string>  $after
+     */
+    private function persistSuccessfulCompletion(Run $run, array &$report, array $decision, Workspace $workspace, array $before, array $after): void
+    {
+        $report['verification_outcomes'] = $decision['outcomes'];
+        $report['completion_blockers'] = $decision['blockers'];
+        $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
+        $classification = $this->classify->handle([
+            'run_id' => $run->id,
+            'verification' => $report['verification'] ?? [],
+            'review' => $report['review'] ?? [],
+        ]);
+        $report['classification'] = [...$classification->toArray(), 'advisory' => true];
+        $this->recordSnapshot($report, $workspace, $before, $after);
+        $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $report
+     * @param  array<string, ?string>  $before
+     */
+    private function persistTerminatedFinalization(Run $run, array &$report, Throwable $exception, Workspace $workspace, array $before): void
+    {
+        $report['error'] = $exception->getMessage();
+        try {
+            $observed = $workspace->read(array_keys($before));
+            $report['changes'] = $workspace->changes($before, $observed);
+            $this->recordSnapshot($report, $workspace, $before, $observed);
+        } catch (Throwable $captureFailure) {
+            $report['changes_unavailable'] = true;
+            $report['snapshots']['after'] = ['status' => 'unavailable', 'reason' => 'SNAPSHOT_CAPTURE_FAILED: '.$captureFailure->getMessage()];
+            $report['components'] = ['status' => 'unavailable', 'reason' => 'The final workspace could not be read. Component changes are unknown.'];
+        }
+        try {
+            $decision = $this->decideCompletion->forTerminated($report);
+            $report['verification_outcomes'] = $decision['outcomes'];
+            $report['completion_blockers'] = $decision['blockers'];
+            $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
+            $report['terminated_before_completion'] = true;
+        } catch (Throwable $receiptFailure) {
+            $report['receipt_error'] = $receiptFailure->getMessage();
+        }
+        $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
+    }
+
     private function applyProposal(Workspace $workspace, array $edits, array $before, string $evidence): void
     {
         $sandbox = $this->sandbox;
