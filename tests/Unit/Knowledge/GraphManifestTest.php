@@ -85,3 +85,23 @@ it('rejects skipped replacement units', function () {
     expect(fn () => $manifest->withReplacedUnit(['id' => 'x', 'status' => 'skipped']))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_MANIFEST_INVALID:');
 });
+
+it('writes manifests privately and atomically with deterministic JSON', function () {
+    $root = realpath(sys_get_temp_dir()).'/molly-manifest-write-'.uniqid('', true);
+    mkdir($root, 0700, true);
+    $manifest = GraphManifest::fromArray([
+        'schema_version' => 1,
+        'units' => [['id' => 'laravel', 'status' => 'ready']],
+        'packages' => ['laravel/framework' => '12.0.0'],
+    ]);
+
+    $path = $manifest->write($root);
+    $again = $manifest->write($root);
+
+    expect($path)->toBe($again)
+        ->and(is_file($path))->toBeTrue()
+        ->and(decoct(fileperms($path) & 0777))->toBe('600')
+        ->and(decoct(fileperms(dirname($path)) & 0777))->toBe('700')
+        ->and(GraphManifest::load($root)->units[0]['status'])->toBe('ready')
+        ->and(file_get_contents($path))->toBe(file_get_contents($path));
+});

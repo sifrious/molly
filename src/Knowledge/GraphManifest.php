@@ -202,6 +202,54 @@ final class GraphManifest
         return true;
     }
 
+    /**
+     * Write this manifest privately and atomically under the project graphs directory.
+     * Never leaves a partial file that could make a failed unit look ready.
+     */
+    public function write(string $root): string
+    {
+        $directory = rtrim($root, '/').'/.molly/graphs';
+        clearstatcache(true, $directory);
+        if (is_link($directory) || (file_exists($directory) && ! is_dir($directory))) {
+            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Graph manifest directories must be real directories, not links or files.');
+        }
+        if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not create the graph manifest directory.');
+        }
+        @chmod($directory, 0700);
+
+        $path = $directory.'/manifest.json';
+        $payload = $this->toArray();
+        // Deterministic formatting for reproducible digests.
+        $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+
+        $temporary = @tempnam($directory, '.manifest-');
+        if ($temporary === false || dirname($temporary) !== $directory) {
+            if (is_string($temporary) && is_file($temporary)) {
+                @unlink($temporary);
+            }
+            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not stage the graph manifest.');
+        }
+
+        try {
+            $written = @file_put_contents($temporary, $json);
+            if ($written !== strlen($json)) {
+                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be written in full.');
+            }
+            @chmod($temporary, 0600);
+            if (! @rename($temporary, $path)) {
+                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be replaced atomically.');
+            }
+            @chmod($path, 0600);
+        } finally {
+            if (isset($temporary) && is_file($temporary) && ! is_link($temporary)) {
+                @unlink($temporary);
+            }
+        }
+
+        return $path;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
