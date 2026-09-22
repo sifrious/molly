@@ -57,6 +57,7 @@ class RunTask
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest): Run {
             $before = $files->read($paths);
+            // Refresh the task once under the lease; outer load stays for safe pre-lease digest/path prep.
             $taskRow = $taskId === null ? null : Task::find($taskId);
             $overrides = is_array($taskRow?->context_snapshot['settings_overrides'] ?? null)
                 ? $taskRow->context_snapshot['settings_overrides']
@@ -79,22 +80,7 @@ class RunTask
                 'identity_status' => $identity['identity_status'],
                 'status' => 'running',
                 'effective_config' => $effectiveConfig,
-                'report' => [
-                    'scope' => $paths,
-                    'protected_test' => [
-                        'path' => $testPath,
-                        'digest' => $testDigest,
-                        'writable' => $allowTestEdits,
-                    ],
-                    'provider' => config('molly.agent', 'ollama'),
-                    'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
-                    'snapshots' => [
-                        'task_creation' => $taskId === null ? null : Task::find($taskId)?->context_snapshot,
-                        'before' => $this->withPreview($files, $before, 'before'),
-                        'after' => ['status' => 'not_captured', 'reason' => 'The run has not captured the final workspace.'],
-                    ],
-                    'components' => ['status' => 'not_compared', 'reason' => 'The run has not captured the final workspace.'],
-                ],
+                'report' => $this->initialReport($files, $before, $paths, $testPath, $testDigest, $allowTestEdits, $taskRow),
             ]);
 
             return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId);
@@ -301,6 +287,31 @@ class RunTask
         if (! in_array($measurement['status'] ?? null, ['ok', 'skipped'], true)) {
             throw new RuntimeException('CLEVER_UNAVAILABLE: '.($measurement['reason'] ?? 'Clever did not produce a usable report.'));
         }
+    }
+
+    /**
+     * @param  array<string, ?string>  $before
+     * @param  list<string>  $paths
+     * @return array<string, mixed>
+     */
+    private function initialReport(Workspace $files, array $before, array $paths, string $testPath, ?string $testDigest, bool $allowTestEdits, ?Task $taskRow): array
+    {
+        return [
+            'scope' => $paths,
+            'protected_test' => [
+                'path' => $testPath,
+                'digest' => $testDigest,
+                'writable' => $allowTestEdits,
+            ],
+            'provider' => config('molly.agent', 'ollama'),
+            'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
+            'snapshots' => [
+                'task_creation' => $taskRow?->context_snapshot,
+                'before' => $this->withPreview($files, $before, 'before'),
+                'after' => ['status' => 'not_captured', 'reason' => 'The run has not captured the final workspace.'],
+            ],
+            'components' => ['status' => 'not_compared', 'reason' => 'The run has not captured the final workspace.'],
+        ];
     }
 
     /** @return array<string, mixed> */
