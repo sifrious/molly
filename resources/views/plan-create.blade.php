@@ -4,7 +4,7 @@
 <h1>Plan a project</h1>
 <p><a href="{{ route('molly.plans.index') }}">Saved plans</a></p>
 <p>Describe a project or collection of tasks. The optional Tarpit review asks one question at a time before you choose a small task to run.</p>
-<p>Planning saves your answers and shows bundled source references. Saving a plan and answering the guided questions do not call a model or change files. You can request a separate Jev suggestion when TypeSafe is configured.</p>
+<p>Planning saves your answers and shows bundled source references. Saving a plan and answering the guided questions stay local: they do not call a model, change files, or enable Jev. A later explicit suggestion is a separate request and requires the default-off Jev integration (<code>MOLLY_JEV_ENABLED=true</code>) plus Laravel AI provider credentials.</p>
 <form method="post" action="{{ route('molly.plans.store') }}">
     @csrf
     <label for="description">What would you like to build?</label>
