@@ -38,3 +38,27 @@ it('keeps legacy constructor call sites working with null provenance', function 
         ->and($decision->model)->toBeNull()
         ->and($decision->toArray()['fallback_reason'])->toBeNull();
 });
+
+it('serializes null provenance honestly without synthesizing probability', function () {
+    $decision = new ClassificationDecision('laravel-ai.decide', 'retry', null, ['run:1'], 'keep_failed');
+    $array = $decision->toArray();
+
+    expect($array['probability'])->toBeNull()
+        ->and($array['confidence'])->toBeNull()
+        ->and($array['provenance_status'])->toBe(ClassificationDecision::PROVENANCE_NOT_MEASURED)
+        ->and(array_key_exists('fallback_reason', $array))->toBeTrue();
+});
+
+it('distinguishes disabled unsupported and provider failure statuses', function () {
+    foreach ([
+        ClassificationDecision::PROVENANCE_DISABLED,
+        ClassificationDecision::PROVENANCE_UNSUPPORTED,
+        ClassificationDecision::PROVENANCE_PROVIDER_FAILURE,
+    ] as $reason) {
+        $decision = new ClassificationDecision(
+            'molly.fallback', 'inspect', null, [], 'keep_failed', fallbackReason: $reason,
+        );
+        expect($decision->toArray()['provenance_status'])->toBe($reason)
+            ->and($decision->toArray()['probability'])->toBeNull();
+    }
+});
