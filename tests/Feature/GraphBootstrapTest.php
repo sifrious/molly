@@ -7,6 +7,7 @@ use Sifrious\Molly\Actions\RetryProjectKnowledgeGraphUnit;
 use Sifrious\Molly\Knowledge\ComposerLock;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphCache;
+use Sifrious\Molly\PlanningGuide;
 
 beforeEach(function (): void {
     $this->mollyHome = sys_get_temp_dir().'/molly-home-'.Str::uuid();
@@ -151,4 +152,126 @@ it('retries a single unit via RetryProjectKnowledgeGraphUnit', function (): void
 
     expect($retry['retried_unit'])->toBe('laravel:laravel/framework')
         ->and(collect($retry['units'])->firstWhere('id', 'laravel:laravel/framework')['status'])->toBe('ready');
+});
+
+it('indexes the project workspace graph unit', function (): void {
+    writeLock($this->project, 'v12.0.0');
+
+    $result = makeBootstrap(
+        new GraphCache($this->mollyHome.'/graph-cache'),
+        new Graph($this->knowledgeDatabase),
+    )->handle($this->project);
+
+    $project = collect($result['units'])->firstWhere('id', 'project:workspace');
+    expect($project)->not->toBeNull()
+        ->and($project['status'])->toBe('ready')
+        ->and($project['source'])->toBe('built')
+        ->and($project['namespace'])->toBe('project');
+});
+
+it('reports progress in lockfile then laravel then project then manifest order', function (): void {
+    writeLock($this->project, 'v12.0.0');
+    $steps = [];
+
+    makeBootstrap(
+        new GraphCache($this->mollyHome.'/graph-cache'),
+        new Graph($this->knowledgeDatabase),
+    )->handle($this->project, function (string $step, string $message) use (&$steps): void {
+        $steps[] = $step;
+    });
+
+    $unique = [];
+    foreach ($steps as $step) {
+        if (! in_array($step, $unique, true)) {
+            $unique[] = $step;
+        }
+    }
+
+    expect($unique[0] ?? null)->toBe('lockfile')
+        ->and($unique)->toContain('laravel')
+        ->and($unique)->toContain('project')
+        ->and($unique[array_key_last($unique)] ?? null)->toBe('manifest');
+
+    $lockIdx = array_search('lockfile', $unique, true);
+    $laravelIdx = array_search('laravel', $unique, true);
+    $projectIdx = array_search('project', $unique, true);
+    $manifestIdx = array_search('manifest', $unique, true);
+    expect($lockIdx)->toBeLessThan($laravelIdx)
+        ->and($laravelIdx)->toBeLessThan($projectIdx)
+        ->and($projectIdx)->toBeLessThan($manifestIdx);
+});
+
+it('preserves sibling units in the manifest when retrying one unit', function (): void {
+    writeLock($this->project, 'v12.0.0');
+    $bootstrap = makeBootstrap(
+        new GraphCache($this->mollyHome.'/graph-cache'),
+        new Graph($this->knowledgeDatabase),
+    );
+    $first = $bootstrap->handle($this->project);
+    $beforeIds = collect($first['units'])->pluck('id')->sort()->values()->all();
+
+    $retry = (new RetryProjectKnowledgeGraphUnit($bootstrap))->handle(
+        $this->project,
+        'laravel:laravel/framework',
+    );
+    $afterIds = collect($retry['units'])->pluck('id')->sort()->values()->all();
+
+    expect($afterIds)->toBe($beforeIds)
+        ->and($afterIds)->toContain('laravel:laravel/framework')
+        ->and($afterIds)->toContain('project:workspace');
+});
+
+it('keeps deterministic laravel snapshot node counts across fresh builds', function (): void {
+    writeLock($this->project, 'v12.0.0');
+    $cacheDir = $this->mollyHome.'/graph-cache-a';
+    $dbA = sys_get_temp_dir().'/molly-knowledge-a-'.Str::uuid().'.sqlite';
+    $dbB = sys_get_temp_dir().'/molly-knowledge-b-'.Str::uuid().'.sqlite';
+
+    $first = makeBootstrap(new GraphCache($cacheDir.'-1'), new Graph($dbA))->handle($this->project);
+    $secondProject = sys_get_temp_dir().'/molly-graph-project-'.Str::uuid();
+    File::ensureDirectoryExists($secondProject);
+    File::put($secondProject.'/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($secondProject.'/composer.json', File::get($this->project.'/composer.json'));
+    writeLock($secondProject, 'v12.0.0');
+    $second = makeBootstrap(new GraphCache($cacheDir.'-2'), new Graph($dbB))->handle($secondProject);
+
+    $firstLaravel = collect($first['units'])->firstWhere('id', 'laravel:laravel/framework');
+    $secondLaravel = collect($second['units'])->firstWhere('id', 'laravel:laravel/framework');
+    expect($firstLaravel['source'])->toBe('built')
+        ->and($secondLaravel['source'])->toBe('built')
+        ->and($firstLaravel['counts'])->toBe($secondLaravel['counts']);
+
+    File::deleteDirectory($secondProject);
+    File::delete($dbA);
+    File::delete($dbB);
+});
+
+it('records optional NativePHP unit failure without aborting laravel bootstrap', function (): void {
+    writeLock($this->project, 'v12.0.0', [
+        ['name' => 'nativephp/desktop', 'version' => '1.2.3'],
+    ]);
+
+    app()->instance(PlanningGuide::class, new class extends PlanningGuide
+    {
+        public function source(string $id): array
+        {
+            if ($id === 'nativephp-desktop') {
+                throw new RuntimeException('NATIVEPHP_GRAPH_FAIL');
+            }
+
+            return parent::source($id);
+        }
+    });
+
+    $result = makeBootstrap(
+        new GraphCache($this->mollyHome.'/graph-cache'),
+        new Graph($this->knowledgeDatabase),
+    )->handle($this->project);
+
+    $laravel = collect($result['units'])->firstWhere('id', 'laravel:laravel/framework');
+    $nativeUnit = collect($result['units'])->firstWhere('id', 'nativephp:nativephp/desktop');
+    expect($laravel['status'])->toBe('ready')
+        ->and($nativeUnit['status'])->toBe('failed')
+        ->and($nativeUnit['error'])->toContain('NATIVEPHP_GRAPH_FAIL')
+        ->and($result['ok'])->toBeFalse();
 });
