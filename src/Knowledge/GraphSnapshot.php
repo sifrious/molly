@@ -81,6 +81,48 @@ final readonly class GraphSnapshot
         }
     }
 
+    /** Merge another snapshot of the same namespace/version by stable id; reject conflicts; return sorted. */
+    public function merge(self $other): self
+    {
+        if ($other->namespace !== $this->namespace || $other->version !== $this->version) {
+            throw new RuntimeException('KNOWLEDGE_SCOPE_INVALID: Snapshot records must use one namespace and version.');
+        }
+
+        return new self(
+            $this->namespace,
+            $this->version,
+            self::mergeRecords($this->sources, $other->sources, 'source'),
+            self::mergeRecords($this->nodes, $other->nodes, 'node'),
+            self::mergeRecords($this->edges, $other->edges, 'edge'),
+        );
+    }
+
+    /**
+     * @template T of GraphSource|GraphNode|GraphEdge
+     *
+     * @param  list<T>  $left
+     * @param  list<T>  $right
+     * @return list<T>
+     */
+    private static function mergeRecords(array $left, array $right, string $kind): array
+    {
+        $byId = [];
+        foreach ([...$left, ...$right] as $record) {
+            $id = $record->id();
+            if (isset($byId[$id])) {
+                if (serialize($byId[$id]) !== serialize($record)) {
+                    throw new RuntimeException('KNOWLEDGE_ID_CONFLICT: Conflicting '.$kind.' records share id '.$id.'.');
+                }
+
+                continue;
+            }
+            $byId[$id] = $record;
+        }
+        ksort($byId);
+
+        return array_values($byId);
+    }
+
     /** @return array{namespace: string, version: string, sources: list<array<string, mixed>>, nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>} */
     public function toArray(): array
     {

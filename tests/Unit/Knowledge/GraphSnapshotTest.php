@@ -64,3 +64,32 @@ it('rejects incomplete cached snapshots', function () {
     expect(fn () => GraphSnapshot::fromArray(['namespace' => 'laravel']))
         ->toThrow(RuntimeException::class, 'KNOWLEDGE_SNAPSHOT_INVALID:');
 });
+
+it('merges snapshots by stable id with deterministic ordering', function () {
+    $source = snapSource('doc');
+    $a = new GraphNode('laravel', '12', 'concept', 'a', 'A', [$source->id()]);
+    $b = new GraphNode('laravel', '12', 'concept', 'b', 'B', [$source->id()]);
+    $left = new GraphSnapshot('laravel', '12', [$source], [$a], []);
+    $right = new GraphSnapshot('laravel', '12', [$source], [$b], []);
+
+    $merged = $left->merge($right);
+    expect($merged->nodes)->toHaveCount(2)
+        ->and($merged->nodes[0]->id() < $merged->nodes[1]->id())->toBeTrue();
+});
+
+it('rejects merge across scopes and conflicting ids', function () {
+    $source = snapSource();
+    $node = new GraphNode('laravel', '12', 'concept', 'a', 'A', [$source->id()]);
+    $left = new GraphSnapshot('laravel', '12', [$source], [$node], []);
+    $otherScope = new GraphSnapshot('other', '12', [
+        new GraphSource('other', '12', 'document', 'doc', 'Doc'),
+    ], [], []);
+
+    expect(fn () => $left->merge($otherScope))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_SCOPE_INVALID:');
+
+    $conflict = new GraphNode('laravel', '12', 'concept', 'a', 'Different', [$source->id()]);
+    $right = new GraphSnapshot('laravel', '12', [$source], [$conflict], []);
+    expect(fn () => $left->merge($right))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_ID_CONFLICT:');
+});
