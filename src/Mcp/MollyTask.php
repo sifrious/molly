@@ -178,7 +178,7 @@ class MollyTask extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'operation' => $schema->string()->enum(self::OPERATIONS)->description('advice checks limits and may request optional TypeSafe evaluation. It saves advice but does not start or retry work. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent or open a pull request. lock_test freezes the Pest digest after a test-authoring task.')->required(),
+            'operation' => $schema->string()->enum(self::OPERATIONS)->description('advice checks limits and may use optional default-off Jev classification through Laravel AI when enabled; it is advisory and state-preserving and does not promise a provider request. It saves advice but does not start or retry work. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent or open a pull request. lock_test freezes the Pest digest after a test-authoring task.')->required(),
             'id' => $schema->string()->description('Task nickname or UUID, or a run UUID for show_run.'),
             'nickname' => $schema->string()->description('Optional nickname when saving a task; required for name. Unique, 1 to 64 letters, digits, or hyphens, starting with a letter.'),
             'thread' => $schema->string()->description('Amp thread ID beginning with T-, required for link_thread. Records a user association without starting work.'),
