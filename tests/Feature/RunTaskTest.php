@@ -2,13 +2,19 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\DecideRunCompletion;
+use Sifrious\Molly\Actions\EvaluateChanges;
 use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Actions\MeasureComplexity;
+use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Actions\VerifyChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Agents\TarpitReviewer;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Verification\FalseGreenVerifier;
 
 function mollyReviewFixture(): array
 {
@@ -229,4 +235,232 @@ it('finalizes NOT_RUN receipts when a run stops before verification', function (
         ->and(is_file($tarpitReceipt))->toBeTrue()
         ->and(File::get($pestReceipt))->toContain('"state":"NOT_RUN"')
         ->and(File::get($tarpitReceipt))->toContain('"state":"NOT_RUN"');
+});
+
+it('proves RunTask phase order and failure semantics', function () {
+    $phases = [];
+    $progress = function (string $message) use (&$phases): void {
+        $phases[] = $message;
+    };
+
+    // Serial success: measurements → generate → verify → review → after measure → receipts → advisory classification → snapshots.
+    config(['molly.parallel_checks' => false, 'molly.false_green.enabled' => false]);
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    measureMollyFixture();
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn([
+        'status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true,
+    ]);
+
+    $serial = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        progress: $progress,
+        taskId: $task->id,
+    );
+
+    expect($serial->status)->toBe('completed')
+        ->and($serial->report['mode'])->toBe('serial')
+        ->and($serial->report['classification']['advisory'])->toBeTrue()
+        ->and($serial->report['verification_receipts'])->not->toBeEmpty()
+        ->and($serial->report['snapshots']['before']['status'])->toBe('captured')
+        ->and($serial->report['snapshots']['after']['status'])->toBe('captured')
+        ->and($serial->report['components']['status'])->toBe('compared')
+        ->and($phases)->toContain(
+            'Measuring complexity before changes',
+            'Writing the selected files with Ollama',
+            'Applying the proposed changes',
+            'Running the required Pest tests',
+            'Reviewing complexity with the seven Tarpit checks',
+            'Measuring complexity after changes',
+        );
+
+    $log = app(RecordLifecycleEvent::class)->load($this->workspace);
+    $types = array_map(fn ($event) => $event->type()?->value, $log->events($task->id));
+    expect($types)->toContain(
+        LifecycleEventType::DispatchRequested->value,
+        LifecycleEventType::AgentStarted->value,
+        LifecycleEventType::ProposalReceived->value,
+        LifecycleEventType::EditsAccepted->value,
+        LifecycleEventType::VerificationStarted->value,
+    );
+
+    app()->forgetInstance(RunTask::class);
+    // Parallel mode uses EvaluateChanges and records mode=parallel.
+    File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    $phases = [];
+    config(['molly.parallel_checks' => true]);
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    measureMollyFixture();
+    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+    $this->mock(EvaluateChanges::class)->shouldReceive('handle')->once()->andReturn([
+        'verification' => ['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true],
+        'review' => mollyReviewFixture(),
+        'branches' => [
+            [
+                'kind' => 'verification', 'branch_id' => 'verification-1', 'attempt_id' => 'attempt-1',
+                'execution_target' => 'local', 'status' => 'passed', 'finished_at' => '2026-09-22T12:00:00Z',
+                'result_ref' => '/evidence/verification.json',
+            ],
+            [
+                'kind' => 'review', 'branch_id' => 'review-1', 'attempt_id' => 'attempt-1',
+                'execution_target' => 'local', 'status' => 'passed', 'finished_at' => '2026-09-22T12:00:01Z',
+                'result_ref' => '/evidence/review.json',
+            ],
+        ],
+    ]);
+
+    $parallel = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        progress: $progress,
+    );
+
+    expect($parallel->status)->toBe('completed')
+        ->and($parallel->report['mode'])->toBe('parallel')
+        ->and($phases)->toContain('Running Pest and Tarpit review in parallel');
+
+    app()->forgetInstance(RunTask::class);
+    // Protected test integrity before apply.
+    File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    config(['molly.parallel_checks' => false]);
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn(['status' => 'ok', 'probes' => []]);
+    ChangeWriter::fake([[
+        'summary' => 'Weaken the test.',
+        'files' => [['path' => 'tests/GreetingTest.php', 'content' => '<?php it("weak", fn () => expect(true)->toBeTrue());']],
+    ]])->preventStrayPrompts();
+    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+
+    $protected = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($protected->status)->toBe('failed')
+        ->and($protected->report['error'])->toStartWith('PROTECTED_TEST_CHANGED:')
+        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;');
+
+    app()->forgetInstance(RunTask::class);
+    // No-changes rejection after proposal.
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn(['status' => 'ok', 'probes' => []]);
+    ChangeWriter::fake([['summary' => 'No change.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return null;']]]])->preventStrayPrompts();
+    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+    $noChanges = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($noChanges->status)->toBe('failed')
+        ->and($noChanges->report['error'])->toStartWith('NO_CHANGES:');
+
+    app()->forgetInstance(RunTask::class);
+    // Workspace mutation after verification invalidates the run.
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    measureMollyFixture();
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturnUsing(function () {
+        File::put($this->workspace.'/app/Greeting.php', '<?php return "mutated";');
+
+        return ['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true];
+    });
+    $mutated = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($mutated->status)->toBe('failed')
+        ->and($mutated->report['error'])->toStartWith('WORKSPACE_CHANGED:');
+
+    app()->forgetInstance(RunTask::class);
+    // False-green probe runs when enabled and keeps advisory classification on success.
+    File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    config(['molly.false_green.enabled' => true]);
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    measureMollyFixture();
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn([
+        'status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true,
+    ]);
+    $this->mock(FalseGreenVerifier::class)->shouldReceive('handle')->once()->andReturn([
+        'status' => 'clean', 'state' => 'PASS', 'conclusion' => 'strong_test',
+    ]);
+    $falseGreen = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($falseGreen->status)->toBe('completed')
+        ->and($falseGreen->report['false_green']['status'])->toBe('clean')
+        ->and($falseGreen->report['classification']['advisory'])->toBeTrue();
+    config(['molly.false_green.enabled' => false]);
+
+    app()->forgetInstance(RunTask::class);
+    // Stop boundary before generation finalizes NOT_RUN receipts and stopped status.
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->never();
+    $stopped = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        shouldStop: fn (): bool => true,
+    );
+    expect($stopped->status)->toBe('stopped')
+        ->and($stopped->report['terminated_before_completion'])->toBeTrue()
+        ->and($stopped->report['verification_outcomes']['pest']['state'])->toBe('NOT_RUN')
+        ->and($stopped->report['verification_outcomes']['tarpit']['state'])->toBe('NOT_RUN')
+        ->and(is_file($this->workspace.'/.molly/receipts/'.$stopped->id.'/pest.json'))->toBeTrue();
+
+    app()->forgetInstance(RunTask::class);
+    // Measurement failure blocks generation.
+    ChangeWriter::fake()->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn([
+        'status' => 'unavailable', 'reason' => 'clever_not_installed', 'probes' => [],
+    ]);
+    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+    $measureFail = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($measureFail->status)->toBe('failed')
+        ->and($measureFail->report['error'])->toStartWith('CLEVER_UNAVAILABLE:')
+        ->and($measureFail->report['changes'])->toBe([])
+        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return "Hello";');
+
+    app()->forgetInstance(RunTask::class);
+    // Snapshot capture failure on terminated path marks components unavailable.
+    File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    measureMollyFixture();
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturnUsing(function () {
+        File::delete($this->workspace.'/app/Greeting.php');
+        File::makeDirectory($this->workspace.'/app/Greeting.php');
+
+        return ['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true];
+    });
+    $snapshotFail = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($snapshotFail->status)->toBe('failed')
+        ->and($snapshotFail->report['changes_unavailable'] ?? null)->toBeTrue()
+        ->and($snapshotFail->report['snapshots']['after']['status'])->toBe('unavailable')
+        ->and($snapshotFail->report['snapshots']['after']['reason'])->toStartWith('SNAPSHOT_CAPTURE_FAILED:')
+        ->and($snapshotFail->report['components']['status'])->toBe('unavailable');
+
+    app()->forgetInstance(RunTask::class);
+    // Receipt/finalization failure on stop still persists stopped status with receipt_error.
+    $greeting = $this->workspace.'/app/Greeting.php';
+    if (is_dir($greeting)) {
+        rmdir($greeting);
+    }
+    File::put($greeting, '<?php return null;');
+    writeProtectedTest($this->workspace);
+    $this->mock(DecideRunCompletion::class)->shouldReceive('forTerminated')->twice()
+        ->andThrow(new RuntimeException('RECEIPT_FINALIZE_FAILED: outcomes unavailable'));
+    $receiptFail = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        shouldStop: fn (): bool => true,
+    );
+    expect($receiptFail->status)->toBe('stopped')
+        ->and($receiptFail->report['receipt_error'])->toStartWith('RECEIPT_FINALIZE_FAILED:')
+        ->and($receiptFail->report)->not->toHaveKey('terminated_before_completion');
+
+    app()->forgetInstance(RunTask::class);
+    // Invalid parallel config fails closed before verification.
+    File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
+    config(['molly.parallel_checks' => 'sometimes']);
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn(['status' => 'ok', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+    $badParallel = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect($badParallel->status)->toBe('failed')
+        ->and($badParallel->report['error'])->toStartWith('PARALLEL_CONFIG_INVALID:');
+    config(['molly.parallel_checks' => false]);
 });
