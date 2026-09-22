@@ -7,9 +7,12 @@ use Sifrious\Molly\Execution\Sandbox;
 it('injects Sandbox and Clever into CheckEnvironment', function () {
     $action = app(CheckEnvironment::class);
     $r = new ReflectionClass($action);
-    foreach ([('sandbox', Sandbox::class), ('clever', Clever::class)] as [$name, $class]) {
-        $prop = $r->getProperty($name);
-        $prop->setAccessible(true);
-        expect($prop->getValue($action))->toBeInstanceOf($class);
-    }
+
+    $sandbox = $r->getProperty('sandbox');
+    $sandbox->setAccessible(true);
+    $clever = $r->getProperty('clever');
+    $clever->setAccessible(true);
+
+    expect($sandbox->getValue($action))->toBeInstanceOf(Sandbox::class)
+        ->and($clever->getValue($action))->toBeInstanceOf(Clever::class);
 });
