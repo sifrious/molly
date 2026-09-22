@@ -74,3 +74,33 @@ it('rejects incomplete glossary markers', function () {
     expect(fn () => $renderer->replaceManagedGlossary('<!-- molly:glossary:start --> only'))
         ->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED:');
 });
+
+it('keeps untrusted markdown and html inert through escape and quote', function () {
+    $renderer = new JournalRenderer;
+    $payload = implode("\n", [
+        '<script>alert(1)</script>',
+        '![img](javascript:alert(1))',
+        '[click](javascript:void(0))',
+        '# Forged heading',
+        '```',
+        'fence break',
+        '```',
+        '<img src=x onerror=alert(1)>',
+    ]);
+
+    $escaped = $renderer->escape($payload);
+    $quoted = $renderer->quote($payload);
+
+    expect($escaped)->not->toContain('<script>')
+        ->and($escaped)->toContain('&lt;script&gt;')
+        ->and($escaped)->toContain('\\#')
+        ->and($escaped)->toContain('\\`')
+        ->and($quoted)->toStartWith('> ')
+        ->and($quoted)->not->toContain("\n# ")
+        ->and($quoted)->not->toContain('<img')
+        ->and($quoted)->toContain('javascript'); // text may remain but is escaped/quoted
+
+    foreach (explode("\n", $quoted) as $line) {
+        expect($line)->toStartWith('> ');
+    }
+});
