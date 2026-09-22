@@ -3,11 +3,13 @@
 namespace Sifrious\Molly\Knowledge;
 
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 
 /**
  * Exact-version graph cache under ~/.molly/graph-cache.
  *
  * Entries are keyed by namespace + package + exact version. A different version never hits.
+ * Cached graph records are hydrated through GraphSnapshot; malformed payloads miss.
  */
 final class GraphCache
 {
@@ -62,6 +64,10 @@ final class GraphCache
             return null;
         }
 
+        if (! $this->hydrateSnapshot($namespace, $payload)) {
+            return null;
+        }
+
         return $payload;
     }
 
@@ -70,24 +76,78 @@ final class GraphCache
      */
     public function put(string $namespace, string $package, string $exactVersion, array $snapshot): void
     {
-        $path = $this->path($namespace, $package, $exactVersion);
-        File::ensureDirectoryExists(dirname($path), 0700);
-        $payload = [
+        $graphVersionKey = $snapshot['graph_version_key'] ?? $exactVersion;
+        $candidate = [
             'schema_version' => self::SCHEMA_VERSION,
             'namespace' => $namespace,
             'package' => $package,
             'exact_version' => $exactVersion,
-            'graph_version_key' => $snapshot['graph_version_key'] ?? $exactVersion,
+            'graph_version_key' => $graphVersionKey,
             'built_at' => gmdate('c'),
             'sources' => $snapshot['sources'],
             'nodes' => $snapshot['nodes'],
             'edges' => $snapshot['edges'],
         ];
+
+        if (! $this->hydrateSnapshot($namespace, $candidate)) {
+            throw new RuntimeException('KNOWLEDGE_SNAPSHOT_INVALID: Cache put rejected a malformed graph snapshot.');
+        }
+
+        $path = $this->path($namespace, $package, $exactVersion);
+        File::ensureDirectoryExists(dirname($path), 0700);
         $mask = umask(0077);
         try {
-            File::put($path, json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+            File::put($path, json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
         } finally {
             umask($mask);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function hydrateSnapshot(string $namespace, array $payload): bool
+    {
+        $version = $payload['graph_version_key'] ?? $payload['exact_version'] ?? null;
+        if (! is_string($version) || $version === '') {
+            return false;
+        }
+
+        try {
+            GraphSnapshot::fromArray([
+                'namespace' => $namespace,
+                'version' => $version,
+                'sources' => array_values(array_map(
+                    fn (mixed $row): array => is_array($row) ? $row : [],
+                    is_array($payload['sources'] ?? null) ? $payload['sources'] : [],
+                )),
+                'nodes' => array_values(array_map(
+                    fn (mixed $row): array => is_array($row) ? $this->normalizeSourceIds($row) : [],
+                    is_array($payload['nodes'] ?? null) ? $payload['nodes'] : [],
+                )),
+                'edges' => array_values(array_map(
+                    fn (mixed $row): array => is_array($row) ? $this->normalizeSourceIds($row) : [],
+                    is_array($payload['edges'] ?? null) ? $payload['edges'] : [],
+                )),
+            ]);
+        } catch (RuntimeException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function normalizeSourceIds(array $row): array
+    {
+        if (isset($row['sourceIds']) && ! isset($row['source_ids'])) {
+            $row['source_ids'] = $row['sourceIds'];
+            unset($row['sourceIds']);
+        }
+
+        return $row;
     }
 }
