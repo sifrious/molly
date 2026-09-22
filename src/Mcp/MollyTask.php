@@ -37,10 +37,16 @@ use Sifrious\Molly\Actions\StopTask;
 #[IsDestructive]
 class MollyTask extends Tool
 {
+    /** @var list<string> */
+    private const OPERATIONS = [
+        'list', 'show', 'create', 'from_plan', 'start', 'retry', 'stop', 'show_run', 'import_github',
+        'comment', 'approve', 'lock_test', 'pr_body', 'pr_opened', 'merged', 'handoff', 'name', 'link_thread', 'advice',
+    ];
+
     public function handle(Request $request): Response|ResponseFactory
     {
         $data = $request->validate([
-            'operation' => ['required', 'in:list,show,create,from_plan,start,retry,stop,show_run,import_github,comment,approve,lock_test,pr_body,pr_opened,merged,handoff,name,link_thread,advice'],
+            'operation' => ['required', 'in:'.implode(',', self::OPERATIONS)],
             'id' => ['required_if:operation,show,start,retry,stop,show_run,comment,approve,lock_test,pr_body,pr_opened,merged,handoff,name,link_thread,advice', 'string', 'max:100'],
             'nickname' => ['required_if:operation,name', 'string', 'max:64'],
             'thread' => ['required_if:operation,link_thread', 'string', 'max:38'],
@@ -172,7 +178,7 @@ class MollyTask extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'operation' => $schema->string()->enum(['list', 'show', 'create', 'from_plan', 'start', 'retry', 'stop', 'show_run', 'import_github', 'comment', 'approve', 'lock_test', 'pr_body', 'pr_opened', 'merged', 'handoff', 'name', 'link_thread', 'advice'])->description('advice checks limits and may request optional TypeSafe evaluation. It saves advice but does not start or retry work. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent or open a pull request. lock_test freezes the Pest digest after a test-authoring task.')->required(),
+            'operation' => $schema->string()->enum(self::OPERATIONS)->description('advice checks limits and may request optional TypeSafe evaluation. It saves advice but does not start or retry work. comment, approve, lock_test, pr_opened, and merged require approve=true and never start an agent or open a pull request. lock_test freezes the Pest digest after a test-authoring task.')->required(),
             'id' => $schema->string()->description('Task nickname or UUID, or a run UUID for show_run.'),
             'nickname' => $schema->string()->description('Optional nickname when saving a task; required for name. Unique, 1 to 64 letters, digits, or hyphens, starting with a letter.'),
             'thread' => $schema->string()->description('Amp thread ID beginning with T-, required for link_thread. Records a user association without starting work.'),
