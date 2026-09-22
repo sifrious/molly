@@ -54,8 +54,11 @@ Use this page when a Molly report or guide uses a term you do not recognize.
 | --- | --- |
 | Agent provider | The selected `amp` or `ollama` path for proposals and Tarpit review. |
 | Molly MCP server | Local stdio server that exposes Molly actions to MCP clients. It has no HTTP route. |
-| TypeSafe evaluation | Optional hosted evaluation used only when explicitly enabled for selected planning, advice, or commit-review paths. |
-| Task advice | A recommendation based on saved state, attempt limits, and optional TypeSafe evidence. It never executes the recommendation. |
+| Laravel AI classification | The borrowed Laravel AI seam Molly uses for optional structured classification. Laravel AI owns provider plumbing; Molly does not run a separate TypeSafe HTTP client. |
+| TypeSafe provider | The configured Laravel AI provider (`ai.providers.typesafe` / `TYPESAFE_API_KEY`) that may serve classification when Jev is enabled. |
+| Jev | Molly's optional model/capability policy under `molly.jev` (model, confidence threshold, timeout, instructions). Enabled only when `MOLLY_JEV_ENABLED=true`. |
+| Deterministic fallback | Molly policy when Jev is off or unavailable: no classification request; Pest, Tarpit, bounded retries, and completion stay authoritative. |
+| Task advice | A recommendation based on saved state, attempt limits, and optional Jev classification evidence. It never executes the recommendation and cannot upgrade a failed run. |
 
 ## Amp connection terms
 
