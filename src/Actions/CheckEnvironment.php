@@ -25,6 +25,20 @@ class CheckEnvironment
             $checks[] = ['name' => $name, 'status' => $passed ? 'passed' : 'failed', 'code' => $code, 'message' => $message];
         };
 
+        $this->checkDatabase($add);
+        $workspace = realpath($workspace);
+        $this->checkPest($workspace, $add);
+        $this->checkSandbox($add);
+        $this->checkParallel($add);
+        $this->checkAgent($add);
+        $this->checkClever($add);
+
+        return ['ready' => ! in_array('failed', array_column($checks, 'status'), true), 'checks' => $checks];
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkDatabase(callable $add): void
+    {
         try {
             $ready = Schema::hasTable('molly_runs') && Schema::hasTable('molly_tasks')
                 && Schema::hasColumn('molly_tasks', 'nickname') && Schema::hasColumn('molly_tasks', 'context_snapshot')
@@ -37,11 +51,18 @@ class CheckEnvironment
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');
         }
+    }
 
-        $workspace = realpath($workspace);
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkPest(string|false $workspace, callable $add): void
+    {
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
+    }
 
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkSandbox(callable $add): void
+    {
         $sandbox = $this->sandbox;
         $available = $sandbox->available();
         $unsafe = $sandbox->allowUnsafe();
@@ -55,83 +76,115 @@ class CheckEnvironment
                     ? 'This host cannot isolate writer and verifier processes. molly.sandbox.allow_unsafe is enabled for local diagnostics only.'
                     : 'This host cannot supply a writer and verifier sandbox. molly:doctor refuses the safe workflow until Landlock and user/network namespaces are available, or you explicitly set molly.sandbox.allow_unsafe.'),
         );
+    }
 
-        if (config('molly.parallel_checks', true) === true) {
-            $available = function_exists('posix_setsid') && function_exists('posix_kill');
-            $add('Parallel checks', $available, $available ? 'parallel_process_groups_ready' : 'parallel_process_groups_unavailable', $available
-                ? 'PHP provides the POSIX functions required to start and stop parallel checks.'
-                : 'Parallel checks require posix_setsid and posix_kill. Enable these PHP functions or set molly.parallel_checks to false to run checks serially.');
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkParallel(callable $add): void
+    {
+        if (config('molly.parallel_checks', true) !== true) {
+            return;
         }
 
-        if (config('molly.agent', 'ollama') === 'amp') {
-            try {
-                $available = Process::timeout(15)->run(['amp', 'usage'])->successful();
-                $add('Amp account', $available, $available ? 'amp_ready' : 'amp_unavailable', $available
-                    ? 'The Amp CLI can access the configured account. Model selection is managed by Amp.'
-                    : 'Install the Amp CLI and sign in with amp login before running tasks.');
-            } catch (Throwable) {
-                $add('Amp account', false, 'amp_unavailable', 'Molly could not check the Amp account. Install the Amp CLI and sign in with amp login.');
-            }
-        } elseif (config('molly.agent', 'ollama') !== 'ollama') {
-            $add('Agent', false, 'agent_invalid', 'Choose amp or ollama for molly.agent.');
-        } else {
-            $url = (string) config('ai.providers.ollama.url', '');
-            $model = trim((string) config('molly.model', ''));
-            $valid = false;
-            try {
-                LocalOllama::validate();
-                $valid = true;
-                $add('Local provider and model', true, 'ollama_configured', 'Laravel AI is configured for local Ollama model '.$model.' at '.$url.'.');
-                $add('Configured endpoint', true, 'ollama_endpoint', 'Base URL: '.$url.' (loopback HTTP; no API key required for local QuickStart).');
-            } catch (Throwable) {
-                $code = $model === '' ? 'model_not_configured' : (str_contains($model, 'cloud') ? 'model_not_local' : 'ollama_config_invalid');
-                $message = match ($code) {
-                    'model_not_configured' => 'Set MOLLY_LOCAL_MODEL (or run `php artisan molly:setup --agent=ollama --model=...`) to a name from `ollama list`.',
-                    'model_not_local' => 'MOLLY_LOCAL_MODEL looks like a cloud model name. Choose a local Ollama model instead.',
-                    default => 'Ollama QuickStart config is invalid. Use driver=ollama, an HTTP loopback URL such as http://127.0.0.1:11434, MOLLY_LOCAL_MODEL, and a positive molly.timeout. Non-loopback or HTTPS Ollama URLs are refused for the local path.',
-                };
-                $add('Local provider and model', false, $code, $message);
-            }
+        $available = function_exists('posix_setsid') && function_exists('posix_kill');
+        $add('Parallel checks', $available, $available ? 'parallel_process_groups_ready' : 'parallel_process_groups_unavailable', $available
+            ? 'PHP provides the POSIX functions required to start and stop parallel checks.'
+            : 'Parallel checks require posix_setsid and posix_kill. Enable these PHP functions or set molly.parallel_checks to false to run checks serially.');
+    }
 
-            if ($valid) {
-                try {
-                    $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
-                    $models = $response->json('models');
-                    if (! $response->successful() || ! is_array($models)) {
-                        $add('Ollama', false, 'ollama_response_invalid', 'Ollama at '.$url.' responded, but the model list was invalid. Check the Ollama version and URL path.');
-                    } else {
-                        $add('Ollama', true, 'ollama_reachable', 'Ollama is reachable at '.$url.'.');
-                        if ($model !== '') {
-                            $names = array_column($models, 'name');
-                            $installed = in_array($model, $names, true) || in_array($model.':latest', $names, true);
-                            $add(
-                                'Installed model',
-                                $installed,
-                                $installed ? 'model_ready' : 'model_missing',
-                                $installed
-                                    ? 'Configured model '.$model.' is installed in Ollama.'
-                                    : 'Ollama is reachable, but model '.$model.' is not installed. This is different from connection refused. Run: ollama pull '.$model,
-                            );
-                        }
-                    }
-                } catch (Throwable) {
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkAgent(callable $add): void
+    {
+        if (config('molly.agent', 'ollama') === 'amp') {
+            $this->checkAmp($add);
+
+            return;
+        }
+
+        if (config('molly.agent', 'ollama') !== 'ollama') {
+            $add('Agent', false, 'agent_invalid', 'Choose amp or ollama for molly.agent.');
+
+            return;
+        }
+
+        $this->checkOllama($add);
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkAmp(callable $add): void
+    {
+        try {
+            $available = Process::timeout(15)->run(['amp', 'usage'])->successful();
+            $add('Amp account', $available, $available ? 'amp_ready' : 'amp_unavailable', $available
+                ? 'The Amp CLI can access the configured account. Model selection is managed by Amp.'
+                : 'Install the Amp CLI and sign in with amp login before running tasks.');
+        } catch (Throwable) {
+            $add('Amp account', false, 'amp_unavailable', 'Molly could not check the Amp account. Install the Amp CLI and sign in with amp login.');
+        }
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkOllama(callable $add): void
+    {
+        $url = (string) config('ai.providers.ollama.url', '');
+        $model = trim((string) config('molly.model', ''));
+        $valid = false;
+        try {
+            LocalOllama::validate();
+            $valid = true;
+            $add('Local provider and model', true, 'ollama_configured', 'Laravel AI is configured for local Ollama model '.$model.' at '.$url.'.');
+            $add('Configured endpoint', true, 'ollama_endpoint', 'Base URL: '.$url.' (loopback HTTP; no API key required for local QuickStart).');
+        } catch (Throwable) {
+            $code = $model === '' ? 'model_not_configured' : (str_contains($model, 'cloud') ? 'model_not_local' : 'ollama_config_invalid');
+            $message = match ($code) {
+                'model_not_configured' => 'Set MOLLY_LOCAL_MODEL (or run `php artisan molly:setup --agent=ollama --model=...`) to a name from `ollama list`.',
+                'model_not_local' => 'MOLLY_LOCAL_MODEL looks like a cloud model name. Choose a local Ollama model instead.',
+                default => 'Ollama QuickStart config is invalid. Use driver=ollama, an HTTP loopback URL such as http://127.0.0.1:11434, MOLLY_LOCAL_MODEL, and a positive molly.timeout. Non-loopback or HTTPS Ollama URLs are refused for the local path.',
+            };
+            $add('Local provider and model', false, $code, $message);
+        }
+
+        if (! $valid) {
+            return;
+        }
+
+        try {
+            $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
+            $models = $response->json('models');
+            if (! $response->successful() || ! is_array($models)) {
+                $add('Ollama', false, 'ollama_response_invalid', 'Ollama at '.$url.' responded, but the model list was invalid. Check the Ollama version and URL path.');
+            } else {
+                $add('Ollama', true, 'ollama_reachable', 'Ollama is reachable at '.$url.'.');
+                if ($model !== '') {
+                    $names = array_column($models, 'name');
+                    $installed = in_array($model, $names, true) || in_array($model.':latest', $names, true);
                     $add(
-                        'Ollama',
-                        false,
-                        'ollama_unreachable',
-                        'Could not reach Ollama at '.$url.'. Start Ollama (`ollama serve`) or fix ai.providers.ollama.url / OLLAMA_URL. Unreachable is different from a missing model.',
+                        'Installed model',
+                        $installed,
+                        $installed ? 'model_ready' : 'model_missing',
+                        $installed
+                            ? 'Configured model '.$model.' is installed in Ollama.'
+                            : 'Ollama is reachable, but model '.$model.' is not installed. This is different from connection refused. Run: ollama pull '.$model,
                     );
                 }
             }
+        } catch (Throwable) {
+            $add(
+                'Ollama',
+                false,
+                'ollama_unreachable',
+                'Could not reach Ollama at '.$url.'. Start Ollama (`ollama serve`) or fix ai.providers.ollama.url / OLLAMA_URL. Unreachable is different from a missing model.',
+            );
         }
+    }
 
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkClever(callable $add): void
+    {
         try {
             $enabled = $this->clever->enabled();
             $add('Clever', $enabled, $enabled ? 'clever_ready' : 'clever_disabled', $enabled ? 'Bundled Clever measurements are enabled.' : 'Enable molly-complexity.enabled outside production to measure complexity.');
         } catch (Throwable) {
             $add('Clever', false, 'clever_unavailable', 'Molly could not load the bundled Clever measurements.');
         }
-
-        return ['ready' => ! in_array('failed', array_column($checks, 'status'), true), 'checks' => $checks];
     }
 }
