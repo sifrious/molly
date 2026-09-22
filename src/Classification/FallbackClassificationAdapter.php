@@ -28,6 +28,15 @@ final class FallbackClassificationAdapter implements ClassificationAdapter
                 isset($evidence['verification']['junit']) ? 'junit' : null,
             ])),
             $status === 'passed' ? 'complete_if_required_gates_pass' : 'keep_failed',
+            provider: null,
+            model: null,
+            laravelAiVersion: null,
+            question: null,
+            result: null,
+            probability: null,
+            threshold: null,
+            fallbackReason: null,
+            provenanceStatus: ClassificationDecision::PROVENANCE_NOT_MEASURED,
         );
     }
 }

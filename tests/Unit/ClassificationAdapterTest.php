@@ -1,5 +1,6 @@
 <?php
 
+use Sifrious\Molly\Classification\ClassificationDecision;
 use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 use Sifrious\Molly\Classification\FallbackClassificationAdapter;
@@ -15,7 +16,15 @@ it('keeps classification advisory and never upgrades a failed Pest run', functio
     expect($failed->action)->toBe('retry')
         ->and($failed->deterministicFollowUp)->toBe('keep_failed')
         ->and($passed->deterministicFollowUp)->toBe('complete_if_required_gates_pass')
-        ->and($adapter->name())->toBe('molly.fallback');
+        ->and($adapter->name())->toBe('molly.fallback')
+        ->and($failed->confidence)->toBeNull()
+        ->and($failed->probability)->toBeNull()
+        ->and($failed->provider)->toBeNull()
+        ->and($failed->model)->toBeNull()
+        ->and($failed->laravelAiVersion)->toBeNull()
+        ->and($failed->fallbackReason)->toBeNull()
+        ->and($failed->toArray()['provenance_status'])->toBe(ClassificationDecision::PROVENANCE_NOT_MEASURED)
+        ->and($passed->toArray()['provenance_status'])->toBe(ClassificationDecision::PROVENANCE_NOT_MEASURED);
 });
 
 it('does not claim Laravel AI decide support before the 1.x API is installed', function () {
