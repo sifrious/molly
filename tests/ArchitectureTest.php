@@ -65,6 +65,39 @@ arch('cross-repository contracts do not depend on transport or presentation')
         'Livewire',
     ]);
 
+arch('journal rendering stays free of filesystem and Eloquent access')
+    ->expect('Sifrious\Molly\Journal\JournalRenderer')
+    ->not->toUse([
+        'Illuminate\Support\Facades\File',
+        'Illuminate\Support\Facades\Storage',
+        'Illuminate\Database',
+        'Illuminate\Database\Eloquent',
+        'Sifrious\Molly\Models',
+        'Sifrious\Molly\Agents',
+        'Sifrious\Molly\Http',
+        'Sifrious\Molly\Console',
+        'Sifrious\Molly\Livewire',
+        'Laravel\Mcp',
+        'Laravel\Prompts',
+        'Livewire',
+    ]);
+
+arch('console transport does not own run completion decisions')
+    ->expect('Sifrious\Molly\Console')
+    ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
+
+arch('http transport does not own run completion decisions')
+    ->expect('Sifrious\Molly\Http')
+    ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
+
+arch('livewire transport does not own run completion decisions')
+    ->expect('Sifrious\Molly\Livewire')
+    ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
+
+arch('mcp transport does not own run completion decisions')
+    ->expect('Sifrious\Molly\Mcp')
+    ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
+
 it('resolves collaborator-bearing actions from the Laravel container', function () {
     foreach ([CreateTask::class, VerifyChanges::class] as $action) {
         expect(app($action))->toBeInstanceOf($action);
