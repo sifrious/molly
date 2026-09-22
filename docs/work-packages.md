@@ -25,7 +25,7 @@ Protected tests are now the default. Writer and Pest isolation exists on hosts w
 | MOL-WP-06 | GitHub issue to Pest to PR traceability | Import is idempotent. Approved comments, PR bodies, and recorded PR or merge events exist. Molly still does not open or merge a pull request |
 | MOL-WP-07 | Verified Orb execution targets | Local default and Orb refusal exist; verified Orb dispatch remains |
 | MOL-WP-08 | Agent handoff inside Bloom | Headless envelopes exist. Recipients cannot widen scope, edit the protected test, or merge. Bloom child workspaces remain |
-| MOL-WP-09 | Laravel AI classification compatibility | Structured-output detection and an advisory Laravel AI adapter exist. They cannot upgrade a failed Pest run. Unreleased Laravel AI names are not used |
+| MOL-WP-09 | Laravel AI classification compatibility (Jev) | Optional default-off Jev classification through Laravel AI. Pest, Tarpit, bounded retries, and completion authority stay deterministic. Do not use Molly-owned TypeSafe HTTP. Unreleased Laravel AI names are not used |
 | MOL-WP-10 | Project graph and broader Laravel knowledge | Project graph indexing exists, including locked Pest approvals. Laravel knowledge covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 are a separate namespace. Bundled tarpit notes are a separate namespace and are not a quality score. Implementation prompts receive bounded advisory neighborhoods. The local Molly UI shows a 40-node workspace overview with blockers first. `molly:decide` writes Git-tracked records under `docs/decisions/`. A visual Bloom view remains |
 | MOL-WP-11 | Component previews | Optional local renderer exists. Unconfigured hosts stay unavailable. Visual evidence remains advisory |
 | MOL-WP-12 | Compatibility matrix and packaging | Composer and CI now accept Laravel 12 and 13. Packagist publication remains |
@@ -63,6 +63,10 @@ In progress elsewhere:
 
 - MME-1806 two isolated local Orbs
 
-Classification work for MOL-WP-09 uses the MME-5249 / MME-5252 family. Do not invent new IDs. MME-5255 is Burdgen-specific and out of this Molly-only path. Penelope (MME-5144) and Bud (MME-5145) stay deferred.
+Classification work for MOL-WP-09 uses the MME-5249 / MME-5252 family plus the file-level Jev / Laravel AI migration epics MME-5545 through MME-5575. Those epics cover Composer require, config, classification seams, agent/commit-review call sites, docs, and focused proofs. Do not invent new IDs. Do not keep draft or direct-HTTP TypeSafe notes in this index.
+
+Release gate for Jev: ship only against a tagged `laravel/ai` release that includes the public classification / TypeSafe provider seam (PR #1049). Convergence proof stays: `Classification::fake()`, `Classification::assertClassified()`, and `Classification::assertNothingClassified()` in Molly tests — never a duplicated provider wire protocol. `MOLLY_JEV_ENABLED=false` is the default and performs no classification.
+
+MME-5255 is Burdgen-specific and out of this Molly-only path. Penelope (MME-5144) and Bud (MME-5145) stay deferred.
 
 Release blockers without a distinct Linear ticket stay on the work packages above: protected tests, writer and Pest sandboxes, Bloom task loop, approval before PR or merge, Packagist `v0.1.0-alpha.1`, and a Composer install without a custom VCS repository.
