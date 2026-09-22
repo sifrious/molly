@@ -379,3 +379,34 @@ it('prints ContextPack debug details through molly:knowledge:pack', function () 
         ->and($payload['query']['needles'])->not->toBeEmpty()
         ->and($payload['concepts'])->toContain('Queue');
 });
+
+it('validates complete snapshots before replacement and preserves the prior graph on failure', function () {
+    $fixture = knowledgeFixture('13');
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
+    $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], $fixture['edges']);
+    $before = $graph->counts('laravel', '13');
+    $query = $graph->query(new GraphQuery('laravel', '13', 'Queue'))->toArray();
+
+    $foreign = new GraphSource('other', '13', 'documentation', 'queues', 'Other queues', null, null, null);
+    expect(fn () => $graph->replace('laravel', '13', [$fixture['source']], [
+        new GraphNode('laravel', '13', 'concept', 'queue', 'Queue', [$foreign->id()]),
+    ], []))->toThrow(RuntimeException::class, 'KNOWLEDGE_SOURCE_INVALID')
+        ->and($graph->counts('laravel', '13'))->toBe($before)
+        ->and($graph->query(new GraphQuery('laravel', '13', 'Queue'))->toArray())->toBe($query);
+
+    expect(fn () => $graph->replace('laravel', '13', [$fixture['source']], [
+        new GraphNode('other', '13', 'concept', 'queue', 'Queue', [$fixture['source']->id()]),
+    ], []))->toThrow(RuntimeException::class, 'KNOWLEDGE_SCOPE_INVALID')
+        ->and($graph->counts('laravel', '13'))->toBe($before);
+
+    $orphan = new GraphNode('laravel', '13', 'concept', 'orphan', 'Orphan', [$fixture['source']->id()]);
+    expect(fn () => $graph->replace('laravel', '13', [$fixture['source']], $fixture['nodes'], [
+        new GraphEdge('laravel', '13', 'related_to', $fixture['nodes'][0]->id(), $orphan->id(), [$fixture['source']->id()]),
+    ]))->toThrow(RuntimeException::class, 'KNOWLEDGE_EDGE_INVALID')
+        ->and($graph->counts('laravel', '13'))->toBe($before);
+
+    expect(fn () => $graph->replace('laravel', '13', [$fixture['source'], $fixture['source']], $fixture['nodes'], $fixture['edges']))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_ID_DUPLICATE')
+        ->and($graph->counts('laravel', '13'))->toBe($before)
+        ->and($graph->query(new GraphQuery('laravel', '13', 'Queue'))->toArray())->toBe($query);
+});

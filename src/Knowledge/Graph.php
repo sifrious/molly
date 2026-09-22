@@ -25,28 +25,9 @@ final class Graph
      */
     public function replace(string $namespace, string $version, array $sources, array $nodes, array $edges): array
     {
+        // Validate the complete snapshot before opening the replacement transaction.
+        $snapshot = new GraphSnapshot($namespace, $version, $sources, $nodes, $edges);
         $database = $this->connection();
-        $sourceIds = [];
-        $nodeIds = [];
-
-        foreach ($sources as $source) {
-            $this->assertScope($source->namespace, $source->version, $namespace, $version);
-            $sourceIds[$source->id()] = true;
-        }
-
-        foreach ($nodes as $node) {
-            $this->assertScope($node->namespace, $node->version, $namespace, $version);
-            $nodeIds[$node->id()] = true;
-            $this->assertSources($node->sourceIds, $sourceIds);
-        }
-
-        foreach ($edges as $edge) {
-            $this->assertScope($edge->namespace, $edge->version, $namespace, $version);
-            $this->assertSources($edge->sourceIds, $sourceIds);
-            if (! isset($nodeIds[$edge->from], $nodeIds[$edge->to])) {
-                throw new RuntimeException('KNOWLEDGE_EDGE_INVALID: Every edge must connect nodes in the same snapshot.');
-            }
-        }
 
         $database->beginTransaction();
 
@@ -56,16 +37,16 @@ final class Graph
                 $statement->execute(compact('namespace', 'version'));
             }
 
-            $this->insertSources($database, $sources);
-            $this->insertNodes($database, $nodes);
-            $this->insertEdges($database, $edges);
+            $this->insertSources($database, $snapshot->sources);
+            $this->insertNodes($database, $snapshot->nodes);
+            $this->insertEdges($database, $snapshot->edges);
             $database->commit();
         } catch (\Throwable $exception) {
             $database->rollBack();
             throw $exception;
         }
 
-        return ['sources' => count($sources), 'nodes' => count($nodes), 'edges' => count($edges)];
+        return ['sources' => count($snapshot->sources), 'nodes' => count($snapshot->nodes), 'edges' => count($snapshot->edges)];
     }
 
     public function query(GraphQuery $query): GraphResult
@@ -392,28 +373,6 @@ final class Graph
         }
 
         return implode(', ', $placeholders);
-    }
-
-    /** @param  list<string>  $sourceIds
-     * @param  array<string, bool>  $available
-     */
-    private function assertSources(array $sourceIds, array $available): void
-    {
-        if ($sourceIds === []) {
-            throw new RuntimeException('KNOWLEDGE_PROVENANCE_REQUIRED: Every node and edge needs a source.');
-        }
-        foreach ($sourceIds as $sourceId) {
-            if (! isset($available[$sourceId])) {
-                throw new RuntimeException('KNOWLEDGE_SOURCE_INVALID: A node or edge refers to a source outside its snapshot.');
-            }
-        }
-    }
-
-    private function assertScope(string $actualNamespace, string $actualVersion, string $namespace, string $version): void
-    {
-        if ($actualNamespace !== $namespace || $actualVersion !== $version) {
-            throw new RuntimeException('KNOWLEDGE_SCOPE_INVALID: Snapshot records must use one namespace and version.');
-        }
     }
 
     /** @param  array<string, mixed>  $value */
