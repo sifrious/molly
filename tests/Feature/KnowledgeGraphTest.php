@@ -410,3 +410,85 @@ it('validates complete snapshots before replacement and preserves the prior grap
         ->and($graph->counts('laravel', '13'))->toBe($before)
         ->and($graph->query(new GraphQuery('laravel', '13', 'Queue'))->toArray())->toBe($query);
 });
+
+it('proves bounded deterministic graph reads after storage cleanup', function () {
+    $graph = new Graph(new GraphSchema, $this->knowledgeDatabase);
+    $primary = new GraphSource('laravel', '13', 'documentation', 'queues', 'Queues', 'docs/queues.md', 'rev-1', 'digest-1', ['kind' => 'docs']);
+    $secondary = new GraphSource('laravel', '13', 'framework_source', 'Illuminate\\Queue\\Queue', 'Queue class', 'vendor/queue.php', '13.0.0', 'digest-2', ['kind' => 'source']);
+    $blocker = new GraphNode('laravel', '13', 'blocker', 'blocked-queue', 'Blocked Queue', [$primary->id()], ['severity' => 'high']);
+    $task = new GraphNode('laravel', '13', 'task', 'queue-task', 'Queue Task', [$primary->id()]);
+    $queue = new GraphNode('laravel', '13', 'concept', 'queue', 'Queue', [$primary->id(), $secondary->id()], ['rank' => 1]);
+    $job = new GraphNode('laravel', '13', 'concept', 'job', 'Job', [$primary->id()], ['rank' => 2]);
+    $retry = new GraphNode('laravel', '13', 'concept', 'retry', 'Retry', [$secondary->id()]);
+    $routing = new GraphNode('laravel', '13', 'concept', 'routing', 'Routing', [$primary->id()]);
+    $related = [];
+    $edges = [
+        new GraphEdge('laravel', '13', 'related_to', $queue->id(), $job->id(), [$primary->id(), $secondary->id()], ['weight' => 2]),
+        new GraphEdge('laravel', '13', 'uses', $job->id(), $retry->id(), [$secondary->id()]),
+        new GraphEdge('laravel', '13', 'blocks', $blocker->id(), $queue->id(), [$primary->id()]),
+    ];
+    for ($i = 0; $i < 25; $i++) {
+        $node = new GraphNode('laravel', '13', 'concept', 'neighbor-'.$i, 'Neighbor '.$i, [$primary->id(), $secondary->id()]);
+        $related[] = $node;
+        $edges[] = new GraphEdge('laravel', '13', 'related_to', $queue->id(), $node->id(), [$primary->id()]);
+    }
+    $nodes = [$blocker, $task, $queue, $job, $retry, $routing, ...$related];
+
+    $firstReplace = $graph->replace('laravel', '13', [$primary, $secondary], $nodes, $edges);
+    $secondReplace = $graph->replace('laravel', '13', [$primary, $secondary], $nodes, $edges);
+    expect($firstReplace)->toBe(['sources' => 2, 'nodes' => count($nodes), 'edges' => count($edges)])
+        ->and($secondReplace)->toBe($firstReplace)
+        ->and($graph->counts('laravel', '13'))->toBe($firstReplace);
+
+    $exact = $graph->query(new GraphQuery('laravel', '13', 'Queue', depth: 2, limit: 40))->toArray();
+    $exactAgain = $graph->query(new GraphQuery('laravel', '13', 'Queue', depth: 2, limit: 40))->toArray();
+    $exactKey = $graph->query(new GraphQuery('laravel', '13', 'routing', depth: 0, limit: 10))->toArray();
+    $partial = $graph->query(new GraphQuery('laravel', '13', 'eighbo', depth: 0, limit: 40))->toArray();
+    $filtered = $graph->query(new GraphQuery('laravel', '13', 'Job', depth: 1, limit: 20, relations: ['uses']))->toArray();
+    $limited = $graph->query(new GraphQuery('laravel', '13', 'Queue', depth: 2, limit: 3))->toArray();
+
+    expect($exact)->toBe($exactAgain)
+        ->and(array_column($exact['nodes'], 'label'))->toContain('Queue', 'Job', 'Retry', 'Neighbor 0')
+        ->not->toContain('Routing')
+        ->and(array_column($exactKey['nodes'], 'label'))->toBe(['Routing'])
+        ->and(array_column($partial['nodes'], 'label'))->toContain('Neighbor 0', 'Neighbor 1')
+        ->not->toContain('Queue', 'Routing')
+        ->and(array_column($filtered['nodes'], 'label'))->toBe(['Job', 'Retry'])
+        ->and(array_column($filtered['edges'], 'relation'))->toBe(['uses'])
+        ->and($limited['nodes'])->toHaveCount(3)
+        ->and($limited['truncated'])->toBeTrue();
+
+    $queueNode = collect($exact['nodes'])->firstWhere('key', 'queue');
+    expect($queueNode['metadata'])->toBe(['rank' => 1])
+        ->and(collect($queueNode['sources'])->pluck('key')->all())->toBe(['queues', 'Illuminate\\Queue\\Queue'])
+        ->and($queueNode['sources'][0]['metadata'])->toBe(['kind' => 'docs'])
+        ->and($queueNode['sources'][1]['metadata'])->toBe(['kind' => 'source']);
+
+    $edge = collect($exact['edges'])->first(fn (array $edge): bool => $edge['relation'] === 'related_to' && $edge['to'] === $job->id());
+    expect($edge)->not->toBeNull()
+        ->and($edge['metadata'])->toBe(['weight' => 2])
+        ->and(collect($edge['sources'])->pluck('key')->all())->toBe(['queues', 'Illuminate\\Queue\\Queue']);
+
+    foreach ([...$exact['nodes'], ...$exact['edges'], ...$limited['nodes']] as $record) {
+        expect($record['sources'])->not->toBeEmpty();
+    }
+
+    $overview = $graph->overview('laravel', '13', 5);
+    expect(array_column($overview['nodes'], 'type'))->toBe(['blocker', 'task', 'concept', 'concept', 'concept'])
+        ->and($overview['truncated'])->toBeTrue()
+        ->and($overview['nodes'][0]['key'])->toBe('blocked-queue')
+        ->and($overview['nodes'][1]['key'])->toBe('queue-task');
+    foreach ($overview['nodes'] as $node) {
+        expect($node['sources'])->not->toBeEmpty();
+    }
+
+    $pdo = new PDO('sqlite:'.$this->knowledgeDatabase);
+    expect((new GraphSchema)->recordedVersion($pdo))->toBe(GraphSchema::VERSION);
+
+    $before = $graph->counts('laravel', '13');
+    $prior = $graph->query(new GraphQuery('laravel', '13', 'Queue', depth: 1, limit: 10))->toArray();
+    expect(fn () => $graph->replace('laravel', '13', [$primary, $primary], $nodes, $edges))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_ID_DUPLICATE')
+        ->and($graph->counts('laravel', '13'))->toBe($before)
+        ->and($graph->query(new GraphQuery('laravel', '13', 'Queue', depth: 1, limit: 10))->toArray())->toBe($prior);
+});
