@@ -78,13 +78,19 @@ php artisan molly:setup --agent=amp
 
 ## Jev and TypeSafe
 
-Jev-backed semantic judgment can be disabled globally with `MOLLY_JEV_ENABLED=false`. When disabled, Molly does not send Jev/TypeSafe requests and Laravel AI boolean classification falls back to deterministic behavior.
+Jev classification is off by default. Published config sets `molly.jev.enabled` from `MOLLY_JEV_ENABLED` with a `false` default. When the gate is off, Molly opens no classification request, records no TypeSafe/Laravel AI classification provenance, and keeps Pest, Tarpit, retries, and completion on their deterministic paths.
 
-TypeSafe is optional and off by default.
+There is one explicit opt-in:
+
+```bash
+MOLLY_JEV_ENABLED=true
+php artisan config:clear
+php artisan molly:doctor
+```
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `molly.jev.enabled` | `true` | Global Jev switch. Environment: `MOLLY_JEV_ENABLED`. Set false to disable every Jev-backed request path. |
+| `molly.jev.enabled` | `false` | Single default-off Jev gate. Environment: `MOLLY_JEV_ENABLED`. Non-true values keep every Jev-backed path closed. |
 | `molly.typesafe.enabled` | `false` | Explicit opt-in for TypeSafe requests. |
 | `molly.typesafe.api_key` | `null` | Secret from `TYPESAFE_API_KEY`. Never commit it. |
 | `molly.typesafe.model` | `jev-latest` | Requested evaluator model. |
@@ -140,7 +146,7 @@ CLI `molly:start` runs in the current terminal and does not need a queue worker.
 | `MOLLY_KNOWLEDGE_DATABASE` | Local SQLite graph path |
 | `MOLLY_UI_ENABLED` | Enable local web routes |
 | `MOLLY_COMPLEXITY_ENABLED` | Optional complexity-measurement override |
-| `MOLLY_JEV_ENABLED` | Global switch for Jev-backed semantic judgment |
+| `MOLLY_JEV_ENABLED` | Single default-off Jev gate (`false` unless set true) |
 | `TYPESAFE_API_KEY` | Secret key for explicitly enabled TypeSafe evaluation |
 | `OLLAMA_URL` | Local Ollama endpoint |
 | `APP_ENV` | Host Laravel environment, normally `local` for Molly |
