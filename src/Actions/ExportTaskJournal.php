@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEvent;
+use Sifrious\Molly\Journal\JournalRenderer;
+use Sifrious\Molly\Journal\JournalWriter;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
@@ -13,10 +15,17 @@ use Throwable;
 
 class ExportTaskJournal
 {
+    public function __construct(
+        private ShowTask $showTask,
+        private RecordLifecycleEvent $lifecycleEvents,
+        private JournalRenderer $journalRenderer,
+        private JournalWriter $journalWriter,
+    ) {}
+
     /** @return array{path: string, task_id: string, attempt_count: int} */
     public function handle(string $reference): array
     {
-        $task = app(ShowTask::class)->handle($reference);
+        $task = $this->showTask->handle($reference);
         if ($task === null) {
             throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
         }
@@ -147,7 +156,7 @@ class ExportTaskJournal
     /** @return list<string> */
     private function lifecycleSummary(Task $task): array
     {
-        $log = app(RecordLifecycleEvent::class)->load($task->workspace);
+        $log = $this->lifecycleEvents->load($task->workspace);
         $events = $log->events($task->id);
         if ($events === []) {
             return [];
