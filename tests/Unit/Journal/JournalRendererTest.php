@@ -52,3 +52,25 @@ it('renders a task journal as pure Markdown with quoted untrusted content', func
 it('quotes non-string untrusted values as not recorded', function () {
     expect((new JournalRenderer)->quote(null))->toBe('> Not recorded');
 });
+
+it('renders project chronology and preserves user glossary text outside markers', function () {
+    $renderer = new JournalRenderer;
+    $project = $renderer->renderProject([
+        ['kind' => 'task', 'id' => 't1', 'nickname' => 'One', 'status' => 'open', 'prompt' => 'hello'],
+    ]);
+    expect($project)->toContain('# Project journal')
+        ->and($project)->toContain('## Task created')
+        ->and($project)->toContain('> hello');
+
+    $existing = "# Project glossary\n\nMy custom term.\n\n<!-- molly:glossary:start -->\nold\n<!-- molly:glossary:end -->\n";
+    $updated = $renderer->replaceManagedGlossary($existing);
+    expect($updated)->toContain('My custom term.')
+        ->and($updated)->toContain('## Molly terms')
+        ->and($updated)->not->toContain('\nold\n');
+});
+
+it('rejects incomplete glossary markers', function () {
+    $renderer = new JournalRenderer;
+    expect(fn () => $renderer->replaceManagedGlossary('<!-- molly:glossary:start --> only'))
+        ->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED:');
+});
