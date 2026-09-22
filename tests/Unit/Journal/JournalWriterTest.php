@@ -37,3 +37,28 @@ it('rejects symlink or hard-linked file destinations', function () {
     expect(fn () => (new JournalWriter)->validateFile($link))
         ->toThrow(RuntimeException::class, 'JOURNAL_PATH_INVALID:');
 });
+
+it('atomically replaces a journal file with compare-and-swap', function () {
+    $root = realpath(sys_get_temp_dir()).'/molly-journal-cas-'.uniqid('', true);
+    $path = $root.'/JOURNAL.md';
+    $writer = new JournalWriter;
+    $writer->ensureDirectory($root);
+    $writer->replaceFile($path, "one\n", false);
+    expect(file_get_contents($path))->toBe("one\n")
+        ->and(decoct(fileperms($path) & 0777))->toBe('600');
+
+    $hash = hash_file('sha256', $path);
+    $writer->replaceFile($path, "two\n", $hash);
+    expect(file_get_contents($path))->toBe("two\n");
+});
+
+it('fails compare-and-swap when the expected hash does not match', function () {
+    $root = realpath(sys_get_temp_dir()).'/molly-journal-cas-fail-'.uniqid('', true);
+    $path = $root.'/JOURNAL.md';
+    $writer = new JournalWriter;
+    $writer->ensureDirectory($root);
+    $writer->replaceFile($path, "one\n", false);
+
+    expect(fn () => $writer->replaceFile($path, "two\n", 'deadbeef'))
+        ->toThrow(RuntimeException::class, 'JOURNAL_WRITE_FAILED:');
+});
