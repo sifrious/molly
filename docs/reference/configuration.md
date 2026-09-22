@@ -104,9 +104,15 @@ When enabled, Jev can support explicit planning suggestions, task advice, and co
 
 ### Laravel AI compatibility
 
-Molly currently requires Laravel AI's `1.x-dev` line so it can use the public classification / `decide` seam merged in [laravel/ai#1049](https://github.com/laravel/ai/pull/1049) before the next tag. The maintainer `composer.lock` records the exact revision proven by Molly's release tests. Move back to a tagged compatible constraint once Laravel publishes one.
+Molly keeps its normal install on the stable Laravel AI baseline. Jev is an optional capability: until Laravel publishes a tag containing the classification / `decide` seam, a host that wants Jev must explicitly opt its root application into Laravel AI's development line:
 
-`MOLLY_JEV_ENABLED` still defaults to `false`. Enabling it is an explicit opt-in; deterministic Pest, Tarpit, retry and completion gates remain authoritative.
+```bash
+composer require 'laravel/ai:1.x-dev@dev' --with-all-dependencies
+```
+
+Molly's release CI runs a separate Jev lane against that 1.x line while the ordinary PHP/Laravel package matrix stays on stable dependencies. Once Laravel publishes a compatible tag, this extra root opt-in can be removed.
+
+`MOLLY_JEV_ENABLED` still defaults to `false`. Enabling it is a separate explicit opt-in; deterministic Pest, Tarpit, retry and completion gates remain authoritative.
 
 ## Complexity measurements
 
