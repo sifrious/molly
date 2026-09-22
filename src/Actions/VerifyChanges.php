@@ -13,6 +13,8 @@ use Throwable;
 
 class VerifyChanges
 {
+    public function __construct(private Sandbox $sandbox) {}
+
     /**
      * @return array{status: string, tests: int, assertions: int, failures: int, errors: int, skipped: int, output: string, command: list<string>, reason?: string, junit?: string}
      */
@@ -31,11 +33,10 @@ class VerifyChanges
         }
 
         try {
-            $sandbox = app(Sandbox::class);
             $timeout = max(1, min(3600, (int) config('molly.test_timeout', 120)));
             $env = $this->workspaceEnvironment();
-            if ($sandbox->available() && ! $sandbox->allowUnsafe()) {
-                $sandboxed = $sandbox->run(
+            if ($this->sandbox->available() && ! $this->sandbox->allowUnsafe()) {
+                $sandboxed = $this->sandbox->run(
                     $workspace,
                     [$evidenceDirectory],
                     $command,
