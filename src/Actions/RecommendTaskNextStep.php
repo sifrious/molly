@@ -116,10 +116,10 @@ class RecommendTaskNextStep
             default => 'inspect',
         };
         $advice['reason'] = match ($choice) {
-            'retry' => 'TypeSafe recommends another bounded attempt. Retry is allowed, but the recorded failure remains until a new attempt passes its required checks.',
-            'stop' => 'TypeSafe recommends ending this approach. Another retry is still allowed by the attempt limit, but this advice recommends against it. No task state changed.',
-            'continue' => 'TypeSafe returned continue, but this task failed. Inspect the recorded checks before choosing whether to retry. The recommendation does not establish success.',
-            default => 'TypeSafe recommends human review. Inspect the recorded evidence before choosing whether to retry.',
+            'retry' => 'Jev recommends another bounded attempt. Retry is allowed, but the recorded failure remains until a new attempt passes its required checks.',
+            'stop' => 'Jev recommends ending this approach. Another retry is still allowed by the attempt limit, but this advice recommends against it. No task state changed.',
+            'continue' => 'Jev returned continue, but this task failed. Inspect the recorded checks before choosing whether to retry. The recommendation does not establish success.',
+            default => 'Jev recommends human review. Inspect the recorded evidence before choosing whether to retry.',
         };
         $advice['command'] = $this->command($advice['next_action'], $task, $task->runs->last());
 
@@ -139,10 +139,10 @@ class RecommendTaskNextStep
     private function fallbackReason(mixed $reason): string
     {
         return match ($reason) {
-            'disabled' => 'TypeSafe is disabled, so this is deterministic guidance.',
-            'invalid_config' => 'TypeSafe is not configured for a request. No model recommendation is available.',
-            'low_confidence' => 'TypeSafe confidence was below the configured threshold. Molly kept the deterministic guidance.',
-            default => 'TypeSafe did not return a usable recommendation. Molly kept the deterministic guidance.',
+            'disabled', 'jev_disabled' => 'Jev is disabled, so this is deterministic guidance.',
+            'invalid_config' => 'Jev is not configured for a request. No model recommendation is available.',
+            'low_confidence' => 'Jev confidence was below the configured threshold. Molly kept the deterministic guidance.',
+            default => 'Jev did not return a usable recommendation. Molly kept the deterministic guidance.',
         };
     }
 
@@ -166,7 +166,7 @@ class RecommendTaskNextStep
             'name' => 'typesafe', 'status' => $this->boundedText($evaluation['status'] ?? 'unavailable', 32),
             'reason' => $this->boundedText($evaluation['reason'] ?? 'provider_unavailable', 64),
             'model' => isset($evaluation['model']) ? $this->boundedText($evaluation['model'], 128) : null,
-            'threshold' => $this->probability(config('molly.typesafe.confidence_threshold')),
+            'threshold' => $this->probability(config('molly.jev.confidence_threshold')),
             'answers' => $answers, 'duration_ms' => is_int($evaluation['duration_ms'] ?? null) ? $evaluation['duration_ms'] : null,
         ];
     }
