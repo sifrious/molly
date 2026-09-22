@@ -44,7 +44,7 @@
 <form method="post" action="{{ route('molly.tasks.advice', $task->id) }}">
 @csrf
 <flux:button type="submit" :loading="false">Get next-step advice</flux:button>
-<p>Check attempt limits and saved evidence. Optional TypeSafe evaluation may recommend a next step.</p>
+<p>Reading this page is side-effect free. Requesting advice checks attempt limits and saved evidence. Optional Jev classification through Laravel AI may recommend a next step when enabled; it stays advisory and cannot override Pest, Tarpit, retries, or completion.</p>
 </form>
 <h2>Attempts</h2>
 @if($task->runs->isEmpty())<p>No attempts recorded.</p>@else
