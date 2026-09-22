@@ -42,12 +42,13 @@ return [
         'url' => env('MOLLY_PREVIEW_URL'),
         'viewport' => env('MOLLY_PREVIEW_VIEWPORT', '1280x720'),
     ],
+    /*
+     | Jev gate (MME-5547): single enabling point MOLLY_JEV_ENABLED.
+     | Non-true values are disabled. Credentials / base URL come from
+     | ai.providers.typesafe (TYPESAFE_API_KEY) — not from this file.
+     */
     'jev' => [
-        'enabled' => env('MOLLY_JEV_ENABLED', true),
-    ],
-    'typesafe' => [
-        'enabled' => false,
-        'api_key' => env('TYPESAFE_API_KEY'),
+        'enabled' => filter_var(env('MOLLY_JEV_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
         'model' => 'jev-latest',
         'confidence_threshold' => 0.8,
         'timeout' => 30,
