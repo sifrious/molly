@@ -16,6 +16,8 @@ class GenerateChanges
         private CollectRunKnowledge $knowledge,
         private CollectNativePhpKnowledge $nativephp,
         private CollectTarpitKnowledge $tarpit,
+        private AmpResponse $amp,
+        private PestTestAuthoring $pestTestAuthoring,
     ) {}
 
     /**
@@ -36,7 +38,7 @@ class GenerateChanges
             ...($previousAttempt === null ? [] : ['previous_attempt' => $previousAttempt]),
         ], JSON_THROW_ON_ERROR);
         if (config('molly.agent', 'ollama') === 'amp') {
-            $result = app(AmpResponse::class)->prompt(new ChangeWriter, $input);
+            $result = $this->amp->prompt(new ChangeWriter, $input);
         } elseif (config('molly.agent', 'ollama') === 'ollama') {
             LocalOllama::validate();
             $response = ChangeWriter::make()->prompt(
@@ -66,7 +68,7 @@ class GenerateChanges
                 throw new RuntimeException('GENERATION_INVALID: The model proposed a file outside the allowed paths.');
             }
             if ($allowTestEdits && $file['path'] === $testPath) {
-                app(PestTestAuthoring::class)->assertAcceptable($file['content']);
+                $this->pestTestAuthoring->assertAcceptable($file['content']);
             }
         }
 
