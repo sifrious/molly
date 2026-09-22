@@ -45,6 +45,14 @@ function writeLock(string $root, string $laravelVersion, array $extraPackages = 
     ], JSON_PRETTY_PRINT));
 }
 
+function makeBootstrap(GraphCache $cache, Graph $graph): BootstrapProjectKnowledgeGraphs
+{
+    app()->instance(GraphCache::class, $cache);
+    app()->instance(Graph::class, $graph);
+
+    return app(BootstrapProjectKnowledgeGraphs::class);
+}
+
 it('reads exact laravel version from composer.lock', function (): void {
     writeLock($this->project, 'v12.3.1');
     $lock = (new ComposerLock)->read($this->project);
@@ -68,11 +76,10 @@ it('refuses a cache entry from a different exact dependency version', function (
 it('bootstraps a mandatory laravel graph and writes provenance', function (): void {
     writeLock($this->project, 'v12.0.0');
 
-    $result = (new BootstrapProjectKnowledgeGraphs(
-        new ComposerLock,
+    $result = makeBootstrap(
         new GraphCache($this->mollyHome.'/graph-cache'),
         new Graph($this->knowledgeDatabase),
-    ))->handle($this->project);
+    )->handle($this->project);
 
     expect($result['ok'])->toBeTrue()
         ->and($result['laravel_exact'])->toBe('12.0.0')
@@ -97,7 +104,7 @@ it('reuses exact-version cache on a second project with the same lock version', 
     writeLock($this->project, 'v12.0.0');
     $cache = new GraphCache($this->mollyHome.'/graph-cache');
     $graph = new Graph($this->knowledgeDatabase);
-    $bootstrap = new BootstrapProjectKnowledgeGraphs(new ComposerLock, $cache, $graph);
+    $bootstrap = makeBootstrap($cache, $graph);
 
     $first = $bootstrap->handle($this->project);
     $laravelFirst = collect($first['units'])->firstWhere('id', 'laravel:laravel/framework');
@@ -123,17 +130,15 @@ it('fails when laravel/framework is missing from the lockfile', function (): voi
         'packages-dev' => [],
     ], JSON_PRETTY_PRINT));
 
-    expect(fn () => (new BootstrapProjectKnowledgeGraphs(
-        new ComposerLock,
+    expect(fn () => makeBootstrap(
         new GraphCache($this->mollyHome.'/graph-cache'),
         new Graph($this->knowledgeDatabase),
-    ))->handle($this->project))->toThrow(RuntimeException::class, 'LARAVEL_VERSION_MISSING');
+    )->handle($this->project))->toThrow(RuntimeException::class, 'LARAVEL_VERSION_MISSING');
 });
 
 it('retries a single unit via RetryProjectKnowledgeGraphUnit', function (): void {
     writeLock($this->project, 'v12.0.0');
-    $bootstrap = new BootstrapProjectKnowledgeGraphs(
-        new ComposerLock,
+    $bootstrap = makeBootstrap(
         new GraphCache($this->mollyHome.'/graph-cache'),
         new Graph($this->knowledgeDatabase),
     );
