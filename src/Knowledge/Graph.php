@@ -198,7 +198,7 @@ final class Graph
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $this->connection->exec('PRAGMA foreign_keys = ON');
-        (new GraphSchema)->apply($this->connection);
+        (new GraphSchema)->migrate($this->connection);
 
         return $this->connection;
     }

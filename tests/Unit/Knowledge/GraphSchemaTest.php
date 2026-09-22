@@ -26,3 +26,22 @@ it('owns versioned SQLite DDL and records schema metadata', function () {
 
     @unlink($path);
 });
+
+it('migrates idempotently and refuses unsupported newer schemas', function () {
+    $path = sys_get_temp_dir().'/molly-graph-migrate-'.uniqid('', true).'.sqlite';
+    @unlink($path);
+    $schema = new GraphSchema;
+    $pdo = new PDO('sqlite:'.$path);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    $schema->migrate($pdo);
+    expect($schema->recordedVersion($pdo))->toBe(GraphSchema::VERSION);
+    $schema->migrate($pdo); // idempotent
+    expect($schema->recordedVersion($pdo))->toBe(GraphSchema::VERSION);
+
+    $pdo->exec("UPDATE schema_metadata SET value = '99' WHERE key = 'schema_version'");
+    expect(fn () => $schema->migrate($pdo))
+        ->toThrow(RuntimeException::class, 'KNOWLEDGE_SCHEMA_UNSUPPORTED:');
+
+    @unlink($path);
+});

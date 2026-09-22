@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Knowledge;
 
 use PDO;
+use RuntimeException;
 
 /** Versioned SQLite DDL for the isolated Molly knowledge graph database. */
 final class GraphSchema
@@ -66,12 +67,45 @@ final class GraphSchema
         ]);
     }
 
+    /** Create or upgrade forward-only; refuse newer unsupported schemas; idempotent. */
+    public function migrate(PDO $database): void
+    {
+        $database->beginTransaction();
+        try {
+            $current = $this->recordedVersion($database);
+            if ($current === null) {
+                // Fresh or legacy without metadata table — apply full DDL + record version.
+                $this->apply($database);
+            } elseif ($current > self::VERSION) {
+                throw new RuntimeException(
+                    'KNOWLEDGE_SCHEMA_UNSUPPORTED: Knowledge database schema '.$current.' is newer than Molly supports ('.self::VERSION.').'
+                );
+            } elseif ($current < self::VERSION) {
+                // Forward-only upgrades would run here; VERSION==1 has no intermediate steps yet.
+                $this->apply($database);
+            } else {
+                // Already current — re-apply DDL idempotently (IF NOT EXISTS).
+                $this->apply($database);
+            }
+            $database->commit();
+        } catch (\Throwable $exception) {
+            if ($database->inTransaction()) {
+                $database->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
     public function recordedVersion(PDO $database): ?int
     {
-        $statement = $database->query(
-            "SELECT value FROM schema_metadata WHERE key = '".self::METADATA_KEY."'"
-        );
-        $value = $statement?->fetchColumn();
+        try {
+            $statement = $database->query(
+                "SELECT value FROM schema_metadata WHERE key = '".self::METADATA_KEY."'"
+            );
+            $value = $statement?->fetchColumn();
+        } catch (\Throwable) {
+            return null;
+        }
 
         return is_string($value) && ctype_digit($value) ? (int) $value : null;
     }
