@@ -4,10 +4,10 @@ namespace Sifrious\Molly\Actions;
 
 use Closure;
 use RuntimeException;
+use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
-use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Verification\PestAssertionHints;
 use Sifrious\Molly\Workspace;
 use Throwable;
@@ -20,6 +20,7 @@ class StartTask
         private RestoreTaskBaseline $baseline,
         private RecordLifecycleEvent $lifecycle,
         private LocalAgentBus $bus,
+        private PestAssertionHints $pestAssertionHints,
     ) {}
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
@@ -114,7 +115,6 @@ class StartTask
         return gethostname().':'.getmypid();
     }
 
-
     /** @return array<string, mixed>|null */
     private function previousAttempt(Task $task): ?array
     {
@@ -162,7 +162,7 @@ class StartTask
         $output = is_string($report['verification']['output'] ?? null)
             ? $report['verification']['output']
             : null;
-        foreach (app(PestAssertionHints::class)->handle($output) as $hint) {
+        foreach ($this->pestAssertionHints->handle($output) as $hint) {
             $summary = [];
             foreach (['pattern' => 64, 'hint' => 512] as $key => $limit) {
                 if (is_string($hint[$key] ?? null)) {
