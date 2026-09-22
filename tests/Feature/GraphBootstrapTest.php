@@ -87,7 +87,7 @@ it('bootstraps a mandatory laravel graph and writes provenance', function (): vo
 
     $manifest = json_decode(File::get($result['manifest_path']), true, 512, JSON_THROW_ON_ERROR);
     expect($manifest['laravel_exact'])->toBe('12.0.0')
-        ->and($manifest['laravel_major'])->toBe('12')
+        ->and($manifest['laravel_major'])->toBe(12)
         ->and($manifest['schema_version'])->toBe(BootstrapProjectKnowledgeGraphs::MANIFEST_SCHEMA);
 
     $laravel = collect($manifest['units'])->firstWhere('id', 'laravel:laravel/framework');

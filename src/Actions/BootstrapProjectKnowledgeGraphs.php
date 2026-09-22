@@ -2,12 +2,12 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Knowledge\ComposerLock;
 use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphCache;
 use Sifrious\Molly\Knowledge\GraphEdge;
+use Sifrious\Molly\Knowledge\GraphManifest;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSnapshot;
 use Sifrious\Molly\Knowledge\GraphSource;
@@ -22,7 +22,7 @@ use Sifrious\Molly\Knowledge\NativePhpGraph;
  */
 final class BootstrapProjectKnowledgeGraphs
 {
-    public const MANIFEST_SCHEMA = 1;
+    public const MANIFEST_SCHEMA = GraphManifest::SCHEMA_VERSION;
 
     /** @var array<string, string> composer package => graph namespace */
     public const SUPPORTED_DEPENDENCIES = [
@@ -50,6 +50,10 @@ final class BootstrapProjectKnowledgeGraphs
     {
         $progress ??= static function (string $step, string $message): void {};
         $root = rtrim(str_replace('\\', '/', $projectRoot), '/');
+        $resolved = realpath($root);
+        if (is_string($resolved)) {
+            $root = $resolved;
+        }
         $lock = $this->lock->read($root);
 
         if ($lock['laravel'] === null || $lock['laravel_major'] === null) {
@@ -415,28 +419,7 @@ final class BootstrapProjectKnowledgeGraphs
      */
     private function writeManifest(string $root, array $lock, array $units): string
     {
-        $directory = $root.'/.molly/graphs';
-        File::ensureDirectoryExists($directory, 0700);
-        $path = $directory.'/manifest.json';
-        $payload = [
-            'schema_version' => self::MANIFEST_SCHEMA,
-            'project_path' => $root,
-            'lock_path' => $lock['lock_path'],
-            'lock_hash' => $lock['lock_hash'],
-            'laravel_exact' => $lock['laravel'],
-            'laravel_major' => $lock['laravel_major'],
-            'packages' => $lock['packages'],
-            'units' => $units,
-            'updated_at' => gmdate('c'),
-        ];
-        $mask = umask(0077);
-        try {
-            File::put($path, json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
-        } finally {
-            umask($mask);
-        }
-
-        return $path;
+        return $this->manifest($root, $lock, $units)->write($root);
     }
 
     /**
@@ -445,43 +428,51 @@ final class BootstrapProjectKnowledgeGraphs
      */
     private function mergeUnits(string $root, array $fresh): array
     {
-        $path = $root.'/.molly/graphs/manifest.json';
-        if (! is_file($path)) {
-            return array_values(array_filter($fresh, fn ($unit) => ($unit['status'] ?? null) !== 'skipped'));
-        }
-
-        try {
-            /** @var array<string, mixed> $existing */
-            $existing = json_decode(File::get($path), true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return array_values(array_filter($fresh, fn ($unit) => ($unit['status'] ?? null) !== 'skipped'));
-        }
-
-        $byId = [];
-        foreach ($existing['units'] ?? [] as $unit) {
-            if (is_array($unit) && isset($unit['id']) && is_string($unit['id'])) {
-                $byId[$unit['id']] = $unit;
-            }
-        }
+        $manifest = GraphManifest::load($root);
         foreach ($fresh as $unit) {
             if (($unit['status'] ?? null) === 'skipped') {
                 continue;
             }
-            $byId[$unit['id']] = $unit;
+            $manifest = $manifest->withReplacedUnit($unit);
         }
 
-        return array_values($byId);
+        return $manifest->units;
     }
 
     /** @param  list<array<string, mixed>>  $units */
     private function allReady(array $units): bool
     {
-        foreach ($units as $unit) {
-            if (($unit['status'] ?? null) === 'failed') {
-                return false;
-            }
-        }
+        return new GraphManifest(
+            schemaVersion: GraphManifest::SCHEMA_VERSION,
+            projectPath: null,
+            lockPath: null,
+            lockHash: null,
+            laravelExact: null,
+            laravelMajor: null,
+            packages: [],
+            units: $units,
+            updatedAt: null,
+            path: null,
+        )->allReady();
+    }
 
-        return true;
+    /**
+     * @param  array{packages: array<string, string>, laravel: string, laravel_major: string, lock_path: string, lock_hash: ?string}  $lock
+     * @param  list<array<string, mixed>>  $units
+     */
+    private function manifest(string $root, array $lock, array $units): GraphManifest
+    {
+        return new GraphManifest(
+            schemaVersion: GraphManifest::SCHEMA_VERSION,
+            projectPath: $root,
+            lockPath: $lock['lock_path'],
+            lockHash: $lock['lock_hash'],
+            laravelExact: $lock['laravel'],
+            laravelMajor: (int) $lock['laravel_major'],
+            packages: $lock['packages'],
+            units: $units,
+            updatedAt: gmdate('c'),
+            path: GraphManifest::pathFor($root),
+        );
     }
 }
