@@ -10,13 +10,6 @@ use Sifrious\Molly\Knowledge\GraphCache;
 use Sifrious\Molly\Knowledge\GraphEdge;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSource;
-use Sifrious\Molly\Knowledge\LaravelContainerGraph;
-use Sifrious\Molly\Knowledge\LaravelEloquentGraph;
-use Sifrious\Molly\Knowledge\LaravelEventsGraph;
-use Sifrious\Molly\Knowledge\LaravelQueueGraph;
-use Sifrious\Molly\Knowledge\LaravelRoutingGraph;
-use Sifrious\Molly\Knowledge\LaravelTestingGraph;
-use Sifrious\Molly\Knowledge\LaravelValidationGraph;
 use Sifrious\Molly\Knowledge\NativePhpGraph;
 
 /**
@@ -36,15 +29,17 @@ final class BootstrapProjectKnowledgeGraphs
         'nativephp/mobile' => 'nativephp',
     ];
 
+    /**
+     * @param  list<object{build(string): array{sources: list<GraphSource>, nodes: list<GraphNode>, edges: list<GraphEdge>}}>  $laravelGraphs
+     */
     public function __construct(
-        private ?ComposerLock $lock = null,
-        private ?GraphCache $cache = null,
-        private ?Graph $graph = null,
-    ) {
-        $this->lock ??= new ComposerLock;
-        $this->cache ??= new GraphCache;
-        $this->graph ??= app(Graph::class);
-    }
+        private ComposerLock $lock,
+        private GraphCache $cache,
+        private Graph $graph,
+        private NativePhpGraph $nativePhpGraph,
+        private IndexProjectGraph $indexProjectGraph,
+        private array $laravelGraphs,
+    ) {}
 
     /**
      * @param  (callable(string, string): void)|null  $progress
@@ -238,7 +233,7 @@ final class BootstrapProjectKnowledgeGraphs
                 default => throw new RuntimeException('GRAPH_UNSUPPORTED: No builder for '.$package.'.'),
             };
 
-            $built = app(NativePhpGraph::class)->build($track);
+            $built = $this->nativePhpGraph->build($track);
             $counts = $this->graph->replace(
                 $namespace,
                 $built['version'],
@@ -292,7 +287,7 @@ final class BootstrapProjectKnowledgeGraphs
         $unitId = 'project:workspace';
         $progress('project', 'Indexing project workspace graph');
         try {
-            $result = app(IndexProjectGraph::class)->handle($root);
+            $result = $this->indexProjectGraph->handle($root);
 
             return [
                 'id' => $unitId,
@@ -330,15 +325,10 @@ final class BootstrapProjectKnowledgeGraphs
     /** @return array{sources: list<GraphSource>, nodes: list<GraphNode>, edges: list<GraphEdge>} */
     private function buildLaravelSnapshot(string $major): array
     {
-        $parts = [
-            app(LaravelQueueGraph::class)->build($major),
-            app(LaravelRoutingGraph::class)->build($major),
-            app(LaravelTestingGraph::class)->build($major),
-            app(LaravelValidationGraph::class)->build($major),
-            app(LaravelContainerGraph::class)->build($major),
-            app(LaravelEloquentGraph::class)->build($major),
-            app(LaravelEventsGraph::class)->build($major),
-        ];
+        $parts = [];
+        foreach ($this->laravelGraphs as $builder) {
+            $parts[] = $builder->build($major);
+        }
 
         $sources = [];
         $nodes = [];
