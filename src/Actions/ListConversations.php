@@ -6,7 +6,7 @@ use Sifrious\Molly\Conversations\ConversationStore;
 
 final class ListConversations
 {
-    public function __construct(private ConversationStore $store = new ConversationStore) {}
+    public function __construct(private ConversationStore $store) {}
 
     /**
      * @return array{conversations: list<array<string, mixed>>, path: string}
