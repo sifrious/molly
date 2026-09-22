@@ -316,29 +316,65 @@ final class Graph
         return $statement->fetchAll();
     }
 
+    private const SOURCE_BATCH_SIZE = 400;
+
     /**
      * @param  list<array<string, mixed>>  $records
      * @return list<array<string, mixed>>
      */
     private function withSources(PDO $database, string $pivot, string $foreignKey, array $records, bool $edge = false): array
     {
-        $statement = $database->prepare("SELECT sources.* FROM sources JOIN {$pivot} ON {$pivot}.source_id = sources.id WHERE {$pivot}.{$foreignKey} = :id ORDER BY sources.type, sources.source_key");
+        if ($records === []) {
+            return [];
+        }
 
-        return array_map(function (array $record) use ($statement, $edge): array {
-            $statement->execute(['id' => $record['id']]);
-            $sources = array_map(fn (array $source): array => [
-                'id' => $source['id'], 'namespace' => $source['namespace'], 'version' => $source['version'],
-                'type' => $source['type'], 'key' => $source['source_key'],
-                'title' => $source['title'], 'location' => $source['location'], 'revision' => $source['revision'],
-                'digest' => $source['digest'], 'metadata' => $this->decode($source['metadata']),
-            ], $statement->fetchAll());
+        $ids = array_values(array_unique(array_map(fn (array $record): string => $record['id'], $records)));
+        /** @var array<string, list<array<string, mixed>>> $sourcesByOwner */
+        $sourcesByOwner = [];
+        foreach ($ids as $id) {
+            $sourcesByOwner[$id] = [];
+        }
+
+        foreach (array_chunk($ids, self::SOURCE_BATCH_SIZE) as $chunk) {
+            $parameters = [];
+            $sql = "SELECT {$pivot}.{$foreignKey} AS owner_id, sources.* FROM sources JOIN {$pivot} ON {$pivot}.source_id = sources.id WHERE {$pivot}.{$foreignKey} IN (".$this->placeholders('owner', $chunk, $parameters).') ORDER BY sources.type, sources.source_key, sources.id';
+            $statement = $database->prepare($sql);
+            $statement->execute($parameters);
+            foreach ($statement->fetchAll() as $source) {
+                $ownerId = $source['owner_id'];
+                unset($source['owner_id']);
+                $sourcesByOwner[$ownerId][] = [
+                    'id' => $source['id'],
+                    'namespace' => $source['namespace'],
+                    'version' => $source['version'],
+                    'type' => $source['type'],
+                    'key' => $source['source_key'],
+                    'title' => $source['title'],
+                    'location' => $source['location'],
+                    'revision' => $source['revision'],
+                    'digest' => $source['digest'],
+                    'metadata' => $this->decode($source['metadata']),
+                ];
+            }
+        }
+
+        return array_map(function (array $record) use ($sourcesByOwner, $edge): array {
+            $sources = $sourcesByOwner[$record['id']] ?? [];
 
             return $edge ? [
-                'id' => $record['id'], 'relation' => $record['relation'], 'from' => $record['from_node_id'],
-                'to' => $record['to_node_id'], 'metadata' => $this->decode($record['metadata']), 'sources' => $sources,
+                'id' => $record['id'],
+                'relation' => $record['relation'],
+                'from' => $record['from_node_id'],
+                'to' => $record['to_node_id'],
+                'metadata' => $this->decode($record['metadata']),
+                'sources' => $sources,
             ] : [
-                'id' => $record['id'], 'type' => $record['type'], 'key' => $record['node_key'],
-                'label' => $record['label'], 'metadata' => $this->decode($record['metadata']), 'sources' => $sources,
+                'id' => $record['id'],
+                'type' => $record['type'],
+                'key' => $record['node_key'],
+                'label' => $record['label'],
+                'metadata' => $this->decode($record['metadata']),
+                'sources' => $sources,
             ];
         }, $records);
     }
