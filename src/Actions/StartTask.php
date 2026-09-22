@@ -124,21 +124,58 @@ class StartTask
         }
 
         $report = $run->report ?? [];
-        $evidence = ['run_id' => $run->id, 'status' => $run->status, 'verification' => [], 'review_findings' => []];
+        $evidence = [
+            'run_id' => $run->id,
+            'status' => $run->status,
+            'verification' => $this->boundedVerification($report['verification'] ?? []),
+            'review_findings' => $this->boundedReviewFindings($report['review']['findings'] ?? [], $task->paths),
+        ];
+        if (is_string($report['error'] ?? null)) {
+            $evidence['error'] = $this->boundedText($report['error'], 512);
+        }
+        $output = is_string($report['verification']['output'] ?? null)
+            ? $report['verification']['output']
+            : null;
+        $hints = $this->boundedAssertionHints($output);
+        if ($hints !== []) {
+            $evidence['assertion_hints'] = $hints;
+        }
+
+        return $evidence;
+    }
+
+    /** @param  array<string, mixed>  $verification
+     *  @return array<string, mixed> */
+    private function boundedVerification(array $verification): array
+    {
+        $bounded = [];
         foreach (['status' => 32, 'reason' => 128, 'output' => 2048] as $key => $limit) {
-            if (is_string($report['verification'][$key] ?? null)) {
-                $evidence['verification'][$key] = $this->boundedText($report['verification'][$key], $limit);
+            if (is_string($verification[$key] ?? null)) {
+                $bounded[$key] = $this->boundedText($verification[$key], $limit);
             }
         }
         foreach (['tests', 'assertions', 'failures', 'errors', 'skipped'] as $key) {
-            if (is_int($report['verification'][$key] ?? null)) {
-                $evidence['verification'][$key] = $report['verification'][$key];
+            if (is_int($verification[$key] ?? null)) {
+                $bounded[$key] = $verification[$key];
             }
         }
-        $findings = collect($report['review']['findings'] ?? [])
+
+        return $bounded;
+    }
+
+    /**
+     * @param  list<mixed>  $findings
+     * @param  list<string>  $paths
+     * @return list<array<string, mixed>>
+     */
+    private function boundedReviewFindings(array $findings, array $paths): array
+    {
+        $selected = [];
+        $ordered = collect($findings)
+            ->filter(fn (mixed $finding): bool => is_array($finding))
             ->sortByDesc(fn (array $finding): bool => ($finding['severity'] ?? null) === 'blocking');
-        foreach ($findings as $finding) {
-            if (! in_array($finding['path'] ?? null, $task->paths, true)) {
+        foreach ($ordered as $finding) {
+            if (! in_array($finding['path'] ?? null, $paths, true)) {
                 continue;
             }
             $summary = [];
@@ -150,18 +187,19 @@ class StartTask
             if (is_int($finding['line'] ?? null)) {
                 $summary['line'] = $finding['line'];
             }
-            $evidence['review_findings'][] = $summary;
-            if (count($evidence['review_findings']) === 3) {
+            $selected[] = $summary;
+            if (count($selected) === 3) {
                 break;
             }
         }
-        if (is_string($report['error'] ?? null)) {
-            $evidence['error'] = $this->boundedText($report['error'], 512);
-        }
 
-        $output = is_string($report['verification']['output'] ?? null)
-            ? $report['verification']['output']
-            : null;
+        return $selected;
+    }
+
+    /** @return list<array<string, string>> */
+    private function boundedAssertionHints(?string $output): array
+    {
+        $hints = [];
         foreach ($this->pestAssertionHints->handle($output) as $hint) {
             $summary = [];
             foreach (['pattern' => 64, 'hint' => 512] as $key => $limit) {
@@ -170,11 +208,11 @@ class StartTask
                 }
             }
             if ($summary !== []) {
-                $evidence['assertion_hints'][] = $summary;
+                $hints[] = $summary;
             }
         }
 
-        return $evidence;
+        return $hints;
     }
 
     private function boundedText(string $value, int $bytes): string
