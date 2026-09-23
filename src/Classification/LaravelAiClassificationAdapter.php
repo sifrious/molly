@@ -8,7 +8,7 @@ use Throwable;
 
 final class LaravelAiClassificationAdapter implements ClassificationAdapter
 {
-    public function __construct(private DetectLaravelAiClassification $detect) {}
+    public function __construct(private JevGate $gate, private DetectLaravelAiClassification $detect) {}
 
     public function name(): string
     {
@@ -17,7 +17,7 @@ final class LaravelAiClassificationAdapter implements ClassificationAdapter
 
     public function available(): bool
     {
-        return config('molly.jev.enabled', false) === true && $this->detect->supportsDecide();
+        return $this->gate->enabled() && $this->detect->supportsDecide();
     }
 
     public function classify(array $evidence): ClassificationDecision

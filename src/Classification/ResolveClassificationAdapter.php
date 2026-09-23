@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Classification;
 final class ResolveClassificationAdapter
 {
     public function __construct(
+        private JevGate $gate,
         private DetectLaravelAiClassification $detect,
         private LaravelAiClassificationAdapter $laravelAi,
         private FallbackClassificationAdapter $fallback,
@@ -12,7 +13,7 @@ final class ResolveClassificationAdapter
 
     public function handle(): ClassificationAdapter
     {
-        if (config('molly.jev.enabled', false) !== true) {
+        if (! $this->gate->enabled()) {
             return $this->fallback;
         }
 

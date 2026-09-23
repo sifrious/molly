@@ -2,14 +2,14 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Laravel\Ai\Classification;
-use Laravel\Ai\Classification\Choice;
-use Laravel\Ai\Enums\Lab;
-use Laravel\Ai\Responses\Data\ChoiceAnswer;
+use Sifrious\Molly\Classification\ChoiceClassifier;
+use Sifrious\Molly\Classification\JevGate;
 use Throwable;
 
 class EvaluateWithTypeSafe
 {
+    public function __construct(private JevGate $gate, private ChoiceClassifier $classifier) {}
+
     /** @param array<string, mixed> $evidence
      * @return array{status: string, next_action: ?string, confidence: ?float, answers: array, reason: string, provider: string, model: ?string}
      */
@@ -63,7 +63,12 @@ class EvaluateWithTypeSafe
             && is_array($state['review']['citations'] ?? null));
     }
 
-    /** @param array<string, mixed> $state
+    /**
+     * One evaluation path for every question. The result shape and reason
+     * codes are the accepted contract in docs/reference/configuration.md
+     * ("Jev states"); every transport projects this array unchanged.
+     *
+     * @param  array<string, mixed>  $state
      * @param  array<string, string>  $criteria
      * @return array<string, mixed>
      */
@@ -81,8 +86,12 @@ class EvaluateWithTypeSafe
             'model' => is_string($model) ? $model : null,
         ];
 
-        if (($config['enabled'] ?? false) !== true) {
-            return array_replace($result, ['status' => 'disabled', $question => null, 'reason' => 'jev_disabled']);
+        $gate = $this->gate->status();
+        if ($gate === JevGate::DISABLED || $gate === JevGate::UNAVAILABLE) {
+            return array_replace($result, ['status' => $gate, $question => null, 'reason' => $this->gate->reason()]);
+        }
+        if ($gate !== JevGate::READY) {
+            return $result;
         }
 
         $threshold = $config['confidence_threshold'] ?? null;
@@ -99,16 +108,12 @@ class EvaluateWithTypeSafe
         }
 
         try {
-            $response = Classification::of($state)
-                ->question($question, new Choice($instructions, $criteria))
-                ->timeout($timeout)
-                ->classify(provider: Lab::TypeSafe, model: $model);
+            $answer = $this->classifier->choose($state, $question, $instructions, $criteria, $model, $timeout);
         } catch (Throwable) {
             return array_replace($result, ['reason' => 'provider_error']);
         }
 
-        $answer = $response[$question] ?? null;
-        if (! $answer instanceof ChoiceAnswer || ! array_key_exists($answer->choice, $criteria)
+        if ($answer === null || ! array_key_exists($answer->choice, $criteria)
             || ! $this->probability($answer->confidence) || count($answer->probabilities) !== count($criteria)) {
             return array_replace($result, ['reason' => 'invalid_answer']);
         }
@@ -126,7 +131,7 @@ class EvaluateWithTypeSafe
 
         $confidence = (float) $answer->confidence;
         $result = array_replace($result, [
-            'model' => $response->meta->model ?? $model,
+            'model' => $answer->model ?? $model,
             'confidence' => $confidence,
             'answers' => [$question => [
                 'type' => 'choice',

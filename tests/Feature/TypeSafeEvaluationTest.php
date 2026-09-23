@@ -1,19 +1,17 @@
 <?php
 
 use Laravel\Ai\Classification;
-use Laravel\Ai\Classification\Choice;
 use Laravel\Ai\Prompts\ClassificationPrompt;
 use Laravel\Ai\Responses\Data\ChoiceAnswer;
 use Sifrious\Molly\Actions\AnswerPlan;
 use Sifrious\Molly\Actions\CreatePlan;
 use Sifrious\Molly\Actions\EvaluateWithTypeSafe;
 use Sifrious\Molly\Actions\SuggestPlanReview;
+use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 use Sifrious\Molly\PlanningGuide;
 
 beforeEach(function (): void {
-    if (! class_exists(Classification::class) || ! class_exists(Choice::class) || ! class_exists(ChoiceAnswer::class)) {
-        $this->markTestSkipped('Live Jev classification requires the optional Laravel AI 1.x capability.');
-    }
+    skipWithoutJevCapability(app(DetectLaravelAiClassification::class)->supportsChoice(), 'Live Jev classification requires the optional Laravel AI classification capability.');
 
     config([
         'molly.jev.enabled' => true,
@@ -48,8 +46,7 @@ it('uses Laravel AI classification for each allowed task action', function (stri
         'provider' => 'typesafe',
     ]);
 
-    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool =>
-        $prompt->asks('next_action') && $prompt->contains('Fix the flag.')
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->asks('next_action') && $prompt->contains('Fix the flag.')
     );
 })->with(['continue', 'retry', 'stop', 'needs_review']);
 
@@ -142,8 +139,7 @@ it('saves a cited planning focus without changing plan answers', function (strin
         ->and($plan->fresh()->answers)->toBe(['outcome' => 'List pending tasks.'])
         ->and($plan->fresh()->nextStep()['id'])->toBe('state');
 
-    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool =>
-        $prompt->asks('focus') && $prompt->contains('Show the pending tasks.')
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->asks('focus') && $prompt->contains('Show the pending tasks.')
     );
 })->with(['outcome', 'state', 'laravel', 'boundaries', 'verification']);
 
@@ -175,7 +171,6 @@ it('assesses commit quality with a fixed bounded choice rubric', function (): vo
 
     expect($result['next_action'])->toBe('continue');
 
-    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool =>
-        $prompt->asks('next_action') && $prompt->contains('Assess this PHP diff.')
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->asks('next_action') && $prompt->contains('Assess this PHP diff.')
     );
 });

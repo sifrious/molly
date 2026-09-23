@@ -17,19 +17,27 @@ final class Git
 {
     private ?GitStatus $status = null;
 
+    private ?string $root = null;
+
     private bool $shallow = false;
 
     public function __construct(private readonly CleverConfig $config) {}
 
     /**
-     * Cheap ordered checks, memoized: binary present, inside a work tree,
-     * has at least one commit. Also records whether the clone is shallow.
+     * Cheap ordered checks, memoized per configured root: binary present,
+     * inside a work tree, has at least one commit. Also records whether the
+     * clone is shallow. A root change re-runs the checks.
      */
     public function preflight(): GitStatus
     {
-        if ($this->status !== null) {
+        $root = $this->config->root();
+
+        if ($this->status !== null && $this->root === $root) {
             return $this->status;
         }
+
+        $this->root = $root;
+        $this->shallow = false;
 
         try {
             if (! $this->run(['git', '--version'])->successful()) {

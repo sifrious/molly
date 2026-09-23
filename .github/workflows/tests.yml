@@ -177,9 +177,15 @@ jobs:
 
 
   jev:
-    name: Jev / Laravel AI 1.x
+    name: Jev / Laravel AI classification (exact commit)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # Accepted upstream classification implementation: laravel/ai PR #1049 merge commit.
+      # Replace with the stable tag constraint once Laravel publishes a compatible release.
+      LARAVEL_AI_COMMIT: f0a5d4f3c5bddda7c8975eb79e92d62811197484
+      # Live-capability proofs must fail, not skip, in this lane.
+      MOLLY_REQUIRE_JEV_CAPABILITY: '1'
     steps:
       - name: Check out the package
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -197,11 +203,56 @@ jobs:
       - name: Install stable Molly baseline
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Opt this root package into Laravel AI 1.x
-        run: composer require 'laravel/ai:1.x-dev@dev' --with-all-dependencies --no-interaction --prefer-dist --no-progress
+      - name: Opt this root package into the accepted Laravel AI commit
+        id: laravel-ai
+        run: |
+          composer require "laravel/ai:1.x-dev#${LARAVEL_AI_COMMIT}" --with-all-dependencies --no-interaction --prefer-dist --no-progress
+          resolved=$(composer show laravel/ai --format=json | php -r '$package = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR); echo $package["source"]["reference"] ?? "";')
+          echo "Resolved laravel/ai commit: $resolved"
+          test "$resolved" = "$LARAVEL_AI_COMMIT"
+          echo "laravel_ai_commit=$resolved" >> "$GITHUB_OUTPUT"
+          echo "Jev lane resolved laravel/ai to \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Prove live Jev capability
-        run: vendor/bin/pest tests/Feature/TypeSafeEvaluationTest.php tests/Unit/ClassificationAdapterTest.php --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
+      - name: Prove the exact classification capability is present
+        run: vendor/bin/pest tests/Unit/Classification/DetectLaravelAiClassificationTest.php tests/Unit/ClassificationAdapterTest.php tests/Feature/TypeSafeEvaluationTest.php --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
 
-      - name: Run full package suite with Laravel AI 1.x
+      - name: Run full package suite against the accepted commit
+        run: vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
+
+  dependencies:
+    name: ${{ matrix.name }} compatible dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lowest
+            flags: --prefer-lowest --prefer-stable
+          - name: Highest
+            flags: --prefer-stable
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Resolve ${{ matrix.name }} compatible dependencies
+        timeout-minutes: 8
+        run: |
+          composer update ${{ matrix.flags }} --no-interaction --prefer-dist --no-progress
+          for package in laravel/framework laravel/ai orchestra/testbench pestphp/pest; do
+            composer show "$package" --format=json | php -r '$package = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR); echo $package["name"], " ", implode(", ", $package["versions"] ?? []), "\n";' | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Run package tests
+        timeout-minutes: 5
         run: vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning

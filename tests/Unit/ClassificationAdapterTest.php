@@ -35,9 +35,7 @@ it('uses fallback capability detection on the stable Laravel AI baseline', funct
 it('detects the live Laravel AI Jev capabilities when 1.x is installed', function () {
     $detect = new DetectLaravelAiClassification;
 
-    if (! $detect->supportsDecide()) {
-        $this->markTestSkipped('Laravel AI 1.x decide capability is not installed in this lane.');
-    }
+    skipWithoutJevCapability($detect->supportsDecide(), 'Laravel AI decide capability is not installed in this lane.');
 
     expect($detect->supportsChoice())->toBeTrue()
         ->and($detect->adapter())->toBe('laravel-ai.decide')
@@ -53,9 +51,7 @@ it('uses deterministic fallback when Jev is globally disabled', function () {
 
 it('uses Laravel AI decide when Jev is enabled but never upgrades a failed run', function () {
     $detect = new DetectLaravelAiClassification;
-    if (! $detect->supportsDecide()) {
-        $this->markTestSkipped('Laravel AI 1.x decide capability is not installed in this lane.');
-    }
+    skipWithoutJevCapability($detect->supportsDecide(), 'Laravel AI decide capability is not installed in this lane.');
 
     config(['molly.jev.enabled' => true]);
 
@@ -88,7 +84,6 @@ it('uses Laravel AI decide when Jev is enabled but never upgrades a failed run',
         ->and($run->fresh()->report['classification']['advisory'])->toBeTrue()
         ->and($run->fresh()->status)->toBe('failed');
 
-    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool =>
-        $prompt->asks('decision') && $prompt->contains('failed')
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->asks('decision') && $prompt->contains('failed')
     );
 });

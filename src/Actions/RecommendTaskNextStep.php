@@ -38,7 +38,7 @@ class RecommendTaskNextStep
             if ($current->status !== $task->status || $current->runs->count() !== $task->runs->count() || $latest?->id !== $run->id || $this->reportWithoutAdvice($latest) !== $this->reportWithoutAdvice($run)) {
                 $advice['status'] = 'fallback';
                 $advice['fallback'] = true;
-                $advice['reason'] .= ' Saved evidence changed during the request, so Molly discarded the TypeSafe recommendation.';
+                $advice['reason'] .= ' Saved evidence changed during the request, so Molly discarded the Jev recommendation.';
                 $advice['provider'] = $this->provider($evaluation);
                 $advice['provider']['reason'] = 'evidence_changed';
             } elseif ($advice['retry_allowed']) {
@@ -140,7 +140,10 @@ class RecommendTaskNextStep
     {
         return match ($reason) {
             'disabled', 'jev_disabled' => 'Jev is disabled, so this is deterministic guidance.',
+            'capability_missing' => 'Jev is enabled, but the installed Laravel AI does not provide classification, so this is deterministic guidance.',
             'invalid_config' => 'Jev is not configured for a request. No model recommendation is available.',
+            'invalid_evidence' => 'The saved evidence could not be sent to Jev. Molly kept the deterministic guidance.',
+            'provider_error' => 'The Jev provider request failed. Molly kept the deterministic guidance.',
             'low_confidence' => 'Jev confidence was below the configured threshold. Molly kept the deterministic guidance.',
             default => 'Jev did not return a usable recommendation. Molly kept the deterministic guidance.',
         };

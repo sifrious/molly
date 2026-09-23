@@ -18,6 +18,8 @@ final class DetectLaravelAiClassification
 
     private const LAB = 'Laravel\\Ai\\Enums\\Lab';
 
+    private const PENDING = 'Laravel\\Ai\\PendingResponses\\PendingClassification';
+
     public function adapter(): string
     {
         // Boolean decide adapter activates only when the macro is registered.
@@ -70,19 +72,24 @@ final class DetectLaravelAiClassification
     }
 
     /**
-     * Choice capability: Classification + Choice + ChoiceAnswer + Lab::TypeSafe together.
-     * Package presence or structured-agent support alone is not enough.
+     * Choice capability: Classification::of, PendingClassification question/timeout/classify,
+     * Choice, ChoiceAnswer, and Lab::TypeSafe together. Package presence, a nearby class,
+     * or structured-agent support alone is not enough.
      */
     public function supportsChoice(): bool
     {
         if (! $this->classAvailable(self::CLASSIFICATION)
             || ! $this->classAvailable(self::CHOICE)
             || ! $this->classAvailable(self::CHOICE_ANSWER)
+            || ! $this->classAvailable(self::PENDING)
             || ! $this->labHasTypeSafe()) {
             return false;
         }
 
-        return true;
+        return method_exists(self::CLASSIFICATION, 'of')
+            && method_exists(self::PENDING, 'question')
+            && method_exists(self::PENDING, 'timeout')
+            && method_exists(self::PENDING, 'classify');
     }
 
     public function supportsStructuredAgents(): bool

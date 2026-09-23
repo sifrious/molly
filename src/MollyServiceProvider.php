@@ -7,7 +7,10 @@ use Laravel\Mcp\Facades\Mcp;
 use Livewire\Livewire;
 use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 use Sifrious\Molly\Actions\DetectFalseGreen;
+use Sifrious\Molly\Classification\ChoiceClassifier;
+use Sifrious\Molly\Classification\LaravelAiChoiceClassifier;
 use Sifrious\Molly\Complexity\Clever;
+use Sifrious\Molly\Complexity\ComplexityScanner;
 use Sifrious\Molly\Complexity\Console\Commands\HotspotsCommand;
 use Sifrious\Molly\Complexity\Console\Commands\LonelyFilesCommand;
 use Sifrious\Molly\Complexity\Console\Commands\OwnedDiffCommand;
@@ -73,6 +76,8 @@ class MollyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(FalseGreenVerifier::class, DetectFalseGreen::class);
+        $this->app->bind(ChoiceClassifier::class, LaravelAiChoiceClassifier::class);
+        $this->app->bind(ComplexityScanner::class, Clever::class);
         $this->app->when(BootstrapProjectKnowledgeGraphs::class)
             ->needs('$laravelGraphs')
             ->give(function ($app) {

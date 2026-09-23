@@ -266,8 +266,8 @@ it('returns application scope errors without saving an unsafe task', function ()
     expect(Task::count())->toBe(0);
 });
 
-it('persists a TypeSafe fallback suggestion without answering the plan', function () {
-    config()->set('molly.typesafe.enabled', false);
+it('persists a Jev fallback suggestion without answering the plan', function () {
+    config()->set('molly.jev.enabled', false);
     MollyServer::tool(MollyPlan::class, ['operation' => 'create', 'description' => 'Plan a mobile report.'])->assertOk();
     $plan = Plan::sole();
     MollyServer::tool(MollyPlan::class, ['operation' => 'suggest', 'id' => $plan->id])->assertOk()
@@ -275,19 +275,12 @@ it('persists a TypeSafe fallback suggestion without answering the plan', functio
     expect($plan->fresh()->suggestion)->not->toBeNull()->and($plan->fresh()->answers)->toBe([]);
 });
 
-it('returns the persisted TypeSafe choice confidence and citations', function () {
-    config()->set('molly.typesafe.enabled', true);
-    config()->set('molly.typesafe.api_key', 'test-key');
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response([
-        'model' => 'jev-latest', 'answers' => ['focus' => [
-            'type' => 'choice', 'choice' => 'state', 'confidence' => 0.9,
-            'probabilities' => ['outcome' => 0, 'state' => 1, 'laravel' => 0, 'boundaries' => 0, 'verification' => 0],
-        ]],
-    ])]);
+it('returns the persisted Jev choice confidence and citations', function () {
+    $jev = fakeJev(jevChoice('state', ['outcome', 'state', 'laravel', 'boundaries', 'verification']));
     MollyServer::tool(MollyPlan::class, ['operation' => 'create', 'description' => 'Plan a report.'])->assertOk();
     $plan = Plan::sole();
     MollyServer::tool(MollyPlan::class, ['operation' => 'suggest', 'id' => $plan->id])->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json) => $json->where('plan.suggestion.focus', 'state')->where('plan.suggestion.confidence', 0.9)->has('plan.suggestion.sources.0.url')->where('next_step.id', 'outcome')->etc());
-    expect($plan->fresh()->suggestion['focus'])->toBe('state')->and($plan->fresh()->answers)->toBe([]);
-    Http::assertSentCount(1);
+    expect($plan->fresh()->suggestion['focus'])->toBe('state')->and($plan->fresh()->answers)->toBe([])->and($jev->requests)->toHaveCount(1);
+    Http::assertNothingSent();
 });

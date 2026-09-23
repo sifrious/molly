@@ -113,6 +113,8 @@ When you explicitly enable Jev, Molly borrows Laravel AI's classification seam (
 
 Inputs stay bounded to the evidence Molly already collected for that call. Provider credentials and transport belong to Laravel AI (`ai.providers.typesafe` / `TYPESAFE_API_KEY`), not a second Molly transport stack. Molly records the real provider provenance returned by Laravel AI.
 
+One class, `Sifrious\Molly\Classification\JevGate`, decides whether a request may classify. Its states are `disabled` (the default, reason `jev_disabled`), `unavailable` (enabled, but the installed Laravel AI lacks the classification surface, reason `capability_missing`), `unconfigured` (enabled and capable, but no `ai.providers.typesafe.key`, reason `invalid_config`), and `ready`. Enabled-but-unavailable is reported explicitly and is never treated as success: advice falls back, `molly:review-commit` exits non-zero, and plan suggestions are refused. Provider failures report `provider_error`, malformed answers `invalid_answer`, and confidence below the threshold `low_confidence`. The full table is in [Configuration](reference/configuration.md#jev-states).
+
 Jev cannot replace Pest or Tarpit, cannot widen retries, and cannot make a failed run pass. Agents must not invent flags, env overrides, or MCP tools that bypass `MOLLY_JEV_ENABLED` or those deterministic gates.
 
 See [Configuration](reference/configuration.md#jev-and-typesafe) for the settings.
