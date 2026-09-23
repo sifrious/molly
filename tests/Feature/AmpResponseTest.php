@@ -105,7 +105,7 @@ it('checks Amp account health without disclosing command output or contacting Ol
     $result = app(CheckEnvironment::class)->handle(__DIR__.'/../..');
     expect(array_column($result['checks'], 'code'))->toContain($code)
         ->and(json_encode($result))->not->toContain('sensitive account details', 'ollama');
-    Process::assertRan(['amp', 'usage']);
+    Process::assertRan(fn ($process) => $process->command === ['amp', 'usage']);
     Http::assertNothingSent();
 })->with([[0, 'amp_ready'], [1, 'amp_unavailable']]);
 

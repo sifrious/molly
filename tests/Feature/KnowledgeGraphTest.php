@@ -122,7 +122,11 @@ it('indexes the bundled queue guide and installed Laravel source', function () {
     expect($indexed['sources'])->toBeGreaterThanOrEqual(15)
         ->and($indexed['nodes'])->toBeGreaterThanOrEqual(26)
         ->and($indexed['version'])->toBe($version)
-        ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue', 'assertPushed');
+        ->and(array_column($result['nodes'], 'label'))->toContain('Queue', 'Retry', 'ShouldQueue');
+    // The bounded Queue neighbourhood truncates at 40 nodes in an order that differs between
+    // Laravel majors, so prove the testing seam through its own node instead of the window.
+    $queueFake = app(QueryKnowledgeGraph::class)->handle('QueueFake', $version, depth: 1, limit: 20);
+    expect(array_column($queueFake['nodes'], 'label'))->toContain('QueueFake', 'assertPushed');
     $routing = app(QueryKnowledgeGraph::class)->handle('Route', $version, depth: 1, limit: 20);
     expect(array_column($routing['nodes'], 'label'))->toContain('Route');
     $testing = app(QueryKnowledgeGraph::class)->handle('Pest', $version, depth: 1, limit: 20);

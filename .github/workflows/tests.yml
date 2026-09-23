@@ -220,7 +220,7 @@ jobs:
         run: vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
 
   dependencies:
-    name: ${{ matrix.name }} compatible dependencies
+    name: ${{ matrix.name }} compatible dependencies on PHP ${{ matrix.php }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -228,8 +228,10 @@ jobs:
       matrix:
         include:
           - name: Lowest
+            php: '8.3'
             flags: --prefer-lowest --prefer-stable
           - name: Highest
+            php: '8.5'
             flags: --prefer-stable
     steps:
       - name: Check out the package
@@ -237,10 +239,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up PHP
+      - name: Set up PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: '8.4'
+          php-version: ${{ matrix.php }}
           extensions: curl, dom, mbstring, pcntl, pdo_sqlite, posix, sqlite3, xml, xmlwriter
           coverage: none
           tools: composer:v2

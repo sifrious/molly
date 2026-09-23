@@ -19,6 +19,7 @@ use Sifrious\Molly\Actions\VerifyChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Contracts\DisplayStatus;
 use Sifrious\Molly\Jobs\StartSavedTask;
+use Sifrious\Molly\Knowledge\LaravelVersion;
 use Sifrious\Molly\Mcp\MollyGuide;
 use Sifrious\Molly\Mcp\MollyKnowledge;
 use Sifrious\Molly\Mcp\MollyPlan;
@@ -58,9 +59,10 @@ it('publishes local MCP tools and reads offline citations', function () {
 it('returns indexed Laravel knowledge with provenance', function () {
     $database = sys_get_temp_dir().'/molly-mcp-knowledge-'.Str::uuid().'.sqlite';
     config()->set('molly.knowledge.database', $database);
-    app(IndexLaravelKnowledge::class)->handle('13');
+    $version = app(LaravelVersion::class)->current();
+    app(IndexLaravelKnowledge::class)->handle($version);
 
-    MollyServer::tool(MollyKnowledge::class, ['concept' => 'Queue', 'version' => '13', 'depth' => 3, 'limit' => 40])
+    MollyServer::tool(MollyKnowledge::class, ['concept' => 'Queue', 'version' => $version, 'depth' => 3, 'limit' => 40])
         ->assertOk()
         ->assertSee(['Queue', 'Retry', 'ShouldQueue', 'sources', 'revision']);
 
@@ -256,7 +258,7 @@ it('imports issue context through the existing GitHub action without executing i
     ]))]);
     MollyServer::tool(MollyTask::class, ['operation' => 'import_github', 'issue_url' => $url, ...mcpTaskScope()])->assertOk();
     expect(Task::sole()->source['issue_number'])->toBe(7)->and(Run::count())->toBe(0);
-    Process::assertRan(['gh', 'api', '--hostname', 'github.com', 'repos/example/project/issues/7']);
+    Process::assertRan(fn ($process) => $process->command === ['gh', 'api', '--hostname', 'github.com', 'repos/example/project/issues/7']);
 });
 
 it('returns application scope errors without saving an unsafe task', function () {
