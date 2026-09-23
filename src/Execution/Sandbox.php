@@ -167,6 +167,15 @@ final class Sandbox
             }
         }
 
+        // Pest resolves its project root from the real autoloader path
+        // (dirname(vendor/autoload.php, 2)), so the project that really owns
+        // the vendor directory must be readable. For a normal workspace that
+        // is the workspace itself; it only differs when vendor is a symlink.
+        $vendor = realpath($workspace.'/vendor');
+        if ($vendor !== false) {
+            $paths[] = dirname($vendor);
+        }
+
         $resolved = [];
         foreach ($paths as $path) {
             $real = realpath($path);

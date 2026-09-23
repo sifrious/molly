@@ -23,7 +23,7 @@
     <p>{{ $providerName }} returned a choice from the allowed options.</p>
 @elseif(($advice['provider']['status'] ?? '') === 'disabled' || ($advice['provider']['reason'] ?? '') === 'disabled')
     <p>Jev classification is disabled. Molly used saved task state and checks only.</p>
-@elseif(in_array(($advice['provider']['reason'] ?? ''), ['invalid_config', 'provider_unavailable'], true) || ($advice['provider']['status'] ?? '') === 'unavailable')
+@elseif(in_array(($advice['provider']['reason'] ?? ''), ['invalid_config', 'provider_unavailable', 'capability_missing', 'provider_error'], true) || ($advice['provider']['status'] ?? '') === 'unavailable')
     <p>No usable provider recommendation was available ({{ $providerReason }}). Molly used saved task state and checks only.</p>
 @elseif(($advice['provider']['reason'] ?? '') === 'low_confidence')
     <p>Provider confidence was below the configured threshold. Molly kept deterministic guidance from saved task state and checks.</p>

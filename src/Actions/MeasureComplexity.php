@@ -2,12 +2,12 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Sifrious\Molly\Complexity\Clever;
+use Sifrious\Molly\Complexity\ComplexityScanner;
 use Throwable;
 
 class MeasureComplexity
 {
-    public function __construct(private Clever $clever) {}
+    public function __construct(private ComplexityScanner $clever) {}
 
     /**
      * @return array{status: string, probes: list<array<string, mixed>>, reason?: string, report?: string, detail?: string}

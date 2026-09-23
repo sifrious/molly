@@ -102,11 +102,34 @@ Molly policy for enabled Jev stays under `molly.jev`:
 
 When enabled, Jev can support explicit planning suggestions, task advice, and commit review through Laravel AI classification. It cannot bypass tests, Tarpit blockers, or attempt limits. Configure one provider stack only: Laravel AI TypeSafe plus `molly.jev` policy — never both a Molly `typesafe` client and Laravel AI.
 
-### Tagged Laravel AI compatibility
+### Jev states
 
-Ship Jev against a **tagged** `laravel/ai` release that includes the public classification / TypeSafe provider seam from [laravel/ai#1049](https://github.com/laravel/ai/pull/1049) (merged 2026-09-21). As of this writing, the newest published tag is `v0.11.2` (2026-09-03), which **does not** yet contain that seam — wait for the next tagged release that includes the merge, then pin Molly's Composer constraint to that tag or a caret range that selects it.
+One class, `Sifrious\Molly\Classification\JevGate`, decides whether a request may classify. Planning suggestions, task advice, commit review, and every transport (Artisan, HTTP, Livewire, MCP) ask that gate and project the same result. These are the accepted outcomes:
 
-Do not instruct hosts to require a `dev-` branch, a PR ref, or an untagged VCS override for production installs. Until a qualifying tag exists, leave `MOLLY_JEV_ENABLED` at its default `false`. On older supported `laravel/ai` versions that lack the seam, Molly keeps the gate closed, performs no classification request, and stays on deterministic Pest / Tarpit / retry / completion behavior.
+| Jev setting | Laravel AI capability | Result |
+| --- | --- | --- |
+| Disabled (default) | Any | No classification. Evaluation status `disabled`, reason `jev_disabled`. Advice, plan, and commit review keep deterministic guidance; the provider block records `status: disabled`, `reason: jev_disabled`. |
+| Enabled | Missing (stable Laravel AI without the `Classification` / `Choice` / `ChoiceAnswer` / `Lab::TypeSafe` surface) | No classification. Evaluation status `unavailable`, reason `capability_missing`. Advice falls back with `provider.status: unavailable`; `molly:review-commit` exits non-zero; the plan page offers no suggestion and `POST /molly/plans/{id}/suggest` returns 403. This state is never reported as success. |
+| Enabled | Present, but `ai.providers.typesafe.key` is empty or `molly.jev` policy is invalid | No classification. Evaluation status `needs_review`, reason `invalid_config`. |
+| Enabled | Present and configured | Laravel AI classification runs with provider `Lab::TypeSafe` and `molly.jev.model`. Evaluation status `evaluated`, reason `evaluated`, confidence and per-option probabilities recorded. |
+| Enabled | Provider request throws | Evaluation status `needs_review`, reason `provider_error`. Deterministic evidence is preserved; no provider payload is retained. |
+| Enabled | Answer malformed (unknown option, missing or non-numeric probability, distribution not summing to 1, argmax not the choice, confidence outside 0..1) | Evaluation status `needs_review`, reason `invalid_answer`. |
+| Enabled | Confidence below `molly.jev.confidence_threshold` | Evaluation status `needs_review`, reason `low_confidence`, confidence recorded. Confidence exactly at the threshold is accepted. |
+| Any | A deterministic gate fails (Pest, Tarpit blocker, attempt limit, diff check) | That failure stays authoritative regardless of any Jev output. |
+
+Molly never changes the provider, execution target, or model on its own. A Jev result is advice: it can recommend `retry`, `stop`, `inspect`, or a planning focus, but it cannot start, retry, or complete work, and human approval remains distinct from both model success and deterministic verification.
+
+### Laravel AI compatibility
+
+Molly keeps its normal install on the stable Laravel AI baseline, where the gate reports `unavailable` / `capability_missing` if you enable it. Jev is an optional capability: until Laravel publishes a tag containing the classification seam, a host that wants Jev must explicitly opt its root application into the accepted upstream implementation, the merge commit of Laravel AI PR #1049:
+
+```bash
+composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484' --with-all-dependencies
+```
+
+Molly's release CI runs a separate Jev lane that resolves exactly that commit, records the resolved commit in the workflow summary, fails (never skips) the live-capability proofs, and then runs the complete package suite. The ordinary PHP/Laravel package matrix stays on stable dependencies. A floating `1.x-dev` branch is not release evidence. Once Laravel publishes a compatible tag, replace the exact commit with that stable constraint and rerun the complete matrix.
+
+`MOLLY_JEV_ENABLED` still defaults to `false`. Enabling it is a separate explicit opt-in; deterministic Pest, Tarpit, retry and completion gates remain authoritative.
 
 ## Complexity measurements
 

@@ -3,11 +3,37 @@
 use Illuminate\Support\Str;
 use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 
-it('does not treat structured-agent support as choice capability on current laravel/ai', function () {
+/**
+ * The exact surface Molly needs, computed independently of the detector so the
+ * same test is honest on the stable baseline and on the accepted Laravel AI commit.
+ */
+function choiceSurfaceInstalled(): bool
+{
+    $lab = 'Laravel\\Ai\\Enums\\Lab';
+
+    return class_exists('Laravel\\Ai\\Classification')
+        && class_exists('Laravel\\Ai\\Classification\\Choice')
+        && class_exists('Laravel\\Ai\\Responses\\Data\\ChoiceAnswer')
+        && class_exists('Laravel\\Ai\\PendingResponses\\PendingClassification')
+        && enum_exists($lab)
+        && in_array('TypeSafe', array_column($lab::cases(), 'name'), true);
+}
+
+it('reports choice capability only when the exact classification surface is installed', function () {
     $detect = new DetectLaravelAiClassification;
 
-    expect($detect->supportsChoice())->toBeFalse()
-        ->and($detect->supportsStructuredAgents() ? true : true)->toBeTrue();
+    expect($detect->supportsChoice())->toBe(choiceSurfaceInstalled());
+});
+
+it('does not treat structured-agent support or package presence as choice capability', function () {
+    $detect = new DetectLaravelAiClassification;
+
+    if (choiceSurfaceInstalled()) {
+        $this->markTestSkipped('This lane has the full classification surface, so the negative proof does not apply.');
+    }
+
+    expect($detect->supportsStructuredAgents() || $detect->version() !== null)->toBeTrue()
+        ->and($detect->supportsChoice())->toBeFalse();
 });
 
 it('falls back when decide macro and choice capability are absent', function () {
@@ -16,7 +42,7 @@ it('falls back when decide macro and choice capability are absent', function () 
     if (! $detect->supportsDecide() && ! $detect->supportsChoice()) {
         expect($detect->adapter())->toBe('molly.fallback');
     } else {
-        expect($detect->adapter())->not->toBe('');
+        expect($detect->adapter())->toBeIn(['laravel-ai.decide', 'laravel-ai.choice']);
     }
 });
 
@@ -25,7 +51,7 @@ it('reports composer pretty version or null without using version as capability'
     $version = $detect->version();
 
     expect($version === null || (is_string($version) && $version !== ''))->toBeTrue()
-        ->and($detect->supportsChoice())->toBeFalse()
+        ->and($detect->supportsChoice())->toBe(choiceSurfaceInstalled())
         ->and($detect->supportsDecide())->toBe(Str::hasMacro('decide'));
 });
 
@@ -33,44 +59,39 @@ it('treats the decide macro as an independent boolean capability', function () {
     $detect = new DetectLaravelAiClassification;
     $hadDecide = Str::hasMacro('decide');
 
-    // Version / structured agents must never imply decide.
-    expect($detect->supportsDecide())->toBe($hadDecide)
-        ->and($detect->supportsDecide())->not->toBe($detect->supportsStructuredAgents() && $detect->version() !== null);
+    expect($detect->supportsDecide())->toBe($hadDecide);
 
     if ($hadDecide) {
-        Str::flushMacros();
+        // The macro is the capability. Version text and structured-agent support never stand in for it.
+        expect($detect->adapter())->toBe('laravel-ai.decide');
+
+        return;
     }
 
-    expect((new DetectLaravelAiClassification)->supportsDecide())->toBeFalse()
-        ->and((new DetectLaravelAiClassification)->adapter())->not->toBe('laravel-ai.decide');
+    expect((new DetectLaravelAiClassification)->adapter())->not->toBe('laravel-ai.decide');
 
     Str::macro('decide', fn () => true);
 
-    expect((new DetectLaravelAiClassification)->supportsDecide())->toBeTrue()
-        ->and((new DetectLaravelAiClassification)->adapter())->toBe('laravel-ai.decide');
-
-    // Cleanup: remove only our test macro when the suite started without one.
-    if (! $hadDecide) {
+    try {
+        expect((new DetectLaravelAiClassification)->supportsDecide())->toBeTrue()
+            ->and((new DetectLaravelAiClassification)->adapter())->toBe('laravel-ai.decide');
+    } finally {
         Str::flushMacros();
     }
+
+    expect((new DetectLaravelAiClassification)->supportsDecide())->toBeFalse();
 });
 
 it('journals can record version while selection stays feature-based', function () {
     $detect = new DetectLaravelAiClassification;
     $version = $detect->version();
 
-    // Pretty version may be present for provenance…
     expect($version === null || (is_string($version) && $version !== ''))->toBeTrue();
 
-    // …but adapter selection never uses version text.
     $adapter = $detect->adapter();
-    expect(in_array($adapter, ['laravel-ai.decide', 'laravel-ai.choice', 'molly.fallback'], true))->toBeTrue();
+    expect($adapter)->toBeIn(['laravel-ai.decide', 'laravel-ai.choice', 'molly.fallback']);
 
-    if ($version !== null) {
-        expect($detect->supportsDecide())->toBe(Str::hasMacro('decide'))
-            ->and($detect->supportsChoice())->toBeFalse(); // v0.11.2 has no Choice stack
-        if (! Str::hasMacro('decide')) {
-            expect($adapter)->toBe('molly.fallback');
-        }
+    if (! Str::hasMacro('decide') && ! choiceSurfaceInstalled()) {
+        expect($adapter)->toBe('molly.fallback');
     }
 });

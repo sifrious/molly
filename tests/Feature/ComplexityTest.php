@@ -4,11 +4,12 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Process;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Complexity\Clever;
+use Sifrious\Molly\Complexity\ComplexityScanner;
 
 it('preserves Clever measurements and restores host configuration', function (string $probeStatus, string $status): void {
     config(['molly-complexity.root' => '/original', 'molly-complexity.report.path' => '/original.json']);
     $probe = ['key' => 'c1', 'status' => $probeStatus, 'metrics' => ['code_lines' => 47], 'headline' => 'owned diff: 47 lines', 'hand_verify' => 'cloc app', 'caveats' => ['Line counts do not measure design quality.'], 'warnings' => [], 'skip_reason' => null];
-    $scanner = new class($probe)
+    $scanner = new class($probe) implements ComplexityScanner
     {
         public array $seen = [];
 
@@ -34,7 +35,7 @@ it('preserves Clever measurements and restores host configuration', function (st
             }];
         }
     };
-    app()->instance(Clever::class, $scanner);
+    app()->instance(ComplexityScanner::class, $scanner);
 
     $result = app(MeasureComplexity::class)->handle('/target', '/evidence');
 
@@ -47,7 +48,7 @@ it('preserves Clever measurements and restores host configuration', function (st
 
 it('never runs a Clever scan when disabled or in production', function (bool $enabled, string $environment): void {
     app()->instance('env', $environment);
-    app()->instance(Clever::class, new class($enabled)
+    app()->instance(ComplexityScanner::class, new class($enabled) implements ComplexityScanner
     {
         public function __construct(private bool $enabled) {}
 
@@ -71,7 +72,7 @@ it('never runs a Clever scan when disabled or in production', function (bool $en
 
 it('reports scan failures and restores host configuration', function (): void {
     config(['molly-complexity.root' => '/original', 'molly-complexity.report.path' => '/original.json']);
-    app()->instance(Clever::class, new class
+    app()->instance(ComplexityScanner::class, new class implements ComplexityScanner
     {
         public function enabled(): bool
         {
@@ -92,7 +93,7 @@ it('reports scan failures and restores host configuration', function (): void {
 });
 
 it('does not treat an empty Clever scan as passing measurements', function (): void {
-    app()->instance(Clever::class, new class
+    app()->instance(ComplexityScanner::class, new class implements ComplexityScanner
     {
         public function enabled(): bool
         {

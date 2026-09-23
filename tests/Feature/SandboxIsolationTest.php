@@ -83,7 +83,7 @@ PHP);
         $this->root.'/evidence',
     );
 
-    expect($result['status'])->toBe('passed')
+    expect($result['status'])->toBe('passed', json_encode(array_intersect_key($result, array_flip(['status', 'reason', 'output', 'error', 'exit_code'])), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))
         ->and($result['tests'])->toBe(1)
         ->and($result['junit'])->toBeFile();
 });

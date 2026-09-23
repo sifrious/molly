@@ -1,16 +1,18 @@
 <?php
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Sifrious\Molly\Actions\NameTask;
 use Sifrious\Molly\Actions\RecommendTaskNextStep;
+use Sifrious\Molly\Classification\ChoiceClassification;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 
 beforeEach(function (): void {
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'advice-test-key']);
+    $this->jev = fakeJev();
 });
 
 function adviceTask(string $status = 'failed'): Task
@@ -23,12 +25,7 @@ function adviceRun(Task $task, string $status = 'failed', ?array $report = null)
     return $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => $status, 'report' => $report ?? ['verification' => ['status' => 'failed', 'tests' => 1, 'assertions' => 2, 'failures' => 1, 'errors' => 0, 'skipped' => 0], 'review' => ['findings' => []]]]);
 }
 
-function adviceResponse(string $choice = 'retry', float $confidence = 0.9): array
-{
-    return ['model' => 'jev-latest', 'answers' => ['next_action' => ['type' => 'choice', 'choice' => $choice, 'confidence' => $confidence, 'probabilities' => array_replace(array_fill_keys(['continue', 'retry', 'stop', 'needs_review'], 0), [$choice => 1])]]];
-}
-
-it('returns deterministic state guidance without consulting TypeSafe', function (string $state, string $action, bool $retryAllowed, ?string $runState): void {
+it('returns deterministic state guidance without consulting Jev', function (string $state, string $action, bool $retryAllowed, ?string $runState): void {
     $task = adviceTask($state);
     $run = $runState === null ? null : adviceRun($task, $runState);
     $before = $task->fresh()->getRawOriginal();
@@ -42,7 +39,8 @@ it('returns deterministic state guidance without consulting TypeSafe', function 
         ->and($result['confidence'])->toBeNull()
         ->and($result['task_id'])->toBe($task->id)
         ->and($task->fresh()->getRawOriginal())->toBe($before)
-        ->and($task->runs()->count())->toBe($run === null ? 0 : 1);
+        ->and($task->runs()->count())->toBe($run === null ? 0 : 1)
+        ->and($this->jev->requests)->toBe([]);
     Http::assertNothingSent();
 })->with([
     'pending' => ['pending', 'start', false, null],
@@ -65,7 +63,8 @@ it('blocks exhausted tasks before requesting a model recommendation', function (
         ->and($result['reason'])->toContain('all 1 allowed attempts')
         ->and($result['observed'])->toBe(['task_status' => $status, 'attempt_count' => 1, 'max_attempts' => 1])
         ->and($run->fresh()->report['advice'])->toBe($result)
-        ->and($task->fresh()->status)->toBe($status);
+        ->and($task->fresh()->status)->toBe($status)
+        ->and($this->jev->requests)->toBe([]);
     Http::assertNothingSent();
 })->with(['failed', 'stopped']);
 
@@ -79,7 +78,8 @@ it('returns inspection advice for an invalid attempt limit', function (mixed $li
     expect($result['next_action'])->toBe('inspect')
         ->and($result['retry_allowed'])->toBeFalse()
         ->and($result['observed']['max_attempts'])->toBeNull()
-        ->and($result['reason'])->toContain('attempt limit is invalid');
+        ->and($result['reason'])->toContain('attempt limit is invalid')
+        ->and($this->jev->requests)->toBe([]);
     Http::assertNothingSent();
 })->with([0, 11, '3', null]);
 
@@ -92,12 +92,13 @@ it('keeps missing evidence local instead of spending a provider request', functi
     expect($result['next_action'])->toBe('inspect')
         ->and($result['provider']['reason'])->toBe('missing_evidence')
         ->and($result['reason'])->toContain('No usable verification or Tarpit evidence')
-        ->and($run->fresh()->report['advice'])->toBe($result);
+        ->and($run->fresh()->report['advice'])->toBe($result)
+        ->and($this->jev->requests)->toBe([]);
     Http::assertNothingSent();
 });
 
-it('maps TypeSafe choices without changing execution state or treating continue as success', function (string $choice, string $action): void {
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(adviceResponse($choice))]);
+it('maps Jev choices without changing execution state or treating continue as success', function (string $choice, string $action): void {
+    $jev = fakeJev(jevChoice($choice));
     $task = adviceTask();
     $run = adviceRun($task);
     $beforeTask = $task->fresh()->getRawOriginal();
@@ -110,6 +111,9 @@ it('maps TypeSafe choices without changing execution state or treating continue 
         ->and($result['retry_allowed'])->toBeTrue()
         ->and($result['status'])->toBe('evaluated')
         ->and($result['confidence'])->toBe(0.9)
+        ->and($result['provider']['status'])->toBe('evaluated')
+        ->and($result['provider']['reason'])->toBe('evaluated')
+        ->and($result['provider']['model'])->toBe('jev-latest')
         ->and($result['provider']['answers']['next_action']['choice'])->toBe($choice)
         ->and($result['provider']['answers']['next_action']['probabilities'][$choice])->toBe(1.0)
         ->and($result['provider']['threshold'])->toBe(0.8)
@@ -120,8 +124,9 @@ it('maps TypeSafe choices without changing execution state or treating continue 
         ->and($task->fresh()->getRawOriginal())->toBe($beforeTask)
         ->and($run->fresh()->getRawOriginal('updated_at'))->toBe($beforeRun['updated_at'])
         ->and($run->fresh()->status)->toBe('failed')
-        ->and($task->runs()->count())->toBe(1);
-    Http::assertSentCount(1);
+        ->and($task->runs()->count())->toBe(1)
+        ->and($jev->requests)->toHaveCount(1);
+    Http::assertNothingSent();
 })->with(['retry' => ['retry', 'retry'], 'stop' => ['stop', 'stop'], 'continue' => ['continue', 'inspect'], 'human review' => ['needs_review', 'inspect']]);
 
 it('sends only bounded selected evidence and puts blocking Tarpit findings first', function (): void {
@@ -134,14 +139,10 @@ it('sends only bounded selected evidence and puts blocking Tarpit findings first
     }
     $findings[] = ['path' => '.env', 'severity' => 'blocking', 'problem' => 'outside-secret'];
     adviceRun($task, report: ['verification' => ['status' => 'failed', 'tests' => 1, 'assertions' => 4, 'output' => 'output-secret', 'reason' => 'reason-secret'], 'review' => ['checks' => ['E' => ['status' => 'findings', 'evidence' => 'check-secret']], 'findings' => $findings], 'provider' => ['key' => 'provider-secret'], 'source' => 'full-source-secret']);
-    $sent = null;
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => function ($request) use (&$sent) {
-        $sent = $request['state'];
-
-        return Http::response(adviceResponse());
-    }]);
+    $jev = fakeJev(jevChoice('retry'));
 
     app(RecommendTaskNextStep::class)->handle($task->id);
+    $sent = $jev->state();
     $encoded = json_encode($sent, JSON_THROW_ON_ERROR);
 
     expect(array_keys($sent))->toBe(['prompt', 'verification', 'review'])
@@ -149,14 +150,15 @@ it('sends only bounded selected evidence and puts blocking Tarpit findings first
         ->and($sent['verification'])->toBe(['status' => 'failed', 'tests' => 1, 'assertions' => 4])
         ->and($sent['review']['findings'])->toHaveCount(3)
         ->and($sent['review']['findings'][0]['severity'])->toBe('blocking')
-        ->and($encoded)->not->toContain('source-secret', 'snapshot-secret', 'finding-secret', 'outside-secret', 'output-secret', 'reason-secret', 'check-secret', 'provider-secret', 'full-source-secret');
-    Http::assertSentCount(1);
+        ->and($encoded)->not->toContain('source-secret', 'snapshot-secret', 'finding-secret', 'outside-secret', 'output-secret', 'reason-secret', 'check-secret', 'provider-secret', 'full-source-secret')
+        ->and($jev->requests)->toHaveCount(1);
+    Http::assertNothingSent();
 });
 
-it('keeps honest deterministic guidance when TypeSafe is disabled or missing a key', function (string $setting, mixed $value, string $reason): void {
-    config(['molly.typesafe.'.$setting => $value]);
+it('keeps honest deterministic guidance when Jev is disabled, unavailable, or missing a credential', function (Closure $arrange, string $providerStatus, string $reason, string $wording): void {
+    $jev = $arrange();
     $task = adviceTask();
-    adviceRun($task);
+    $run = adviceRun($task);
 
     $result = app(RecommendTaskNextStep::class)->handle($task->id);
 
@@ -164,13 +166,21 @@ it('keeps honest deterministic guidance when TypeSafe is disabled or missing a k
         ->and($result['next_action'])->toBe('inspect')
         ->and($result['fallback'])->toBeTrue()
         ->and($result['confidence'])->toBeNull()
+        ->and($result['provider']['status'])->toBe($providerStatus)
         ->and($result['provider']['reason'])->toBe($reason)
-        ->and($result['provider']['answers'])->toBe([]);
+        ->and($result['provider']['answers'])->toBe([])
+        ->and($result['reason'])->toContain($wording)
+        ->and($run->fresh()->report['advice'])->toBe($result)
+        ->and($jev->requests)->toBe([]);
     Http::assertNothingSent();
-})->with(['disabled' => ['enabled', false, 'disabled'], 'missing key' => ['api_key', '', 'invalid_config']]);
+})->with([
+    'disabled' => [fn () => tap(fakeJev(jevChoice('retry')), fn () => config(['molly.jev.enabled' => false])), 'disabled', 'jev_disabled', 'Jev is disabled'],
+    'enabled without capability' => [fn () => fakeJev(jevChoice('retry'), available: false), 'unavailable', 'capability_missing', 'does not provide classification'],
+    'enabled without credential' => [fn () => tap(fakeJev(jevChoice('retry')), fn () => config(['ai.providers.typesafe.key' => ''])), 'needs_review', 'invalid_config', 'not configured'],
+]);
 
-it('keeps failed evidence visible when TypeSafe cannot supply usable advice', function (array $response, int $status, string $reason): void {
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response($response, $status)]);
+it('keeps failed evidence visible when Jev cannot supply usable advice', function (ChoiceClassification|Throwable|null $answer, string $reason): void {
+    $jev = fakeJev($answer);
     $task = adviceTask();
     $run = adviceRun($task);
 
@@ -178,25 +188,29 @@ it('keeps failed evidence visible when TypeSafe cannot supply usable advice', fu
 
     expect($result['next_action'])->toBe('inspect')
         ->and($result['status'])->toBe('fallback')
+        ->and($result['provider']['status'])->toBe('needs_review')
         ->and($result['provider']['reason'])->toBe($reason)
-        ->and($run->fresh()->report['verification']['status'])->toBe('failed');
-    Http::assertSentCount(1);
+        ->and($run->fresh()->report['verification']['status'])->toBe('failed')
+        ->and(json_encode($run->fresh()->report, JSON_THROW_ON_ERROR))->not->toContain('Do not retain this provider payload.')
+        ->and($jev->requests)->toHaveCount(1);
 })->with([
-    'provider error' => [['error' => 'Do not retain this provider payload.'], 503, 'provider_error'],
-    'malformed response' => [['answers' => 'bad response'], 200, 'invalid_response'],
-    'low confidence' => [adviceResponse('retry', 0.5), 200, 'low_confidence'],
+    'provider error' => [new RuntimeException('Do not retain this provider payload.'), 'provider_error'],
+    'no answer' => [null, 'invalid_answer'],
+    'malformed answer' => [new ChoiceClassification('retry', ['continue' => 'bad', 'retry' => 1, 'stop' => 0, 'needs_review' => 0], 0.9), 'invalid_answer'],
+    'low confidence' => [jevChoice('retry', confidence: 0.5), 'low_confidence'],
 ]);
 
 it('falls back after a provider connection failure without retrying the request', function (): void {
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::failedConnection()]);
+    $jev = fakeJev(new ConnectionException('cURL error 7: Failed to connect'));
     $task = adviceTask();
     adviceRun($task);
 
     $result = app(RecommendTaskNextStep::class)->handle($task->id);
 
     expect($result['status'])->toBe('fallback')
-        ->and($result['provider']['reason'])->toBe('connection_failed')
-        ->and($result['next_action'])->toBe('inspect');
+        ->and($result['provider']['reason'])->toBe('provider_error')
+        ->and($result['next_action'])->toBe('inspect')
+        ->and($jev->requests)->toHaveCount(1);
 });
 
 it('returns current guidance without persisting into a running report', function (): void {
@@ -228,12 +242,12 @@ it('does not persist advice into an attempt with an unrecognized status', functi
 it('discards a provider answer if the task starts a new attempt during the request', function (): void {
     $task = adviceTask();
     $previous = adviceRun($task);
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => function () use ($task) {
+    $jev = fakeJev(function () use ($task): ChoiceClassification {
         $task->update(['status' => 'running']);
         adviceRun($task, 'running', ['phase' => 'generation']);
 
-        return Http::response(adviceResponse());
-    }]);
+        return jevChoice('retry');
+    });
 
     $result = app(RecommendTaskNextStep::class)->handle($task->id);
 
@@ -244,18 +258,18 @@ it('discards a provider answer if the task starts a new attempt during the reque
         ->and($result['persisted'])->toBeFalse()
         ->and($result['observed']['attempt_count'])->toBe(2)
         ->and($previous->fresh()->report)->not->toHaveKey('advice')
-        ->and($task->runs()->reorder()->latest()->orderByDesc('id')->first()->report)->not->toHaveKey('advice');
-    Http::assertSentCount(1);
+        ->and($task->runs()->reorder()->latest()->orderByDesc('id')->first()->report)->not->toHaveKey('advice')
+        ->and($jev->requests)->toHaveCount(1);
 });
 
 it('uses the current nickname in a recommended command after a rename during evaluation', function (): void {
     $task = adviceTask();
     adviceRun($task);
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => function () use ($task) {
+    fakeJev(function () use ($task): ChoiceClassification {
         app(NameTask::class)->handle($task->id, 'renamed-check');
 
-        return Http::response(adviceResponse());
-    }]);
+        return jevChoice('retry');
+    });
 
     $result = app(RecommendTaskNextStep::class)->handle($task->id);
 
@@ -265,7 +279,7 @@ it('uses the current nickname in a recommended command after a rename during eva
 });
 
 it('does not append stale advice when run evidence changes just before persistence', function (): void {
-    config(['molly.typesafe.enabled' => false]);
+    config(['molly.jev.enabled' => false]);
     $task = adviceTask();
     $run = adviceRun($task);
     $event = 'eloquent.retrieved: '.Run::class;
@@ -291,17 +305,17 @@ it('keeps a usable provider recommendation when another advice request finishes 
     $task = adviceTask();
     $run = adviceRun($task);
     $report = $run->report;
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => function () use ($task) {
-        config(['molly.typesafe.enabled' => false]);
+    $jev = fakeJev(function () use ($task): ChoiceClassification {
+        config(['molly.jev.enabled' => false]);
         try {
             $earlier = app(RecommendTaskNextStep::class)->handle($task->id);
             expect($earlier['persisted'])->toBeTrue()->and($earlier['status'])->toBe('fallback');
         } finally {
-            config(['molly.typesafe.enabled' => true]);
+            config(['molly.jev.enabled' => true]);
         }
 
-        return Http::response(adviceResponse());
-    }]);
+        return jevChoice('retry');
+    });
 
     $result = app(RecommendTaskNextStep::class)->handle($task->id);
 
@@ -311,12 +325,12 @@ it('keeps a usable provider recommendation when another advice request finishes 
         ->and($result['persisted'])->toBeTrue()
         ->and(json_encode($run->fresh()->report, JSON_THROW_ON_ERROR))->toBe(json_encode([...$report, 'advice' => $result], JSON_THROW_ON_ERROR))
         ->and($task->fresh()->status)->toBe('failed')
-        ->and($task->runs()->count())->toBe(1);
-    Http::assertSentCount(1);
+        ->and($task->runs()->count())->toBe(1)
+        ->and($jev->requests)->toHaveCount(1);
 });
 
 it('replaces advice saved just before persistence while preserving all other run evidence', function (): void {
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(adviceResponse())]);
+    $jev = fakeJev(jevChoice('retry'));
     $task = adviceTask();
     $run = adviceRun($task);
     $report = [...$run->report, 'metadata' => ['retain' => 'This metadata is part of the saved report.']];
@@ -339,12 +353,12 @@ it('replaces advice saved just before persistence while preserving all other run
         ->and($result['persisted'])->toBeTrue()
         ->and($result['next_action'])->toBe('retry')
         ->and(json_encode($run->fresh()->report, JSON_THROW_ON_ERROR))->toBe(json_encode([...$report, 'advice' => $result], JSON_THROW_ON_ERROR))
-        ->and($run->fresh()->status)->toBe('failed');
-    Http::assertSentCount(1);
+        ->and($run->fresh()->status)->toBe('failed')
+        ->and($jev->requests)->toHaveCount(1);
 });
 
 it('returns JSON advice and readable terminal guidance without executing the recommendation', function (): void {
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(adviceResponse())]);
+    fakeJev(jevChoice('retry'));
     $task = adviceTask();
     $run = adviceRun($task);
 
@@ -358,19 +372,20 @@ it('returns JSON advice and readable terminal guidance without executing the rec
         ->and($task->runs()->count())->toBe(1);
 
     $this->artisan('molly:advice', ['task' => 'health-check'])
-        ->expectsOutputToContain('TypeSafe recommends another bounded attempt.')
+        ->expectsOutputToContain('Jev recommends another bounded attempt.')
         ->expectsOutputToContain('Next command: php artisan molly:retry health-check')
         ->expectsOutputToContain('Advice does not start, retry, or stop a task.')
         ->assertSuccessful();
 });
 
-it('reports an unknown task without creating records or calling TypeSafe', function (): void {
+it('reports an unknown task without creating records or calling Jev', function (): void {
     $exit = Artisan::call('molly:advice', ['task' => 'missing', '--json' => true]);
     $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($exit)->toBe(1)
         ->and($result)->toBe(['task' => 'missing', 'status' => 'error', 'error' => 'TASK_NOT_FOUND: No saved task has that name or ID.'])
         ->and(Task::count())->toBe(0)
-        ->and(Run::count())->toBe(0);
+        ->and(Run::count())->toBe(0)
+        ->and($this->jev->requests)->toBe([]);
     Http::assertNothingSent();
 });

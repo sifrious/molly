@@ -442,7 +442,7 @@ final class BootstrapProjectKnowledgeGraphs
     /** @param  list<array<string, mixed>>  $units */
     private function allReady(array $units): bool
     {
-        return new GraphManifest(
+        return (new GraphManifest(
             schemaVersion: GraphManifest::SCHEMA_VERSION,
             projectPath: null,
             lockPath: null,
@@ -453,7 +453,7 @@ final class BootstrapProjectKnowledgeGraphs
             units: $units,
             updatedAt: null,
             path: null,
-        )->allReady();
+        ))->allReady();
     }
 
     /**

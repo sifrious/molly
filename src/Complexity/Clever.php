@@ -11,7 +11,7 @@ use Sifrious\Molly\Complexity\Probes\ProbeResult;
 use Sifrious\Molly\Complexity\Report\ReportWriter;
 use Sifrious\Molly\Complexity\Support\CleverConfig;
 
-final class Clever
+final class Clever implements ComplexityScanner
 {
     public function __construct(
         private readonly Application $app,

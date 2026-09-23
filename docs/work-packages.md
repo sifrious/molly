@@ -65,6 +65,25 @@ In progress elsewhere:
 
 Classification work for MOL-WP-09 uses the MME-5249 / MME-5252 family plus the file-level Jev / Laravel AI migration epics MME-5545 through MME-5575. Those epics cover Composer require, config, classification seams, agent/commit-review call sites, docs, and focused proofs. Do not invent new IDs. Do not keep draft or direct-HTTP TypeSafe notes in this index.
 
+Jev file map (MME-5642). Every Jev production and test file has one owning ticket:
+
+| File | Owns | Ticket |
+| --- | --- | --- |
+| `config/molly.php` (`molly.jev`) | Single default-off gate setting and policy | MME-5633 |
+| `src/Classification/JevGate.php` | One authoritative gate: disabled / unavailable / unconfigured / ready | MME-5633 |
+| `src/Classification/ChoiceClassifier.php`, `src/Classification/ChoiceClassification.php` | Molly-owned single-choice seam and typed answer | MME-5641 |
+| `src/Classification/LaravelAiChoiceClassifier.php` | The only Laravel AI classification call (`Lab::TypeSafe`) | MME-5200 |
+| `src/Classification/DetectLaravelAiClassification.php` | Exact-surface capability detection, version for provenance only | MME-5200 |
+| `src/Classification/ResolveClassificationAdapter.php`, `LaravelAiClassificationAdapter.php`, `FallbackClassificationAdapter.php`, `ClassifyRunEvidence.php`, `ClassificationDecision.php` | Run-evidence classification behind the gate; deterministic follow-up stays authoritative | MME-5641 |
+| `src/Actions/EvaluateWithTypeSafe.php` | Shared evaluation contract for advice, planning, and commit review | MME-5641 |
+| `src/Actions/RecommendTaskNextStep.php`, `src/Actions/SuggestPlanReview.php`, `src/Actions/ReviewCommit.php` | Consumers that project the shared result without transport-specific behavior | MME-5637 |
+| `src/Http/PlanController.php`, `src/Console/MollyAdviceCommand.php`, `src/Console/MollyReviewCommitCommand.php`, `src/Mcp/MollyTask.php`, `src/Mcp/MollyPlan.php`, `resources/views/advice.blade.php`, `resources/views/plan.blade.php` | Transports asking the gate and rendering the same states | MME-5637 |
+| `tests/Unit/Classification/JevGateTest.php`, `tests/Feature/JevContractTest.php`, `tests/Support/FakeChoiceClassifier.php` | Truth-table proofs through Molly's seam in every lane | MME-5633 |
+| `tests/Feature/TypeSafeEvaluationTest.php`, `tests/Unit/ClassificationAdapterTest.php`, `tests/Unit/Classification/DetectLaravelAiClassificationTest.php` | Live convergence proofs with `Classification::fake()` on the accepted Laravel AI commit | MME-5200 |
+| `tests/Feature/TaskAdviceTest.php`, `TaskAdviceInterfacesTest.php`, `PlanningInterfacesTest.php`, `CommitReviewTest.php`, `McpToolsTest.php` | Transport parity for advice, planning, and commit review | MME-5637 |
+| `.github/workflows/tests.yml` (`jev` lane) | Exact-commit Laravel AI verification lane | MME-5544 |
+| `docs/reference/configuration.md` ("Jev states"), `docs/agents.md` | Documented truth table and agent rules | MME-5637 |
+
 Release gate for Jev: ship only against a tagged `laravel/ai` release that includes the public classification / TypeSafe provider seam (PR #1049). Convergence proof stays: `Classification::fake()`, `Classification::assertClassified()`, and `Classification::assertNothingClassified()` in Molly tests — never a duplicated provider wire protocol. `MOLLY_JEV_ENABLED=false` is the default and performs no classification.
 
 MME-5255 is Burdgen-specific and out of this Molly-only path. Penelope (MME-5144) and Bud (MME-5145) stay deferred.

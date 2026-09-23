@@ -29,10 +29,10 @@ class MollyAdviceCommand extends Command
                     ['Recommended action', ucfirst($advice['next_action'])],
                     ['Retry allowed', $advice['retry_allowed'] ? 'Yes' : 'No'],
                     ['Attempts used', $advice['observed']['attempt_count'].' / '.($advice['observed']['max_attempts'] ?? 'Invalid limit')],
-                    ['TypeSafe', ucfirst(str_replace('_', ' ', $advice['provider']['status']))],
+                    ['Jev', ucfirst(str_replace('_', ' ', $advice['provider']['status']))],
                 ]);
                 if ($advice['confidence'] !== null) {
-                    note('TypeSafe confidence: '.$advice['confidence'].'. Required threshold: '.($advice['provider']['threshold'] ?? 'Not configured').'.');
+                    note('Jev confidence: '.$advice['confidence'].'. Required threshold: '.($advice['provider']['threshold'] ?? 'Not configured').'.');
                 }
                 if ($advice['command'] !== null) {
                     note('Next command: '.$advice['command']);

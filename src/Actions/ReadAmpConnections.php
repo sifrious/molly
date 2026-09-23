@@ -243,7 +243,12 @@ class ReadAmpConnections
         } catch (Throwable) {
             return ['status' => 'unavailable', 'reason' => 'AMP_PROCESS_UNAVAILABLE: Molly could not run the Amp executable.', 'output' => ''];
         } finally {
-            $process?->stop(0.1);
+            // Best-effort cleanup: Laravel 12 fakes do not implement stop(), and a
+            // failed stop must never replace the result already decided above.
+            try {
+                $process?->stop(0.1);
+            } catch (Throwable) {
+            }
         }
     }
 

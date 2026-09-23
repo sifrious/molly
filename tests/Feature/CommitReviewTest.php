@@ -39,16 +39,18 @@ it('only sends staged PHP changes while excluding environment and dependency fil
     File::put($this->commitWorkspace.'/vendor/example/Private.php', '<?php // DO_NOT_SEND');
     File::put($this->commitWorkspace.'/note.txt', 'DO_NOT_SEND');
     Process::path($this->commitWorkspace)->run(['git', 'add', '.']);
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(['model' => 'jev-latest', 'answers' => ['next_action' => ['type' => 'choice', 'choice' => 'continue', 'confidence' => .95, 'probabilities' => ['continue' => .9, 'retry' => .04, 'stop' => .01, 'needs_review' => .05]]]])]);
+    $jev = fakeJev(jevChoice('continue', confidence: 0.95));
 
     $report = app(ReviewCommit::class)->handle($this->commitWorkspace, staged: true);
 
-    expect($report['evaluation']['status'])->toBe('evaluated')->and($report['evaluation']['next_action'])->toBe('continue');
-    Http::assertSent(fn ($request) => str_contains($request['state']['review']['diff'], 'return true;')
-        && ! str_contains(json_encode($request['state']), 'DO_NOT_SEND')
-        && $request['state']['verification']['tests'] === 'not_run'
-        && count($request['state']['review']['citations']) === 3);
+    $state = $jev->state();
+    expect($report['evaluation']['status'])->toBe('evaluated')->and($report['evaluation']['next_action'])->toBe('continue')
+        ->and($jev->requests)->toHaveCount(1)
+        ->and($state['review']['diff'])->toContain('return true;')
+        ->and(json_encode($state))->not->toContain('DO_NOT_SEND')
+        ->and($state['verification']['tests'])->toBe('not_run')
+        ->and($state['review']['citations'])->toHaveCount(3);
+    Http::assertNothingSent();
 });
 
 it('reviews PHP changes introduced by a merge against its first parent', function () {
@@ -61,17 +63,19 @@ it('reviews PHP changes introduced by a merge against its first parent', functio
     foreach ([['git', 'add', '.'], ['git', 'commit', '-qm', 'Add existing behavior'], ['git', 'merge', '--no-ff', 'feature', '-m', 'Merge the feature']] as $command) {
         expect(Process::path($this->commitWorkspace)->run($command)->successful())->toBeTrue();
     }
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
-    Http::fake(['https://api.typesafe.ai/v1/systemone' => Http::response(['model' => 'jev-latest', 'answers' => ['next_action' => ['type' => 'choice', 'choice' => 'continue', 'confidence' => .95, 'probabilities' => ['continue' => .9, 'retry' => .04, 'stop' => .01, 'needs_review' => .05]]]])]);
+    $jev = fakeJev(jevChoice('continue', confidence: 0.95));
 
     $report = app(ReviewCommit::class)->handle($this->commitWorkspace);
 
+    $state = $jev->state();
     expect($report['evaluation']['status'])->toBe('evaluated')
         ->and($report['diff_check']['status'])->toBe('failed')
-        ->and($report['diff_check']['output'])->toContain('app/Merged.php', 'trailing whitespace');
-    Http::assertSent(fn ($request) => str_contains($request['state']['review']['diff'], "return 'merged';")
-        && ! str_contains($request['state']['review']['diff'], 'already present')
-        && $request['state']['verification']['diff_check'] === 'failed');
+        ->and($report['diff_check']['output'])->toContain('app/Merged.php', 'trailing whitespace')
+        ->and($jev->requests)->toHaveCount(1)
+        ->and($state['review']['diff'])->toContain("return 'merged';")
+        ->and($state['review']['diff'])->not->toContain('already present')
+        ->and($state['verification']['diff_check'])->toBe('failed');
+    Http::assertNothingSent();
 });
 
 it('keeps whitespace failure visible even when semantic evaluation is disabled', function () {
@@ -85,10 +89,10 @@ it('keeps whitespace failure visible even when semantic evaluation is disabled',
 });
 
 it('does not send a staged empty diff for semantic review', function () {
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
+    $jev = fakeJev(jevChoice('continue'));
     $report = app(ReviewCommit::class)->handle($this->commitWorkspace, staged: true);
 
-    expect($report['evaluation']['reason'])->toBe('no_php_changes')->and($report['diff_bytes'])->toBe(0);
+    expect($report['evaluation']['reason'])->toBe('no_php_changes')->and($report['diff_bytes'])->toBe(0)->and($jev->requests)->toBe([]);
     Http::assertNothingSent();
 });
 
@@ -105,9 +109,32 @@ it('rejects a large diff instead of silently omitting evidence', function () {
     Http::assertNothingSent();
 });
 
-it('rejects ambiguous command scope and reports unavailable Jev as a failure when enabled', function () {
+it('rejects ambiguous command scope and reports unavailable or unconfigured Jev as a failure when enabled', function () {
     $this->artisan('molly:review-commit', ['ref' => 'HEAD', '--staged' => true, '--json' => true])->assertExitCode(1);
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => null]);
+
+    $jev = fakeJev(jevChoice('continue'), available: false);
     $this->artisan('molly:review-commit', ['--workspace' => $this->commitWorkspace, '--json' => true])->assertExitCode(1);
+    expect(app(ReviewCommit::class)->handle($this->commitWorkspace)['evaluation'])
+        ->toMatchArray(['status' => 'unavailable', 'reason' => 'capability_missing', 'next_action' => null, 'confidence' => null])
+        ->and($jev->requests)->toBe([]);
+
+    $jev = fakeJev(jevChoice('continue'));
+    config(['ai.providers.typesafe.key' => null]);
+    $this->artisan('molly:review-commit', ['--workspace' => $this->commitWorkspace, '--json' => true])->assertExitCode(1);
+    expect(app(ReviewCommit::class)->handle($this->commitWorkspace)['evaluation'])
+        ->toMatchArray(['status' => 'needs_review', 'reason' => 'invalid_config', 'next_action' => 'needs_review'])
+        ->and($jev->requests)->toBe([]);
     Http::assertNothingSent();
+});
+
+it('keeps a deterministic diff failure authoritative over an evaluated continue', function () {
+    File::put($this->commitWorkspace.'/app/Flag.php', "<?php return true;   \n");
+    Process::path($this->commitWorkspace)->run(['git', 'add', 'app/Flag.php']);
+    $jev = fakeJev(jevChoice('continue', confidence: 0.99));
+
+    $report = app(ReviewCommit::class)->handle($this->commitWorkspace, staged: true);
+
+    expect($report['evaluation']['status'])->toBe('evaluated')->and($report['evaluation']['next_action'])->toBe('continue')
+        ->and($report['diff_check']['status'])->toBe('failed')->and($jev->requests)->toHaveCount(1);
+    $this->artisan('molly:review-commit', ['--workspace' => $this->commitWorkspace, '--staged' => true, '--json' => true])->assertExitCode(1);
 });

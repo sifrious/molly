@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CheckEnvironment;
+use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Execution\SandboxCapability;
 
 it('records sandbox capability on the local execution target snapshot', function () {
@@ -30,4 +33,26 @@ it('refuses the safe workflow when this host cannot isolate writer and verifier 
 
     expect(fn () => $capability->refuseSafeWorkflow())
         ->toThrow(RuntimeException::class, 'SANDBOX_UNAVAILABLE');
+});
+
+it('grants the verifier read access to the project that really owns the workspace vendor directory', function () {
+    $root = sys_get_temp_dir().'/molly-sandbox-policy-'.Str::uuid();
+    File::ensureDirectoryExists($root.'/project/vendor/bin');
+    File::ensureDirectoryExists($root.'/project/tests');
+    File::ensureDirectoryExists($root.'/workspace');
+    File::put($root.'/project/vendor/autoload.php', '<?php');
+    File::put($root.'/project/vendor/bin/pest', '<?php');
+    symlink($root.'/project/vendor', $root.'/workspace/vendor');
+
+    try {
+        $method = new ReflectionMethod(Sandbox::class, 'readPaths');
+        $paths = $method->invoke(app(Sandbox::class), $root.'/workspace', [PHP_BINARY, $root.'/workspace/vendor/bin/pest']);
+
+        expect($paths)->toContain(realpath($root.'/workspace'))
+            ->and($paths)->toContain(realpath($root.'/project/vendor'))
+            ->and($paths)->toContain(realpath($root.'/project'))
+            ->and($paths)->not->toContain(realpath($root));
+    } finally {
+        File::deleteDirectory($root);
+    }
 });

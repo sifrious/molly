@@ -218,17 +218,22 @@ it('lists saved plans and links back to their review', function (): void {
     $this->get('/molly/plans/'.$plan->id)->assertOk()->assertSee(route('molly.plans.index'), false);
 });
 
-it('requires configured TypeSafe before exposing or requesting a Jev suggestion', function (): void {
+it('requires an open, capable, and configured Jev gate before exposing or requesting a suggestion', function (Closure $arrange): void {
+    $arrange();
     $plan = app(CreatePlan::class)->handle('Review the household planner.');
     $suggest = Mockery::mock(SuggestPlanReview::class);
     $suggest->shouldNotReceive('handle');
     $this->app->instance(SuggestPlanReview::class, $suggest);
-    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertDontSee('Ask Jev for a Tarpit suggestion')->assertSee('Jev suggestions are not configured. Guided review works offline.');
+    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertDontSee('Ask for a Tarpit suggestion')->assertSee('Jev classification is off or not configured');
     $this->post('/molly/plans/'.$plan->id.'/suggest')->assertForbidden();
-});
+})->with([
+    'disabled by default' => [fn () => expect(config('molly.jev.enabled'))->toBeFalse()],
+    'enabled without capability' => [fn () => fakeJev(available: false)],
+    'enabled without credential' => [fn () => tap(fakeJev(), fn () => config(['ai.providers.typesafe.key' => '']))],
+]);
 
 it('shows Jev needs review results without changing saved answers', function (): void {
-    config(['molly.typesafe.enabled' => true, 'molly.typesafe.api_key' => 'test-key']);
+    fakeJev();
     $plan = app(CreatePlan::class)->handle('Review the household planner.');
     $result = ['status' => 'needs_review', 'reason' => 'low_confidence', 'answers_at_evaluation' => [], 'sources' => []];
     $this->mock(SuggestPlanReview::class)->shouldReceive('handle')->once()
@@ -238,9 +243,9 @@ it('shows Jev needs review results without changing saved answers', function ():
 
             return $result;
         });
-    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertSee('Ask Jev for a Tarpit suggestion');
+    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertSee('Ask for a Tarpit suggestion');
     $this->post('/molly/plans/'.$plan->id.'/suggest')->assertRedirect(route('molly.plans.show', $plan->id));
-    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertSee('needs_review')->assertSee('low_confidence')->assertDontSee('No model has evaluated the project.')->assertDontSee('Jev suggestions are not configured.');
+    $this->get('/molly/plans/'.$plan->id)->assertOk()->assertSee('needs_review')->assertSee('low_confidence')->assertDontSee('No model has evaluated the project.')->assertDontSee('Jev classification is off or not configured');
     expect($plan->refresh()->answers)->toBe([])->and(Task::count())->toBe(0);
 });
 
