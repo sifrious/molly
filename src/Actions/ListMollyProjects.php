@@ -7,7 +7,7 @@ use Sifrious\Molly\Projects\ProjectRegistry;
 
 final class ListMollyProjects
 {
-    public function __construct(private ProjectRegistry $registry = new ProjectRegistry) {}
+    public function __construct(private ProjectRegistry $registry) {}
 
     /** @return list<MollyProject> */
     public function handle(): array
