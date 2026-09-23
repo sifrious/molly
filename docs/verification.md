@@ -150,7 +150,7 @@ Read [Component snapshots](component-snapshots.md) for the exact behavior.
 
 The required Pest test is protected by default. A proposal that changes it is rejected before application. Molly also fails the run if the test digest changes on disk.
 
-Writer and Pest processes run in a Landlock sandbox with a network namespace when the host supports it. `molly:doctor` reports that as the Sandbox check. Pest still executes PHP, so keep the workspace disposable. Use Pest 4.7.6 or newer in the workspace: Pest 4.7.0 through 4.7.5 bootstrap a test-impact-analysis plugin that writes outside the allowed paths, so the sandboxed run reports `failed` instead of producing JUnit evidence.
+Writer and Pest processes run in a Landlock sandbox with a network namespace when the host supports it. `molly:doctor` reports that as the Sandbox check. Pest still executes PHP, so keep the workspace disposable.
 
 Set `molly.sandbox.allow_unsafe` only for local diagnostics. That override is conspicuous, local-only, and excluded from release evidence.
 
