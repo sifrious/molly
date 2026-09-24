@@ -1,7 +1,6 @@
 ---
 layout: default
 title: Molly documentation
-permalink: /overview.html
 ---
 
 # Molly documentation
