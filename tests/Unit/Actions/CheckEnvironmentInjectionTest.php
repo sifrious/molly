@@ -1,10 +1,11 @@
 <?php
 
 use Sifrious\Molly\Actions\CheckEnvironment;
+use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
 
-it('injects Sandbox and Clever into CheckEnvironment', function () {
+it('injects Sandbox, Clever, and the Jev gate into CheckEnvironment', function () {
     $action = app(CheckEnvironment::class);
     $r = new ReflectionClass($action);
 
@@ -13,6 +14,10 @@ it('injects Sandbox and Clever into CheckEnvironment', function () {
     $clever = $r->getProperty('clever');
     $clever->setAccessible(true);
 
+    $jev = $r->getProperty('jev');
+    $jev->setAccessible(true);
+
     expect($sandbox->getValue($action))->toBeInstanceOf(Sandbox::class)
-        ->and($clever->getValue($action))->toBeInstanceOf(Clever::class);
+        ->and($clever->getValue($action))->toBeInstanceOf(Clever::class)
+        ->and($jev->getValue($action))->toBeInstanceOf(JevGate::class);
 });

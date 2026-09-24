@@ -116,6 +116,7 @@ it('checks actual PHP process group capabilities only for parallel execution', f
 $app = Orchestra\Testbench\Foundation\Application::create(options: ['extra' => ['dont-discover' => ['*']]]);
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
+$app->register(Sifrious\Molly\MollyServiceProvider::class);
 $kernel->registerCommand(new Sifrious\Molly\Console\MollyDoctorCommand);
 Illuminate\Support\Facades\Http::preventStrayRequests();
 config(['molly.parallel_checks' => $argv[1] === 'parallel', 'molly.model' => '']);
@@ -398,4 +399,27 @@ it('labels unreachable Ollama separately from config and missing-model failures'
         ->and($codes)->not->toContain('model_missing')
         ->and($checks['ollama_unreachable']['message'])->toContain('http://127.0.0.1:11434')
         ->and($checks['ollama_unreachable']['message'])->toContain('different from a missing model');
+});
+
+it('reports the Jev gate state in doctor without ever treating an enabled but unusable gate as ready', function (): void {
+    Http::preventStrayRequests();
+    Http::fake();
+    config(['molly.model' => '']);
+    $code = fn (): array => array_column(app(CheckEnvironment::class)->handle(__DIR__.'/../..')['checks'], null, 'name')['Jev'];
+
+    expect($code())->toMatchArray(['status' => 'passed', 'code' => 'jev_disabled']);
+
+    $jev = fakeJev(available: false);
+    expect($code())->toMatchArray(['status' => 'failed', 'code' => 'jev_capability_missing']);
+
+    $jev = fakeJev();
+    config(['ai.providers.typesafe.key' => null]);
+    expect($code())->toMatchArray(['status' => 'failed', 'code' => 'jev_unconfigured']);
+
+    fakeJev();
+    $check = $code();
+    expect($check)->toMatchArray(['status' => 'passed', 'code' => 'jev_ready'])
+        ->and($check['message'])->toContain('jev-latest')
+        ->and($jev->requests)->toBe([]);
+    Http::assertNothingSent();
 });
