@@ -219,7 +219,7 @@ class Workspace
                 $absolute = $this->resolve($edit['path']);
                 $attempted[] = $edit['path'];
                 File::ensureDirectoryExists(dirname($absolute));
-                File::replace($absolute, $edit['content']);
+                File::replace($absolute, $edit['content'], is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
                 if (File::get($absolute) !== $edit['content']) {
                     throw new RuntimeException('The file does not match the proposed contents.');
                 }
@@ -284,7 +284,7 @@ class Workspace
                         throw new RuntimeException('Could not remove the new file.');
                     }
                 } else {
-                    File::replace($absolute, $before[$path]);
+                    File::replace($absolute, $before[$path], is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
                     if (File::get($absolute) !== $before[$path]) {
                         throw new RuntimeException('Could not restore the original contents.');
                     }
