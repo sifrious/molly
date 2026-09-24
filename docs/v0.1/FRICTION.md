@@ -5,6 +5,8 @@ title: v0.1 Friction — Ollama QuickStart
 
 # v0.1 Friction notes (Ollama QuickStart)
 
+> **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 Known sharp edges for tonight’s local Ollama path. Pair with [QUICKSTART](QUICKSTART.md) and [Troubleshooting](../troubleshooting.md).
 
 ## Doctor: unreachable vs missing model

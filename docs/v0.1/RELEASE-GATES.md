@@ -1,5 +1,7 @@
 # Release gates (MME-5399)
 
+> **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 Mac-local preferred evidence: `./bin/molly-release-gates`.
 
 ## Composer lock

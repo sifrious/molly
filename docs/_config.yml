@@ -1,5 +1,5 @@
 title: Molly
-description: Run local coding tasks, check the result, and review the complexity of each change.
+description: A local-first Laravel coding agent. The model can propose the work. Evidence decides whether the work is done.
 url: https://sifrious.github.io
 baseurl: /molly
 repository: sifrious/molly
@@ -21,16 +21,20 @@ defaults:
 navigation:
   - title: Start here
     pages:
-      - title: Overview
+      - title: Home
         url: /
+      - title: Documentation overview
+        url: /overview.html
       - title: Getting started
         url: /getting-started.html
-      - title: QuickStart — Ollama
+      - title: QuickStart — standalone
+        url: /quickstart-standalone.html
+      - title: QuickStart — with Bloom
+        url: /quickstart-bloom.html
+      - title: Local Ollama details
         url: /ollama-quickstart.html
-      - title: v0.1 QUICKSTART
-        url: /v0.1/QUICKSTART.html
-      - title: v0.1 FRICTION
-        url: /v0.1/FRICTION.html
+      - title: Compatibility
+        url: /compatibility.html
       - title: Tasks and retries
         url: /tasks.html
       - title: Planning

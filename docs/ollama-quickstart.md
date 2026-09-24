@@ -5,15 +5,15 @@ title: QuickStart — Ollama
 
 # QuickStart: Ollama
 
-Use this path when you want Molly running against a **local** model with **no paid AI account**.
+Use this page for the details of running Molly against a **local** model with **no paid AI account**. The shortest path is the [standalone QuickStart](quickstart-standalone.md), which uses the same commands. Bloom is not required.
 
 Ollama is Molly’s recommended local default. It is not a hard dependency. Amp and hosted providers stay optional and never run unless you configure them.
 
-Molly orchestrates the task and verification. Laravel AI talks to Ollama. Bloom (optional) is only the workspace/UI host. Orbs are optional remote local targets — see [Execution targets](execution-targets.md) for planned behavior; tonight’s QuickStart is loopback Ollama on your machine.
+Molly orchestrates the task and verification. Laravel AI talks to Ollama. Bloom (optional) is only the workspace/UI host. Remote Orb execution is planned, not shipped. See [Execution targets](execution-targets.md). This QuickStart uses loopback Ollama on your machine.
 
 ## Copy-paste first run
 
-From a Laravel 12/13 app with Pest 4:
+From a Laravel 12 or 13 app with Pest installed (see [Compatibility](compatibility.md)):
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
@@ -120,7 +120,7 @@ Per-run model override stays a config/profile concern — do not edit loop code 
 
 ## 8. Ollama on an Orb or another machine
 
-Tonight’s supported QuickStart is **loopback**. Pointing Molly at Ollama on another host or an Orb is policy/config work (LAN URL, Orb capability ads) and is covered in [Execution targets](execution-targets.md) / Orb docs as those land. Do not weaken the loopback safety check for casual remote URLs.
+The supported QuickStart is **loopback**. Pointing Molly at Ollama on another host or an Orb is policy/config work (LAN URL, Orb capability ads) and is planned work described in [Execution targets](execution-targets.md). Do not weaken the loopback safety check for casual remote URLs.
 
 ## 9. Troubleshoot
 
@@ -151,5 +151,5 @@ Keep that gate off for the local path. Enabling Jev is a separate advanced step 
 - **Molly** — task scope, Pest/Tarpit verification, receipts, completion gate.
 - **Laravel AI** — provider transport to Ollama (and optional classification when Jev is explicitly enabled).
 - **Bloom** — optional desktop/workspace host, not the model.
-- **Orb** — optional local execution target advertising capabilities.
+- **Orb** — planned remote execution target. Not shipped.
 - **Jev / TypeSafe** — optional advanced classification path; off by default and not part of QuickStart.

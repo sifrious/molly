@@ -75,3 +75,20 @@ Also test navigation, code blocks, keyboard access, and the 404 page.
 A documentation content rollback is a normal Git revert followed by a successful Pages build.
 
 If the custom hostname must be retired, remove its routing record and restore the default Pages configuration in a coordinated change.
+
+## Switching public docs to v1
+
+Public install lines stay on the current tagged 0.1 constraint until every item below is true. Do not publish `sifrious/molly:^1.0` before then.
+
+1. The `v1.0.0` tag exists on `main`.
+2. Composer resolves `sifrious/molly:^1.0` from the documented source, Packagist or the public VCS repository.
+3. Fresh Laravel 12 and 13 consumers install `^1.0` and complete the standalone demo flow and a Bloom contract export.
+4. The published docs site serves the updated pages and every link resolves.
+
+Then update these together in one change:
+
+- `InitializeMollyInExistingProject::RELEASE_CONSTRAINT` and the `MOLLY_CONSTRAINT` default in `bin/molly-demo` (a test keeps them equal)
+- The install lines in `README.md`, `docs/index.html`, `docs/quickstart-standalone.md`, `docs/ollama-quickstart.md`, and `docs/troubleshooting.md`
+- The tagged `bin/molly-demo` download URL in `README.md` and `docs/getting-started.md`
+- The supported-versions table in `SECURITY.md`
+- The repository line, if Packagist now lists the package

@@ -82,6 +82,10 @@ fi
 
 echo "Installing Pest (Molly needs it) …"
 composer config allow-plugins.pestphp/pest-plugin true
+# Laravel 12 pins phpunit/phpunit ^11 in the app; Pest 4 needs PHPUnit 12.
+if grep -q '"phpunit/phpunit"' composer.json; then
+  composer remove --dev phpunit/phpunit --no-interaction
+fi
 composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies --no-interaction
 
 echo "Installing Molly ${MOLLY_CONSTRAINT} …"
@@ -104,13 +108,25 @@ php artisan molly:demo --no-interaction
 
 cat <<EOF
 
-Molly demo is ready in:
+Molly is ready in:
   $TARGET
 
-Next steps:
-1. Open this folder in Bloom with “Open existing branch…” (Molly does not create a Bloom worktree).
-2. Check setup:  php artisan molly:doctor
-3. Start the demo: php artisan molly:start demo-greeting
+Standalone (no Bloom required):
+1. cd "$TARGET"
+2. Choose a local model: ollama pull qwen2.5-coder:7b
+   php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+3. Check setup:    php artisan molly:doctor
+   Doctor reports whether this host can sandbox the writer and verifier.
+   macOS usually cannot. Read the sandbox section of
+   https://github.com/sifrious/molly/blob/main/docs/troubleshooting.md
+4. Start the demo: php artisan molly:start demo-greeting
+
+Optional Bloom workflow:
+Open this project and branch in Bloom with "Open existing branch…", then export
+a Molly Bloom contract using the workspace UUID, branch, and merge-base SHA that
+Bloom shows:
+  php artisan molly:bloom-contract demo-greeting --workspace-id=… --branch=… --base-sha=…
+Molly does not create a Bloom worktree.
 
 Installed constraint: ${MOLLY_CONSTRAINT}
 No cloud was called. No Bloom install was added.

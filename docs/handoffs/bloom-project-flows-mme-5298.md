@@ -1,5 +1,7 @@
 # MME-5298 — New Molly project + Add to existing
 
+> **Historical.** This page records a Bloom project-flow handoff. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 ## Discovery
 
 - `molly:create` / `CreateTask` create tasks, not projects

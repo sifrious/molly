@@ -32,7 +32,9 @@ Common doctor codes:
 | --- | --- |
 | `migration_missing` | Review pending migrations, then run `php artisan migrate`. |
 | `database_unavailable` | Fix the host application's database connection. |
-| `pest_missing` | Install Pest 4 in the selected workspace. |
+| `pest_missing` | Install Pest in the selected workspace. See [Compatibility](compatibility.md) for tested versions. |
+| `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
+| `sandbox_unsafe_override` | The local diagnostics override is on. Do not use it for untrusted code. |
 | `amp_unavailable` | Check `amp usage` and Amp login. |
 | `parallel_process_groups_unavailable` | Install POSIX support or set `parallel_checks` to `false`. |
 | `model_not_configured` | Set `MOLLY_LOCAL_MODEL` to a model from `ollama list`. |
@@ -56,7 +58,36 @@ composer show laravel/framework
 composer check-platform-reqs
 ```
 
-Molly currently requires PHP 8.3 or later and Laravel 12 or 13. Install a tagged release (`^0.1.1`).
+Molly currently requires PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, never a development branch:
+
+```bash
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:^0.1.1
+```
+
+Molly is not listed on Packagist yet, so Composer needs the repository line. Without it, Composer reports that it cannot find `sifrious/molly`.
+
+## Sandbox unavailable
+
+Molly runs the writer and the Pest verifier inside a Landlock sandbox with Linux user and network namespaces when the host supports them. `molly:doctor` reports the result as the Sandbox check.
+
+| Signal | Meaning |
+| --- | --- |
+| Doctor `sandbox_unavailable` | The host has no Landlock or user and network namespaces. This is normal on macOS. |
+| `SANDBOX_UNAVAILABLE` from `molly:start` | Molly refused the safe workflow on this host. |
+| Doctor `sandbox_unsafe_override` | Someone set the local diagnostics override. |
+
+Run the safe workflow on a Linux host that supports those features.
+
+For diagnostics in a trusted checkout only, you can turn isolation off:
+
+```dotenv
+MOLLY_SANDBOX_ALLOW_UNSAFE=1
+```
+
+Then run `php artisan config:clear` and `php artisan molly:doctor`. Doctor reports `sandbox_unsafe_override`. Writer and Pest processes then run with your user's full permissions. Never use this for untrusted repositories or shared machines, and do not count runs made this way as release evidence.
+
+If `molly:start` already failed on the sandbox, the task is `failed`. Use `php artisan molly:retry TASK` after fixing the host rather than editing files by hand.
 
 ## Pest fails
 

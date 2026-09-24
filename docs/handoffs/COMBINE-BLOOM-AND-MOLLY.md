@@ -5,6 +5,8 @@ title: Handoff. Clone Bloom and finish the Molly loop
 
 # Handoff. Clone Bloom and finish the Molly loop
 
+> **Historical.** This page records a pre-release handoff for the unpublished Bloom adapter. Its references to an untagged package and `v0.1.0-alpha.1` predate the v0.1.x tags. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 Read this page first. Do not wait for Linear. Do not ask for Linear. Do not import Burdgen.
 
 ## Do not write a new Swift adapter

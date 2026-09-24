@@ -5,6 +5,8 @@ title: Work packages
 
 # Work packages
 
+> **Historical.** This page records the alpha backlog as it stood before the v0.1 tags. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](getting-started.md).
+
 Use this page to track Molly's alpha work without Linear. The IDs match GitHub branches, commits, and pull requests.
 
 Inspected Molly `main` at handoff: `ef7f234f8985d43b278a71a7bac9525d4ce29e56`.

@@ -18,9 +18,16 @@ use Sifrious\Molly\Projects\ProjectRegistry;
  * - Publishes `config/molly.php` only when the destination file does not exist
  * - Does not rewrite `.env` agent settings (that remains `molly:setup`)
  * - Registers the path in the shared `~/.molly/projects.json` index Bloom also reads
+ * - Requires a tagged release constraint, never a development branch
  */
 final class InitializeMollyInExistingProject
 {
+    /** The tagged release line the initializer installs. Keep in step with bin/molly-demo. */
+    public const RELEASE_CONSTRAINT = '^0.1.1';
+
+    /** Public VCS source used until sifrious/molly is listed on Packagist. */
+    public const REPOSITORY_URL = 'https://github.com/sifrious/molly';
+
     public function __construct(private ProjectRegistry $registry) {}
 
     /**
@@ -170,12 +177,32 @@ final class InitializeMollyInExistingProject
 
     private function composerRequire(string $root): void
     {
-        $result = Process::path($root)->timeout(600)->run([
-            'composer', 'require', '--dev', 'sifrious/molly:dev-main', '--no-interaction',
-        ]);
+        if (! $this->hasMollyRepository($root)) {
+            $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
+        }
+
+        $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+    }
+
+    /** @param  list<string>  $arguments */
+    private function composer(string $root, array $arguments): void
+    {
+        $result = Process::path($root)->timeout(600)->run(['composer', ...$arguments]);
         if (! $result->successful()) {
             throw new RuntimeException('COMPOSER_REQUIRE_FAILED: '.$this->processError($result->errorOutput().$result->output()));
         }
+    }
+
+    private function hasMollyRepository(string $root): bool
+    {
+        $composer = json_decode(File::get($root.'/composer.json'), true) ?: [];
+        foreach ((array) ($composer['repositories'] ?? []) as $repository) {
+            if (is_array($repository) && str_contains((string) ($repository['url'] ?? ''), 'github.com/sifrious/molly')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function publishConfig(string $root): bool

@@ -5,6 +5,8 @@ title: v0.1 Walkthrough — screenshots
 
 # v0.1 Walkthrough (screenshots)
 
+> **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 Companion to [QUICKSTART](QUICKSTART.md) and [FRICTION](FRICTION.md). CLI steps stay in QuickStart; images below show Molly’s **local web UI** after a demo task exists.
 
 **Bloom:** Bloom workspace/UI is out of this automated set. Treat Bloom-native steps as Manual.

@@ -1,5 +1,7 @@
 # MME-5297 — Bloom plugin host + Molly registration
 
+> **Historical.** This page records a Bloom plugin-host handoff. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 ## Branches
 
 - Bloom (local Spatie checkout): `tip/mme-5297-plugin-host` under `/Users/mme/gits/sifrious/bloom-spatie` @ `e03dd138` + tip commits

@@ -1,5 +1,7 @@
 # Stacks boundary map (MME-5352 Workstream 1)
 
+> **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 Date: 2026-09-21  
 Molly baseline: `1c875ad` (`sifrious/molly` main)  
 Extractor hosts (Studio, read-only — **not** runtime deps):

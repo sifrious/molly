@@ -3,61 +3,24 @@
 [![Package tests](https://github.com/sifrious/molly/actions/workflows/tests.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/tests.yml)
 [![HOL Guard](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml)
 
-Molly is a development tool for Laravel. Give it one small coding task, tell it which files it may edit, and give it a Pest test that must pass.
+**Yes, with receipts.** Molly is a local-first Laravel coding agent. The model can propose the work. Evidence decides whether the work is done.
 
-Molly asks an AI agent for the code change, then checks the result before it can complete the task.
+Give Molly one small task, the files it may edit, and a Pest test that must pass. It asks an AI agent for the change, then runs real verification before the task can complete.
 
-> Molly v0.1.x is tagged. Prefer `composer require sifrious/molly:^0.1.1` (Packagist when listed; otherwise public GitHub VCS).
+## Choose a path
 
-## QuickStart: Ollama
+| Path | What it is | Start here |
+| --- | --- | --- |
+| **Use Molly standalone** | Terminal-first Laravel workflow. No Bloom required. | [QuickStart: standalone](docs/quickstart-standalone.md) |
+| **Use Molly with Bloom** | Bloom owns the workspace and review UI. Molly owns verification and evidence. | [QuickStart: Molly + Bloom](docs/quickstart-bloom.md) |
 
-Recommended local path — **no paid AI account**. v0.1: [docs/v0.1/QUICKSTART.md · [Release gates](docs/v0.1/RELEASE-GATES.md)](docs/v0.1/QUICKSTART.md) · [FRICTION](docs/v0.1/FRICTION.md) · [WALKTHROUGH](docs/v0.1/WALKTHROUGH.md) · full guide: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
+Bloom is optional. Everything below works without it.
 
-```bash
-composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
-php artisan vendor:publish --tag=molly-config
-php artisan migrate
-ollama pull qwen2.5-coder:7b
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
-php artisan config:clear
-php artisan molly:doctor
-php artisan molly:run "Add a health endpoint" --file=routes/web.php --test=tests/Feature/ExampleTest.php
-```
+## Install
 
-Or scaffold the greeting demo: `php artisan molly:demo` then `php artisan molly:start demo-greeting`.
+You need PHP 8.3 or later, Laravel 12 or 13, Pest in the host app, Git, and a working database connection. See [Compatibility](docs/compatibility.md) for tested Pest versions.
 
-`qwen2.5-coder:7b` is a starter suggestion (roughly ~8 GB RAM). Any installed local Ollama model works via `MOLLY_LOCAL_MODEL`. Molly will not silently fall back to a hosted provider if Ollama is missing.
-
-## Start here
-
-### No Laravel app yet?
-
-One copy-paste path creates a fresh app, installs Molly, and scaffolds the greeting demo:
-
-```bash
-# Prefer a release-tagged script (no pipe-to-main):
-# curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
-# shasum -a 256 molly-demo  # compare to release notes checksum when published
-# chmod +x molly-demo && ./molly-demo
-```
-
-Or download the script and choose a folder:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
-bash molly-demo ~/molly-demo
-```
-
-That writes only under the chosen directory (default `~/molly-demo`). It refuses a path that already exists and is not empty unless you pass `--force`. It does not install Bloom or call cloud.
-
-Then open that folder in Bloom with **Open existing branch…**, run `php artisan molly:doctor`, and `php artisan molly:start demo-greeting`.
-
-### Already have a Laravel project?
-
-You need PHP 8.3 or later, Laravel 12 or 13, Pest 4, and a working database connection.
-
-Install Molly in a Laravel project:
+Molly is not listed on Packagist yet, so Composer installs the tagged release from the public GitHub repository:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
@@ -72,39 +35,46 @@ Add Molly's local files to `.gitignore`:
 .molly/
 ```
 
-Choose an agent.
+## QuickStart: local Ollama
 
-For local Ollama:
+No paid AI account needed:
 
 ```bash
 ollama pull qwen2.5-coder:7b
 php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
-```
-
-For Amp:
-
-```bash
-php artisan molly:setup --agent=amp
-amp mcp approve molly
-amp mcp doctor molly
-```
-
-Then check the setup:
-
-```bash
 php artisan config:clear
 php artisan molly:doctor
+php artisan molly:demo
+php artisan molly:start demo-greeting
 ```
 
-When Molly prints `Molly is ready.`, create your first task:
+Then inspect the result:
 
 ```bash
-php artisan molly:demo                   # Optional first greeting task
-php artisan molly:create
-php artisan molly:start TASK_NAME
+php artisan molly:task demo-greeting
+php artisan molly:show RUN_ID --verbose
+git diff
+vendor/bin/pest
 ```
 
-Read [Getting started](docs/getting-started.md) for a complete first task.
+`qwen2.5-coder:7b` is a starter suggestion that needs roughly 8 GB of free memory. Any local Ollama model works. Molly will not silently fall back to a hosted provider if Ollama is missing.
+
+Prefer Amp? Run `php artisan molly:setup --agent=amp`, then `amp mcp approve molly` and `amp mcp doctor molly`.
+
+`molly:doctor` also reports whether this host can sandbox the writer and verifier. macOS usually cannot. Read [Troubleshooting](docs/troubleshooting.md#sandbox-unavailable) if doctor reports `sandbox_unavailable`.
+
+Full walkthrough: [QuickStart: standalone](docs/quickstart-standalone.md). Ollama details: [docs/ollama-quickstart.md](docs/ollama-quickstart.md).
+
+### No Laravel app yet?
+
+The demo installer creates a fresh Laravel app, installs Pest and the tagged Molly release, and scaffolds the greeting demo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
+bash molly-demo ~/molly-demo
+```
+
+It writes only under the chosen directory, refuses a non-empty path unless you pass `--force`, and does not install Bloom or call a hosted AI service. Continue from the `molly:setup` step above.
 
 ## What happens during a task
 
@@ -191,6 +161,9 @@ Read [Local web interface](docs/web-interface.md) before enabling it.
 New to Molly:
 
 - [Getting started](docs/getting-started.md)
+- [QuickStart: standalone](docs/quickstart-standalone.md)
+- [QuickStart: Molly + Bloom](docs/quickstart-bloom.md)
+- [Compatibility](docs/compatibility.md)
 - [Manage tasks](docs/tasks.md)
 - [Understand verification](docs/verification.md)
 - [Troubleshooting](docs/troubleshooting.md)
@@ -212,25 +185,29 @@ Reference:
 - [Commands](docs/reference/commands.md)
 - [Configuration](docs/reference/configuration.md)
 - [Glossary](docs/reference/glossary.md)
-- [Documentation index](docs/index.md)
+- [Documentation overview](docs/overview.md)
 
-## What is current and what is planned
+## What ships today and what does not
 
-Current `v0.1.x` includes saved tasks, bounded retries, Amp and Ollama, Pest and Tarpit checks, Clever measurements, planning, local MCP tools, a local web UI with a project graph page, journals, Git-tracked decisions, source snapshots, optional local previews, Laravel knowledge for queues, routing, testing, validation, the container, Eloquent, and events, NativePHP Desktop v2 and Mobile v4 knowledge, and bundled tarpit notes. Pest fails a passing JUnit report that does not name the required test.
+Current `v0.1.x` includes bounded Laravel coding tasks, protected acceptance tests, Pest verification with false-green protection, required Tarpit review, separate Clever measurements, bounded retries, persisted attempt history, local Ollama, explicit Amp integration, local MCP tools, a local web UI, the project graph, the Laravel knowledge graph, NativePHP knowledge namespaces, Git-tracked decisions, journals, source snapshots, and optional local component previews.
 
 These are not finished yet:
 
 - Verified Orb identity and remote execution selection
-- Bloom still asks its agent to open and merge GitHub pull requests after Molly records approval
-- A compiled Bloom macOS app. This Linux orb cannot run `swift test`
+- Molly opening or merging pull requests itself. Molly records approvals, pull requests, and merges that people make.
+- A compiled Bloom macOS integration. The Bloom adapter is unpublished.
 - Visual Bloom preview display
-- Broader Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, NativePHP, and tarpit notes
+- Laravel knowledge beyond queues, routing, testing, validation, the container, Eloquent, events, NativePHP, and Tarpit notes
 
 Planned behavior is kept separate in [Execution targets](docs/execution-targets.md).
 
+## Why "Molly"
+
+Molly is named for Molly Bloom in James Joyce's *Ulysses*, whose chapter begins and ends with *yes*. Molly's yes has to be earned by evidence. Mary Perry's family has also always called her Molly. The thinking behind Tarpit and Clever comes from her Laracon US 2026 talk, [Cleverness Is A Loan](https://www.youtube.com/watch?v=vsxoaTgtyjw). More at [clever.mary.win](https://clever.mary.win/).
+
 ## Safety
 
-Use Molly in a trusted development checkout. The required Pest test is protected by default. Writer and Pest processes run in a Landlock sandbox with a network namespace when `molly:doctor` reports that isolation is available.
+Use Molly in a trusted development checkout. The required Pest test is protected by default. Writer and Pest processes run in a Landlock sandbox with a network namespace when the host supports it. `molly:doctor` reports whether that safe workflow is available. The `molly.sandbox.allow_unsafe` override is for local diagnostics in a trusted checkout only.
 
 Review generated tests as carefully as generated application code. The weaker `--allow-test-edits` path is not the default.
 
