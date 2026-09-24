@@ -67,7 +67,7 @@ class RecommendTaskNextStep
     {
         $limit = config('molly.max_attempts', 3);
         $validLimit = is_int($limit) && $limit >= 1 && $limit <= 10;
-        $count = $task->runs->count();
+        $count = $task->attemptsUsed();
         $retryAllowed = $validLimit && in_array($task->status, ['failed', 'stopped'], true) && $count < $limit;
         [$action, $reason] = match (true) {
             ! $validLimit => ['inspect', 'The attempt limit is invalid. Set molly.max_attempts to an integer from 1 to 10 before starting another attempt.'],
@@ -248,9 +248,9 @@ class RecommendTaskNextStep
     private function save(Run $run, array $advice): bool
     {
         return $run->getConnection()->transaction(function () use ($run, $advice): bool {
-            $task = Task::whereKey($advice['task_id'])->lockForUpdate()->withCount('runs')->firstOrFail();
+            $task = Task::whereKey($advice['task_id'])->lockForUpdate()->firstOrFail();
             $saved = Run::whereKey($run->id)->lockForUpdate()->firstOrFail();
-            if ($task->status !== $advice['observed']['task_status'] || $task->runs_count !== $advice['observed']['attempt_count']
+            if ($task->status !== $advice['observed']['task_status'] || $task->attemptsUsed() !== $advice['observed']['attempt_count']
                 || $task->reference() !== $advice['task_reference'] || $saved->status !== $run->status || $this->reportWithoutAdvice($saved) !== $this->reportWithoutAdvice($run)) {
                 return false;
             }

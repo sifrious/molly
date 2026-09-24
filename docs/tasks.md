@@ -51,7 +51,7 @@ Creating the task does not call the model. It saves a pending task with:
 - the files Molly may edit
 - the workspace
 
-The required Pest test is protected by default. Molly records its SHA-256 digest and rejects proposals that change it. Pass `--allow-test-edits` only when a separate test-authoring task should change that file. After that task writes the test, `molly:lock-test TASK --approve --file=app/Example.php` freezes the digest, records who approved it, and starts the implementation scope. The weaker option stays explicit. It is never the default.
+The required Pest test is protected by default. Molly records its SHA-256 digest and rejects proposals that change it. Pass `--allow-test-edits` only when a separate test-authoring task should change that file. After that task writes the test, `molly:lock-test TASK --approve --file=app/Example.php` freezes the digest, records who approved it, and starts the implementation scope with a fresh attempt budget: the authoring runs stay on the task's history but are not charged against `molly.max_attempts` for the implementation. The weaker option stays explicit. It is never the default.
 
 ## File scope
 
