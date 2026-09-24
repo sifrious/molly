@@ -59,3 +59,12 @@ PHP;
     expect(app(PestTestAuthoring::class)->issues($content))
         ->toContain('Emit Pest it() or test() Feature cases Pest can discover; do not rely on PHPUnit @test methods alone.');
 });
+
+it('rejects an authored Pest file that omits the opening PHP tag', function (): void {
+    $content = "it('returns ready', function () {\n    \$this->getJson('/ready')->assertOk();\n});\n";
+
+    expect(app(PestTestAuthoring::class)->issues($content))
+        ->toContain('Start the file with <?php; Pest found no tests in a file without the opening tag.')
+        ->and(app(PestTestAuthoring::class)->issues("<?php\n\n".$content))->toBe([])
+        ->and(app(PestTestAuthoring::class)->issues("\xEF\xBB\xBF<?php\n".$content))->toBe([]);
+});

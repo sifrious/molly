@@ -180,3 +180,16 @@ it('rejects invalid lock locations without invoking the callback', function (boo
 
     expect(fn () => $workspace->exclusively(fn () => 'unexpected'))->toThrow(RuntimeException::class, 'WORKSPACE_LOCK_INVALID');
 })->with([false, true]);
+
+it('keeps the file mode of a selected file when applying a proposal', function () {
+    $workspace = new Workspace($this->workspaceDirectory);
+    $path = $this->workspaceDirectory.'/app/Greeting.php';
+    file_put_contents($path, '<?php return "original";');
+    chmod($path, 0644);
+    $before = $workspace->read(['app/Greeting.php']);
+
+    $workspace->apply([['path' => 'app/Greeting.php', 'content' => '<?php return "changed";']], $before);
+
+    expect(fileperms($path) & 0777)->toBe(0644)
+        ->and(file_get_contents($path))->toBe('<?php return "changed";');
+});

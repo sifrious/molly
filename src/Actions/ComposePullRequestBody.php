@@ -3,15 +3,22 @@
 namespace Sifrious\Molly\Actions;
 
 use RuntimeException;
+use Sifrious\Molly\Contracts\DisplayStatus;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 
 class ComposePullRequestBody
 {
+    public function __construct(private RecordLifecycleEvent $lifecycle) {}
+
     public function handle(string $reference, bool $closeIssue = false): array
     {
         $task = app(ShowTask::class)->handle($reference)
             ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
+        $status = $this->lifecycle->load($task->workspace)->displayStatus($task->id);
+        if (! in_array($status, [DisplayStatus::Approved, DisplayStatus::Merged], true)) {
+            throw new RuntimeException('APPROVAL_REQUIRED: Record human approval with molly:approve before composing a pull request body.');
+        }
         $source = $task->source ?? [];
         $issueUrl = $source['issue_url'] ?? null;
         $run = $task->runs->last();
@@ -35,7 +42,7 @@ class ComposePullRequestBody
             'Acceptance test: `'.$task->test_path.'`',
             'Approved digest: `'.($task->test_digest ?? 'none').'`',
             'Task: '.$task->id,
-            'Attempts: '.$task->runs->count(),
+            'Attempts: '.$task->attemptsUsed(),
         ];
         if ($run !== null) {
             $lines[] = 'Latest run: '.$run->id.' / '.$run->status;

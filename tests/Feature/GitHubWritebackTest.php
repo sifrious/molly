@@ -8,7 +8,9 @@ use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\ComposePullRequestBody;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\PublishGitHubIssueStatus;
+use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Console\MollyCommentCommand;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-writeback-'.Str::uuid();
@@ -65,9 +67,20 @@ it('posts a concise GitHub comment after approval and keeps a later identical co
     Process::assertRanTimes(fn (PendingProcess $process): bool => in_array('repos/sifrious/molly/issues/42/comments', $process->command, true), 1);
 });
 
+it('refuses a pull request body before a human approves the verified change', function () {
+    $this->task->update(['status' => 'completed']);
+    $run = $this->task->runs()->create(['prompt' => $this->task->prompt, 'workspace' => $this->task->workspace, 'status' => 'completed', 'report' => ['completion_blockers' => []]]);
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::ApprovalRequested, $this->task->id, $run->id);
+
+    expect(fn () => app(ComposePullRequestBody::class)->handle($this->task->id))
+        ->toThrow(RuntimeException::class, 'APPROVAL_REQUIRED');
+    expect(Artisan::call('molly:pr-body', ['task' => $this->task->id, '--json' => true]))->toBe(1);
+    expect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'])->toStartWith('APPROVAL_REQUIRED:');
+});
+
 it('prints a pull request body that links the issue and acceptance test without local paths', function () {
     $this->task->update(['status' => 'completed']);
-    $this->task->runs()->create([
+    $run = $this->task->runs()->create([
         'prompt' => $this->task->prompt,
         'workspace' => $this->task->workspace,
         'status' => 'completed',
@@ -80,6 +93,8 @@ it('prints a pull request body that links the issue and acceptance test without 
             'completion_blockers' => [],
         ],
     ]);
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::ApprovalRequested, $this->task->id, $run->id);
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::ApprovalResolved, $this->task->id, $run->id);
 
     $result = app(ComposePullRequestBody::class)->handle($this->task->id, true);
 
@@ -91,6 +106,10 @@ it('prints a pull request body that links the issue and acceptance test without 
 });
 
 it('keeps closing language off a failed task', function () {
+    $run = $this->task->runs()->create(['prompt' => $this->task->prompt, 'workspace' => $this->task->workspace, 'status' => 'failed', 'report' => []]);
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::ApprovalRequested, $this->task->id, $run->id);
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::ApprovalResolved, $this->task->id, $run->id);
+
     expect(fn () => app(ComposePullRequestBody::class)->handle($this->task->id, true))
         ->toThrow(RuntimeException::class, 'GITHUB_CLOSE_UNAVAILABLE');
 });
