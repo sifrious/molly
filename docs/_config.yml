@@ -23,42 +23,50 @@ navigation:
     pages:
       - title: Home
         url: /
-      - title: Documentation overview
+      - title: Documentation
         url: /overview.html
       - title: Getting started
         url: /getting-started.html
-      - title: QuickStart — standalone
-        url: /quickstart-standalone.html
-      - title: QuickStart — with Bloom
-        url: /quickstart-bloom.html
-      - title: Local Ollama details
-        url: /ollama-quickstart.html
-      - title: Compatibility
-        url: /compatibility.html
-      - title: Tasks and retries
+      - title: Tasks
         url: /tasks.html
-      - title: Planning
-        url: /planning.html
-      - title: Agents and MCP
-        url: /agents.html
-      - title: Next-step advice
-        url: /task-advice.html
-      - title: Web interface
-        url: /web-interface.html
-      - title: Verification and review
+      - title: Verification
         url: /verification.html
-      - title: Component snapshots
-        url: /component-snapshots.html
-      - title: Laravel knowledge
-        url: /knowledge-graph.html
-      - title: Project graph
-        url: /project-graph.html
-      - title: Task journals
-        url: /journal.html
-      - title: Task connections
-        url: /connections.html
+      - title: Tutorials
+        url: /tutorials.html
       - title: Troubleshooting
         url: /troubleshooting.html
+  - title: Using Molly
+    pages:
+      - title: Molly on its own
+        url: /standalone.html
+      - title: Molly with Bloom
+        url: /bloom.html
+      - title: Ollama
+        url: /ollama-quickstart.html
+      - title: Agents and MCP
+        url: /agents.html
+      - title: Web interface
+        url: /web-interface.html
+      - title: Planning
+        url: /planning.html
+      - title: Task advice
+        url: /task-advice.html
+      - title: Project graph
+        url: /project-graph.html
+      - title: Laravel knowledge
+        url: /knowledge-graph.html
+      - title: Journals and decisions
+        url: /journal.html
+      - title: Inspecting tasks and runs
+        url: /inspection.html
+      - title: Component snapshots
+        url: /component-snapshots.html
+      - title: Amp thread links
+        url: /connections.html
+      - title: Settings
+        url: /settings.html
+      - title: Compatibility
+        url: /compatibility.html
   - title: Reference
     pages:
       - title: Commands
@@ -71,7 +79,7 @@ navigation:
     pages:
       - title: Contributing
         url: /contributing.html
-      - title: Orb connection plan
+      - title: Execution targets (planned)
         url: /execution-targets.html
       - title: Publishing the docs
         url: /publishing.html

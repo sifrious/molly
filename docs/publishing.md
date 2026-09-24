@@ -5,7 +5,7 @@ title: Documentation publishing plan
 
 # Documentation publishing plan
 
-> This page is for maintainers. It describes a planned documentation deployment, not a step Molly users need for installation or task execution.
+> This page is for maintainers. It describes the documentation site and the checklist for switching the public install line to v1. Nothing here is needed to use Molly.
 
 The planned public documentation hostname is `molly.mary.win`, using GitHub Pages from the repository's `main` branch and `/docs` directory.
 
@@ -88,7 +88,7 @@ Public install lines stay on the current tagged 0.1 constraint until every item 
 Then update these together in one change:
 
 - `InitializeMollyInExistingProject::RELEASE_CONSTRAINT` and the `MOLLY_CONSTRAINT` default in `bin/molly-demo` (a test keeps them equal)
-- The install lines in `README.md`, `docs/index.html`, `docs/quickstart-standalone.md`, `docs/ollama-quickstart.md`, and `docs/troubleshooting.md`
+- The install lines in `README.md`, `docs/index.html`, `docs/getting-started.md`, `docs/quickstart-standalone.md`, and `docs/troubleshooting.md`
 - The tagged `bin/molly-demo` download URL in `README.md` and `docs/getting-started.md`
 - The supported-versions table in `SECURITY.md`
 - The repository line, if Packagist now lists the package

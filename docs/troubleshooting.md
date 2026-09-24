@@ -5,9 +5,7 @@ title: Troubleshooting
 
 # Troubleshooting
 
-Start with saved evidence instead of retrying blindly.
-
-Run these first:
+Read the saved evidence before trying again. Most problems name themselves in doctor or in the run report:
 
 ```bash
 php artisan molly:doctor --json
@@ -15,42 +13,62 @@ php artisan molly:task TASK --json
 php artisan molly:show RUN_ID --verbose
 ```
 
-Replace `TASK` and `RUN_ID` with the values from your run.
-
 ## Doctor fails
 
-After changing `.env` or Molly configuration, always run:
+After any change to `.env` or `config/molly.php`:
 
 ```bash
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-Common doctor codes:
+Restart queue workers after configuration changes too.
 
 | Code | What to do |
 | --- | --- |
-| `migration_missing` | Review pending migrations, then run `php artisan migrate`. |
-| `database_unavailable` | Fix the host application's database connection. |
-| `pest_missing` | Install Pest in the selected workspace. See [Compatibility](compatibility.md) for tested versions. |
+| `migration_missing` | Run `php artisan migrate`. |
+| `database_unavailable` | Fix the application's database connection. |
+| `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
-| `sandbox_unsafe_override` | The local diagnostics override is on. Do not use it for untrusted code. |
-| `amp_unavailable` | Check `amp usage` and Amp login. |
-| `parallel_process_groups_unavailable` | Install POSIX support or set `parallel_checks` to `false`. |
-| `model_not_configured` | Set `MOLLY_LOCAL_MODEL` to a model from `ollama list`. |
-| `model_not_local` | Choose a local model instead of a cloud model name. |
-| `ollama_unreachable` | Start Ollama (`ollama serve`) and check `OLLAMA_URL` / `ai.providers.ollama.url`. Unreachable is **not** the same as a missing model. |
-| `model_missing` | Ollama is up; pull the configured model (`ollama pull …`) or fix `MOLLY_LOCAL_MODEL`. |
-| `ollama_config_invalid` | Use loopback HTTP + Ollama driver + local model + positive `molly.timeout`. |
-| `ollama_endpoint` | Informational: shows the configured base URL (no secrets). |
-| `clever_disabled` | Use local/testing or remove an explicit false override. |
-| `clever_unavailable` | Check the package install and application logs. |
+| `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |
+| `parallel_process_groups_unavailable` | Install POSIX support, or set `parallel_checks` to `false`. |
+| `model_not_configured` | Run `molly:setup --agent=ollama --model=NAME`. |
+| `model_not_local` | Choose an installed local model, not a hosted model name. |
+| `ollama_unreachable` | Start Ollama (`ollama serve`) or fix `OLLAMA_URL`. Unreachable is not the same as a missing model. |
+| `model_missing` | Ollama is up. Pull the model or fix `MOLLY_LOCAL_MODEL`. |
+| `ollama_config_invalid` | Use a loopback HTTP URL, the Ollama driver, and a positive `molly.timeout`. |
+| `amp_unavailable` | Run `amp usage` and log in to Amp. |
+| `clever_disabled` | Use the `local` or `testing` environment, or remove an explicit `false` in `config/molly-complexity.php`. |
+| `clever_unavailable` | Check the package install and the application log. |
+| `jev_capability_missing` | Jev is on, but `laravel/ai` cannot classify. Pin the accepted commit or turn Jev off. See [Jev](reference/configuration.md#jev). |
+| `jev_unconfigured` | Jev is on and capable, but `TYPESAFE_API_KEY` is empty or `config/ai.php` predates the TypeSafe provider. |
 
-Restart long-running queue workers after configuration changes.
+Informational codes such as `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
 
-## Composer cannot install Molly
+## Sandbox unavailable
 
-Check the runtime Composer is using:
+On Linux, Molly runs the writer and the Pest verifier in a Landlock sandbox with private user and network namespaces. Doctor reports it as the Sandbox check. `sandbox_unavailable` means the host lacks those features, which is always true on macOS, and `molly:start` then refuses with `SANDBOX_UNAVAILABLE`.
+
+For a checkout you trust, turn isolation off:
+
+```dotenv
+MOLLY_SANDBOX_ALLOW_UNSAFE=true
+```
+
+Run `php artisan config:clear` and `php artisan molly:doctor`. Doctor now reports `sandbox_unsafe_override` and passes. The writer and Pest run with your user's permissions from then on, so do not use this for repositories you do not trust or on shared machines. Molly still limits proposals to the allowed files.
+
+A task that already failed on the sandbox check is `failed`. Fix the host, then `php artisan molly:retry TASK`.
+
+## Composer cannot find Molly
+
+Molly is not on Packagist yet. Composer needs the repository line:
+
+```bash
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:^0.1.1
+```
+
+If the requirement still fails, check the PHP Composer is using and the Laravel version:
 
 ```bash
 php --version
@@ -58,110 +76,51 @@ composer show laravel/framework
 composer check-platform-reqs
 ```
 
-Molly currently requires PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, never a development branch:
-
-```bash
-composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
-```
-
-Molly is not listed on Packagist yet, so Composer needs the repository line. Without it, Composer reports that it cannot find `sifrious/molly`.
-
-## Sandbox unavailable
-
-Molly runs the writer and the Pest verifier inside a Landlock sandbox with Linux user and network namespaces when the host supports them. `molly:doctor` reports the result as the Sandbox check.
-
-| Signal | Meaning |
-| --- | --- |
-| Doctor `sandbox_unavailable` | The host has no Landlock or user and network namespaces. This is normal on macOS. |
-| `SANDBOX_UNAVAILABLE` from `molly:start` | Molly refused the safe workflow on this host. |
-| Doctor `sandbox_unsafe_override` | Someone set the local diagnostics override. |
-
-Run the safe workflow on a Linux host that supports those features.
-
-For diagnostics in a trusted checkout only, you can turn isolation off:
-
-```dotenv
-MOLLY_SANDBOX_ALLOW_UNSAFE=1
-```
-
-Then run `php artisan config:clear` and `php artisan molly:doctor`. Doctor reports `sandbox_unsafe_override`. Writer and Pest processes then run with your user's full permissions. Never use this for untrusted repositories or shared machines, and do not count runs made this way as release evidence.
-
-If `molly:start` already failed on the sandbox, the task is `failed`. Use `php artisan molly:retry TASK` after fixing the host rather than editing files by hand.
+Molly needs PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, not a branch.
 
 ## Pest fails
 
-Read the recorded test output:
+Read the recorded output, then run the test yourself:
 
 ```bash
 php artisan molly:show RUN_ID --verbose
-```
-
-Then run the required test directly:
-
-```bash
 vendor/bin/pest tests/Feature/YourTest.php
 ```
 
-Common reasons:
-
 | Reason | Meaning |
 | --- | --- |
-| `tests_failed` | An assertion or test execution failed. |
-| `no_tests` | Molly could not find an executed test in the required file. |
-| `tests_skipped_or_incomplete` | The required evidence is incomplete. |
-| `test_timeout` | Pest exceeded the configured timeout. |
+| `tests_failed` | An assertion failed or a test errored. |
+| `no_tests` | Pest found no test in the required file. Check for `<?php` and an `it()` or `test()` call. |
+| `no_assertions` | A test ran but asserted nothing. |
+| `tests_skipped_or_incomplete` | Skipped or incomplete tests are not passing evidence. |
+| `test_timeout` | Pest ran longer than `molly.test_timeout`. |
 | `test_process_failed` | The Pest process exited unsuccessfully. |
-| `junit_missing` / `junit_invalid` | Molly cannot trust the recorded test evidence. |
-| `no_assertions` | Pest ran a test file but recorded zero assertions. |
-| `false_green` | JUnit recorded a pass that did not identify the required test file. |
+| `junit_missing` or `junit_invalid` | Molly cannot trust the report. |
+| `false_green` | The report passed without naming the required file. |
 
-Do not weaken assertions just to make a retry pass.
+Do not weaken the assertions to get a retry through.
 
 ## Tarpit blocks completion
 
-Read the finding's file, line, problem, classification, and recommendation.
+Read the finding: file, line, problem, classification, and recommendation. Only unresolved accidental complexity blocks. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no review evidence; small models do this often, and a larger one usually fixes it. A passing review never overrides a failed test.
 
-Only unresolved accidental complexity can be blocking. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no valid review evidence to accept.
+## The model is slow or returns bad changes
 
-A passing review cannot override failed tests.
+The proposal and review requests each get `molly.timeout` seconds (180 by default). Try a smaller task before raising it.
 
-## The model is slow or returns invalid changes
-
-The default proposal/review timeout is 180 seconds.
-
-Before raising it, try a smaller task. If you do change the timeout, edit `config/molly.php`, clear configuration, and run doctor again.
-
-Useful failure names include:
-
-- `GENERATION_INVALID`: provider output did not match the proposal contract.
-- `CHANGES_INVALID`: the proposal was empty, duplicated a file, or named a disallowed file.
-- `FILE_TOO_LARGE`: selected content or a replacement exceeded the configured limit.
-- `NO_CHANGES`: the proposal did not change the selected files.
+| Failure | Meaning |
+| --- | --- |
+| `GENERATION_INVALID` | The model's output did not match the proposal format. |
+| `CHANGES_INVALID` | The proposal was empty, repeated a file, or named a file outside the allowed list. |
+| `FILE_TOO_LARGE` | A selected file or replacement is over `molly.max_file_bytes`. |
+| `NO_CHANGES` | The proposal left the selected files as they were. |
+| `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. |
 
 ## A parallel check fails
 
-Use:
+`molly:show RUN_ID --verbose` names the branch. `branch_start_failed`, `branch_timeout`, `branch_cancelled`, `branch_result_invalid`, and `CHECK_PROCESS_GROUP_UNAVAILABLE` all mean one branch did not produce valid evidence. Both branches must; one passing branch cannot stand in for the other. If process groups are the problem, set `parallel_checks` to `false`.
 
-```bash
-php artisan molly:show RUN_ID --verbose
-```
-
-Look for the failing branch and classification.
-
-Common values:
-
-- `branch_start_failed`
-- `branch_timeout`
-- `branch_cancelled`
-- `branch_result_invalid`
-- `CHECK_PROCESS_GROUP_UNAVAILABLE`
-
-Both Pest and review branches need valid results. One passing branch cannot stand in for the other.
-
-## A task is stuck in `running`
-
-Read it before doing anything else:
+## A task is stuck in running
 
 ```bash
 php artisan molly:task TASK
@@ -169,52 +128,33 @@ php artisan molly:stop TASK
 php artisan molly:task TASK
 ```
 
-Do not delete `.molly` lock files to force a retry. `WORKSPACE_BUSY` means Molly could not acquire a lock. Check whether work is still running first.
+`WORKSPACE_BUSY` means another run holds the workspace lock. Check whether it is still working before doing anything else. Do not delete files under `.molly/` to force a retry; an expired lease is recovered on its own.
 
 ## Retry is rejected
 
-`molly:start` is for pending tasks. `molly:retry` is for failed or stopped tasks.
+`molly:start` is for pending tasks and `molly:retry` for failed or stopped ones. `ATTEMPT_LIMIT_REACHED` means the task used its attempts (three by default). `COMMAND_ALREADY_SUCCEEDED` means the task already completed. `php artisan molly:advice TASK` says what is allowed.
 
-`ATTEMPT_LIMIT_REACHED` means the task has used its configured number of attempts. The default is three total attempts.
+## The web interface returns 404 or no run appears
 
-For a saved explanation of the next allowed action:
-
-```bash
-php artisan molly:advice TASK
-```
-
-## The web UI returns 404 or no run appears
-
-Check:
+Check `.env`:
 
 ```dotenv
 APP_ENV=local
 MOLLY_UI_ENABLED=true
 ```
 
-Then:
-
-```bash
-php artisan config:clear
-php artisan queue:failed
-```
-
-Make sure the queue worker is running and the queue reservation/visibility timeout is above 3600 seconds.
-
-CLI execution with `molly:start` does not need a queue worker.
+Then `php artisan config:clear`. For runs started from the browser, make sure a worker is running and look at `php artisan queue:failed`. Artisan starts need no worker.
 
 ## Workspace changed during a run
 
-`WORKSPACE_CHANGED` means a selected file no longer matches the saved content Molly expected at that stage.
+`WORKSPACE_CHANGED` means a selected file no longer matched what Molly expected. Avoid editing selected files while a run is active. A failed verification does not restore the applied proposal; check `git diff` before retrying.
 
-Avoid editing selected files while Molly runs. Inspect the current Git diff and the saved hashes before retrying.
+## Jev did not answer
 
-Failed verification does not automatically restore an applied proposal.
+Advice and plan pages say why. `jev_disabled` is the default. `capability_missing` means `laravel/ai` in your application has no classification API, `invalid_config` means the key is missing, `provider_error` means the request failed, and `low_confidence` means Jev answered below the threshold and Molly kept its own guidance. Doctor reports the first three. See [Jev](reference/configuration.md#jev).
 
-## Still stuck?
+## Still stuck
 
-Use the references for exact settings and return fields:
-
-- [Command reference](reference/commands.md)
+- [Commands](reference/commands.md)
 - [Configuration](reference/configuration.md)
 - [Verification](verification.md)

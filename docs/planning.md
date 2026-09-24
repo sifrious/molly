@@ -5,9 +5,7 @@ title: Planning
 
 # Planning
 
-Use planning when a request is too large to become one Molly task immediately.
-
-A plan stores your decisions. It does not edit code, start a task, or prove that any implementation is correct.
+A plan is for a request that is too large for one task. It saves your answers to five questions so the tasks you create afterward start from decisions instead of guesses. A plan does not write code, start a task, or prove anything.
 
 ## Start a plan
 
@@ -15,25 +13,25 @@ A plan stores your decisions. It does not edit code, start a task, or prove that
 php artisan molly:plan 'Let people inspect and retry failed tasks from one page.'
 ```
 
-By default, Molly asks five questions:
+Molly asks the questions one at a time and saves each answer before the next:
 
-| Step | What you decide |
+| Step | The question |
 | --- | --- |
-| `outcome` | What the user must be able to do and what is out of scope |
-| `state` | What must be stored and what can be derived |
-| `laravel` | What existing Laravel or application behavior already helps |
-| `boundaries` | Whether a new interface, package, or layer is actually needed |
-| `verification` | What tests and review evidence will prove the requirement |
+| `outcome` | What must the user be able to do, and what is out of scope? |
+| `state` | What must be stored, and what can be computed? |
+| `laravel` | What does Laravel or the application already provide? |
+| `boundaries` | Is a new interface, package, or layer needed? |
+| `verification` | Which tests and review evidence will prove it? |
 
-Molly saves each answer before asking the next one.
+Each question comes with short bundled passages from the Laravel documentation and Mary Perry's Tarpit notes. They are there to prompt you, not to decide for you.
 
-Resume later:
+Come back later:
 
 ```bash
 php artisan molly:plan --resume=PLAN_ID
 ```
 
-## Skip the guided questions
+## Skip the questions
 
 If you already made those decisions:
 
@@ -41,61 +39,29 @@ If you already made those decisions:
 php artisan molly:plan 'Add a read-only task summary.' --skip-review
 ```
 
-Skipping means you chose not to use the guided questions. It does not count as a passing implementation review.
+Skipping records that you chose not to answer. It is not a review.
 
-## Use planning from scripts
-
-Create a draft:
+## From a script
 
 ```bash
 php artisan molly:plan 'Show pending tasks.' --json --no-interaction
-```
-
-Save one answer:
-
-```bash
-php artisan molly:plan --resume=PLAN_ID \
-  --step=outcome \
-  --answer='Show pending tasks on one screen. Editing tasks is out of scope.' \
+php artisan molly:plan --resume=PLAN_ID --step=outcome \
+  --answer='Show pending tasks on one screen. Editing them is out of scope.' \
   --json --no-interaction
 ```
 
-The JSON `next_step` field tells you which step comes next.
+The JSON includes `next_step`, so a script knows which question is next.
 
 ## Turn a plan into tasks
 
-A ready plan can create pending tasks through the local web interface or Molly's MCP task tool.
+Open the plan in the [web interface](web-interface.md) or use the `molly_task` MCP tool with `operation: from_plan`. Each task still needs one small change, a workspace, allowed files, and a required Pest test. The plan gives the task context; it does not loosen those limits. There is no Artisan command that converts and starts a whole plan at once.
 
-Each task still needs:
+## Ask Jev which question to revisit
 
-- one small change
-- a workspace
-- allowed files
-- a required Pest test
-
-The plan provides context. It does not replace those task boundaries.
-
-There is currently no Artisan option that automatically converts and starts every plan item.
-
-## Bundled guidance
-
-Molly includes a small offline planning guide with selected Laravel, Tarpit, and NativePHP material. It is a curated bundle, not a full copy of those manuals.
-
-A topic match tells Molly which material may be relevant. It does not mean Molly should automatically add a queue, interface, package, or native integration.
-
-## Optional TypeSafe suggestion
-
-If TypeSafe is enabled, a plan can explicitly ask for a suggestion about which planning area deserves another look.
-
-That suggestion:
-
-- does not answer a planning question for you
-- does not start a task
-- does not replace Pest or Tarpit
-- can become stale when plan answers change
+With [Jev](reference/configuration.md#jev) enabled, a plan can ask which planning area most needs another look. Request it from the plan page or with the `molly_plan` tool's `suggest` operation. The answer names one step, with a confidence, and links the sources for that step. It does not answer the question for you, and it goes stale when you change an answer; the page tells you when that happens.
 
 ## Next
 
-- [Manage tasks](tasks.md)
-- [Agents and MCP](agents.md)
-- [Configuration](reference/configuration.md)
+- [Tasks](tasks.md)
+- [Web interface](web-interface.md)
+- [Laravel knowledge](knowledge-graph.md)

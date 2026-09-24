@@ -1,11 +1,11 @@
 ---
 layout: default
-title: Planned remote execution
+title: Execution targets (planned)
 ---
 
-# Planned remote execution
+# Execution targets (planned)
 
-> This page is a maintainer design note. The Orb and remote execution controls described here are not shipped user features.
+> This is a design note for maintainers. None of the Orb or remote execution controls on this page exist yet. Every Molly run executes on the machine where you run Artisan.
 
 Today, Molly can save an Amp thread association and read Amp's reported executor connection state. Local execution is the default. Molly refuses an Orb request unless a capability-checked target is supplied. An Amp thread ID is not that target.
 
@@ -67,6 +67,6 @@ CLI, MCP, and web should report the same underlying evidence once those interfac
 
 Until that work lands, do not describe current Amp thread observations as verified Orb execution.
 
-## Local agent-bus claims (v0.1-narrow)
+## What Molly does today
 
-Molly claims work items through a local database lease (`LocalAgentBus`). Two workers racing for the same task produce one valid claim. Expired leases are recovered into a failed/retryable state without a hosted coordinator. Queue delivery of `StartSavedTask` is unique per task start/retry key so duplicate jobs do not double-succeed.
+Molly claims a task through a lease in the application database. Two workers racing for the same task produce one claim; the other sees `WORKSPACE_BUSY`. An expired lease is recovered into a failed, retryable task without any coordinator. A queued start or retry is delivered once per task attempt, so a duplicate job cannot succeed twice.

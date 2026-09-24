@@ -5,82 +5,76 @@ title: Verification
 
 # Verification
 
-Use this page when you want to understand why a Molly run completed or failed.
+The agent does not decide whether a task is complete. Required verification does. If the Pest test named by the task fails, the task stays incomplete no matter what the model says about its own work.
 
-The central rule is simple: deterministic evidence comes before model judgment. A model cannot grade its own work into a passing state.
+This page explains what has to pass, how to read the result, and what Molly does when a check fails.
 
-## What must happen for a run to complete
+## What has to pass
 
-After an agent proposes edits, Molly:
+When a task starts, Molly runs these steps in order:
 
-1. Validates that the proposal only touches allowed files and does not change a protected test.
-2. Applies the changes.
-3. Checks the protected test digest again.
+1. Checks the proposal. It may change only the files you allowed, and it may not change the protected test.
+2. Applies the proposal.
+3. Checks the protected test's digest again.
 4. Runs the required Pest test file.
-5. Runs the seven-check Tarpit review.
-6. Records Clever measurements before and after the change.
-7. Confirms the selected files and protected test still match the reviewed contents.
+5. Runs the Tarpit review, seven questions about the changed files.
+6. Records Clever measurements of the code before and after the change.
+7. Confirms the files still match what was reviewed.
 
-A required failure blocks completion.
+Pest and Tarpit run at the same time by default. Both must finish with valid evidence. A passing Tarpit review never rescues a failed test, and a passing test does not hide a blocking Tarpit finding.
 
-A passing Tarpit review cannot override failed Pest evidence. A model saying that tests should pass is not test evidence.
-
-## Read a saved run
+## Read the result
 
 ```bash
 php artisan molly:show RUN_ID
 php artisan molly:show RUN_ID --verbose
-php artisan molly:show RUN_ID --json
 ```
 
-Reading a report does not execute the model again.
+The short form summarises each check. The verbose form adds the Pest output, every Tarpit check with the model's reasoning, the measurements, and the timing of each branch. Reading a run never runs the model again.
 
-## Read verification receipts
+For scripts, `--json` returns the whole saved report.
 
-Every completed or terminated run finalizes immutable JSON receipts under `.molly/receipts/<run-id>/`.
+## Receipts
+
+Every run that completes or stops leaves a receipt per verifier under `.molly/receipts/RUN_ID/`:
 
 ```bash
 php artisan molly:receipt RUN_ID
-php artisan molly:receipt RUN_ID --workspace=/path/to/repo
-php artisan molly:receipt RUN_ID --json
 ```
 
-Receipts record verifier name, state (`PASS` / `FAIL` / `REVIEW_REQUIRED` / `NOT_RUN`), policy, failure action, evidence digest, and timestamps. Reading them does not rerun Pest, Tarpit, or the model.
+A receipt records the verifier, its state (`PASS`, `FAIL`, `REVIEW_REQUIRED`, or `NOT_RUN`), the policy that applied, the failure action, a digest of the evidence, and timestamps. A verifier that never ran appears as `NOT_RUN` rather than disappearing. Receipt files are written once per run; a retry gets a new run ID and a new directory. Editing a receipt does not change the saved run.
 
-A run that stops or fails before the normal completion decision still gets receipts. Verifiers that never executed appear as `NOT_RUN` rather than being omitted. Finalized receipt files are append-only for that run id; a retry creates a new run id and a new receipt directory.
+## The Pest check
 
+Molly runs only the required test file, not your whole suite, and it wants real evidence: a JUnit report naming that file with at least one executed test and at least one assertion.
 
-The verbose report is the best place to diagnose a failure because it includes test output, review findings, measurement details, and execution branch metadata.
+Any of these keeps the run from completing:
 
-## Pest verification
+| Reason | Meaning |
+| --- | --- |
+| `tests_failed` | An assertion failed or a test errored. |
+| `no_tests` | Pest found no test in the required file. A file without `<?php` looks like this. |
+| `no_assertions` | A test ran but asserted nothing. |
+| `tests_skipped_or_incomplete` | A skipped or incomplete test is not passing evidence. |
+| `test_timeout` | Pest ran longer than `molly.test_timeout` (120 seconds by default). |
+| `junit_missing` or `junit_invalid` | Molly cannot trust the report Pest produced. |
+| `false_green` | The report passed but did not name the required file. |
 
-Molly runs only the required Pest test file for the task. It requires real JUnit evidence and at least one executed test.
-
-These prevent completion:
-
-- failed or errored tests
-- skipped or incomplete tests
-- risky tests or warnings that make the run unusable
-- a timeout
-- missing or invalid JUnit evidence
-- an empty test file
-- a test file that runs but records zero assertions
-- a Pest process that exits successfully while JUnit records failures
-- JUnit evidence that does not name the required test file
-
-A completed or failed run also writes immutable verification receipts under `.molly/receipts/{run-id}/`. Each receipt stores verifier name, state, policy, failure action, evidence digest, and timestamps. Receipts do not replace Pest. Rewriting a receipt file does not change the saved run.
-
-Molly does not run your entire application test suite. Run the broader suite yourself before committing:
+Run the whole suite yourself before committing:
 
 ```bash
 vendor/bin/pest
 ```
 
-## Tarpit review
+## The protected test
 
-Tarpit receives the task plus the selected files before and after the change. It does not explore the whole repository or run tests.
+The Pest test that defines a task is protected by default. Molly records its SHA-256 digest when the task is created, rejects any proposal that touches it, and fails the run if the file changes on disk during the attempt. The agent may change application code to make the test pass; it may not change the test.
 
-The seven checks ask about:
+When you want Molly to write the test itself, create a separate task with `--allow-test-edits`, then lock the result with `molly:lock-test` before the implementation task. [Tutorials](tutorials.md#write-the-test-first) shows the whole flow.
+
+## The Tarpit review
+
+Tarpit asks the model seven questions about the changed files, before and after:
 
 | Check | Looks for |
 | --- | --- |
@@ -88,19 +82,17 @@ The seven checks ask about:
 | B | Business decisions mixed with I/O, time, randomness, or mutation |
 | C | Application decisions living in transport or rendering code |
 | D | Hidden ordering or setup requirements |
-| E | Abstractions or code with no current requirement |
+| E | Abstractions with no current requirement |
 | F | Excessive size, nesting, or duplication |
-| G | Caches or indexes that create hidden behavior or dependencies |
+| G | Caches or indexes that add hidden behavior |
 
-A finding is `essential`, `pragmatic`, or `accidental`. Only unresolved accidental complexity can be `blocking`.
+Each finding is classified as essential, pragmatic, or accidental. Only unresolved accidental complexity blocks completion; the rest stays attached to the run for you to read. Tarpit sees only the task and the selected files. It does not run tests or read the rest of the repository.
 
-The review is one source of evidence. It is not a replacement for Pest.
+`REVIEW_INVALID` means the model returned an incomplete or inconsistent review. Molly treats that as missing evidence, not as a clean review. Small models produce it often; see [Ollama](ollama-quickstart.md#choosing-a-model).
 
 ## Clever measurements
 
-Molly records several code measurements before and after the edit. It never combines them into one score.
-
-Available commands include:
+Molly measures the code before and after the change with the bundled Clever probes and keeps each number separate. They describe the change; they are not a score and never block completion on their own. You can run them yourself:
 
 ```bash
 php artisan clever:scan
@@ -110,65 +102,38 @@ php artisan clever:lonely-files
 php artisan clever:hotspots
 ```
 
-The measurements answer different questions:
+`owned-diff` counts lines and files in your application paths. `welds` finds literal constructor and static calls. `lonely-files` lists files with one Git author. `hotspots` combines size with recent commit activity. Each probe prints its scope, warnings, and the shell command you could use to check it by hand.
 
-- `owned-diff` counts current code, comments, blank lines, and files in configured paths.
-- `welds` finds literal constructor and static-call sites worth inspecting.
-- `lonely-files` lists qualifying PHP files with one recorded Git author.
-- `hotspots` shows files with both current size and recent commit activity.
+## False-green detection
 
-A smaller number is not automatically better. Read each probe's scope, warnings, and skip reason.
+Molly can also check that the test really depends on the code. When `MOLLY_FALSE_GREEN=true`, after Pest passes Molly replaces one selected production file with a throwing stub, runs the test again, and restores the file. If the test still passes, the run fails with `false_green`. A timeout or probe error is recorded as `REVIEW_REQUIRED` and is never counted as a pass. `molly.false_green.max_mutations` and `timeout_seconds` bound the check.
 
-## Parallel and serial checks
+## When a check fails
 
-Pest and Tarpit run in parallel by default. Both must finish with valid evidence.
+The run ends as `failed`, the applied changes stay in your working tree, and the evidence is saved. Molly does not roll the files back and does not commit them. Read the run, then decide:
 
-Parallel mode requires `posix_setsid` and `posix_kill`. If those functions are unavailable, set:
+```bash
+php artisan molly:show RUN_ID --verbose
+php artisan molly:advice TASK
+php artisan molly:retry TASK
+```
+
+A retry sends a bounded summary of the previous failure to the model so it can address it. A task may make three attempts by default (`molly.max_attempts`). Molly never retries on its own.
+
+## Serial checks
+
+Parallel checks need `posix_setsid` and `posix_kill`. If doctor reports `parallel_process_groups_unavailable`, set this in `config/molly.php` and run the checks one after another:
 
 ```php
 'parallel_checks' => false,
 ```
 
-in `config/molly.php`, then run:
+## The sandbox
 
-```bash
-php artisan config:clear
-php artisan molly:doctor
-```
-
-Serial mode runs the same required checks one after another.
-
-## Source snapshots
-
-Molly records hashes for selected files when a task is created and around each run. This helps show which selected files changed.
-
-A hash comparison does not prove a visible UI change. Optional local previews are advisory and never override Pest.
-
-Read [Component snapshots](component-snapshots.md) for the exact behavior.
-
-## Safety and limits
-
-The required Pest test is protected by default. A proposal that changes it is rejected before application. Molly also fails the run if the test digest changes on disk.
-
-Writer and Pest processes run in a Landlock sandbox with a network namespace when the host supports it. `molly:doctor` reports that as the Sandbox check. The verifier can read the workspace, its real `vendor` directory, and the project that owns that directory (Pest resolves its root from the real autoloader path); it can write only the selected files, the evidence directory, and a private temp directory. Pest still executes PHP, so keep the workspace disposable.
-
-Set `molly.sandbox.allow_unsafe` only for local diagnostics. That override is conspicuous, local-only, and excluded from release evidence.
-
-Failed runs may leave applied edits in the workspace. Molly does not commit them.
+On Linux, the writer and the Pest process run inside a Landlock sandbox with private user and network namespaces. The sandbox can read the workspace, its `vendor` directory, and the project that owns that directory, and it can write only the selected files, the run's evidence directory, and a private temp directory. Doctor reports the sandbox as one check. macOS cannot provide it; [Getting started](getting-started.md#macos-and-the-sandbox) explains the override.
 
 ## Next
 
+- [Tasks](tasks.md)
 - [Troubleshooting](troubleshooting.md)
-- [Manage tasks](tasks.md)
-- [Configuration](reference/configuration.md)
-
-## False-green detection (opt-in)
-
-When `molly.false_green.enabled` is true, Molly runs a bounded negative-control probe after Pest:
-
-1. Temporarily replace a selected production file with a throwing stub.
-2. Re-run the required Pest file.
-3. Restore the original file before the next mutation (canonical workspace must match).
-
-If the test stays green, the `false_green` verifier fails and blocks completion. If the test fails under mutation, the probe passes. Timeouts and probe errors are `REVIEW_REQUIRED` / inconclusive — never treated as PASS. Budgets: `max_mutations` and `timeout_seconds`.
-
+- [Configuration](reference/configuration.md#verification)

@@ -1,191 +1,185 @@
 ---
 layout: default
-title: Configuration reference
+title: Configuration
 ---
 
-# Configuration reference
+# Configuration
 
-Use this page when you need to change Molly's defaults or find the environment variable for a setting.
-
-Publish the config files once:
+Molly's settings live in `config/molly.php` and `config/molly-complexity.php`, published with:
 
 ```bash
 php artisan vendor:publish --tag=molly-config
 ```
 
-After changing `.env` or config, run:
+The defaults suit a local development project. After changing `.env` or either file:
 
 ```bash
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-Restart long-running queue workers after configuration changes.
+Restart queue workers after configuration changes.
 
-## Most commonly changed settings
+## The settings you are most likely to change
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `molly.agent` | `ollama` | `ollama` or `amp`. Environment: `MOLLY_AGENT`. |
-| `molly.model` | `null` | Exact local Ollama model name. Environment: `MOLLY_LOCAL_MODEL`. |
-| `molly.timeout` | `180` | Seconds allowed for proposal or review model requests. |
+| `molly.model` | `null` | The exact local Ollama model name. Environment: `MOLLY_LOCAL_MODEL`. |
+| `molly.timeout` | `180` | Seconds allowed for each model request. |
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
-| `molly.parallel_checks` | `true` | Run Pest and Tarpit at the same time. Set false when POSIX process-group support is unavailable. |
-| `molly.max_attempts` | `3` | Total attempts allowed for a saved task. Allowed range: 1 through 10. |
-| `molly.max_files` | `8` | Maximum writable files. The protected test does not count toward this limit. |
-| `molly.verification.pest` | `required` | Pest remains a completion gate. |
-| `molly.verification_actions.pest` | `retry` | Retry Pest failures while attempts remain. |
-| `molly.sandbox.allow_unsafe` | `false` | Local-only override when Landlock isolation is unavailable. Environment: `MOLLY_SANDBOX_ALLOW_UNSAFE`. |
-| `molly.max_file_bytes` | `65536` | Maximum bytes in one selected file or replacement. |
-| `molly.ui.enabled` | `false` | Enables local web routes. Environment: `MOLLY_UI_ENABLED`. |
-| `molly.ui.prefix` | `molly` | Local web route prefix. |
+| `molly.max_attempts` | `3` | Runs a task may make, from 1 to 10. |
+| `molly.parallel_checks` | `true` | Run Pest and Tarpit at the same time. Set `false` without POSIX process groups. |
+| `molly.max_files` | `8` | Writable files per task. The protected test is not counted. |
+| `molly.max_file_bytes` | `65536` | Largest selected file or replacement. |
+| `molly.sandbox.allow_unsafe` | `false` | Run without Landlock isolation. Environment: `MOLLY_SANDBOX_ALLOW_UNSAFE`. See [macOS and the sandbox](../getting-started.md#macos-and-the-sandbox). |
+| `molly.ui.enabled` | `false` | Enable the local web interface. Environment: `MOLLY_UI_ENABLED`. |
+| `molly.ui.prefix` | `molly` | Route prefix for the web interface. |
 
-The task prompt limit is 8,192 bytes. Changing size limits does not expand the allowed directories.
+A task prompt may be up to 8,192 bytes. Raising the size limits does not add directories to the allowed list.
 
-## Laravel knowledge
+## Verification
+
+Each verifier has a policy and a failure action:
+
+| Setting | Default |
+| --- | --- |
+| `molly.verification.pest` | `required` |
+| `molly.verification.tarpit` | `required` |
+| `molly.verification.parallel_join` | `required` |
+| `molly.verification.false_green` | `required` |
+| `molly.verification_actions.pest` | `retry` |
+| `molly.verification_actions.tarpit` | `retry` |
+| `molly.verification_actions.parallel_join` | `retry` |
+| `molly.verification_actions.false_green` | `fail` |
+
+`retry` lets `molly:retry` make another attempt while attempts remain. `fail` ends the task. Pest and Tarpit stay required in every shipped configuration.
+
+False-green detection is off until you enable it:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `molly.knowledge.database` | `.molly/knowledge.sqlite` | Local SQLite knowledge graph. Environment: `MOLLY_KNOWLEDGE_DATABASE`. |
-| `molly.preview.command` | `null` | Local preview renderer. Placeholders: `{input}`, `{output}`, `{url}`, `{viewport}`. Environment: `MOLLY_PREVIEW_COMMAND`. |
-| `molly.preview.url` | `null` | Optional workspace URL passed to the renderer. Environment: `MOLLY_PREVIEW_URL`. |
-| `molly.preview.viewport` | `1280x720` | Recorded viewport label. Environment: `MOLLY_PREVIEW_VIEWPORT`. |
+| `molly.false_green.enabled` | `false` | Run the mutation probe after Pest passes. Environment: `MOLLY_FALSE_GREEN`. |
+| `molly.false_green.max_mutations` | `2` | Files to stub, one at a time. |
+| `molly.false_green.timeout_seconds` | `30` | Budget for each probe run. |
 
-Keep `.molly/` out of version control. The knowledge database is disposable.
+[Verification](../verification.md) explains what each verifier checks.
 
 ## Ollama
 
-Molly uses Laravel AI's Ollama provider.
+Molly uses Laravel AI's Ollama provider, configured in `config/ai.php`:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `ai.providers.ollama.driver` | `ollama` | Must remain the Ollama driver. |
-| `ai.providers.ollama.url` | `http://localhost:11434` | Local endpoint. Environment: `OLLAMA_URL`. |
+| `ai.providers.ollama.driver` | `ollama` | Leave as is. |
+| `ai.providers.ollama.url` | `http://localhost:11434` | Must be a loopback HTTP URL. Environment: `OLLAMA_URL`. |
 
-Molly only accepts a loopback HTTP endpoint for this local provider path. The model name must match `ollama list` and must not be a cloud model name.
+The model name must match `ollama list` and must not look like a hosted model.
 
 ## Amp
 
-Amp has no Molly API-key setting. The Amp CLI owns its login and model selection.
+Amp has no Molly settings beyond `molly.agent`. The Amp CLI keeps its login and model. `amp` must be on the `PATH` of the process running Molly.
 
-The `amp` executable must be on the `PATH` for the process running Molly.
+## Jev
 
-Use:
+Jev is off unless `MOLLY_JEV_ENABLED=true`. When it is off, Molly makes no classification request and records `jev_disabled` wherever advice could have appeared.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `molly.jev.enabled` | `false` | The single gate. Environment: `MOLLY_JEV_ENABLED`. Anything other than a true value keeps it closed. |
+| `molly.jev.model` | `jev-latest` | The TypeSafe model passed through Laravel AI. |
+| `molly.jev.confidence_threshold` | `0.8` | Answers below this become `low_confidence` and Molly keeps its own guidance. |
+| `molly.jev.timeout` | `30` | Seconds per request, from 1 to 120. |
+| `molly.jev.instructions` | the task-advice question | The question asked for failed-task advice. |
+
+The credential belongs to Laravel AI: `ai.providers.typesafe.key`, from `TYPESAFE_API_KEY`. Molly has no TypeSafe client of its own.
+
+### Installing a Laravel AI with classification
+
+Molly's normal install stays on the stable `laravel/ai` release, which has no classification API, so enabling Jev there reports `capability_missing`. Until Laravel tags a release with the classification API, opt your application into the accepted commit (Laravel AI pull request #1049):
 
 ```bash
-php artisan molly:setup --agent=amp
-```
-
-## Jev and TypeSafe
-
-Jev classification is off by default. Published config sets `molly.jev.enabled` from `MOLLY_JEV_ENABLED` with a `false` default. When the gate is off, Molly opens no classification request, records no TypeSafe/Laravel AI classification provenance, and keeps Pest, Tarpit, retries, and completion on their deterministic paths.
-
-There is one explicit opt-in:
-
-```bash
-MOLLY_JEV_ENABLED=true
+composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
+php artisan vendor:publish --tag=ai-config --force
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-Provider credentials and base URL belong to Laravel AI — configure `ai.providers.typesafe` (secret: `TYPESAFE_API_KEY`). Do not set a second Molly HTTP transport. Former `molly.typesafe.*` transport keys (`enabled`, `api_key`, and a fixed Molly-owned endpoint) are removed; Molly no longer publishes them.
-
-Molly policy for enabled Jev stays under `molly.jev`:
-
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| `molly.jev.enabled` | `false` | Single default-off Jev gate. Environment: `MOLLY_JEV_ENABLED`. Non-true values keep every Jev-backed path closed. |
-| `molly.jev.model` | `jev-latest` | Evaluator model name passed through Laravel AI. |
-| `molly.jev.confidence_threshold` | `0.8` | Lower-confidence results become `needs_review`. |
-| `molly.jev.timeout` | `30` | Request timeout, allowed range 1 through 120 seconds. |
-| `molly.jev.instructions` | Built-in task advice question | Instructions used for eligible failed-task advice. |
-
-When enabled, Jev can support explicit planning suggestions, task advice, and commit review through Laravel AI classification. It cannot bypass tests, Tarpit blockers, or attempt limits. Configure one provider stack only: Laravel AI TypeSafe plus `molly.jev` policy — never both a Molly `typesafe` client and Laravel AI.
+The `as 0.11.99` alias is needed because Molly requires `laravel/ai ^0.11.2` and a bare `1.x-dev` pin does not satisfy that constraint. Republishing `config/ai.php` matters when it was published from the stable release, which has no `typesafe` provider entry; a published file replaces the package's provider list. Once a compatible Laravel AI tag exists, replace the pin with that constraint.
 
 ### Jev states
 
-One class, `Sifrious\Molly\Classification\JevGate`, decides whether a request may classify. Planning suggestions, task advice, commit review, and every transport (Artisan, HTTP, Livewire, MCP) ask that gate and project the same result. These are the accepted outcomes:
+One class decides whether a request may classify, and every transport reports the same result:
 
-| Jev setting | Laravel AI capability | Result |
+| Gate | Laravel AI | Result |
 | --- | --- | --- |
-| Disabled (default) | Any | No classification. Evaluation status `disabled`, reason `jev_disabled`. Advice, plan, and commit review keep deterministic guidance; the provider block records `status: disabled`, `reason: jev_disabled`. |
-| Enabled | Missing (stable Laravel AI without the `Classification` / `Choice` / `ChoiceAnswer` / `Lab::TypeSafe` surface) | No classification. Evaluation status `unavailable`, reason `capability_missing`. Advice falls back with `provider.status: unavailable`; `molly:review-commit` exits non-zero; the plan page offers no suggestion and `POST /molly/plans/{id}/suggest` returns 403. This state is never reported as success. |
-| Enabled | Present, but `ai.providers.typesafe.key` is empty or `molly.jev` policy is invalid | No classification. Evaluation status `needs_review`, reason `invalid_config`. |
-| Enabled | Present and configured | Laravel AI classification runs with provider `Lab::TypeSafe` and `molly.jev.model`. Evaluation status `evaluated`, reason `evaluated`, confidence and per-option probabilities recorded. |
-| Enabled | Provider request throws | Evaluation status `needs_review`, reason `provider_error`. Deterministic evidence is preserved; no provider payload is retained. |
-| Enabled | Answer malformed (unknown option, missing or non-numeric probability, distribution not summing to 1, argmax not the choice, confidence outside 0..1) | Evaluation status `needs_review`, reason `invalid_answer`. |
-| Enabled | Confidence below `molly.jev.confidence_threshold` | Evaluation status `needs_review`, reason `low_confidence`, confidence recorded. Confidence exactly at the threshold is accepted. |
-| Any | A deterministic gate fails (Pest, Tarpit blocker, attempt limit, diff check) | That failure stays authoritative regardless of any Jev output. |
+| Off (default) | Any | No request. Status `disabled`, reason `jev_disabled`. |
+| On | No classification API | No request. Status `unavailable`, reason `capability_missing`. Advice falls back, `molly:review-commit` exits `1`, plan suggestions are refused. Never reported as success. |
+| On | Present, key missing or policy invalid | No request. Status `needs_review`, reason `invalid_config`. |
+| On | Present and configured | A request to TypeSafe. Status `evaluated` with the choice, confidence, and probabilities recorded. |
+| On | The request throws | Status `needs_review`, reason `provider_error`. No payload is kept. |
+| On | The answer is malformed | Status `needs_review`, reason `invalid_answer`. |
+| On | Confidence below the threshold | Status `needs_review`, reason `low_confidence`, confidence recorded. Exactly at the threshold passes. |
+| Any | A deterministic check failed | That failure stands regardless of Jev. |
 
-Molly never changes the provider, execution target, or model on its own. A Jev result is advice: it can recommend `retry`, `stop`, `inspect`, or a planning focus, but it cannot start, retry, or complete work, and human approval remains distinct from both model success and deterministic verification.
+`molly:doctor` reports the gate as `jev_disabled`, `jev_capability_missing`, `jev_unconfigured`, or `jev_ready`. Jev never changes the provider, model, or execution target on its own, and a Jev answer is advice: it cannot start, retry, or complete a task.
 
-### Laravel AI compatibility
-
-Molly keeps its normal install on the stable Laravel AI baseline, where the gate reports `unavailable` / `capability_missing` if you enable it. Jev is an optional capability: until Laravel publishes a tag containing the classification seam, a host that wants Jev must explicitly opt its root application into the accepted upstream implementation, the merge commit of Laravel AI PR #1049:
-
-```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484' --with-all-dependencies
-```
-
-Molly's release CI runs a separate Jev lane that resolves exactly that commit, records the resolved commit in the workflow summary, fails (never skips) the live-capability proofs, and then runs the complete package suite. The ordinary PHP/Laravel package matrix stays on stable dependencies. A floating `1.x-dev` branch is not release evidence. Once Laravel publishes a compatible tag, replace the exact commit with that stable constraint and rerun the complete matrix.
-
-`MOLLY_JEV_ENABLED` still defaults to `false`. Enabling it is a separate explicit opt-in; deterministic Pest, Tarpit, retry and completion gates remain authoritative.
-
-## Complexity measurements
-
-`config/molly-complexity.php` controls Clever measurements.
-
-Main settings:
+## Knowledge and previews
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `molly-complexity.enabled` | environment-based | Enabled in local/testing unless explicitly disabled. Production stays disabled. |
-| `molly-complexity.root` | host application | Root used by standalone Clever commands. |
-| `molly-complexity.report.path` | `storage/molly/complexity/report.json` | Standalone report file. |
-| `molly-complexity.probes` | four bundled probes | Measurements run during scans. An empty list cannot complete a Molly task. |
-| `molly-complexity.owned_diff.paths` | app, bootstrap, config, database, routes, resources/js | Paths used for owned-code counts and hotspots. |
-| `molly-complexity.welds.paths` | app | PHP paths scanned for constructor and static-call sites. |
-| `molly-complexity.welds.max_sites` | `200` | Maximum detailed sites retained per list. |
-| `molly-complexity.lonely.min_lines` | `30` | Minimum current code lines for a listed single-author file. |
-| `molly-complexity.lonely.limit` | `10` | Maximum listed lonely files. |
+| `molly.knowledge.database` | `.molly/knowledge.sqlite` | The local graph file. Environment: `MOLLY_KNOWLEDGE_DATABASE`. |
+| `molly.preview.command` | `null` | A local renderer for component previews, with `{input}`, `{output}`, `{url}`, and `{viewport}` placeholders. Environment: `MOLLY_PREVIEW_COMMAND`. |
+| `molly.preview.url` | `null` | Passed to the renderer as `{url}`. Environment: `MOLLY_PREVIEW_URL`. |
+| `molly.preview.viewport` | `1280x720` | Recorded with each preview. Environment: `MOLLY_PREVIEW_VIEWPORT`. |
+
+## Clever measurements
+
+`config/molly-complexity.php` controls the bundled measurements:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `molly-complexity.enabled` | by environment | On in `local` and `testing` unless set `false`; off in production; opt in elsewhere. Environment: `MOLLY_COMPLEXITY_ENABLED`. |
+| `molly-complexity.root` | the application | Root for the standalone `clever:*` commands. |
+| `molly-complexity.report.path` | `storage/molly/complexity/report.json` | Where the standalone commands write. |
+| `molly-complexity.probes` | the four bundled probes | Measurements to run. An empty list cannot complete a task. |
+| `molly-complexity.owned_diff.paths` | `app`, `bootstrap`, `config`, `database`, `routes`, `resources/js` | Paths counted as your code. |
+| `molly-complexity.owned_diff.extensions` | php, js, ts, jsx, tsx, vue, css, json | File types counted. |
+| `molly-complexity.welds.paths` | `app` | Paths scanned for constructor and static calls. |
+| `molly-complexity.welds.facades` | `[]` | Extra facade class names to recognize. |
+| `molly-complexity.welds.max_sites` | `200` | Sites listed per probe. |
+| `molly-complexity.lonely.min_lines` | `30` | Smallest file listed as single-author. |
+| `molly-complexity.lonely.limit` | `10` | Files listed. |
 | `molly-complexity.churn.since` | `24 months ago` | Git history window for hotspots. |
-| `molly-complexity.churn.limit` | `20` | Maximum listed hotspots. |
-| `molly-complexity.exclude` | `[]` | Extra directory names to skip during source enumeration. |
+| `molly-complexity.churn.limit` | `20` | Hotspots listed. |
+| `molly-complexity.exclude` | `[]` | Directory names to skip. |
 
-Default probes are owned diff, welded call sites, lonely files, and hotspots.
+## Database and queue
 
-Read [Verification](../verification.md#clever-measurements) before comparing measurements.
-
-## Host database and queue
-
-Molly uses the Laravel application's existing database and queue configuration. It does not define separate database credentials.
-
-For web or MCP start/retry requests, supported queue drivers are database, Redis, Beanstalkd, and SQS.
-
-Database, Redis, and Beanstalkd reservation time must exceed Molly's 3600-second queued job timeout. `3700` is a suitable example. SQS visibility timeout must also be above 3600 seconds.
-
-CLI `molly:start` runs in the current terminal and does not need a queue worker.
+Molly uses the application's database and queue. It has no connection settings of its own. Starts from the web interface or MCP need the database, Redis, Beanstalkd, or SQS driver with a reservation or visibility timeout above 3600 seconds; [Web interface](../web-interface.md#queue-requirements) has the details. Artisan starts need no worker.
 
 ## Environment variables
 
 | Variable | Meaning |
 | --- | --- |
 | `MOLLY_AGENT` | `ollama` or `amp` |
-| `MOLLY_LOCAL_MODEL` | Installed local Ollama model name |
-| `MOLLY_KNOWLEDGE_DATABASE` | Local SQLite graph path |
-| `MOLLY_UI_ENABLED` | Enable local web routes |
-| `MOLLY_COMPLEXITY_ENABLED` | Optional complexity-measurement override |
-| `MOLLY_JEV_ENABLED` | Single default-off Jev gate (`false` unless set true) |
-| `TYPESAFE_API_KEY` | Laravel AI TypeSafe provider secret (`ai.providers.typesafe`) |
+| `MOLLY_LOCAL_MODEL` | Installed Ollama model name |
 | `OLLAMA_URL` | Local Ollama endpoint |
-| `APP_ENV` | Host Laravel environment, normally `local` for Molly |
-| `APP_NAME` | Host application name used in some reports |
-| `QUEUE_CONNECTION` | Queue used for web/MCP start and retry |
+| `MOLLY_SANDBOX_ALLOW_UNSAFE` | Run without the Linux sandbox |
+| `MOLLY_UI_ENABLED` | Enable the web interface |
+| `MOLLY_FALSE_GREEN` | Enable false-green detection |
+| `MOLLY_JEV_ENABLED` | Enable Jev |
+| `TYPESAFE_API_KEY` | Laravel AI's TypeSafe credential |
+| `MOLLY_KNOWLEDGE_DATABASE` | Graph file path |
+| `MOLLY_COMPLEXITY_ENABLED` | Force Clever on or off |
+| `MOLLY_PREVIEW_COMMAND`, `MOLLY_PREVIEW_URL`, `MOLLY_PREVIEW_VIEWPORT` | Component previews |
+| `MOLLY_HOME` | Where global settings, conversations, and the graph cache live. Defaults to `~/.molly`. |
+| `APP_ENV`, `QUEUE_CONNECTION` | The application's environment and queue |
 
-Timeouts, size limits, attempt limits, parallel-check mode, and the route prefix are changed in the published PHP configuration rather than through Molly-specific environment variables.
+Timeouts, size limits, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.
 
 ## Next
 
-- [Getting started](../getting-started.md)
-- [Command reference](commands.md)
+- [Settings](../settings.md) for the global file
+- [Commands](commands.md)
 - [Troubleshooting](../troubleshooting.md)
