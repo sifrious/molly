@@ -1,8 +1,3 @@
----
-layout: default
-title: QuickStart, Molly on its own
----
-
 # QuickStart: Molly on its own
 
 The shortest path from a Laravel application to a completed Molly task, without Bloom or a paid AI account. [Getting started](getting-started.md) explains each step; this page is the copy-paste version.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Inspecting tasks, runs, and conversations
----
-
 # Inspecting tasks, runs, and conversations
 
 Every task links to its runs, every run links to the conversation Molly had with the agent, and the conversation links back. `molly:inspect` follows those links from any starting point.

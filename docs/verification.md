@@ -1,8 +1,3 @@
----
-layout: default
-title: Verification
----
-
 # Verification
 
 The agent does not decide whether a task is complete. Required verification does. If the Pest test named by the task fails, the task stays incomplete no matter what the model says about its own work.

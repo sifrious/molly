@@ -1,8 +1,3 @@
----
-layout: default
-title: Execution targets (planned)
----
-
 # Execution targets (planned)
 
 > This is a design note for maintainers. None of the Orb or remote execution controls on this page exist yet. Every Molly run executes on the machine where you run Artisan.

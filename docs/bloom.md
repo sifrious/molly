@@ -1,8 +1,3 @@
----
-layout: default
-title: Molly with Bloom
----
-
 # Molly with Bloom
 
 Bloom is a macOS workspace and review tool. Molly does not need it. When both are present, Bloom owns the checkout, the branch, the diff, and the pull request screens, and Molly owns the task, the protected test, verification, and the evidence.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Web interface
----
-
 # Web interface
 
 Molly has a small browser interface for reading tasks, runs, plans, and the project graph, and for creating and starting tasks. It is off by default, local-only, and has no login. Do not expose it beyond your machine.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Tasks
----
-
 # Tasks
 
 A task is a saved request: what should change, which Pest test proves it, and which files the agent may edit. A run is one attempt to complete that task. This page covers creating, starting, inspecting, retrying, and stopping tasks from Artisan.

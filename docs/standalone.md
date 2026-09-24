@@ -1,8 +1,3 @@
----
-layout: default
-title: Molly on its own
----
-
 # Molly on its own
 
 Molly is a Laravel package. Everything it does is available from Artisan and its local web interface, and none of it needs Bloom. This page tours what you have after [Getting started](getting-started.md).

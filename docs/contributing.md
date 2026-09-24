@@ -1,8 +1,3 @@
----
-layout: default
-title: Contributing
----
-
 # Contributing
 
 This page is for changing Molly itself. To use Molly in an application, start with [Getting started](getting-started.md).
@@ -25,7 +20,7 @@ Model responses are faked wherever the model is not the thing under test. Task s
 
 When behavior changes, update the guide developers read, the command or configuration reference when a public input changed, and the glossary only for a new term. `AGENTS.md` requires the Unslop rules for prose, UI copy, and commit messages. Do not describe planned behavior as current on the same page without saying so.
 
-The docs are Markdown under `docs/`, built by Jekyll. `bin/molly-docs-walkthrough` regenerates the web interface screenshots from a running application.
+The docs are plain Markdown under `docs/`, read on GitHub; there is no site generator. CI checks that every relative link and heading anchor resolves. `bin/molly-docs-walkthrough` regenerates the web interface screenshots from a running application.
 
 ## Scope
 

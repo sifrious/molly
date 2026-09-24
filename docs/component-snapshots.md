@@ -1,8 +1,3 @@
----
-layout: default
-title: Component snapshots
----
-
 # Component snapshots
 
 Molly records a SHA-256 hash of every file a task selects, at creation, before each run, and after it. The run report can then say which selected files changed without you reading the whole diff. When a selected file is a Livewire component or a Blade view, the report also names its kind.

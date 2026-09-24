@@ -1,8 +1,3 @@
----
-layout: default
-title: Laravel knowledge
----
-
 # Laravel knowledge
 
 Molly ships short excerpts of the Laravel documentation and can index them together with the framework source installed in your application. An agent then gets a few connected, version-matched pages in its prompt instead of a whole manual, and every page carries its source.

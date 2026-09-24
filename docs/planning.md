@@ -1,8 +1,3 @@
----
-layout: default
-title: Planning
----
-
 # Planning
 
 A plan is for a request that is too large for one task. It saves your answers to five questions so the tasks you create afterward start from decisions instead of guesses. A plan does not write code, start a task, or prove anything.

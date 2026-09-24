@@ -1,8 +1,3 @@
----
-layout: default
-title: Tutorials
----
-
 # Tutorials
 
 Each tutorial takes one workflow beyond the demo. They assume [Getting started](getting-started.md) is done and `molly:doctor` passes.

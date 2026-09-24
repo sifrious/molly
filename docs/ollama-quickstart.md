@@ -1,8 +1,3 @@
----
-layout: default
-title: Ollama
----
-
 # Ollama
 
 Ollama runs a model on your own machine. It is Molly's default agent, it needs no account, and Molly never falls back from it to a hosted service. This page covers choosing a model, the endpoint, and what doctor tells you when something is off.

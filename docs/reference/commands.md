@@ -1,8 +1,3 @@
----
-layout: default
-title: Commands
----
-
 # Commands
 
 Every Molly command takes `--json` for structured output. Add `--no-interaction` in scripts. `TASK` is a task nickname or UUID; `RUN_ID` is a run UUID.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Journals and decisions
----
-
 # Journals and decisions
 
 Molly can write what it knows about a task to Markdown files you can read without Artisan, and it can record a decision you made in a file you commit. The database stays the source of truth; the Markdown is a view of it.

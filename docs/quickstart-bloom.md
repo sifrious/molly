@@ -1,8 +1,3 @@
----
-layout: default
-title: QuickStart, Molly with Bloom
----
-
 # QuickStart: Molly with Bloom
 
 Bloom is optional. Finish the [standalone QuickStart](quickstart-standalone.md) first; Molly must be installed and passing `molly:doctor` before Bloom adds anything.

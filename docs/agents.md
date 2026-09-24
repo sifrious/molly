@@ -1,8 +1,3 @@
----
-layout: default
-title: Agents and MCP
----
-
 # Agents and MCP
 
 Molly asks an agent for two things: a proposed change to the allowed files, and the Tarpit review of that change. The agent can be a local Ollama model or Amp. Both go through the same file limits and the same verification, and Molly does not switch between them when one fails.

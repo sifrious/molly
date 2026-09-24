@@ -1,8 +1,3 @@
----
-layout: default
-title: Getting started
----
-
 # Getting started
 
 This page takes you from an empty terminal to a completed Molly task. You will install Molly into a Laravel application, point it at a local model, run the demo task, and read the evidence it produced. Nothing here needs Bloom or a paid AI account.

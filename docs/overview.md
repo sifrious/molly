@@ -1,8 +1,3 @@
----
-layout: default
-title: Documentation
----
-
 # Molly documentation
 
 Molly makes a small change to a Laravel application and proves it with Pest before the task counts as done. If you are new, read [Getting started](getting-started.md); it takes you from install to a completed task and needs nothing else.
@@ -42,7 +37,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 
 - [Contributing](contributing.md) covers the package tests and CI.
 - [Execution targets](execution-targets.md) is a design note for remote execution, which is not shipped.
-- [Publishing](publishing.md) is the plan for the docs site and the v1 switch.
+- [Publishing](publishing.md) covers the docs link check and the checklist for switching the install line to v1.
 - [Work packages](work-packages.md) is the alpha backlog.
 - The `v0.1/` pages and the Bloom handoffs under `handoffs/` record earlier release work and are not current guidance.
 

@@ -1,8 +1,3 @@
----
-layout: default
-title: Settings
----
-
 # Settings
 
 Molly has two layers of settings. `config/molly.php` belongs to one application and is documented in the [configuration reference](reference/configuration.md). Global defaults shared by every project on your machine live in `~/.molly/settings.json`, or `$MOLLY_HOME/settings.json` when you set `MOLLY_HOME`.

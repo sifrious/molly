@@ -1,8 +1,3 @@
----
-layout: default
-title: v0.1 Walkthrough — screenshots
----
-
 # v0.1 Walkthrough (screenshots)
 
 > **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).

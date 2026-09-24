@@ -7,11 +7,7 @@
 /.env
 /.molly/
 /testbench.yaml
-/_site/
-/docs/_site/
-/docs/.jekyll-cache/
-/docs/.jekyll-metadata
-/build/
+/docs/build/
 vendor/
 
 # Molly Bloom Surfaces build scratch

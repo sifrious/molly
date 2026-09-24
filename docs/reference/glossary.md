@@ -1,8 +1,3 @@
----
-layout: default
-title: Glossary
----
-
 # Glossary
 
 Terms you will meet in Molly's reports and pages, with what they mean in practice.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Troubleshooting
----
-
 # Troubleshooting
 
 Read the saved evidence before trying again. Most problems name themselves in doctor or in the run report:

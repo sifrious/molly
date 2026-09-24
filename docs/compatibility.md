@@ -1,8 +1,3 @@
----
-layout: default
-title: Compatibility
----
-
 # Compatibility
 
 What Molly needs from the application, and which combinations the release tests cover.

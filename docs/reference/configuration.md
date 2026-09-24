@@ -1,8 +1,3 @@
----
-layout: default
-title: Configuration
----
-
 # Configuration
 
 Molly's settings live in `config/molly.php` and `config/molly-complexity.php`, published with:

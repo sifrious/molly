@@ -1,8 +1,3 @@
----
-layout: default
-title: Amp thread links
----
-
 # Amp thread links
 
 When you work on a task in an Amp conversation, you can save the link between the two so that later you can find which thread discussed which task. Molly can also ask Amp whether that thread currently has a connected executor. Neither starts work, and neither proves where a run executed.

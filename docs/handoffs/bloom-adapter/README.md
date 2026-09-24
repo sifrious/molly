@@ -1,8 +1,3 @@
----
-layout: default
-title: Bloom Swift adapter snapshot
----
-
 # Bloom Swift adapter snapshot
 
 Do not write a new adapter. Copy these files onto a Bloom checkout.

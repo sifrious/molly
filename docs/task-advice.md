@@ -1,8 +1,3 @@
----
-layout: default
-title: Task advice
----
-
 # Task advice
 
 Advice tells you which action a saved task allows next and why. It reads the saved state; it never starts, retries, or stops anything.

@@ -1,8 +1,3 @@
----
-layout: default
-title: Project graph
----
-
 # Project graph
 
 The project graph answers questions about your own tasks: why a task is blocked, which test proves it, which files a run touched, and what evidence came out. Molly rebuilds it from saved records in one workspace. Nothing in it comes from a model.
