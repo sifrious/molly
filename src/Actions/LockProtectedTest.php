@@ -56,6 +56,8 @@ class LockProtectedTest
             'reason' => $this->reason($reason),
             'approved_by' => 'human',
             'locked_at' => now()->toIso8601String(),
+            // Authoring attempts stay recorded on the task but are not charged to the implementation scope.
+            'runs_before' => $task->runs()->count(),
         ];
         $task->update([
             'allow_test_edits' => false,

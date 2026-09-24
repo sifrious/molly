@@ -53,7 +53,7 @@ final class LocalAgentBus
             if (! is_int($limit) || $limit < 1 || $limit > 10) {
                 throw new RuntimeException('ATTEMPT_LIMIT_INVALID: Set molly.max_attempts to an integer from 1 to 10.');
             }
-            if ($task->runs()->count() >= $limit) {
+            if ($task->attemptsUsed() >= $limit) {
                 throw new RuntimeException('ATTEMPT_LIMIT_REACHED: This task has used its allowed attempts.');
             }
 

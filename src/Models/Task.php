@@ -59,4 +59,16 @@ class Task extends Model
     {
         return $this->hasMany(Run::class)->oldest()->orderBy('id');
     }
+
+    /**
+     * Attempts counted against molly.max_attempts. Locking an authored Pest
+     * test starts the implementation scope, so runs made while authoring the
+     * test are not charged to the implementation.
+     */
+    public function attemptsUsed(): int
+    {
+        $before = $this->source['test_lock']['runs_before'] ?? 0;
+
+        return max(0, $this->runs()->count() - (is_int($before) ? $before : 0));
+    }
 }
