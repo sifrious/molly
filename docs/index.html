@@ -40,18 +40,15 @@
           <span>Named for Molly Bloom, whose chapter of Ulysses begins and ends with yes. <a href="#name">Why the name</a></span>
         </div>
       </div>
-      <figure class="term" aria-label="Example molly:receipt output">
-        <div class="term__bar"><span class="app__dots"><i></i><i></i><i></i></span><span>example · molly:receipt</span></div>
+      <figure class="term" aria-label="molly:receipt output from a demo-greeting run">
+        <div class="term__bar"><span class="app__dots"><i></i><i></i><i></i></span><span>molly:receipt · demo-greeting</span></div>
         <div class="term__body">
           <div><span class="p">$</span> php artisan molly:receipt RUN_ID</div>
-          <div class="c">task demo-greeting · tests/Feature/GreetingTest.php</div>
-          <div>allowed_file_integrity — <span class="ok">PASS</span> (required)</div>
-          <div>clever — <span class="ok">PASS</span> (advisory)</div>
-          <div>pest — <span class="ok">PASS</span> (required)</div>
-          <div>protected_test_integrity — <span class="ok">PASS</span> (required)</div>
-          <div>sandbox_integrity — <span class="ok">PASS</span> (required)</div>
-          <div>tarpit — <span class="ok">PASS</span> (required)</div>
-          <div class="c">model self-approval: not a verifier</div>
+          <div>parallel_join — <span class="ok">PASS</span> (required, retry)</div>
+          <div>pest — <span class="ok">PASS</span> (required, retry)</div>
+          <div>tarpit — <span class="ok">PASS</span> (required, retry)</div>
+          <div class="c"># clever: advisory, recorded beside the run</div>
+          <div class="c"># model self-approval: not a verifier</div>
         </div>
       </figure>
     </div>
@@ -65,9 +62,9 @@
       </div>
       <div class="ledger">
         <div class="ledger__item"><span class="ledger__n">scope</span><h3>Task boundary</h3><p>One small, named piece of work. Not a backlog.</p></div>
-        <div class="ledger__item"><span class="ledger__n">allowed_file_integrity</span><h3>Allowed files</h3><p>The agent may change only the files the task names.</p></div>
+        <div class="ledger__item"><span class="ledger__n">allowed files</span><h3>Allowed files</h3><p>The agent may change only the files the task names.</p></div>
         <div class="ledger__item"><span class="ledger__n">pest</span><h3>Required Pest test</h3><p>Real Pest runs, and the JUnit evidence has to name that test file.</p></div>
-        <div class="ledger__item"><span class="ledger__n">protected_test_integrity</span><h3>Protected tests</h3><p>The acceptance test is locked by default. The agent cannot rewrite the exam.</p></div>
+        <div class="ledger__item"><span class="ledger__n">protected test</span><h3>Protected tests</h3><p>The acceptance test is locked by default. The agent cannot rewrite the exam.</p></div>
         <div class="ledger__item"><span class="ledger__n">tarpit</span><h3>Tarpit gate</h3><p>Unresolved accidental complexity keeps the task incomplete.</p></div>
         <div class="ledger__item"><span class="ledger__n">receipts</span><h3>Persisted evidence</h3><p>Every attempt, output and receipt is saved for review.</p></div>
       </div>

@@ -69,10 +69,11 @@ php artisan molly:start demo-greeting
 
 The first line points Composer at the public GitHub repository because Molly is not listed on Packagist yet. `^0.1.1` is the current tagged release line. This page switches to the v1 constraint only after v1 is tagged and a fresh install is proven.
 
-Add Molly's local files to `.gitignore`:
+Add Molly's local files and run evidence to `.gitignore`:
 
 ```gitignore
 .molly/
+/storage/molly/
 ```
 
 Molly is a development dependency. Production installs that use `composer install --no-dev` do not include it.

@@ -29,10 +29,11 @@ php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
 
-Add Molly's local files to `.gitignore`:
+Add Molly's local files and run evidence to `.gitignore`:
 
 ```gitignore
 .molly/
+/storage/molly/
 ```
 
 ## QuickStart: local Ollama
