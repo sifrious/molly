@@ -89,18 +89,21 @@ Jev is off unless `MOLLY_JEV_ENABLED=true`. When it is off, Molly makes no class
 
 The credential belongs to Laravel AI: `ai.providers.typesafe.key`, from `TYPESAFE_API_KEY`. Molly has no TypeSafe client of its own.
 
-### Installing a Laravel AI with classification
+### Laravel AI version
 
-Molly's normal install stays on the stable `laravel/ai` release, which has no classification API, so enabling Jev there reports `capability_missing`. Until Laravel tags a release with the classification API, opt your application into the accepted commit (Laravel AI pull request #1049):
+Molly requires `laravel/ai ^1.0` and locks `v1.0.0` for its own tests. Laravel AI v1.0.0 (tag commit `101c7ea33cd8569d82570f753fbf38e48b7d3d95`, released 2026-09-23) contains commit `f0a5d4f3c5bddda7c8975eb79e92d62811197484` from Laravel AI pull request #1049, the classification API that Molly previously pinned by commit. No development branch or inline alias is needed.
+
+If your application still pins the old commit or a `0.11.99` alias, replace it with the stable constraint:
 
 ```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
-php artisan vendor:publish --tag=ai-config --force
+composer require 'laravel/ai:^1.0' --with-all-dependencies
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-The `as 0.11.99` alias is needed because Molly requires `laravel/ai ^0.11.2` and a bare `1.x-dev` pin does not satisfy that constraint. Republishing `config/ai.php` matters when it was published from the stable release, which has no `typesafe` provider entry; a published file replaces the package's provider list. Once a compatible Laravel AI tag exists, replace the pin with that constraint.
+If you published `config/ai.php` under 0.11, merge the `typesafe` provider from `vendor/laravel/ai/config/ai.php` into your file and keep your other providers. A published file replaces the package's provider list, so the gate reports `jev_unconfigured` until the `typesafe` entry exists. The key comes from `TYPESAFE_API_KEY`; Molly never stores a second credential.
+
+Every CI lane, including the lowest-dependency lane, resolves at least `laravel/ai` 1.0.0 and runs the classification tests without skipping them. See [AI ownership](ai-ownership.md) for the boundary between Laravel AI and Molly's own policy.
 
 ### Jev states
 
@@ -120,18 +123,6 @@ One class decides whether a request may classify, and every transport reports th
 `molly:doctor` reports the gate as `jev_disabled`, `jev_capability_missing`, `jev_unconfigured`, or `jev_ready`. Jev never changes the provider, model, or execution target on its own, and a Jev answer is advice: it cannot start, retry, or complete a task.
 
 ## Knowledge and previews
-```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
-php artisan vendor:publish --tag=ai-config --force
-php artisan config:clear
-php artisan molly:doctor
-```
-
-The `as 0.11.99` inline alias is required: Molly itself requires `laravel/ai ^0.11.2`, and a bare `1.x-dev` pin does not satisfy that constraint in a consumer, so Composer refuses it. The alias tells Composer to treat the accepted commit as a 0.11 release for constraint resolution only. Republishing `config/ai.php` matters when the file was published from the stable baseline, which has no `typesafe` provider; a published config replaces the package's provider list, so the gate would report `jev_unconfigured` until the provider entry exists.
-
-`molly:doctor` reports the gate as one check: `jev_disabled` (passed, the default), `jev_capability_missing` (failed: enabled on a laravel/ai without the classification surface), `jev_unconfigured` (failed: enabled and capable, but `ai.providers.typesafe.key` is empty), or `jev_ready`. Keys come from the TypeSafe console (`https://console.typesafe.ai/keys`) and are read only through `TYPESAFE_API_KEY`.
-
-Molly's release CI runs a separate Jev lane that resolves exactly that commit, records the resolved commit in the workflow summary, fails (never skips) the live-capability proofs, and then runs the complete package suite. The ordinary PHP/Laravel package matrix stays on stable dependencies. A floating `1.x-dev` branch is not release evidence. Once Laravel publishes a compatible tag, replace the exact commit with that stable constraint and rerun the complete matrix.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |

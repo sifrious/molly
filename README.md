@@ -84,3 +84,5 @@ Molly does not open or merge pull requests. Remote execution on an Orb is planne
 Molly is named for Molly Bloom in *Ulysses*, whose chapter begins and ends with yes. Molly's yes has to be earned. The thinking behind Tarpit and Clever comes from Mary Perry's Laracon US 2026 talk, [Cleverness Is A Loan](https://www.youtube.com/watch?v=vsxoaTgtyjw).
 
 Molly is available under the [MIT license](LICENSE). See [SECURITY.md](SECURITY.md) for supported versions and private reporting.
+
+See [AI ownership](docs/reference/ai-ownership.md) for the Laravel AI v1 boundary, the responsibilities Molly keeps, and migration checks.
