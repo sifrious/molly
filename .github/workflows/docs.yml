@@ -3,10 +3,12 @@ name: Documentation
 on:
   push:
     paths:
+      - 'README.md'
       - 'docs/**'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
+      - 'README.md'
       - 'docs/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
@@ -15,85 +17,15 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build and check documentation
+  links:
+    name: Check documentation links
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Check out the package
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - name: Build the documentation
-        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1
-        with:
-          source: ./docs
-          destination: ./_site
-
-      - name: Check generated links
-        shell: python
-        run: |
-          from html.parser import HTMLParser
-          from pathlib import Path
-          from urllib.parse import unquote, urljoin, urlsplit
-
-          root = Path('_site').resolve()
-          pages = {}
-          errors = []
-
-          class Page(HTMLParser):
-              def __init__(self):
-                  super().__init__()
-                  self.links = []
-                  self.ids = set()
-                  self.canonical = ''
-
-              def handle_starttag(self, tag, attributes):
-                  attributes = dict(attributes)
-                  if 'id' in attributes:
-                      self.ids.add(attributes['id'])
-                  if tag == 'link' and attributes.get('rel') == 'canonical':
-                      self.canonical = attributes.get('href', '')
-                  for key in ('href', 'src'):
-                      if key in attributes:
-                          self.links.append(attributes[key])
-
-          for path in root.rglob('*.html'):
-              page = Page()
-              page.feed(path.read_text())
-              pages[path] = page
-
-          if not pages or not (root / 'index.html').is_file():
-              raise SystemExit('The documentation build did not produce an index page.')
-
-          canonical = pages[root / 'index.html'].canonical
-          if not canonical:
-              raise SystemExit('The index page does not have a canonical URL.')
-          base = urlsplit(canonical).path.removesuffix('index.html')
-          if not base.endswith('/'):
-              base += '/'
-
-          for path, page in pages.items():
-              current = base + path.relative_to(root).as_posix()
-              for link in page.links:
-                  parts = urlsplit(urljoin(current, link))
-                  if parts.scheme or parts.netloc:
-                      continue
-                  if not parts.path.startswith(base):
-                      errors.append(f'{path.relative_to(root)}: link leaves the site base path: {link}')
-                      continue
-                  target = (root / unquote(parts.path.removeprefix(base))).resolve()
-                  if not target.is_relative_to(root):
-                      errors.append(f'{path.relative_to(root)}: link leaves the build directory: {link}')
-                      continue
-                  if target.is_dir():
-                      target /= 'index.html'
-                  if not target.is_file():
-                      errors.append(f'{path.relative_to(root)}: missing target: {link}')
-                  elif parts.fragment and target in pages and unquote(parts.fragment) not in pages[target].ids:
-                      errors.append(f'{path.relative_to(root)}: missing heading: {link}')
-
-          if errors:
-              raise SystemExit('\n'.join(errors))
-          print(f'Checked local links in {len(pages)} documentation pages.')
+      - name: Check Markdown links and anchors
+        run: python3 bin/molly-docs-check

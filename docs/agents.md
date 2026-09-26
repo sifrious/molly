@@ -1,41 +1,24 @@
----
-layout: default
-title: Agents and MCP
----
-
 # Agents and MCP
 
-Use this page to choose Amp or Ollama, open Molly's local MCP server, or understand which MCP tools are available.
+Molly asks an agent for two things: a proposed change to the allowed files, and the Tarpit review of that change. The agent can be a local Ollama model or Amp. Both go through the same file limits and the same verification, and Molly does not switch between them when one fails.
 
-You do not need MCP to run normal Molly tasks from Artisan.
+You do not need MCP to run tasks from Artisan. MCP lets an editor or chat client work with Molly's tasks.
 
-## Choose a provider
+## Ollama
 
-Molly supports two providers for code proposals and Tarpit review:
-
-- **Ollama** for a model running on your own machine.
-- **Amp** through the Amp CLI and your Amp account.
-
-Both providers use the same allowed-file checks and required verification.
-
-Molly does not silently switch providers when one fails.
-
-## Set up Ollama
-
-For the full copy-paste QuickStart (install → doctor → first task → troubleshoot), see [QuickStart: Ollama](ollama-quickstart.md).
-
-Start Ollama and install a model, then save the exact model name:
+Ollama is the default. Pull a model and save its name:
 
 ```bash
-ollama list
-php artisan molly:setup --agent=ollama --model=YOUR_INSTALLED_MODEL
+php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-The endpoint must be local. The default is `http://127.0.0.1:11434`.
+[Ollama](ollama-quickstart.md) covers choosing a model, the endpoint, and the doctor codes.
 
-## Set up Amp
+## Amp
+
+To use Amp through its CLI and your Amp account:
 
 ```bash
 php artisan molly:setup --agent=amp
@@ -45,97 +28,72 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
-Amp manages its credentials and model choice.
+Amp keeps its own login and model choice; Molly stores only the provider name. The `amp` executable must be on the `PATH` of the process running Molly. Doctor reports `amp_ready` or `amp_unavailable` after checking `amp usage`, without printing account details.
 
-For Molly's code proposal and review requests, the Amp path disables tools, MCP access, IDE access, and remote thread creation. Molly applies the returned edits itself and runs Pest locally.
+When Amp writes a proposal or a review for Molly, tools, MCP access, IDE access, and remote thread creation are turned off. Molly applies the returned edits itself and runs Pest locally.
 
-## Open an interactive Amp chat with Molly tools
+## Chat with Amp and Molly's tools
 
 ```bash
 php artisan molly:chat
 ```
 
-This opens Amp with Molly's local MCP server available. It does not change the provider selected for task execution.
-
-To inspect the command without opening Amp:
-
-```bash
-php artisan molly:chat --json
-```
+This opens Amp with Molly's MCP server attached, so you can create and read tasks from the conversation. It does not change which agent runs tasks. `--json` prints the launch arguments without opening Amp.
 
 ## Connect another MCP client
 
-Run Molly as a local stdio MCP server from the Laravel project:
+Molly's MCP server speaks stdio from the application root:
 
 ```bash
 php artisan mcp:start molly
 ```
 
-The server is registered only in `local` and `testing` environments. Molly does not expose an HTTP MCP route.
+It is registered only in the `local` and `testing` environments and has no HTTP route.
 
 ## MCP tools
 
 | Tool | What it does |
 | --- | --- |
-| `molly_guide` | Reads Molly's bundled planning guide and cited source passages. |
-| `molly_knowledge` | Reads the local Laravel, NativePHP, or tarpit knowledge graph. It never changes the graph. |
-| `molly_plan` | Creates, reads, answers, or reviews a saved plan. |
-| `molly_task` | Creates and manages saved tasks, names, thread links, advice, GitHub comments, human approval, locked Pest tests, recorded pull requests, merge SHAs, handoff envelopes, and lifecycle requests. Show returns display status and recorded GitHub URLs. Approve, lock_test, pr_opened, and merged require `approve=true` and do not open or merge a pull request. `lock_test` freezes the Pest digest after a test-authoring task. |
-| `molly_connections` | Reads saved Amp thread associations and optional current Amp connection observations. |
+| `molly_task` | Creates tasks, reads tasks and runs, names tasks, links Amp threads, imports GitHub issues, asks for advice, records approvals, locks a written test, records pull requests and merges, and queues a start or retry. |
+| `molly_plan` | Creates, reads, and answers plans, and requests a Jev suggestion. |
+| `molly_guide` | Reads Molly's bundled planning guide and the passages it cites. |
+| `molly_knowledge` | Reads the local Laravel, NativePHP, or Tarpit knowledge graph. |
+| `molly_connections` | Reads saved Amp thread links and, optionally, Amp's current connection state. |
 
-Task start and retry requests from MCP use the host application's queue. A queued request means Molly dispatched work. It does not mean the run already completed.
+Operations that record a human decision (`approve`, `lock_test`, `pr_opened`, `merged`, `comment`) require `approve=true`. None of them opens or merges a pull request.
 
-## Laravel knowledge through MCP
+A start or retry from MCP is queued through the application's queue and needs a worker. A queued reply means the work was dispatched, not that it ran. [Web interface](web-interface.md#queue-requirements) lists the supported queue drivers.
 
-Build the graph first:
+## Knowledge in prompts
 
-```bash
-php artisan molly:knowledge:index laravel
-php artisan molly:knowledge:index nativephp
-php artisan molly:knowledge:index tarpit
+When the Laravel knowledge graph is indexed, Molly attaches a small neighborhood to each implementation prompt, chosen from the task, its files, and its test. It adds NativePHP knowledge when the task mentions desktop or mobile, and Tarpit notes when it mentions cleverness or complexity. This context is advisory: it cannot widen the allowed files, change the protected test, or complete a task. See [Laravel knowledge](knowledge-graph.md).
+
+## Jev through Laravel AI
+
+Jev is optional and off by default. When you enable it, Molly may ask TypeSafe's Jev model one bounded question, through Laravel AI's classification provider, in three places: which planning area needs another look, what to do after a failed run, and whether a PHP commit has a semantic problem.
+
+```dotenv
+MOLLY_JEV_ENABLED=true
+TYPESAFE_API_KEY=...
 ```
 
-Then `molly_knowledge` can return a bounded, version-matched Laravel, NativePHP, or tarpit neighborhood with source provenance. NativePHP queries need `namespace=nativephp` and `version=desktop-2` or `mobile-4`. Tarpit queries need `namespace=tarpit`.
+Jev answers with a choice and a confidence. Below the configured threshold, Molly keeps its own deterministic guidance and says so. Jev never changes a Pest or Tarpit result, never widens retries, and never completes a task. [Task advice](task-advice.md#advice-from-jev) shows what it looks like, and the [configuration reference](reference/configuration.md#jev) lists the settings and every gate state doctor can report.
 
-Molly also attaches a small `laravel_knowledge` neighborhood to implementation prompts, `nativephp_knowledge` when the task names desktop or mobile, and `tarpit_knowledge` when it names those notes. That context is advisory and cannot change allowed files, the protected test, or completion.
-
-Read [Laravel knowledge](knowledge-graph.md) for current scope and limits.
-
-## Optional Jev classification through Laravel AI
-
-Jev classification is optional and off by default (`MOLLY_JEV_ENABLED=false`). When disabled, Molly never opens a classification request and never upgrades a Pest, Tarpit, retry, or completion decision.
-
-When you explicitly enable Jev, Molly borrows Laravel AI's classification seam (not a Molly-owned TypeSafe HTTP client) for selected, bounded evidence:
-
-- plan suggestions
-- failed-task advice
-- PHP commit review
-
-Inputs stay bounded to the evidence Molly already collected for that call. Provider credentials and transport belong to Laravel AI (`ai.providers.typesafe` / `TYPESAFE_API_KEY`), not a second Molly transport stack. Molly records the real provider provenance returned by Laravel AI.
-
-One class, `Sifrious\Molly\Classification\JevGate`, decides whether a request may classify. Its states are `disabled` (the default, reason `jev_disabled`), `unavailable` (enabled, but the installed Laravel AI lacks the classification surface, reason `capability_missing`), `unconfigured` (enabled and capable, but no `ai.providers.typesafe.key`, reason `invalid_config`), and `ready`. Enabled-but-unavailable is reported explicitly and is never treated as success: advice falls back, `molly:review-commit` exits non-zero, and plan suggestions are refused. Provider failures report `provider_error`, malformed answers `invalid_answer`, and confidence below the threshold `low_confidence`. The full table is in [Configuration](reference/configuration.md#jev-states).
-
-Jev cannot replace Pest or Tarpit, cannot widen retries, and cannot make a failed run pass. Agents must not invent flags, env overrides, or MCP tools that bypass `MOLLY_JEV_ENABLED` or those deterministic gates.
-
-See [Configuration](reference/configuration.md#jev-and-typesafe) for the settings.
-
-## Review a PHP commit
+## Review a commit
 
 ```bash
 php artisan molly:review-commit HEAD
 php artisan molly:review-commit --staged --json
 ```
 
-This reads a bounded PHP diff, runs Git's whitespace check, and optionally requests Jev classification through Laravel AI when that gate is enabled. It does not run tests, edit files, or create a commit.
+This reads a bounded PHP diff, runs Git's whitespace check, and, when Jev is enabled, asks for a semantic review. It does not run tests or create commits. The command exits `1` when the whitespace check fails or a required review could not be performed.
 
-## Current limits
+## Limits
 
-Molly can save an Amp thread association and read Amp's reported executor connection state. That is not verified Orb identity and does not select a remote execution target.
-
-Remote Orb identity and remote execution are still planned. See [Execution targets](execution-targets.md) only if you are working on that future feature.
+An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is planned and described in [Execution targets](execution-targets.md).
 
 ## Next
 
 - [Getting started](getting-started.md)
 - [Task connections](connections.md)
-- [Command reference](reference/commands.md)
+- [Commands](reference/commands.md)

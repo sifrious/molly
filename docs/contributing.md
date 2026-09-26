@@ -1,13 +1,8 @@
----
-layout: default
-title: Contributing
----
-
 # Contributing
 
-Use this page if you are changing Molly itself. Application developers installing Molly should start with [Getting started](getting-started.md).
+This page is for changing Molly itself. To use Molly in an application, start with [Getting started](getting-started.md).
 
-## Run the package checks
+## Run the checks
 
 ```bash
 composer install
@@ -15,38 +10,20 @@ vendor/bin/pest
 vendor/bin/pint --format agent
 ```
 
-The main GitHub Actions test workflow runs the package on PHP 8.3, 8.4, and 8.5.
+The package suite runs on PHP 8.3, 8.4, and 8.5 in GitHub Actions, along with the lowest and highest dependency sets, a Jev lane on the accepted Laravel AI commit, fresh Laravel 12 and 13 installs, coverage, mutation checks, the documentation build and link check, Composer validation, and a plugin security scan. `bin/molly-release-gates` runs the local subset before a release.
 
-CI also checks Composer metadata, documentation, package archives, mutation behavior, and a clean Laravel 12 or 13 installation.
+## What the tests fake
 
-## What tests may fake
+Model responses are faked wherever the model is not the thing under test. Task state, file validation, the Pest subprocess, queue behavior, evidence handling, parallel checks, and the sandbox policy run for real. Jev is tested through Molly's own classifier seam in every lane, and against Laravel AI's classification fakes in the Jev lane. A live run with a configured model is recorded separately and is not part of the suite.
 
-The package test suite uses fakes for model responses where the model itself is not the behavior under test.
+## Documentation
 
-Execution tests still exercise Molly's task state, file validation, Pest subprocesses, queue behavior, evidence handling, and parallel checks.
+When behavior changes, update the guide developers read, the command or configuration reference when a public input changed, and the glossary only for a new term. `AGENTS.md` requires the Unslop rules for prose, UI copy, and commit messages. Do not describe planned behavior as current on the same page without saying so.
 
-A live agent acceptance test is separate from the package suite because it needs a configured Amp account or local Ollama model.
+The docs are plain Markdown under `docs/`, read on GitHub; there is no site generator. CI checks that every relative link and heading anchor resolves. `bin/molly-docs-walkthrough` regenerates the web interface screenshots from a running application.
 
-## Keep docs in the same change
+## Scope
 
-When behavior changes, update:
+Recorded live checks cover small tasks through Ollama and Amp, saved tasks, queue-backed web execution, retries, GitHub issue import, Amp connection observation, and Jev advice, plan suggestions, and commit review against TypeSafe. Those checks show that the exercised paths worked in those environments, not that every model or project is supported.
 
-1. the task-focused guide developers will read
-2. the command or configuration reference when public inputs changed
-3. the glossary only when a new term is truly needed
-
-Use plain, literal language. Molly's `AGENTS.md` requires the unslop rules for documentation, UI copy, and commit messages.
-
-Do not mix current behavior with planned behavior on the same page without a clear label.
-
-## Current verification scope
-
-Recorded live checks cover small local tasks through Ollama and Amp, saved tasks, queue-backed web execution, retries, read-only GitHub issue import, and Amp connection observation.
-
-Those checks show that the exercised paths worked in those environments. They are not a claim that every model, project, or future feature is supported.
-
-Remote Orb identity and remote execution selection remain planned. The alpha backlog lives in [Work packages](work-packages.md).
-
-## Documentation site
-
-Documentation source lives in `docs/`. Maintainers can read [Publishing](publishing.md) for the site rollout plan.
+Remote execution on an Orb is planned. The alpha backlog is in [Work packages](work-packages.md).

@@ -1,13 +1,8 @@
----
-layout: default
-title: Component snapshots
----
-
 # Component snapshots
 
-Molly records SHA-256 hashes for the files selected by a task. This lets a run report show which selected component source files changed.
+Molly records a SHA-256 hash of every file a task selects, at creation, before each run, and after it. The run report can then say which selected files changed without you reading the whole diff. When a selected file is a Livewire component or a Blade view, the report also names its kind.
 
-Snapshots do not contain source code. Optional local previews are separate advisory evidence.
+Snapshots store hashes, not source. Optional previews are separate.
 
 ## Example
 
@@ -17,17 +12,13 @@ php artisan molly:create 'Show a retry button after a failed run.' \
   --file=app/Livewire/RunStatus.php \
   --file=resources/views/livewire/run-status.blade.php \
   --test=tests/Feature/RunStatusTest.php
-
 php artisan molly:start retry-button
-```
-
-Then inspect the run:
-
-```bash
 php artisan molly:show RUN_ID --verbose
 ```
 
-## What Molly recognizes as a component source
+The report lists each selected file as `added`, `removed`, `modified`, or `unchanged`. A retry gets its own before and after snapshots; earlier ones stay with the earlier run.
+
+## What counts as a component
 
 | Path | Kind |
 | --- | --- |
@@ -37,52 +28,25 @@ php artisan molly:show RUN_ID --verbose
 | `resources/views/components/*.blade.php` | `blade_component` |
 | Other `resources/views/*.blade.php` | `blade_view` |
 
-Nested paths also match.
+Nested paths match too. The component ID is `component:` followed by the path. Molly does not resolve Blade aliases or pair a Livewire class with its view; it reports the files you selected.
 
-The stable component ID is `component:` followed by the repository-relative path.
+A changed hash proves the file changed. It does not prove the screen looks different.
 
-Molly does not resolve Blade aliases or automatically join a Livewire class to its view.
+## Optional previews
 
-## Snapshot times
+To capture an image before and after, point Molly at a local renderer:
 
-Molly can record:
-
-- task creation state
-- before-run state
-- after-run state
-
-Retries get their own before and after snapshots. Earlier run evidence is not replaced.
-
-## Change labels
-
-| Label | Meaning |
-| --- | --- |
-| `added` | The selected file did not exist before and exists afterward. |
-| `removed` | It existed before and is absent afterward. |
-| `modified` | It exists in both snapshots with different content. |
-| `unchanged` | It exists in both with the same content hash. |
-
-A source hash change proves only that file content changed. It does not prove a visible UI change.
-
-## Optional local previews
-
-Source hashes remain the default evidence. A visual preview is advisory and never overrides Pest.
-
-Configure a local renderer when you want before and after images:
-
-```bash
+```dotenv
 MOLLY_PREVIEW_COMMAND="your-renderer {input} {output}"
 MOLLY_PREVIEW_URL="http://127.0.0.1:8000"
 MOLLY_PREVIEW_VIEWPORT=1280x720
 ```
 
-`{input}` is a generated HTML fixture, `{output}` is a PNG path under `.molly/previews/`, and `{url}` is the optional workspace URL. Molly records viewport, fixture name, renderer, source commit when Git is available, and the image digest.
+Molly runs the command with `{input}` set to a generated HTML fixture and `{output}` to a PNG path under `.molly/previews/`; `{url}` and `{viewport}` are also available. The report records the viewport, the fixture, the renderer, the source commit when Git is available, and the image digest.
 
-If no command is set, preview status stays `unavailable` with a reason. A configured URL without a renderer command is also unavailable.
-
-Do not treat a captured preview as proof that the UI is correct unless the task names a deterministic visual assertion.
+Without a command, the preview status is `unavailable` with a reason. A preview is advisory. It never decides whether a task passes, and a captured image is not proof the UI is right unless the task's test asserts it.
 
 ## Next
 
 - [Verification](verification.md)
-- [Manage tasks](tasks.md)
+- [Tutorials](tutorials.md#before-and-after-evidence-for-a-component)

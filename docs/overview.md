@@ -1,75 +1,55 @@
----
-layout: default
-title: Molly documentation
----
-
 # Molly documentation
 
-Molly helps you give an AI agent a small Laravel task, limit the files it may edit, and require real test evidence before the task can complete.
+Molly makes a small change to a Laravel application and proves it with Pest before the task counts as done. If you are new, read [Getting started](getting-started.md); it takes you from install to a completed task and needs nothing else.
 
-If this is your first time here, start with [Getting started](getting-started.md). It routes you to the [standalone QuickStart](quickstart-standalone.md), which needs no Bloom, or the optional [Molly + Bloom QuickStart](quickstart-bloom.md). Do not start with the reference pages.
+## Guides
 
-## Pick what you want to do
-
-| I want to... | Read this |
+| Page | Read it when |
 | --- | --- |
-| Install Molly and run one small task | [QuickStart: Molly standalone](quickstart-standalone.md) |
-| Use Molly inside a Bloom workspace | [QuickStart: Molly + Bloom](quickstart-bloom.md) |
-| Run a local Ollama model (no paid AI) | [Local Ollama details](ollama-quickstart.md) |
-| Check PHP, Laravel, and Pest versions | [Compatibility](compatibility.md) |
-| Create, start, retry, stop, or inspect tasks | [Manage tasks](tasks.md) |
-| Understand why a run passed or failed | [Verification](verification.md) |
-| Fix a setup or execution problem | [Troubleshooting](troubleshooting.md) |
-| Choose Amp or Ollama, or use MCP | [Agents and MCP](agents.md) |
-| Break a larger request into tasks | [Planning](planning.md) |
-| Query Laravel or NativePHP knowledge | [Laravel knowledge](knowledge-graph.md) |
-| Inspect task, test, and blocker relationships | [Project graph](project-graph.md) |
-| Use Molly in a browser | [Local web interface](web-interface.md) |
-| Ask what to do after a failed task | [Task advice](task-advice.md) |
-| Link a task to an Amp thread | [Task connections](connections.md) |
-| Export local Markdown journals | [Journals](journal.md) |
-| Compare selected component source hashes | [Component snapshots](component-snapshots.md) |
+| [Getting started](getting-started.md) | You are installing Molly and running your first task. |
+| [Tasks](tasks.md) | You want to create, start, inspect, retry, stop, or approve tasks. |
+| [Verification](verification.md) | You want to know what has to pass and how to read a failure. |
+| [Tutorials](tutorials.md) | You want the test-first flow, GitHub issues, component evidence, parallel work, Laravel AI tuning, Jev, or the web interface. |
+| [Molly on its own](standalone.md) | You want a tour of everything that works without Bloom. |
+| [Molly with Bloom](bloom.md) | You use Bloom and want to know what it adds today. |
+| [Ollama](ollama-quickstart.md) | You are choosing a local model or reading doctor's Ollama codes. |
+| [Agents and MCP](agents.md) | You want Amp, MCP tools, or Jev. |
+| [Web interface](web-interface.md) | You want to read and start tasks in a browser. |
+| [Planning](planning.md) | A request is too big for one task. |
+| [Task advice](task-advice.md) | You want to know what a task allows next. |
+| [Project graph](project-graph.md) | You want to know why a task is blocked or what a run touched. |
+| [Laravel knowledge](knowledge-graph.md) | You want to see what the agent is given about Laravel. |
+| [Journals and decisions](journal.md) | You want Markdown views of tasks or a committed decision record. |
+| [Inspecting tasks and runs](inspection.md) | You want to follow a task to its runs and conversations. |
+| [Component snapshots](component-snapshots.md) | You want before-and-after evidence for views and components. |
+| [Amp thread links](connections.md) | You want to tie a task to an Amp conversation. |
+| [Settings](settings.md) | You want global defaults across projects. |
+| [Compatibility](compatibility.md) | You want the tested PHP, Laravel, and Pest versions. |
+| [Troubleshooting](troubleshooting.md) | Something failed and you want the code explained. |
 
 ## Reference
 
-Use these when you already know what you are looking for:
-
-- [Command reference](reference/commands.md)
-- [Configuration reference](reference/configuration.md)
+- [Commands](reference/commands.md)
+- [Configuration](reference/configuration.md)
 - [Glossary](reference/glossary.md)
 
-## Maintainer docs
+## For maintainers
 
-These pages are not normal first-run documentation:
+- [Contributing](contributing.md) covers the package tests and CI.
+- [Execution targets](execution-targets.md) is a design note for remote execution, which is not shipped.
+- [Publishing](publishing.md) covers the docs link check and the checklist for switching the install line to v1.
+- [Work packages](work-packages.md) is the alpha backlog.
+- The `v0.1/` pages and the Bloom handoffs under `handoffs/` record earlier release work and are not current guidance.
 
-- [Contributing](contributing.md) explains the package test and CI workflow.
-- [Execution targets](execution-targets.md) describes planned remote execution work. It is not current user behavior.
-- [Publishing](publishing.md) is the maintainer plan for the documentation site and the v1 release switch.
-- [Clone Bloom and finish the Molly loop](handoffs/COMBINE-BLOOM-AND-MOLLY.md) is the handoff for the unpublished Bloom adapter under [docs/handoffs/bloom-adapter](handoffs/bloom-adapter/README.md).
+## How Molly decides
 
-## Historical notes
+1. The agent proposes a change to the files you allowed.
+2. Molly applies it, leaving the protected test alone.
+3. Pest runs the required test.
+4. Tarpit reviews the diff for needless complexity.
+5. Clever measures the code before and after.
+6. The task completes only when the required checks pass.
 
-These pages record earlier release work. They are kept for context and are not current install guidance:
+A model saying its work is correct is never evidence. A passing review never rescues a failing test.
 
-- [Work packages](work-packages.md), the alpha backlog
-- [v0.1 QuickStart](v0.1/QUICKSTART.md), [friction notes](v0.1/FRICTION.md), [walkthrough](v0.1/WALKTHROUGH.md), and [release gates](v0.1/RELEASE-GATES.md)
-- Bloom handoffs for [plugin hosting](handoffs/bloom-plugin-host-mme-5297.md) and [project flows](handoffs/bloom-project-flows-mme-5298.md)
-
-## How Molly decides a task is done
-
-The important order is:
-
-1. The agent proposes code.
-2. Molly applies only allowed-file changes.
-3. Pest produces test evidence.
-4. Tarpit reviews the supplied change for complexity.
-5. Molly records measurements separately.
-6. Required failures keep the run from completing.
-
-The model does not get to declare its own work correct. A passing review never turns failed tests into a pass.
-
-## Current scope
-
-These docs describe the tagged v0.1.x line and the current `main` branch. Molly works without Bloom.
-
-The Laravel knowledge graph currently covers queues, routing, testing, validation, the container, Eloquent, and events. NativePHP Desktop v2 and Mobile v4 live in a separate namespace. Bundled tarpit notes live in a separate namespace and are not a quality score. The project graph covers saved Molly records in one workspace and has a local web page at `/molly/graph`. An unpublished Bloom adapter can bind a Molly contract to the selected workspace and wait for approval before its pull request controls. It is not yet a compiled, shipped Bloom release. Molly records pull requests and merges that people make and does not open or merge them itself. Remote Orb identity and execution remain unfinished. Visual previews are optional and advisory.
+These pages describe the current `main` branch. The install lines use the latest tag, and a few things on these pages shipped after v0.1.3 and arrive with the next tag: doctor's Jev check, the fresh attempt budget after `molly:lock-test`, the approval requirement on `molly:pr-body`, and the `<?php` check on written tests. Everything on these pages works without Bloom.

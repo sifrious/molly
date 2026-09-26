@@ -287,7 +287,7 @@ class Workspace
                         throw new RuntimeException('Could not remove the new file.');
                     }
                 } else {
-                    File::replace($absolute, $before[$path], is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
+                    File::replace($absolute, $before[$path]);
                     if (File::get($absolute) !== $before[$path]) {
                         throw new RuntimeException('Could not restore the original contents.');
                     }

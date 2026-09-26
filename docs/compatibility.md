@@ -1,13 +1,8 @@
----
-layout: default
-title: Compatibility
----
-
 # Compatibility
 
-Molly requires Pest to be available in the host Laravel application. This page lists what current release testing covers, so you can tell a tested combination from an untested one.
+What Molly needs from the application, and which combinations the release tests cover.
 
-## Host application
+## The application
 
 | Requirement | Supported |
 | --- | --- |
@@ -15,36 +10,36 @@ Molly requires Pest to be available in the host Laravel application. This page l
 | Laravel | 12, 13 |
 | PHP extensions | DOM, PDO, PDO SQLite |
 | Database | Any working Laravel connection |
-| Git | Required. Molly binds evidence to the checked-out revision. |
+| Git | Required. Molly records the revision each run started from. |
+| Pest | Pest 4 with `pest-plugin-laravel` 4 is tested. Pest 5 is accepted by doctor but not yet part of release testing. |
 
-## What CI proves
+## What the release tests cover
 
 | Check | Coverage |
 | --- | --- |
-| Molly's package test suite | PHP 8.3, 8.4 and 8.5, running Pest 4 |
-| Fresh consumer install | New Laravel 12 and 13 apps on PHP 8.4: install, publish config, migrate, create and read a task, index Laravel knowledge |
+| Package test suite | PHP 8.3, 8.4, and 8.5 on the locked dependencies, plus the lowest and highest dependency sets Composer will resolve |
+| Fresh application install | New Laravel 12 and 13 applications: install, publish config, migrate, create and read a task, index Laravel knowledge, confirm `--no-dev` leaves Molly out |
+| Jev | The package suite against the accepted Laravel AI classification commit, with the live-capability tests required to run |
+| Sandbox | The Landlock sandbox tests run on Linux and skip on macOS |
 
-The fresh-consumer job installs the checked-out package source. It does not run a model or a Pest task inside the consumer app.
+The fresh-application job installs the checked-out package. It does not run a model.
 
-## Pest in your app
-
-`molly:doctor` checks that `vendor/bin/pest` exists in the workspace. It does not require a particular Pest major version.
-
-| Pest in the host app | Status |
-| --- | --- |
-| Pest 4 with `pest-plugin-laravel` 4 | Tested. The QuickStart and the demo installer use it. |
-| Pest 5 | Accepted by `molly:doctor`. A new Laravel 13 app created with `--pest` can ship Pest 5. A full Molly task run on Pest 5 is not yet part of release testing. |
-
-If you are unsure, install Pest 4:
+## Installing Pest 4
 
 ```bash
 composer config allow-plugins.pestphp/pest-plugin true
 composer remove --dev phpunit/phpunit
 composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
+vendor/bin/pest --init
 ```
 
-Laravel 12 apps pin PHPUnit 11 in `composer.json`, and Pest 4 needs PHPUnit 12, so the second line removes that pin first. Pest installs the PHPUnit version it needs. If your app does not list `phpunit/phpunit`, skip that line.
+Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin. Skip it when `composer.json` does not list `phpunit/phpunit`.
 
-## Sandbox
+## The sandbox
 
-The safe workflow isolates the writer and the Pest verifier with Landlock and Linux user and network namespaces. `molly:doctor` reports whether the host supports them. macOS does not. See [Troubleshooting](troubleshooting.md#sandbox-unavailable).
+On Linux, Molly isolates the writer and the Pest process with Landlock and user and network namespaces. macOS cannot, so doctor reports `sandbox_unavailable` there; [Getting started](getting-started.md#macos-and-the-sandbox) explains the override.
+
+## Next
+
+- [Getting started](getting-started.md)
+- [Troubleshooting](troubleshooting.md)

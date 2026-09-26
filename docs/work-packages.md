@@ -1,8 +1,3 @@
----
-layout: default
-title: Work packages
----
-
 # Work packages
 
 > **Historical.** This page records the alpha backlog as it stood before the v0.1 tags. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](getting-started.md).
