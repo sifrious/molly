@@ -30,7 +30,7 @@ Every public Molly command supports `--json`. Use `--no-interaction` in scripts 
 | `php artisan molly:approve TASK --approve` | Records human approval after required checks pass. Does not open a pull request. |
 | `php artisan molly:lock-test TASK --approve` | Locks the Pest digest after a test-authoring task and drops that file from the writer scope. |
 | `php artisan molly:comment TASK --approve` | Posts or updates a GitHub issue comment after explicit approval. |
-| `php artisan molly:pr-body TASK` | Prints a pull request body that links the issue, acceptance test, and evidence. Does not open a pull request. |
+| `php artisan molly:pr-body TASK` | Prints a pull request body that links the issue, acceptance test, and evidence after `molly:approve` recorded human approval. Does not open a pull request. |
 | `php artisan molly:pr-opened TASK --url URL --approve` | Records that a human opened a pull request. Does not open one. |
 | `php artisan molly:merged TASK --sha SHA --approve` | Records that a human merged a pull request. Does not merge. |
 | `php artisan molly:handoff TASK --from UUID --to UUID` | Prints a handoff envelope for a child Bloom workspace. Does not create a worktree. |

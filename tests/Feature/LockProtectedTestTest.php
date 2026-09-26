@@ -7,10 +7,12 @@ use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\LockProtectedTest;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
+use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Contracts\DisplayStatus;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Mcp\MollyServer;
 use Sifrious\Molly\Mcp\MollyTask;
+use Sifrious\Molly\Models\Task;
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-lock-test-'.Str::uuid();
@@ -95,4 +97,25 @@ it('locks a Pest test through MCP without starting an agent', function () {
 
     expect($task->fresh()->allow_test_edits)->toBeFalse()
         ->and($task->fresh()->paths)->toBe(['app/Greeting.php']);
+});
+
+it('starts the implementation scope with fresh attempts after authoring attempts are exhausted', function () {
+    config(['molly.max_attempts' => 2]);
+    $task = app(CreateTask::class)->handle('Author the greeting test.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true);
+    foreach ([1, 2] as $attempt) {
+        $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => []]);
+    }
+    Task::whereKey($task->id)->update(['status' => 'failed']);
+    $bus = app(LocalAgentBus::class);
+
+    expect(fn () => $bus->claim($task->id, 'worker-a', retry: true))->toThrow(RuntimeException::class, 'ATTEMPT_LIMIT_REACHED');
+
+    writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+    app(LockProtectedTest::class)->handle($task->id, true, ['app/Greeting.php']);
+    $task->refresh();
+
+    expect($task->source['test_lock']['runs_before'])->toBe(2)
+        ->and($task->attemptsUsed())->toBe(0)
+        ->and($task->runs()->count())->toBe(2)
+        ->and($bus->claim($task->id, 'worker-b')->status)->toBe('running');
 });

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Agents\LocalOllama;
+use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
 use Throwable;
@@ -15,6 +16,7 @@ class CheckEnvironment
     public function __construct(
         private Sandbox $sandbox,
         private Clever $clever,
+        private JevGate $jev,
     ) {}
 
     /** @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>} */
@@ -32,6 +34,7 @@ class CheckEnvironment
         $this->checkParallel($add);
         $this->checkAgent($add);
         $this->checkClever($add);
+        $this->checkJev($add);
 
         return ['ready' => ! in_array('failed', array_column($checks, 'status'), true), 'checks' => $checks];
     }
@@ -186,5 +189,22 @@ class CheckEnvironment
         } catch (Throwable) {
             $add('Clever', false, 'clever_unavailable', 'Molly could not load the bundled Clever measurements.');
         }
+    }
+
+    /**
+     * The single Jev gate, reported honestly: off is fine, but an enabled gate
+     * that cannot classify is a failed check, never a silent fallback.
+     *
+     * @param  callable(string, bool, string, string): void  $add
+     */
+    private function checkJev(callable $add): void
+    {
+        [$passed, $code, $message] = match ($this->jev->status()) {
+            JevGate::DISABLED => [true, 'jev_disabled', 'Jev classification is off (MOLLY_JEV_ENABLED defaults to false). Pest, Tarpit, retries, and completion stay deterministic.'],
+            JevGate::UNAVAILABLE => [false, 'jev_capability_missing', 'MOLLY_JEV_ENABLED is true, but the installed laravel/ai has no classification surface. Opt the root application into the accepted Laravel AI commit (see docs/reference/configuration.md, Laravel AI compatibility) or set MOLLY_JEV_ENABLED=false.'],
+            JevGate::UNCONFIGURED => [false, 'jev_unconfigured', 'MOLLY_JEV_ENABLED is true and laravel/ai can classify, but ai.providers.typesafe.key is empty. Set TYPESAFE_API_KEY; if config/ai.php was published before laravel/ai gained the typesafe provider, republish it with --force.'],
+            default => [true, 'jev_ready', 'Jev classification is enabled through Laravel AI (TypeSafe, model '.(is_string(config('molly.jev.model')) ? config('molly.jev.model') : 'unset').'). It stays advisory and cannot override deterministic gates.'],
+        };
+        $add('Jev', $passed, $code, $message);
     }
 }

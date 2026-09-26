@@ -30,6 +30,8 @@ php artisan molly:start demo-greeting
 
 `qwen2.5-coder:7b` is a **starter suggestion**, not a contract. Any installed local Ollama model name works. Set `MOLLY_LOCAL_MODEL` or pass `--model=` to choose another.
 
+Small models are fine for the demo task. Test-authoring tasks and Tarpit review ask the model to follow a structured protocol (Pest `it()` cases in a complete PHP file; a seven-check review answer), and a 7B coder model often cannot: in a recorded acceptance run `qwen2.5-coder:7b` produced PHPUnit classes, omitted the `<?php` tag, and returned incomplete reviews across five bounded attempts, while `gpt-oss:120b-code` completed the same story first time. Molly rejects those outputs deterministically (`TEST_AUTHORING_INVALID`, `REVIEW_INVALID`) rather than guessing. If you see them repeatedly, choose a larger local model with `molly:setup --agent=ollama --model=...`; Molly never switches models on its own.
+
 ### Hardware note
 
 Small coder models (about 7B parameters) typically need on the order of **8 GB RAM** free for comfortable local use. Larger models need more memory and are slower. If Ollama fails with memory or context errors, pull a smaller tag or close other apps — Molly does not invent fallbacks to hosted APIs.
@@ -82,6 +84,7 @@ Doctor prints a **Code** column so failures stay distinguishable:
 | `ollama_config_invalid` | Driver/URL/timeout/model shape refused for local QuickStart |
 | `model_not_configured` | No `MOLLY_LOCAL_MODEL` yet |
 | `model_not_local` | Model name looks like a cloud/hosted id |
+| `jev_disabled` / `jev_ready` | Optional Jev gate is off (default) or enabled and usable; `jev_capability_missing` / `jev_unconfigured` explain an enabled gate that cannot classify |
 
 Doctor never prints API keys or account secrets.
 

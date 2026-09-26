@@ -124,8 +124,15 @@ Molly never changes the provider, execution target, or model on its own. A Jev r
 Molly keeps its normal install on the stable Laravel AI baseline, where the gate reports `unavailable` / `capability_missing` if you enable it. Jev is an optional capability: until Laravel publishes a tag containing the classification seam, a host that wants Jev must explicitly opt its root application into the accepted upstream implementation, the merge commit of Laravel AI PR #1049:
 
 ```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484' --with-all-dependencies
+composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
+php artisan vendor:publish --tag=ai-config --force
+php artisan config:clear
+php artisan molly:doctor
 ```
+
+The `as 0.11.99` inline alias is required: Molly itself requires `laravel/ai ^0.11.2`, and a bare `1.x-dev` pin does not satisfy that constraint in a consumer, so Composer refuses it. The alias tells Composer to treat the accepted commit as a 0.11 release for constraint resolution only. Republishing `config/ai.php` matters when the file was published from the stable baseline, which has no `typesafe` provider; a published config replaces the package's provider list, so the gate would report `jev_unconfigured` until the provider entry exists.
+
+`molly:doctor` reports the gate as one check: `jev_disabled` (passed, the default), `jev_capability_missing` (failed: enabled on a laravel/ai without the classification surface), `jev_unconfigured` (failed: enabled and capable, but `ai.providers.typesafe.key` is empty), or `jev_ready`. Keys come from the TypeSafe console (`https://console.typesafe.ai/keys`) and are read only through `TYPESAFE_API_KEY`.
 
 Molly's release CI runs a separate Jev lane that resolves exactly that commit, records the resolved commit in the workflow summary, fails (never skips) the live-capability proofs, and then runs the complete package suite. The ordinary PHP/Laravel package matrix stays on stable dependencies. A floating `1.x-dev` branch is not release evidence. Once Laravel publishes a compatible tag, replace the exact commit with that stable constraint and rerun the complete matrix.
 

@@ -32,6 +32,10 @@ class PestTestAuthoring
     {
         $issues = [];
 
+        if (! $this->opensAsPhp($content)) {
+            $issues[] = 'Start the file with <?php; Pest found no tests in a file without the opening tag.';
+        }
+
         if (! $this->hasPestDiscovery($content)) {
             $issues[] = 'Emit Pest it() or test() Feature cases Pest can discover; do not rely on PHPUnit @test methods alone.';
         }
@@ -53,6 +57,11 @@ class PestTestAuthoring
         }
 
         return $issues;
+    }
+
+    private function opensAsPhp(string $content): bool
+    {
+        return (bool) preg_match('/\A(?:\xEF\xBB\xBF)?\s*<\?php\b/', $content);
     }
 
     private function hasPestDiscovery(string $content): bool

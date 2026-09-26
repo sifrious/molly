@@ -219,7 +219,10 @@ class Workspace
                 $absolute = $this->resolve($edit['path']);
                 $attempted[] = $edit['path'];
                 File::ensureDirectoryExists(dirname($absolute));
-                File::replace($absolute, $edit['content'], is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
+                // File::replace defaults new files to 0777 - umask, which would turn a
+                // proposed source file executable; keep the existing mode instead.
+                $mode = is_file($absolute) ? (fileperms($absolute) & 0777) : (0666 & ~umask());
+                File::replace($absolute, $edit['content'], $mode);
                 if (File::get($absolute) !== $edit['content']) {
                     throw new RuntimeException('The file does not match the proposed contents.');
                 }
