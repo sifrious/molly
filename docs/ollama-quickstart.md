@@ -40,6 +40,21 @@ php artisan molly:doctor
 ```
 
 Molly never switches models on its own. Small coder models want about 8 GB of free memory; larger ones need proportionally more.
+Doctor prints a **Code** column so failures stay distinguishable:
+
+| Code | Meaning |
+| --- | --- |
+| `ollama_configured` / `ollama_endpoint` | Local provider + loopback URL look valid |
+| `ollama_reachable` | Ollama answered `/api/tags` |
+| `model_ready` | Configured model is installed |
+| `model_missing` | Ollama is up, but that model is not pulled |
+| `ollama_unreachable` | Connection failed — start Ollama or fix the URL |
+| `ollama_config_invalid` | Driver/URL/timeout/model shape refused for local QuickStart |
+| `model_not_configured` | No `MOLLY_LOCAL_MODEL` yet |
+| `model_not_local` | Model name looks like a cloud/hosted id |
+| `jev_disabled` / `jev_ready` | Optional Jev gate is off (default) or enabled and usable; `jev_capability_missing` / `jev_unconfigured` explain an enabled gate that cannot classify |
+
+Doctor never prints API keys or account secrets.
 
 ## The endpoint
 
