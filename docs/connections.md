@@ -1,81 +1,38 @@
----
-layout: default
-title: Task connections
----
+# Amp thread links
 
-# Task connections
-
-Use this feature to record that a saved Molly task is associated with an Amp thread, then optionally ask Amp for current executor connection evidence.
-
-This does not start work and does not prove Orb identity.
+When you work on a task in an Amp conversation, you can save the link between the two so that later you can find which thread discussed which task. Molly can also ask Amp whether that thread currently has a connected executor. Neither starts work, and neither proves where a run executed.
 
 ## Link a thread
 
-Copy the `T-...` thread ID from Amp, then run:
+Copy the `T-…` thread ID from Amp:
 
 ```bash
-php artisan molly:link-thread health-check T-00000000-0000-0000-0000-000000000000
+php artisan molly:link-thread ready-check T-00000000-0000-0000-0000-000000000000
 ```
 
-`health-check` can be a task nickname or UUID.
+Molly checks the ID's shape and saves your assertion. It does not contact Amp to confirm the thread exists.
 
-Linking stores your assertion. Molly validates the ID format but does not contact Amp to prove the thread exists.
-
-## Read saved links only
+## Read the saved links
 
 ```bash
-php artisan molly:connections health-check --stored
+php artisan molly:connections ready-check --stored
 ```
 
-This never contacts Amp.
+This never contacts Amp. Each saved link is `latest_recorded` when the thread's most recent link names this task, or `prior_exact` when the thread was linked to this task before but was later linked to another.
 
-A saved association can be:
-
-- `latest_recorded`: the thread's latest saved link names this task.
-- `prior_exact`: this thread was linked to this task before, but its latest saved link names another task.
-
-Neither value proves current execution.
-
-## Ask Amp for current connection evidence
+## Ask Amp about the thread
 
 ```bash
-php artisan molly:connections health-check
-php artisan molly:connections health-check --json
+php artisan molly:connections ready-check
 ```
 
-The host process must be able to run an authenticated `amp` executable.
-
-Connection values mean:
-
-| Value | Meaning |
-| --- | --- |
-| `connected` | A fresh Amp snapshot reports a connected executor for the thread. |
-| `disconnected` | A fresh Amp snapshot explicitly reports no connected executor. |
-| `unknown` | Molly does not have reliable current evidence. |
-
-The raw `executor_type` may also be present. Molly preserves it without turning it into verified Orb identity.
-
-`working` is a separate observed value. Even `working=true` does not prove that the executor is working on this Molly task.
+The host process needs a logged-in `amp` executable. The result reports `connected`, `disconnected`, or `unknown` for each linked thread, plus the raw executor type Amp reported and whether Amp says the executor is working. None of that proves the executor is working on this task, and an executor type is not a verified Orb identity. Observations are not saved as task history.
 
 ## Web and MCP
 
-The local web task page has a **Find linked Amp threads** flow.
-
-MCP clients can:
-
-- call `molly_connections` to read associations and optional Amp observations
-- call `molly_task` with `operation: "link_thread"` to save an association
-
-## Current limits
-
-- Connection observations are not persisted as task history.
-- A successful command exit does not mean an executor is connected. Inspect the returned status and matches.
-- The current lookup does not verify Orb identity.
-- Molly does not connect, disconnect, or select remote execution targets.
-
-Those remote execution features are planned separately in [Execution targets](execution-targets.md).
+The task page has a "Find linked Amp threads" link. Through MCP, `molly_connections` reads links and observations, and `molly_task` with `operation: link_thread` saves one.
 
 ## Next
 
 - [Agents and MCP](agents.md)
-- [Execution targets, planned work](execution-targets.md)
+- [Execution targets](execution-targets.md), the planned remote work

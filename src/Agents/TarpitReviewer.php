@@ -32,7 +32,7 @@ TEXT;
         foreach (range('A', 'G') as $code) {
             $checks[$code] = $schema->object([
                 'status' => $schema->string()->enum(['clean', 'findings'])->required(),
-                'evidence' => $schema->string()->required(),
+                'evidence' => $schema->string()->min(1)->required(),
             ])->required();
         }
 

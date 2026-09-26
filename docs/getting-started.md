@@ -1,48 +1,17 @@
----
-layout: default
-title: Getting started
----
-
 # Getting started
 
-Use this page to install Molly and complete one small task from the command line.
+This page takes you from an empty terminal to a completed Molly task. You will install Molly into a Laravel application, point it at a local model, run the demo task, and read the evidence it produced. Nothing here needs Bloom or a paid AI account.
 
-Prefer local Ollama with no paid account? Use the dedicated [QuickStart: Ollama](ollama-quickstart.md) copy-paste path first.
+## Requirements
 
-## No Laravel app yet?
-
-If you do not already have a Laravel project, use the demo installer. It is one Terminal copy-paste:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.1/bin/molly-demo -o molly-demo
-chmod +x molly-demo && ./molly-demo
-```
-
-That creates `~/molly-demo` (or a path you pass), installs Laravel + Molly, runs `php artisan molly:demo`, and prints the next doctor / start / Bloom steps. It refuses a non-empty existing path unless you pass `--force`. It does not install Bloom or call cloud.
-
-When the installer finishes, open the folder in Bloom with **Open existing branch…**, then:
-
-```bash
-cd ~/molly-demo
-php artisan molly:doctor
-php artisan molly:start demo-greeting
-```
-
-## Already have a Laravel project?
-
-You should finish with three things: `molly:doctor` passes, Molly can create a task, and you know where to read the test evidence before accepting a change.
-
-## 1. Check the Laravel project
-
-Molly currently expects:
-
-- PHP 8.3 or later
+- PHP 8.3 or later with the DOM, PDO, and PDO SQLite extensions
 - Laravel 12 or 13
-- Pest 4
-- PHP DOM
-- A working Laravel database connection
+- Pest 4 in the application
+- Git, because Molly records which revision each run started from
+- A working database connection
+- [Ollama](https://ollama.com) running locally, or the Amp CLI
 
-Run:
+To check the application:
 
 ```bash
 php --version
@@ -50,30 +19,39 @@ composer show laravel/framework
 vendor/bin/pest --version
 ```
 
-If your project does not have Pest 4 and the Laravel plugin:
+If the application does not have Pest yet, install it:
 
 ```bash
 composer config allow-plugins.pestphp/pest-plugin true
+composer remove --dev phpunit/phpunit
 composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
+vendor/bin/pest --init
 ```
 
-For Laravel feature tests, `tests/Pest.php` should include your application test case:
+Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin first. Skip it if `composer.json` does not list `phpunit/phpunit`.
+
+Feature tests need the application test case. Check that `tests/Pest.php` contains:
 
 ```php
-<?php
-
 pest()->extend(Tests\TestCase::class)->in('Feature');
 ```
 
-Run your existing tests before installing Molly:
+[Compatibility](compatibility.md) lists the tested versions.
+
+### No Laravel application yet?
+
+The demo installer creates a fresh application, installs Pest and the tagged Molly release, and scaffolds the demo task:
 
 ```bash
-vendor/bin/pest
+curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
+bash molly-demo ~/molly-demo
 ```
 
-## 2. Install Molly
+It writes only under the directory you name and refuses a non-empty directory unless you pass `--force`. When it finishes, continue from [Choose a model](#choose-a-model).
 
-From the Laravel project root:
+## Install Molly
+
+From the application root:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
@@ -82,152 +60,138 @@ php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
 
-Molly is a development dependency. Production installs that use `composer install --no-dev` do not install it.
+Molly is not on Packagist yet, so the first line tells Composer to read tagged releases from GitHub. Publishing adds `config/molly.php`. The migration adds the tables that hold tasks and runs.
 
-Add this to the project's `.gitignore`:
+Add Molly's local files to `.gitignore`:
 
 ```gitignore
 .molly/
+/storage/molly/
 ```
 
-Molly uses `.molly/` for local locks, journals, and the optional Laravel knowledge database.
+Molly is a development dependency. A production `composer install --no-dev` does not include it, and its commands do not register in production.
 
-## 3. Optional: scaffold the greeting demo
+## Choose a model
 
-After install, you can create the tiny first task without answering prompts:
-
-```bash
-php artisan molly:demo
-```
-
-This writes `app/Greeting.php` and `tests/Feature/GreetingTest.php` when they are missing, saves task `demo-greeting`, and prints the next doctor / start / Bloom-contract steps. It does not create a Bloom worktree.
-
-Then continue with `molly:doctor` and `molly:start demo-greeting`, or use interactive `molly:create` below for your own task.
-
-## 4. Pick an agent
-
-Molly supports Amp and local Ollama. The same file limits and verification rules apply to both.
-
-### Option A: local Ollama
-
-Start Ollama, then install a coding model. This example uses Qwen2.5-Coder 7B:
+Molly sends the change request to a local Ollama model by default. Pull a model and tell Molly its exact name:
 
 ```bash
 ollama pull qwen2.5-coder:7b
-ollama list
 php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
-```
-
-The default endpoint is `http://127.0.0.1:11434`. Override it with `OLLAMA_URL` if needed.
-
-A model appearing in `ollama list` proves that it is installed. It does not prove that the model can complete a Molly task.
-
-### Option B: Amp
-
-Install the Amp CLI, then run:
-
-```bash
-php artisan molly:setup --agent=amp
-amp mcp approve molly
-amp mcp doctor molly
-```
-
-Amp owns its login credentials. Molly stores the provider choice, not your Amp password or token.
-
-## 5. Check Molly's setup
-
-Run:
-
-```bash
 php artisan config:clear
+```
+
+`molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. It stores no secrets. Any model from `ollama list` works; `qwen2.5-coder:7b` is a starting point that needs about 8 GB of free memory. If Ollama is unreachable, Molly stops rather than falling back to a hosted service.
+
+Small models handle the demo. They often cannot write a Pest test file or answer Molly's review questions on their own, so a larger model is worth the download for real work. [Ollama](ollama-quickstart.md) has the details and the doctor codes.
+
+To use Amp instead, see [Agents](agents.md#amp).
+
+## Check the setup
+
+```bash
 php artisan molly:doctor
 ```
 
-Continue only when you see:
+Doctor checks the database tables, Pest, the sandbox, the model, and the Clever measurements. When everything passes it prints:
 
 ```text
 Molly is ready.
 ```
 
-If a check fails, use [Troubleshooting](troubleshooting.md#doctor-fails).
+A failed check prints a code and what to do about it. [Troubleshooting](troubleshooting.md#doctor-fails) lists every code.
 
-If your PHP build does not have `posix_setsid` and `posix_kill`, set this in `config/molly.php`:
+### macOS and the sandbox
 
-```php
-'parallel_checks' => false,
+Molly runs the model's edits and the Pest process inside a Linux sandbox (Landlock plus user and network namespaces) so a proposal can touch only the files you allowed. macOS has no Landlock, so doctor reports `sandbox_unavailable` and `molly:start` refuses to run.
+
+To run Molly on a Mac, turn isolation off for a checkout you trust:
+
+```dotenv
+MOLLY_SANDBOX_ALLOW_UNSAFE=true
 ```
 
-Then clear configuration and run `molly:doctor` again.
+Then run `php artisan config:clear` and `php artisan molly:doctor` again. Doctor now reports `sandbox_unsafe_override`. Without the sandbox, the writer and Pest run with your user's permissions, so keep this to repositories you control. Molly still checks every proposed path against the allowed files before it applies anything.
 
-## 6. Create a first task
+## Run the demo task
 
-Run:
+```bash
+php artisan molly:demo
+php artisan molly:start demo-greeting
+```
+
+`molly:demo` writes `app/Greeting.php`, a Pest test at `tests/Feature/GreetingTest.php` that fails against it, and saves a task named `demo-greeting`. It does not call the model.
+
+`molly:start` does the work in your terminal:
+
+1. Asks the model for a change to `app/Greeting.php`.
+2. Checks that the proposal touches only that file and leaves the test alone.
+3. Applies the proposal.
+4. Runs `tests/Feature/GreetingTest.php` with Pest.
+5. Asks the model to review the diff with Molly's seven complexity checks (Tarpit).
+6. Records Clever measurements of the code before and after.
+
+The task completes only when Pest passes and Tarpit finds nothing blocking. The command prints the run ID and exits with `0` on completion and `1` otherwise.
+
+## Read the evidence
+
+Read the run before you accept the change:
+
+```bash
+php artisan molly:task demo-greeting
+php artisan molly:show RUN_ID --verbose
+git diff
+vendor/bin/pest
+```
+
+`molly:task` shows the task and every attempt. `molly:show --verbose` shows the Pest output, the Tarpit findings, and the measurements. `git diff` shows exactly what changed. Molly does not commit for you.
+
+A completed run means the required test passed and the review found nothing blocking. It does not mean the whole application is fine, which is why the last command runs your full suite.
+
+## If the run failed
+
+Read why first:
+
+```bash
+php artisan molly:show RUN_ID --verbose
+```
+
+The verbose report names the failing assertion, the Tarpit finding, or the process error. If another attempt makes sense:
+
+```bash
+php artisan molly:retry demo-greeting
+```
+
+Molly keeps the earlier run and starts a new one. A task may make three attempts by default, and Molly never retries on its own. `php artisan molly:advice demo-greeting` explains which action is allowed next.
+
+## Create your own task
 
 ```bash
 php artisan molly:create
 ```
 
-For a simple first task, you can answer with something like:
+Molly asks four questions:
 
 | Question | Example |
 | --- | --- |
-| What should Molly work on? | `Add GET /molly-health returning exactly {"status":"ok"}. Preserve existing routes.` |
-| Task nickname | `health-check` |
-| Which Pest test should pass? | `tests/Feature/MollyHealthTest.php` |
+| What should Molly work on? | `Add GET /ready returning exactly {"ready":true}. Preserve existing routes.` |
+| Task nickname | `ready-check` |
+| Which Pest test should pass? | `tests/Feature/ReadyTest.php` |
 | Which other files may Molly change? | `routes/web.php` |
 
-Creating a task does not call the model or edit files.
+The Pest test must exist before you create the task, and Molly locks its content. The model may change the files you listed, never the test. Creating a task saves it without calling the model.
 
-Start it:
-
-```bash
-php artisan molly:start health-check
-```
-
-## 7. Read the result before accepting it
-
-Molly prints a run ID. Inspect the saved task, the run, and your Git working tree:
+Start it when you are ready:
 
 ```bash
-php artisan molly:task health-check
-php artisan molly:show RUN_ID --verbose
-git status --short
+php artisan molly:start ready-check
 ```
 
-A completed run means Molly has valid required evidence for that task. It does not mean you should commit without review.
-
-Check these items:
-
-- The required Pest test actually ran and passed.
-- The test assertions prove the behavior you asked for.
-- Tarpit has no unresolved blocking finding.
-- The changed files match the task you intended.
-
-Then run your application's broader tests:
-
-```bash
-vendor/bin/pest
-```
-
-## If the attempt fails
-
-Read the failed evidence first:
-
-```bash
-php artisan molly:show RUN_ID --verbose
-```
-
-If another attempt makes sense:
-
-```bash
-php artisan molly:retry health-check
-```
-
-Molly keeps the earlier attempt. The default limit is three attempts total. Molly never retries automatically.
+If you would rather have Molly write the Pest test first, [Tutorials](tutorials.md#write-the-test-first) shows the two-task flow.
 
 ## Next
 
-- [Manage tasks](tasks.md)
-- [Understand verification](verification.md)
-- [Set up the local web interface](web-interface.md)
-- [Choose agents and MCP tools](agents.md)
+- [Tasks](tasks.md) covers starting, stopping, retrying, and naming tasks.
+- [Verification](verification.md) explains what must pass and what happens when it does not.
+- [Molly on its own](standalone.md) tours everything available without Bloom.
+- [Web interface](web-interface.md) shows the same records in a browser.

@@ -1,66 +1,62 @@
----
-layout: default
-title: Task advice
----
-
 # Task advice
 
-Use task advice when you want Molly to explain what action is allowed next for a saved task.
+Advice tells you which action a saved task allows next and why. It reads the saved state; it never starts, retries, or stops anything.
 
 ```bash
-php artisan molly:advice health-check
+php artisan molly:advice ready-check
 ```
 
-Advice never starts, retries, or stops a task.
+## What it says
 
-## What Molly checks first
-
-Molly uses saved state and attempt limits before any optional model evaluation.
-
-| Task state | Typical advice |
+| Task state | Advice |
 | --- | --- |
-| `pending` | Start it if an attempt is available. |
-| `running` | Inspect the active work and wait or stop. |
-| `completed` | Review the evidence and changed files. |
-| `failed` | Inspect failure evidence, then retry only if allowed. |
-| `stopped` | Inspect retained changes before deciding whether to retry. |
+| `pending` | Start it. |
+| `running` | Wait, or inspect and stop. |
+| `completed` | Done. Review the diff and the evidence. |
+| `failed` | Inspect the evidence, then retry if attempts remain. |
+| `stopped` | Inspect the working tree, then retry if attempts remain. |
 
-If the attempt limit is reached, advice cannot authorize another retry.
+Advice includes the command to run next, the attempts used against the limit, and whether a retry is allowed. When the limit is reached, the advice is to stop, and no model is consulted.
 
-## Optional TypeSafe guidance
+Molly saves the advice with the run it describes. If the task changed while advice was being prepared, Molly discards the recommendation and tells you the evidence moved.
 
-TypeSafe is optional. Molly only asks it for eligible failed tasks when:
+## Advice from Jev
 
-- TypeSafe is enabled and configured
-- the latest attempt has usable failure evidence
-- another attempt is still allowed
+When Jev is enabled and a failed task still has attempts left, Molly also asks Jev whether the evidence supports another attempt. It sends a bounded summary: the request, the Pest counts, the Tarpit check statuses, and up to three findings for the task's files. It never sends secrets, full test output, or the whole report.
 
-Molly sends a bounded summary, not the complete report.
+Jev answers with one of `continue`, `retry`, `stop`, or `needs_review`, plus a confidence. Molly applies it like this:
 
-If TypeSafe is disabled, unavailable, low-confidence, or returns invalid output, Molly keeps deterministic local advice and explains the fallback.
+| Jev says | Advice becomes |
+| --- | --- |
+| `retry` with enough confidence | Retry. The recorded failure stands until a new attempt passes. |
+| `stop` with enough confidence | Stop, even though the attempt limit would allow more. |
+| `continue` or `needs_review` | Inspect. A model saying "continue" never marks a failed task as passing. |
+| Confidence below the threshold | Molly keeps its own guidance and records `low_confidence`. |
 
-A TypeSafe response cannot change saved test results or bypass the attempt limit.
+The result lists the provider, the model that answered, the confidence, the threshold, and the probability of each option, so you can see what Jev thought without trusting it blindly.
+
+When Jev is off, advice records `jev_disabled`. When it is on but the installed `laravel/ai` cannot classify, advice records `capability_missing` and falls back; when the credential is missing, `invalid_config`. A provider failure records `provider_error` and keeps no payload. `molly:doctor` reports the same states. See [Jev](reference/configuration.md#jev).
 
 ## Web and MCP
 
-In the local UI, open a task and choose **Get next-step advice**.
+On a task page in the [web interface](web-interface.md), choose "Get next-step advice". The page shows the same advice and the same provider block.
 
 Through MCP:
 
 ```json
-{"operation":"advice","id":"health-check"}
+{"operation": "advice", "id": "ready-check"}
 ```
 
-## JSON output
+## JSON
 
 ```bash
-php artisan molly:advice health-check --json --no-interaction
+php artisan molly:advice ready-check --json --no-interaction
 ```
 
-The result includes the observed task state, retry permission, recommended action, optional command, evidence references, and provider metadata when TypeSafe was used.
+The JSON carries the observed state, `retry_allowed`, `next_action`, `command`, evidence references, the provider block, and whether the advice was persisted with the run.
 
 ## Next
 
-- [Manage tasks](tasks.md)
-- [Troubleshooting](troubleshooting.md)
-- [Configuration](reference/configuration.md)
+- [Tasks](tasks.md)
+- [Verification](verification.md)
+- [Configuration](reference/configuration.md#jev)

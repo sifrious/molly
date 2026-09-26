@@ -1,77 +1,45 @@
----
-layout: default
-title: QuickStart — Ollama
----
+# Ollama
 
-# QuickStart: Ollama
+Ollama runs a model on your own machine. It is Molly's default agent, it needs no account, and Molly never falls back from it to a hosted service. This page covers choosing a model, the endpoint, and what doctor tells you when something is off.
 
-Use this path when you want Molly running against a **local** model with **no paid AI account**.
+## Set it up
 
-Ollama is Molly’s recommended local default. It is not a hard dependency. Amp and hosted providers stay optional and never run unless you configure them.
-
-Molly orchestrates the task and verification. Laravel AI talks to Ollama. Bloom (optional) is only the workspace/UI host. Orbs are optional remote local targets — see [Execution targets](execution-targets.md) for planned behavior; tonight’s QuickStart is loopback Ollama on your machine.
-
-## Copy-paste first run
-
-From a Laravel 12/13 app with Pest 4:
+Install Ollama from [ollama.com](https://ollama.com), pull a model, and give Molly its exact name:
 
 ```bash
-composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
-php artisan vendor:publish --tag=molly-config
-php artisan migrate
 ollama pull qwen2.5-coder:7b
 php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
 php artisan config:clear
 php artisan molly:doctor
-php artisan molly:demo
-php artisan molly:start demo-greeting
 ```
 
-`qwen2.5-coder:7b` is a **starter suggestion**, not a contract. Any installed local Ollama model name works. Set `MOLLY_LOCAL_MODEL` or pass `--model=` to choose another.
+`molly:setup` writes `MOLLY_AGENT=ollama` and `MOLLY_LOCAL_MODEL=qwen2.5-coder:7b` to `.env`. Use the name exactly as `ollama list` prints it.
 
-Small models are fine for the demo task. Test-authoring tasks and Tarpit review ask the model to follow a structured protocol (Pest `it()` cases in a complete PHP file; a seven-check review answer), and a 7B coder model often cannot: in a recorded acceptance run `qwen2.5-coder:7b` produced PHPUnit classes, omitted the `<?php` tag, and returned incomplete reviews across five bounded attempts, while `gpt-oss:120b-code` completed the same story first time. Molly rejects those outputs deterministically (`TEST_AUTHORING_INVALID`, `REVIEW_INVALID`) rather than guessing. If you see them repeatedly, choose a larger local model with `molly:setup --agent=ollama --model=...`; Molly never switches models on its own.
-
-### Hardware note
-
-Small coder models (about 7B parameters) typically need on the order of **8 GB RAM** free for comfortable local use. Larger models need more memory and are slower. If Ollama fails with memory or context errors, pull a smaller tag or close other apps — Molly does not invent fallbacks to hosted APIs.
-
-## 1. Install Ollama
-
-Install from [https://ollama.com](https://ollama.com), then confirm the daemon answers on loopback:
+Confirm the daemon answers:
 
 ```bash
-ollama --version
 curl -s http://127.0.0.1:11434/api/tags
 ```
 
-Default base URL for Molly / Laravel AI: `http://127.0.0.1:11434` (also `localhost` / `[::1]`). Non-loopback URLs are refused for the local QuickStart path.
+## Choosing a model
 
-## 2. Pull a starter model
+Any installed model works with `molly:setup --model=NAME`. A model that appears in `ollama list` is installed; that does not mean it can complete a Molly task.
 
-```bash
-ollama pull qwen2.5-coder:7b
-ollama list
-```
+The demo task is small enough for a 7B coder model. Two parts of a real task are harder:
 
-Use the **exact** name from `ollama list` in Molly config.
+- Writing a Pest test file, when you ask Molly to author the test. The model must return a complete PHP file with `it()` or `test()` cases. Small models often return a PHPUnit class or leave out `<?php`, and Molly rejects those as `TEST_AUTHORING_INVALID`.
+- The Tarpit review, which needs a complete, consistent answer to seven questions. Small models often return `REVIEW_INVALID`, and Molly treats that as missing evidence, not a clean review.
 
-## 3. Configure Molly / Laravel AI
+In a recorded run on an M3 Ultra, `qwen2.5-coder:7b` failed both across five attempts while `gpt-oss:120b-code` completed the same story on the first try. If you see those errors repeatedly, choose a larger model:
 
 ```bash
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+ollama pull OTHER_MODEL
+php artisan molly:setup --agent=ollama --model=OTHER_MODEL
 php artisan config:clear
-```
-
-That sets `MOLLY_AGENT=ollama` and `MOLLY_LOCAL_MODEL=...` without requiring an Ollama API key for local HTTP. Endpoint override (still loopback for QuickStart): `ai.providers.ollama.url` / `OLLAMA_URL`.
-
-## 4. Run doctor
-
-```bash
 php artisan molly:doctor
-php artisan molly:doctor --json
 ```
 
+Molly never switches models on its own. Small coder models want about 8 GB of free memory; larger ones need proportionally more.
 Doctor prints a **Code** column so failures stay distinguishable:
 
 | Code | Meaning |
@@ -88,71 +56,48 @@ Doctor prints a **Code** column so failures stay distinguishable:
 
 Doctor never prints API keys or account secrets.
 
-## 5. First Molly task
+## The endpoint
 
-```bash
-php artisan molly:demo
-php artisan molly:start demo-greeting
-```
+Molly talks to Ollama through Laravel AI's Ollama provider. The default endpoint is `http://127.0.0.1:11434`; `localhost` and `[::1]` also count as local. Override it with `OLLAMA_URL` if Ollama listens elsewhere on the same machine.
 
-Or create your own:
+Molly refuses a non-loopback URL for this path. Pointing Molly at Ollama on another host or an Orb is planned work, described in [Execution targets](execution-targets.md), and is not a supported setting today.
 
-```bash
-php artisan molly:create
-php artisan molly:start TASK
-```
+## Doctor codes
 
-## 6. Inspect output
+`molly:doctor` reports the Ollama setup as several checks so you can tell the cases apart:
 
-```bash
-php artisan molly:task demo-greeting --json
-php artisan molly:show RUN_ID --verbose
-php artisan molly:receipt RUN_ID
-```
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `ollama_configured` | The agent is Ollama and a model name is set. | Nothing. |
+| `ollama_endpoint` | Shows the configured base URL. | Nothing. |
+| `ollama_reachable` | Ollama answered `/api/tags`. | Nothing. |
+| `ollama_unreachable` | The connection failed. | Start Ollama with `ollama serve` or fix `OLLAMA_URL`. |
+| `model_ready` | The configured model is installed. | Nothing. |
+| `model_missing` | Ollama is up, but the model is not pulled. | `ollama pull NAME`, or fix `MOLLY_LOCAL_MODEL`. |
+| `model_not_configured` | No model name is set. | Run `molly:setup --agent=ollama --model=NAME`. |
+| `model_not_local` | The name looks like a hosted model. | Choose an installed local model. |
+| `ollama_config_invalid` | The driver, URL, timeout, or model name is not usable. | Use loopback HTTP, the Ollama driver, and a positive `molly.timeout`. |
 
-## 7. Change the local model
+Doctor never prints API keys or account details.
 
-```bash
-ollama pull OTHER_LOCAL_MODEL
-php artisan molly:setup --agent=ollama --model=OTHER_LOCAL_MODEL
-php artisan config:clear
-php artisan molly:doctor
-```
+## Timeouts
 
-Per-run model override stays a config/profile concern — do not edit loop code to switch models.
+`molly.timeout` in `config/molly.php` allows 180 seconds per model request by default. A slow model hitting that limit fails the run with a timeout rather than waiting. Prefer a smaller task or a faster model before raising it; if you do raise it, clear the configuration cache and run doctor again.
 
-## 8. Ollama on an Orb or another machine
-
-Tonight’s supported QuickStart is **loopback**. Pointing Molly at Ollama on another host or an Orb is policy/config work (LAN URL, Orb capability ads) and is covered in [Execution targets](execution-targets.md) / Orb docs as those land. Do not weaken the loopback safety check for casual remote URLs.
-
-## 9. Troubleshoot
+## Common problems
 
 | Symptom | Likely code | Fix |
 | --- | --- | --- |
-| Connection refused | `ollama_unreachable` | `ollama serve`; confirm `http://127.0.0.1:11434` |
-| Model name unknown | `model_missing` | `ollama pull …` — not the same as unreachable |
-| Bad URL / HTTPS / non-loopback | `ollama_config_invalid` | Use loopback HTTP for local QuickStart |
-| Empty model env | `model_not_configured` | `molly:setup --agent=ollama --model=…` |
-| OOM / context length | (runtime) | Smaller model or more RAM |
-| Timeout | `test_timeout` / Molly timeout | Raise `molly.timeout` carefully; check model speed |
-| Structured-output / tool quirks | (provider) | Prefer a coder model known to return JSON; Molly applies edits itself |
+| Connection refused | `ollama_unreachable` | `ollama serve`, then check the URL. |
+| Model name unknown | `model_missing` | `ollama pull NAME`. |
+| Out of memory or context errors | none (runtime) | A smaller model or more free memory. |
+| The model returns malformed changes | `GENERATION_INVALID` in the run | Retry once; if it repeats, use a larger model. |
+| The review keeps coming back `REVIEW_INVALID` | in the run | Use a larger model. |
 
-Also see [Troubleshooting](troubleshooting.md).
+[Troubleshooting](troubleshooting.md) covers the rest.
 
-## 10. Opt-in hosted fallback
+## Next
 
-Molly **does not** silently fall back to a paid provider when Ollama fails. Hosted / Amp paths require explicit `molly:setup --agent=amp` (or equivalent profile policy). If Ollama is down, doctor fails closed until you fix local readiness or you intentionally switch agents.
-
-## 11. Optional Jev classification (advanced; off by default)
-
-Local agent execution does **not** require a hosted credential and does **not** enable Laravel AI classification / TypeSafe. `MOLLY_JEV_ENABLED` defaults to `false`, so Molly opens no classification request during this QuickStart.
-
-Keep that gate off for the local path. Enabling Jev is a separate advanced step (`MOLLY_JEV_ENABLED=true` plus Laravel AI TypeSafe credentials) documented in [Configuration](reference/configuration.md#jev-and-typesafe). Jev stays advisory: it cannot override Pest, Tarpit, bounded retries, or completion authority.
-
-## Boundaries (short)
-
-- **Molly** — task scope, Pest/Tarpit verification, receipts, completion gate.
-- **Laravel AI** — provider transport to Ollama (and optional classification when Jev is explicitly enabled).
-- **Bloom** — optional desktop/workspace host, not the model.
-- **Orb** — optional local execution target advertising capabilities.
-- **Jev / TypeSafe** — optional advanced classification path; off by default and not part of QuickStart.
+- [Getting started](getting-started.md)
+- [Agents](agents.md) for Amp and MCP
+- [Configuration](reference/configuration.md#ollama)

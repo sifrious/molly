@@ -165,7 +165,7 @@ jobs:
               with ZipFile(archive) as package:
                   names = package.namelist()
                   assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
-                  assert not any(name == '.git' or name.startswith(('.git/', '_site/', 'docs/_site/', 'docs/.jekyll-cache/')) for name in names)
+                  assert not any(name == '.git' or name.startswith('.git/') for name in names)
                   assert 'resources/planning/guide.json' in names
                   assert 'resources/planning/LARAVEL-LICENSE.md' in names
                   assert 'src/Complexity/LICENSE.md' in names

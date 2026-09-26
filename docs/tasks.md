@@ -1,81 +1,31 @@
----
-layout: default
-title: Manage tasks
----
+# Tasks
 
-# Manage tasks
-
-Use this page when you want to save a task, start it later, inspect attempts, retry a failure, or stop work.
-
-A **task** is the saved request. A **run** is one attempt to execute that task.
-
-## The normal task flow
-
-```bash
-php artisan molly:create
-php artisan molly:start TASK
-php artisan molly:task TASK
-php artisan molly:show RUN_ID --verbose
-```
-
-`TASK` can be a nickname such as `health-check` or the task UUID. `molly:task` also prints display status and any recorded GitHub issue, pull request, or merge SHA.
-
-A completed run records `workspace_prepared`, `dispatch_requested`, `proposal_received`, `edits_accepted`, and `verification_started` before it asks for approval. `workspace_prepared` records that Molly used the existing workspace and did not create another worktree. Empty proposals record `edits_rejected` and fail.
-
-Imported GitHub issues stay pending until you start them. After required checks pass, `molly:approve TASK --approve` records human approval. After a human approves writeback, `molly:comment` can post a status comment and `molly:pr-body` can print a pull request body. After a human opens the pull request, `molly:pr-opened TASK --url URL --approve` records that URL. After a human merges it, `molly:merged TASK --sha SHA --approve` records the merge commit. Molly does not open or merge the pull request.
+A task is a saved request: what should change, which Pest test proves it, and which files the agent may edit. A run is one attempt to complete that task. This page covers creating, starting, inspecting, retrying, and stopping tasks from Artisan.
 
 ## Create a task
 
-Interactive creation:
-
 ```bash
 php artisan molly:create
 ```
 
-Scripted creation:
+Molly asks for the request, an optional nickname, the required Pest test, and the other files it may change. The same task from a script:
 
 ```bash
 php artisan molly:create \
   'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
   --name=ready-check \
-  --file=routes/web.php \
   --test=tests/Feature/ReadyTest.php \
+  --file=routes/web.php \
   --json --no-interaction
 ```
 
-Creating the task does not call the model. It saves a pending task with:
+Creating a task saves it and nothing else. The model is not called and no file changes.
 
-- the request
-- an optional nickname
-- the required Pest test
-- the files Molly may edit
-- the workspace
+The test must already exist. Molly records its digest and protects it from the agent for the life of the task. If you want the agent to write the test, see [Write the test first](tutorials.md#write-the-test-first).
 
-The required Pest test is protected by default. Molly records its SHA-256 digest and rejects proposals that change it. Pass `--allow-test-edits` only when a separate test-authoring task should change that file. After that task writes the test, `molly:lock-test TASK --approve --file=app/Example.php` freezes the digest, records who approved it, and starts the implementation scope with a fresh attempt budget: the authoring runs stay on the task's history but are not charged against `molly.max_attempts` for the implementation. The weaker option stays explicit. It is never the default.
+### File scope
 
-## File scope
-
-Molly accepts selected paths under `app/`, `routes/`, `resources/`, and `tests/`.
-
-By default:
-
-- At most 8 distinct writable files may be selected. The protected test does not count toward that limit.
-- Each selected file or proposed replacement may be at most 65,536 bytes.
-- The required test must be a PHP file under `tests/`.
-- Hidden paths, path traversal, symlinks, directories, and special files are rejected.
-
-The file scope limits proposed edits. Writer and Pest processes also run in a Landlock sandbox with a network namespace when `molly:doctor` reports that the host can isolate them.
-
-## Name or rename a task
-
-```bash
-php artisan molly:name TASK_UUID ready-check
-php artisan molly:name old-name new-name
-```
-
-Nicknames are optional. A nickname starts with a letter and may contain lowercase letters, digits, and hyphens after normalization. It may be up to 64 characters.
-
-Renaming does not change the task UUID or its run history.
+Molly accepts paths under `app/`, `routes/`, `resources/`, and `tests/`. By default a task may name up to eight writable files, each up to 64 KB, and the protected test does not count toward that limit. Hidden paths, symlinks, directories, and paths that leave the workspace are rejected. `--workspace=PATH` points the task at another checkout; the default is the application itself.
 
 ## Start a task
 
@@ -83,33 +33,37 @@ Renaming does not change the task UUID or its run history.
 php artisan molly:start ready-check
 ```
 
-A pending task runs in the current terminal. CLI execution does not need a queue worker.
+The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise. No queue worker is needed for Artisan.
 
-A run completes only when the required evidence passes. A model review cannot override failed Pest tests.
+Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed.
 
 ## Inspect tasks and runs
 
 ```bash
-php artisan molly:tasks --limit=20
+php artisan molly:tasks
 php artisan molly:task ready-check
-php artisan molly:show RUN_ID
 php artisan molly:show RUN_ID --verbose
-php artisan molly:show RUN_ID --json
+php artisan molly:receipt RUN_ID
 ```
 
-Reading saved evidence does not call the model again.
+`molly:tasks` lists the newest tasks. `molly:task` shows one task, its display status (for example `awaiting_approval` after a completed run), any recorded pull request, and every attempt. `molly:show` reads a run's evidence, and `molly:receipt` reads its verification receipts. Reading never calls the model.
 
-## Retry a failed or stopped task
+`molly:inspect` follows the links between a task, its runs, and the saved conversations:
+
+```bash
+php artisan molly:inspect ready-check --ensure-conversations
+php artisan molly:inspect --run=RUN_ID
+```
+
+## Retry a failed task
 
 ```bash
 php artisan molly:retry ready-check
 ```
 
-A retry creates another run and keeps the earlier evidence. The default attempt limit is three total runs, including the first.
+A retry creates another run and keeps the earlier one. Molly sends the model a bounded summary of the previous failure. A task may make three attempts in total by default, counted across starts and retries; the limit is `molly.max_attempts`. Molly never retries on its own.
 
-Molly never retries automatically.
-
-Before retrying, read the failed run. Molly sends a bounded part of the previous failure evidence to the next writer so it can address the failure without receiving the entire old report.
+Read the failed run before retrying. If the failure is in the test itself, fix the test in a new task rather than weakening it.
 
 ## Stop a task
 
@@ -117,42 +71,68 @@ Before retrying, read the failed run. Molly sends a bounded part of the previous
 php artisan molly:stop ready-check
 ```
 
-For a pending task, stop is immediate. For active work, Molly records a stop request and checks it between execution stages.
+A pending task stops immediately. A running task is asked to stop at its next step, and Molly records the request. Applied edits may already be in the working tree, so check `git status` afterward. A stopped task can be retried.
 
-Generated changes may already be present. Always inspect the working tree after stopping.
-
-## Import a GitHub issue
-
-If the authenticated `gh` CLI can read the issue:
+## Name a task
 
 ```bash
-php artisan molly:import https://github.com/OWNER/REPOSITORY/issues/NUMBER \
-  --name=issue-fix \
-  --file=app/Example.php \
-  --test=tests/Feature/ExampleTest.php
+php artisan molly:name TASK_UUID ready-check
+php artisan molly:name old-name new-name
 ```
 
-Import creates a pending task. It does not start the task or write anything back to GitHub.
+A nickname starts with a letter and uses lowercase letters, digits, and hyphens. Renaming keeps the UUID and the run history.
+
+## Ask what to do next
+
+```bash
+php artisan molly:advice ready-check
+```
+
+Advice reads the saved state and the attempt limit and tells you which action is allowed: start, inspect, retry, stop, or done. It never performs the action. [Task advice](task-advice.md) covers the optional Jev suggestion.
+
+## Approve, then record the pull request
+
+After a run completes, the task waits for a person:
+
+```bash
+php artisan molly:approve ready-check --approve
+php artisan molly:pr-body ready-check
+```
+
+`molly:approve` records that you reviewed the change. `molly:pr-body` then prints a pull request description built from the evidence. Molly does not open or merge pull requests. When a person does, record it:
+
+```bash
+php artisan molly:pr-opened ready-check --url https://github.com/OWNER/REPO/pull/123 --approve
+php artisan molly:merged ready-check --sha MERGE_SHA --approve
+```
 
 ## Task states
 
 | State | Meaning |
 | --- | --- |
 | `pending` | Saved and ready to start. |
-| `running` | An attempt is active. |
-| `completed` | Required evidence passed. Review the diff before committing. |
-| `failed` | An attempt finished without the evidence needed to complete. |
-| `stopped` | Work stopped before completion. Inspect retained changes and evidence. |
+| `running` | An attempt is in progress. |
+| `completed` | The required checks passed. Review the diff before committing. |
+| `failed` | The attempt ended without the evidence needed to complete. |
+| `stopped` | Work stopped before completion. |
 
-## One writer per workspace
+`molly:task` also shows a display status that folds in approvals and pull requests: `awaiting_approval`, `approved`, `handed_off`, and `merged`.
 
-Molly prevents two writing runs from using the same workspace at the same time. If you see `WORKSPACE_BUSY`, check for active work before retrying.
+## One-off runs
 
-Failed verification does not roll back an already applied proposal. Molly also does not commit changes for you.
+To make a change without saving a reusable task:
+
+```bash
+php artisan molly:run 'Rename the greeting method.' \
+  --test=tests/Feature/GreetingTest.php \
+  --file=app/Greeting.php
+```
+
+The run saves a report but cannot be retried or stopped later.
 
 ## Next
 
 - [Verification](verification.md)
 - [Task advice](task-advice.md)
-- [Task connections](connections.md)
-- [Command reference](reference/commands.md)
+- [Tutorials](tutorials.md)
+- [Commands](reference/commands.md)

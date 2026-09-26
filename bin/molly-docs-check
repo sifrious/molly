@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Check that every relative link and heading anchor in the Markdown docs resolves.
+
+The docs are plain Markdown read on GitHub. This walks README.md and docs/**/*.md,
+follows each relative link to a file, and checks fragments against the headings of
+the target file using GitHub's heading slug rules.
+"""
+import re
+import sys
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+ROOT = Path(__file__).resolve().parent.parent
+FILES = [ROOT / 'README.md', *sorted((ROOT / 'docs').rglob('*.md'))]
+LINK = re.compile(r'(?<!\!)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)')
+HEADING = re.compile(r'^(#{1,6})\s+(.*?)\s*#*\s*$', re.M)
+FENCE = re.compile(r'```.*?```', re.S)
+
+
+def slug(text: str) -> str:
+    text = re.sub(r'`([^`]*)`', r'\1', text)
+    text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)
+    text = text.strip().lower()
+    text = re.sub(r'[^\w\- ]', '', text)
+    return text.replace(' ', '-')
+
+
+def headings(path: Path) -> set[str]:
+    text = FENCE.sub('', path.read_text())
+    seen: dict[str, int] = {}
+    ids = set()
+    for match in HEADING.finditer(text):
+        base = slug(match.group(2))
+        count = seen.get(base, 0)
+        ids.add(base if count == 0 else f'{base}-{count}')
+        seen[base] = count + 1
+    return ids
+
+
+def main() -> int:
+    errors = []
+    cache: dict[Path, set[str]] = {}
+    for path in FILES:
+        text = FENCE.sub('', path.read_text())
+        for match in LINK.finditer(text):
+            link = match.group(1)
+            parts = urlsplit(link)
+            if parts.scheme or parts.netloc or link.startswith('mailto:'):
+                continue
+            target = path if parts.path == '' else (path.parent / unquote(parts.path)).resolve()
+            if not target.exists():
+                errors.append(f'{path.relative_to(ROOT)}: missing target: {link}')
+                continue
+            if parts.fragment and target.suffix == '.md':
+                ids = cache.setdefault(target, headings(target))
+                if unquote(parts.fragment) not in ids:
+                    errors.append(f'{path.relative_to(ROOT)}: missing heading: {link}')
+    if errors:
+        print('\n'.join(errors))
+        return 1
+    print(f'Checked links in {len(FILES)} Markdown files.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

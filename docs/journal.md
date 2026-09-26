@@ -1,82 +1,46 @@
----
-layout: default
-title: Journals
----
+# Journals and decisions
 
-# Journals
+Molly can write what it knows about a task to Markdown files you can read without Artisan, and it can record a decision you made in a file you commit. The database stays the source of truth; the Markdown is a view of it.
 
-Molly can export task evidence to local Markdown files under `.molly/`.
-
-The database remains the source of truth. Journals are readable local views, not a replacement database.
-
-## Export one task
+## Export a task journal
 
 ```bash
-php artisan molly:journal health-check
+php artisan molly:journal ready-check
 ```
 
-Molly writes:
+Molly writes `.molly/journal/TASK_UUID.md` with the request, the file scope, the protected test, each attempt's state, Pest counts, Tarpit checks and findings, Clever measurements, the recorded pull request or merge if there is one, and the lifecycle events from `.molly/lifecycle.jsonl`. Run it again after another attempt to refresh the file. Missing evidence is written as missing.
 
-```text
-.molly/journal/TASK_UUID.md
-```
+## The project journal and glossary
 
-Run the command again after another attempt to refresh the same file.
-
-The export includes the task request, file scope, required test, attempt states, Pest counts, Tarpit checks and findings, separate Clever measurements, recorded pull request or merge SHA when present, and lifecycle events from `.molly/lifecycle.jsonl`.
-
-Missing evidence is shown as missing. A skipped check stays skipped.
-
-## Project journal and glossary
-
-Molly also maintains:
+Every run also refreshes two files for the workspace:
 
 ```text
 .molly/JOURNAL.md
 .molly/GLOSSARY.md
 ```
 
-The project journal lists saved tasks and their linked attempts for that workspace.
-
-The glossary contains a marked Molly-managed section. You may add project-specific definitions outside that section.
-
-The project journal lists current saved records. The per-task journal also lists recorded lifecycle events from `.molly/lifecycle.jsonl`. Editing either Markdown file does not change the database.
-
-## Refresh after a warning
-
-If a task reports that the project journal could not be refreshed:
+The journal lists the saved tasks and their attempts. The glossary has a section Molly maintains and room for your own project terms outside it. If a task page warns that the project journal could not be refreshed:
 
 ```bash
-php artisan molly:journal health-check --project
+php artisan molly:journal ready-check --project
 ```
 
-For scripts:
+A journal write failure never changes a run's result.
+
+## Keep them out of Git
+
+Journals can contain task descriptions and review text, so read them before sharing. Molly writes them with owner-only permissions and adds an ignore rule inside `.molly/.gitignore`. Keep `.molly/` ignored in your repository as well; Molly does not edit your root `.gitignore`.
+
+## Record a decision
 
 ```bash
-php artisan molly:journal health-check --json --no-interaction
+php artisan molly:decide --title="Keep Pest required" \
+  --body="Pest remains the completion gate for every task."
 ```
 
-A journal write failure does not change the task's execution result.
-
-## Privacy and Git
-
-Journals can contain task descriptions and review explanations. Read them before sharing.
-
-Molly writes them with restrictive local permissions and adds an ignore rule inside `.molly/.gitignore`. It does not change your repository's root `.gitignore`.
-
-Already tracked files stay tracked, so keep `.molly/` ignored in your project.
-
-## Architectural decisions
-
-Molly can write a short decision record under `docs/decisions/` in the named workspace:
-
-```bash
-php artisan molly:decide --title="Keep Pest required" --body="Pest remains the hard completion gate."
-```
-
-That file is project memory. Commit it if the repository should keep it. Molly does not commit it for you. It is not a journal, and it does not start an agent.
+Molly writes `docs/decisions/YYYY-MM-DD-keep-pest-required.md` in the workspace. Running the same title and body again on the same day leaves the file unchanged. Add `--task=ready-check` to link the decision to a task. Commit the file if the repository should keep it; Molly does not commit for you.
 
 ## Next
 
-- [Manage tasks](tasks.md)
+- [Tasks](tasks.md)
 - [Verification](verification.md)

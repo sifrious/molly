@@ -1,86 +1,65 @@
----
-layout: default
-title: Glossary
----
-
 # Glossary
 
-Use this page when a Molly report or guide uses a term you do not recognize.
+Terms you will meet in Molly's reports and pages, with what they mean in practice.
 
-## Core work
+## Work
 
 | Term | Meaning |
 | --- | --- |
-| Host application | The Laravel application where Molly is installed and where you run Artisan. It stores Molly's task and run records. |
-| Workspace | The checkout containing the files Molly may edit. It can be the host application or another local checkout. |
-| File scope | The selected files an agent may propose changing. The required Pest test is protected unless the task explicitly allows test edits. |
-| Task | A saved request with file scope, required test, optional nickname, and lifecycle state. |
-| Task nickname | An optional readable task reference such as `health-check`. The task UUID remains the stable identifier. |
-| Run | One execution attempt with its own status and evidence. |
-| Attempt | A run linked to a saved task. Retrying creates another attempt. |
-| Plan | Saved decisions for a larger piece of work. A plan does not edit code or prove implementation correctness. |
+| Task | A saved request: what should change, the files the agent may edit, and the Pest test that proves it. |
+| Run | One attempt at a task, with its own status, evidence, and receipts. Retrying makes a new run. |
+| Attempt limit | How many runs a task may make, three by default. Counted from the test lock onward when a task wrote its own test. |
+| Workspace | The checkout the task edits. Usually the application itself; `--workspace` names another. |
+| File scope | The files a proposal may touch. The protected test is never in it. |
+| Nickname | A readable name for a task, such as `ready-check`. The UUID stays the stable identifier. |
+| Plan | Saved answers to five planning questions. It does not write code. |
+| Display status | The task's state including human decisions: `awaiting_approval`, `approved`, `handed_off`, `merged`. |
 
 ## Verification
 
 | Term | Meaning |
 | --- | --- |
-| Protected test | The required Pest file whose SHA-256 digest is locked before implementation. Changing it fails the run. |
-| Test lock | Human approval of a Pest digest after a test-authoring task. The next run cannot edit that file. |
-| Failure action | What Molly does after a verifier does not pass: retry, fail, or warn. Policy and action stay separate fields. |
-| Verification | The required Pest execution and JUnit evidence for the selected test file. A model statement is not verification. |
-| False green | A passing JUnit report that did not identify the required Pest file or matching class. Molly fails the run with `false_green`. |
-| Tarpit review | Seven model checks for unnecessary complexity in the supplied before-and-after files. It cannot override failed tests. |
-| Finding | A Tarpit issue with a check, file, line, problem, recommendation, classification, and severity. |
-| Essential complexity | Complexity required by the current requirement. |
-| Pragmatic complexity | Complexity justified by a documented tradeoff. |
-| Accidental complexity | Complexity that can be removed while preserving required behavior. It may block completion. |
-| Clever measurement | One descriptive code measurement. Molly does not combine measurements into one quality score. |
-| Evidence | Saved test results, review findings, hashes, measurements, and execution metadata used to inspect a run. |
+| Protected test | The required Pest file. Molly locks its digest and rejects any proposal that changes it. |
+| Test lock | Your approval of a test the agent wrote, recorded by `molly:lock-test`. From then on the file is protected. |
+| Verifier | One required check: `pest`, `tarpit`, `parallel_join`, or `false_green`. |
+| Policy and failure action | Whether a verifier is required, and what happens when it fails (retry or fail). Both are in `config/molly.php`. |
+| Receipt | The saved outcome of one verifier for one run, under `.molly/receipts/`. States are `PASS`, `FAIL`, `REVIEW_REQUIRED`, and `NOT_RUN`. |
+| False green | A passing test report that did not name the required file, or a test that still passes when the code is broken. Fails the run. |
+| Tarpit review | Seven questions the model answers about the changed files. Only an unresolved accidental finding blocks completion. |
+| Finding | One Tarpit result: check, file, line, problem, recommendation, classification, severity. |
+| Essential, pragmatic, accidental | How a finding is classified. Essential is required by the request, pragmatic is a documented trade-off, accidental can be removed. |
+| Clever | The bundled measurements Molly records before and after a change. Numbers, not a score. |
+| Evidence | Everything saved with a run: test output, findings, measurements, hashes, timings. |
 
-## Source and component evidence
-
-| Term | Meaning |
-| --- | --- |
-| Source snapshot | Metadata for selected files at one moment, including path and SHA-256 hash. It does not store source contents. |
-| Component identity | `component:` plus a recognized Blade or Livewire source path. It identifies source, not a rendered UI component. |
-| Task journal | Markdown export for one task at `.molly/journal/TASK_UUID.md`. |
-| Project journal | `.molly/JOURNAL.md`, a generated view of saved tasks and attempts in one workspace. |
-| Project glossary | `.molly/GLOSSARY.md`, including a Molly-managed section plus space for project-specific terms. |
-| Project decision | A Git-tracked Markdown record under `docs/decisions/`. It is project memory, not run evidence. |
-
-## Agents and providers
+## Files and records
 
 | Term | Meaning |
 | --- | --- |
-| Agent provider | The selected `amp` or `ollama` path for proposals and Tarpit review. |
-| Molly MCP server | Local stdio server that exposes Molly actions to MCP clients. It has no HTTP route. |
-| Laravel AI classification | The borrowed Laravel AI seam Molly uses for optional structured classification. Laravel AI owns provider plumbing; Molly does not run a separate TypeSafe HTTP client. |
-| TypeSafe provider | The configured Laravel AI provider (`ai.providers.typesafe` / `TYPESAFE_API_KEY`) that may serve classification when Jev is enabled. |
-| Jev | Molly's optional model/capability policy under `molly.jev` (model, confidence threshold, timeout, instructions). Enabled only when `MOLLY_JEV_ENABLED=true`. |
-| Deterministic fallback | Molly policy when Jev is off or unavailable: no classification request; Pest, Tarpit, bounded retries, and completion stay authoritative. |
-| Task advice | A recommendation based on saved state, attempt limits, and optional Jev classification evidence. It never executes the recommendation and cannot upgrade a failed run. |
+| Source snapshot | The path and SHA-256 hash of each selected file at one moment. No source is stored. |
+| Component | A selected Livewire class or view, or a Blade component or view, identified as `component:` plus its path. |
+| Journal | `.molly/journal/TASK_UUID.md`, a Markdown export of one task. `.molly/JOURNAL.md` covers the workspace. |
+| Decision | A Markdown record under `docs/decisions/` written by `molly:decide`. Project memory you commit. |
+| Conversation | The saved messages between Molly and the agent for one run, under `~/.molly/conversations/`. |
+| Effective config | The settings a run used, saved with the run when it was created. |
 
-## Amp connection terms
-
-| Term | Meaning |
-| --- | --- |
-| Amp thread | An Amp conversation identified by a `T-` UUID. |
-| Task thread association | A user-recorded link between an Amp thread and a Molly task UUID. It is not provider-confirmed work. |
-| `latest_recorded` | The thread's latest saved association names the requested task. |
-| `prior_exact` | The thread was linked to the requested task before, but its latest saved association names another task. |
-| Connection observation | A current read of Amp executor state for a requested thread. |
-| Executor type | Raw Amp metadata. Molly preserves it without treating it as verified Orb identity. |
-
-## Planned remote-execution terms
+## Agents
 
 | Term | Meaning |
 | --- | --- |
-| Orb | A planned remote execution environment whose identity Molly does not currently verify. |
-| Execution target | The place where work executes. Current Molly task execution is local; remote target selection is planned. |
-| Handoff | A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge. |
-| Bloom contract | Versioned JSON Molly writes to `.molly/bloom-contract.json`. Bloom binds it to the selected workspace and does not create another worktree. |
-| Recorded pull request | A human-opened GitHub pull request URL stored after `molly:pr-opened --approve`. Molly does not open the pull request. |
-| Recorded merge | A 40-character merge commit SHA stored after `molly:merged --approve`. Molly does not merge. |
-| Project graph | Local SQLite relationships among tasks, tests, files, attempts, pull requests, commits, and blockers. Separate from Laravel documentation knowledge. |
+| Agent | The model that proposes changes and answers the Tarpit review: Ollama or Amp. |
+| Laravel AI | The package Molly uses to talk to Ollama and, for Jev, to TypeSafe. |
+| Jev | TypeSafe's classification model. Molly may ask it one bounded question for advice, a plan suggestion, or a commit review. Off by default. |
+| Jev gate | The single switch, `MOLLY_JEV_ENABLED`, and the states doctor reports: `disabled`, `unavailable`, `unconfigured`, `ready`. |
+| MCP server | Molly's local stdio server for editors and chat clients. No HTTP route. |
+| Sandbox | Landlock plus private user and network namespaces around the writer and Pest on Linux. |
 
-For current task behavior, read [Manage tasks](../tasks.md). For planned remote work, read [Execution targets](../execution-targets.md).
+## Bloom and GitHub
+
+| Term | Meaning |
+| --- | --- |
+| Bloom | An optional macOS workspace and review tool. It owns the checkout and pull request screens; Molly owns the task and its evidence. |
+| Bloom contract | `.molly/bloom-contract.json`, the versioned task description Bloom binds to a workspace. |
+| Handoff | An envelope that passes a task to a child Bloom workspace with the same scope. |
+| Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
+| Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
+| Orb | A planned remote execution environment. Not shipped; see [Execution targets](../execution-targets.md). |

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Molly</title>
+  <meta name="description" content="A local-first Laravel coding agent. The model can propose the work. Evidence decides whether the work is done.">
+  <!-- Burd design system, pinned to a published commit of sifrious/official-burd-design. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sifrious/official-burd-design@898cf53d345bdb15910368bc2e02a9e7623bf319/design-system/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sifrious/official-burd-design@898cf53d345bdb15910368bc2e02a9e7623bf319/design-system/landing-site.css">
+</head>
+<body class="burg-paper">
+
+<header class="hdr">
+  <div class="wrap hdr__in">
+    <a class="hdr__mark" href="./"><span class="wm">molly<b>.</b></span></a>
+    <span class="hdr__tag">for Laravel</span>
+    <nav aria-label="Site">
+      <a href="getting-started.md">Get started</a>
+      <a href="overview.md">Docs</a>
+      <a href="https://github.com/sifrious/molly">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="band band--first hero">
+    <div class="wrap hero__grid">
+      <div>
+        <span class="overline">A Laravel coding agent that has to show its work</span>
+        <h1>Yes, with receipts.</h1>
+        <p class="hero__lede">Molly is a local-first Laravel coding agent. The model can propose the work. Evidence decides whether the work is done.</p>
+        <div class="hero__cta">
+          <a class="burg-btn" href="getting-started.md">Get started</a>
+          <a class="burg-btn burg-btn--secondary" href="overview.md">Read the docs</a>
+          <a class="burg-btn burg-btn--secondary" href="https://github.com/sifrious/molly">View on GitHub</a>
+        </div>
+        <div class="hero__fine">
+          <span>Named for Molly Bloom, whose chapter of Ulysses begins and ends with yes. <a href="#name">Why the name</a></span>
+        </div>
+      </div>
+      <figure class="term" aria-label="molly:receipt output from a demo-greeting run">
+        <div class="term__bar"><span class="app__dots"><i></i><i></i><i></i></span><span>molly:receipt · demo-greeting</span></div>
+        <div class="term__body">
+          <div><span class="p">$</span> php artisan molly:receipt RUN_ID</div>
+          <div>parallel_join — <span class="ok">PASS</span> (required, retry)</div>
+          <div>pest — <span class="ok">PASS</span> (required, retry)</div>
+          <div>tarpit — <span class="ok">PASS</span> (required, retry)</div>
+          <div class="c"># clever: advisory, recorded beside the run</div>
+          <div class="c"># model self-approval: not a verifier</div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="band band--sunk">
+    <div class="wrap">
+      <div class="band__head">
+        <h2>The agent does not grade its own homework.</h2>
+        <p>A model saying its own work is correct can never turn failed test evidence into a pass.</p>
+      </div>
+      <div class="ledger">
+        <div class="ledger__item"><span class="ledger__n">scope</span><h3>Task boundary</h3><p>One small, named piece of work. Not a backlog.</p></div>
+        <div class="ledger__item"><span class="ledger__n">allowed files</span><h3>Allowed files</h3><p>The agent may change only the files the task names.</p></div>
+        <div class="ledger__item"><span class="ledger__n">pest</span><h3>Required Pest test</h3><p>Real Pest runs, and the JUnit evidence has to name that test file.</p></div>
+        <div class="ledger__item"><span class="ledger__n">protected test</span><h3>Protected tests</h3><p>The acceptance test is locked by default. The agent cannot rewrite the exam.</p></div>
+        <div class="ledger__item"><span class="ledger__n">tarpit</span><h3>Tarpit gate</h3><p>Unresolved accidental complexity keeps the task incomplete.</p></div>
+        <div class="ledger__item"><span class="ledger__n">receipts</span><h3>Persisted evidence</h3><p>Every attempt, output and receipt is saved for review.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap sell">
+      <div class="band__head">
+        <h2>Bound, execute, verify, inspect, accept</h2>
+        <p>A passing test supports a claim. It does not prove the entire application is correct. Molly never commits for you.</p>
+      </div>
+      <ol class="steps">
+        <li><div><b>Bound</b><p>Name the task, the files it may touch, and the Pest test that must pass.</p></div></li>
+        <li><div><b>Execute</b><p>The agent proposes a change. Molly applies only allowed-file edits.</p></div></li>
+        <li><div><b>Verify</b><p>Pest runs the required test. Tarpit reviews complexity. Clever records measurements on the side.</p></div></li>
+        <li><div><b>Inspect</b><p>Attempts and receipts stay on disk. Bounded retries keep the earlier evidence.</p></div></li>
+        <li><div><b>Accept</b><p>A person reads the diff, runs the wider suite, and decides whether to integrate.</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band band--sunk" id="name">
+    <div class="wrap sell">
+      <div>
+        <div class="band__head">
+          <h2>Why Molly</h2>
+          <p>Molly is named for Molly Bloom, from James Joyce’s Ulysses. Her chapter, “Penelope”, opens with yes and closes with one of the most famous yeses in literature.</p>
+        </div>
+        <p class="verdict">yes I said yes I will Yes.<span class="burg-verdict__cite">James Joyce, Ulysses, 1922</span></p>
+        <p><small>For the chapter and its adaptations, see Nick Bentley and James Peacock, “<a href="https://academic.oup.com/adaptation/article/18/1/apae025/7896241">Stories into song: theory and co-creative practice of adapting literary fiction into pop and rock songs</a>”, Adaptation, Oxford Academic, 2024.</small></p>
+        <p>Software is full of yes. Yes, we can build it. Yes, the model can change the file. Yes, the abstraction can be added. Molly’s yes has to be earned.</p>
+        <p>There is a plainer reason too. My family has always called me Molly. <small>Mary Perry</small></p>
+      </div>
+      <dl class="burg-dl">
+        <dt><span class="anointment">yes</span></dt><dd>if the evidence passes.</dd>
+        <dt><span class="ribbon">yes, but</span></dt><dd>this has become too complicated.</dd>
+        <dt><span class="ribbon">not yet</span></dt><dd>we do not have enough evidence.</dd>
+        <dt><span class="ribbon">no</span></dt><dd>this task should not get any bigger.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="band__head">
+        <h2>Use it alone. Add Bloom if you want a workspace.</h2>
+        <p>Bloom is optional. Everything Molly verifies works without it.</p>
+      </div>
+      <div class="local">
+        <div class="boundary">
+          <span class="boundary__tag">Molly standalone · no Bloom required</span>
+          <p>Install into a Laravel app, choose Ollama or Amp, and run tasks from Artisan. <a href="quickstart-standalone.md">Standalone QuickStart</a></p>
+          <ul>
+            <li><em></em>File scope</li>
+            <li><em></em>Protected tests</li>
+            <li><em></em>Pest and Tarpit</li>
+            <li><em></em>Clever measurements</li>
+            <li><em></em>Retries and history</li>
+            <li><em></em>Local web UI and MCP</li>
+          </ul>
+        </div>
+        <div class="outside">
+          <h4>Molly with Bloom</h4>
+          <p>Bloom owns the worktree, branch, diff, agent session and pull request flow. Molly exports a task contract for that workspace and keeps the tests, attempts, receipts and approval state.</p>
+          <p><a href="quickstart-bloom.md">Bloom QuickStart</a></p>
+          <p class="outside__none">Molly never creates a second Bloom worktree.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--sunk">
+    <div class="wrap">
+      <div class="band__head">
+        <h2>Generation is cheap. Judgment isn’t.</h2>
+        <p>Complexity is adjacent to correctness.</p>
+      </div>
+      <div class="ledger">
+        <div class="ledger__item"><span class="ledger__n">planning principle</span><h3>Prioritize</h3><p>Doing the wrong thing efficiently is still doing the wrong thing. Ask what should happen next, what is blocking progress, the smallest verifiable slice, and what can be left out.</p></div>
+        <div class="ledger__item"><span class="ledger__n">architecture principle</span><h3>Seams</h3><p>Use the seam the framework already gives you: events, contracts, middleware, bindings, drivers, commands, policies, jobs and configuration.</p></div>
+        <div class="ledger__item"><span class="ledger__n">blocking gate</span><h3>Tarpit</h3><p>A complexity review, separate from Pest, that can keep a task incomplete. Not a quality score. A model cannot override it.</p></div>
+        <div class="ledger__item"><span class="ledger__n">advisory measurement</span><h3>Clever</h3><p>Before and after measurements recorded next to the run. Never one score, never a verdict. <a href="https://clever.mary.win/">clever.mary.win</a></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap sell">
+      <div class="band__head">
+        <h2>Cleverness Is A Loan</h2>
+        <p>At Laracon US 2026, Mary Perry argued that every abstraction, novel mechanism or architectural trick is a loan someone has to service later. Molly applies that talk: as generation gets cheaper, restraint and verification matter more.</p>
+        <p><a href="https://www.youtube.com/watch?v=vsxoaTgtyjw">Watch the talk on YouTube</a> · <a href="https://clever.mary.win/">clever.mary.win</a></p>
+      </div>
+      <div class="sell__shot" style="aspect-ratio: 16 / 9">
+        <iframe style="width: 100%; height: 100%; border: 0" src="https://www.youtube-nocookie.com/embed/vsxoaTgtyjw" title="Cleverness Is A Loan, Mary Perry at Laracon US 2026" loading="lazy" allow="encrypted-media; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--sunk">
+    <div class="wrap">
+      <div class="band__head">
+        <h2>Local first, on purpose</h2>
+      </div>
+      <div class="faq">
+        <div><h4>Ollama is first-class</h4><p>The QuickStart talks to Ollama on loopback with no paid account.</p></div>
+        <div><h4>No silent fallback</h4><p>If local Ollama fails, Molly stops and says why. Hosted providers are explicit settings.</p></div>
+        <div><h4>Sandbox when the host allows it</h4><p>Molly uses stronger process isolation when the host supports the required Linux sandbox features. molly:doctor reports whether that safe workflow is available.</p></div>
+        <div><h4>Knowledge is advisory</h4><p>Queues, routing, testing, validation, the container, Eloquent and events. NativePHP and Tarpit notes live in their own namespaces. Knowledge cannot widen files, touch a protected test, or declare a task complete.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="band__head">
+        <h2>What ships today, and what does not</h2>
+      </div>
+      <div class="local">
+        <div class="boundary">
+          <span class="boundary__tag">Ships today</span>
+          <ul>
+            <li><em></em>Bounded Laravel coding tasks</li>
+            <li><em></em>Protected acceptance tests</li>
+            <li><em></em>Pest with false-green protection</li>
+            <li><em></em>Required Tarpit review</li>
+            <li><em></em>Separate Clever measurements</li>
+            <li><em></em>Bounded retries and history</li>
+            <li><em></em>Local Ollama, explicit Amp</li>
+            <li><em></em>Local MCP tools and web UI</li>
+            <li><em></em>Project and Laravel knowledge graphs</li>
+            <li><em></em>NativePHP knowledge</li>
+            <li><em></em>Decisions, journals, snapshots</li>
+            <li><em></em>Optional component previews</li>
+          </ul>
+        </div>
+        <div class="outside">
+          <h4>Not yet</h4>
+          <p>Verified Orb identity. Remote execution selection. Molly opening or merging pull requests itself. A compiled Bloom macOS integration. Visual previews inside Bloom. Laravel knowledge beyond the areas listed above.</p>
+          <p class="outside__none">Humans still make the final integration decision.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--sunk">
+    <div class="wrap dl">
+      <div>
+        <div class="band__head">
+          <h2>Install the current release</h2>
+          <p>PHP 8.3 or later, Laravel 12 or 13, Pest, Git and a working database. Molly installs from the public GitHub repository until it is listed on Packagist.</p>
+        </div>
+        <div class="notice"><div><b>v1 is not tagged yet</b><p>The v1 install line appears here once v1 is tagged and a fresh install is proven.</p></div></div>
+      </div>
+      <div class="term">
+        <div class="term__bar"><span class="app__dots"><i></i><i></i><i></i></span><span>laravel app</span></div>
+        <pre class="term__body" style="margin: 0; overflow-x: auto"><span class="p">$</span> composer config repositories.molly vcs https://github.com/sifrious/molly
+<span class="p">$</span> composer require --dev sifrious/molly:^0.1.1
+<span class="p">$</span> php artisan vendor:publish --tag=molly-config
+<span class="p">$</span> php artisan migrate
+<span class="c"># then follow the standalone QuickStart</span></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="ftr">
+  <div class="wrap ftr__in">
+    <span class="wm wm--sm">molly<b>.</b></span>
+    <nav aria-label="Footer">
+      <a href="overview.md">Documentation</a>
+      <a href="quickstart-standalone.md">Standalone QuickStart</a>
+      <a href="https://github.com/sifrious/molly">GitHub</a>
+      <a href="https://github.com/sifrious/molly/blob/main/SECURITY.md">Security</a>
+    </nav>
+    <span class="overline">AI can propose the work. Evidence decides whether the work is done.</span>
+  </div>
+</footer>
+
+</body>
+</html>

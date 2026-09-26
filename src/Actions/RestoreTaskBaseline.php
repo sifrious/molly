@@ -50,7 +50,7 @@ class RestoreTaskBaseline
                 continue;
             }
             File::ensureDirectoryExists(dirname($absolute));
-            File::replace($absolute, $contents);
+            File::replace($absolute, $contents, is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
         }
     }
 

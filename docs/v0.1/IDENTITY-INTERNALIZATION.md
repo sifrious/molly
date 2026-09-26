@@ -1,5 +1,7 @@
 # Identity internalization & drift policy (MME-5352)
 
+> **Historical.** This page records work from the v0.1 release. It is kept for context and is not current install guidance. For today's install steps, read [Getting started](../getting-started.md).
+
 ## Source revision
 
 Behavioral shape for Molly-owned workspace references was characterized against:
