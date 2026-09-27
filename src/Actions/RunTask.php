@@ -41,8 +41,9 @@ class RunTask
     /**
      * @param  list<string>  $paths
      * @param  Closure|null  $heartbeat  Renews the caller's task lease at each checkpoint.
+     * @param  Closure|null  $prepared  Runs once the preconditions pass and the run is saved.
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null): Run
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null, ?Closure $prepared = null): Run
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -67,7 +68,7 @@ class RunTask
         GitBinary::require();
         $this->sandbox->refuseSafeWorkflow();
 
-        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat): Run {
+        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat, $prepared): Run {
             $before = $files->read($paths);
             // Refresh the task once under the lease; outer load stays for safe pre-lease digest/path prep.
             $taskRow = $taskId === null ? null : Task::find($taskId);
@@ -94,6 +95,9 @@ class RunTask
                 'effective_config' => $effectiveConfig,
                 'report' => $this->initialReport($files, $before, $paths, $testPath, $testDigest, $allowTestEdits, $taskRow),
             ]);
+            if ($prepared !== null) {
+                $prepared($run);
+            }
 
             return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId, $heartbeat);
         });

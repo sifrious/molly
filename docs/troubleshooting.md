@@ -75,7 +75,7 @@ MOLLY_SANDBOX_ALLOW_UNSAFE=true
 
 Run `php artisan config:clear` and `php artisan molly:doctor`. Doctor now reports `sandbox_unsafe_override` and passes. The writer and Pest run with your user's permissions from then on, so do not use this for repositories you do not trust or on shared machines. Molly still limits proposals to the allowed files.
 
-A task that already failed on the sandbox check is `failed`. Fix the host, then `php artisan molly:retry TASK`.
+A start refused with `SANDBOX_UNAVAILABLE` saves no run and leaves the task `pending`. Fix the host or the setting, then run `php artisan molly:start TASK` again. Tasks that failed this way in earlier versions are `failed`; use `php artisan molly:retry TASK` for those.
 
 ## Composer cannot find Molly
 

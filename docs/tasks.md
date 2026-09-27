@@ -122,6 +122,8 @@ php artisan molly:merged ready-check --sha MERGE_SHA --approve
 | `failed` | The attempt ended without the evidence needed to complete. |
 | `stopped` | Work stopped before completion. |
 
+When `molly:start` or `molly:retry` is refused before an attempt begins, for example with `GIT_MISSING`, `SANDBOX_UNAVAILABLE`, `RED_BASELINE_MISSING`, `WORKSPACE_BUSY`, or `PROTECTED_TEST_MISSING`, no run is saved. The task keeps its state and attempt count, the claim is released, and `.molly/lifecycle.jsonl` gets one `start_refused` event with the code and message. Fix the cause and run the same command again. A failure after the run is saved still marks the task `failed`.
+
 `molly:task` also shows a display status that folds in approvals and pull requests: `awaiting_approval`, `approved`, `handed_off`, and `merged`.
 
 ## One-off runs

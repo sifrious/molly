@@ -47,7 +47,8 @@ final class LifecycleLog
 
         foreach ($this->events($taskId) as $event) {
             $type = $event->type();
-            if ($type === null) {
+            // A refused start created no run and left the task as it was.
+            if ($type === null || $type === LifecycleEventType::StartRefused) {
                 continue;
             }
 
