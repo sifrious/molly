@@ -64,7 +64,7 @@ Molly is not on Packagist yet. Composer needs the repository line:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
+composer require --dev sifrious/molly:^0.2
 ```
 
 If the requirement still fails, check the PHP Composer is using and the Laravel version:

@@ -16,7 +16,7 @@ python3 bin/molly-docs-check
 
 ## Switching the public install line to v1
 
-The install lines stay on the tagged `^0.1.1` constraint until all of these are true:
+The install lines stay on the `^0.2` constraint until all of these are true:
 
 1. The `v1.0.0` tag exists on `main`.
 2. Composer resolves `sifrious/molly:^1.0` from the documented source, Packagist or the public repository.
