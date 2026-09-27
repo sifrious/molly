@@ -1,0 +1,148 @@
+{
+    "simulated": true,
+    "scenario": "intel-mac-x86_64",
+    "label": "Intel Mac, x86_64: MacBook Pro 16-inch 2019, 32 GB, AMD GPU",
+    "commands": {
+        "uname -s": {
+            "exit": 0,
+            "stdout": "Darwin\n",
+            "stderr": ""
+        },
+        "uname -m": {
+            "exit": 0,
+            "stdout": "x86_64\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.optional.arm64": {
+            "exit": 1,
+            "stdout": "",
+            "stderr": "sysctl: unknown oid 'hw.optional.arm64'\n"
+        },
+        "sysctl -n sysctl.proc_translated": {
+            "exit": 1,
+            "stdout": "",
+            "stderr": "sysctl: unknown oid 'sysctl.proc_translated'\n"
+        },
+        "sysctl -n hw.model": {
+            "exit": 0,
+            "stdout": "MacBookPro16,1\n",
+            "stderr": ""
+        },
+        "sysctl -n machdep.cpu.brand_string": {
+            "exit": 0,
+            "stdout": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz\n",
+            "stderr": ""
+        },
+        "sw_vers": {
+            "exit": 0,
+            "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.6\nBuildVersion:\t\t24G84\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.memsize": {
+            "exit": 0,
+            "stdout": "34359738368\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.pagesize": {
+            "exit": 0,
+            "stdout": "4096\n",
+            "stderr": ""
+        },
+        "vm_stat": {
+            "exit": 0,
+            "stdout": "Mach Virtual Memory Statistics: (page size of 4096 bytes)\nPages free:                                       1203344.\nPages active:                                     3011220.\nPages inactive:                                   2890112.\nPages speculative:                                  40221.\nPages throttled:                                        0.\nPages wired down:                                  900112.\nPages purgeable:                                    30112.\n\"Translation faults\":                           123456789.\nPages copy-on-write:                              2345678.\nPages stored in compressor:                        400112.\nPages occupied by compressor:                      200556.\nPageins:                                           100000.\nPageouts:                                               0.\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_level": {
+            "exit": 0,
+            "stdout": "60\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_vm_pressure_level": {
+            "exit": 0,
+            "stdout": "1\n",
+            "stderr": ""
+        },
+        "system_profiler SPDisplaysDataType -json": {
+            "exit": 0,
+            "stdout": "{\n    \"SPDisplaysDataType\": [\n        {\n            \"_name\": \"AMD Radeon Pro 5500M\",\n            \"spdisplays_mtlgpufamilysupport\": \"spdisplays_metal3\",\n            \"spdisplays_vendor\": \"sppci_vendor_amd\",\n            \"sppci_bus\": \"spdisplays_pcie_device\",\n            \"sppci_model\": \"AMD Radeon Pro 5500M\"\n        }\n    ]\n}\n",
+            "stderr": ""
+        },
+        "command -v ollama": {
+            "exit": 0,
+            "stdout": "/usr/local/bin/ollama\n",
+            "stderr": ""
+        },
+        "'/usr/local/bin/ollama' --version": {
+            "exit": 0,
+            "stdout": "ollama version is 0.34.4\n",
+            "stderr": ""
+        },
+        "df -kP *": {
+            "exit": 0,
+            "stdout": "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s5 971350180 505763748 465586432 52% /System/Volumes/Data\n",
+            "stderr": ""
+        },
+        "diskutil info -plist *": {
+            "exit": 0,
+            "stdout": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>FilesystemType</key>\n\t<string>apfs</string>\n\t<key>FilesystemName</key>\n\t<string>APFS</string>\n\t<key>VolumeName</key>\n\t<string>Data</string>\n\t<key>Internal</key>\n\t<true/>\n\t<key>RemovableMediaOrExternalDevice</key>\n\t<false/>\n\t<key>Removable</key>\n\t<false/>\n\t<key>Ejectable</key>\n\t<false/>\n\t<key>MountPoint</key>\n\t<string>/System/Volumes/Data</string>\n</dict>\n</plist>\n",
+            "stderr": ""
+        }
+    },
+    "http": {
+        "/api/version": {
+            "status": 200,
+            "json": {
+                "version": "0.34.4"
+            }
+        },
+        "/api/tags": {
+            "status": 200,
+            "json": {
+                "models": [
+                    {
+                        "name": "qwen2.5-coder:7b",
+                        "model": "qwen2.5-coder:7b",
+                        "size": 4683087561,
+                        "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+                        "details": {
+                            "parameter_size": "7.6B",
+                            "quantization_level": "Q4_K_M"
+                        }
+                    },
+                    {
+                        "name": "gpt-oss:20b",
+                        "model": "gpt-oss:20b",
+                        "size": 13793441244,
+                        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+                        "details": {
+                            "parameter_size": "20.9B",
+                            "quantization_level": "MXFP4"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/ps": {
+            "status": 200,
+            "json": {
+                "models": []
+            }
+        }
+    },
+    "expect": {
+        "platform.architecture": "x86_64",
+        "platform.cpu_brand": "Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz",
+        "memory.page_size_bytes": 4096,
+        "memory.available_bytes": 16931540992,
+        "acceleration.gpu_vendor": "amd",
+        "acceleration.metal_support": "metal3",
+        "ollama.binary_path": "/usr/local/bin/ollama"
+    },
+    "expect_unknown": [
+        "platform.arm64_capable",
+        "platform.translated",
+        "acceleration.gpu_cores"
+    ],
+    "destination": "{workspace}"
+}

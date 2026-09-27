@@ -1,0 +1,140 @@
+{
+    "simulated": true,
+    "scenario": "low-disk",
+    "label": "Low disk: MacBook Air M2, 16 GB, 2 GiB free on the model volume",
+    "commands": {
+        "uname -s": {
+            "exit": 0,
+            "stdout": "Darwin\n",
+            "stderr": ""
+        },
+        "uname -m": {
+            "exit": 0,
+            "stdout": "arm64\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.optional.arm64": {
+            "exit": 0,
+            "stdout": "1\n",
+            "stderr": ""
+        },
+        "sysctl -n sysctl.proc_translated": {
+            "exit": 0,
+            "stdout": "0\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.model": {
+            "exit": 0,
+            "stdout": "Mac14,2\n",
+            "stderr": ""
+        },
+        "sysctl -n machdep.cpu.brand_string": {
+            "exit": 0,
+            "stdout": "Apple M2\n",
+            "stderr": ""
+        },
+        "sw_vers": {
+            "exit": 0,
+            "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.6\nBuildVersion:\t\t24G84\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.memsize": {
+            "exit": 0,
+            "stdout": "17179869184\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.pagesize": {
+            "exit": 0,
+            "stdout": "16384\n",
+            "stderr": ""
+        },
+        "vm_stat": {
+            "exit": 0,
+            "stdout": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                        150000.\nPages active:                                      400000.\nPages inactive:                                    300000.\nPages speculative:                                   5000.\nPages throttled:                                        0.\nPages wired down:                                  150000.\nPages purgeable:                                     9000.\n\"Translation faults\":                           123456789.\nPages copy-on-write:                              2345678.\nPages stored in compressor:                         50000.\nPages occupied by compressor:                       25000.\nPageins:                                           100000.\nPageouts:                                               0.\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_level": {
+            "exit": 0,
+            "stdout": "60\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_vm_pressure_level": {
+            "exit": 0,
+            "stdout": "1\n",
+            "stderr": ""
+        },
+        "system_profiler SPDisplaysDataType -json": {
+            "exit": 0,
+            "stdout": "{\n    \"SPDisplaysDataType\": [\n        {\n            \"_name\": \"Apple M2\",\n            \"spdisplays_mtlgpufamilysupport\": \"spdisplays_metal3\",\n            \"spdisplays_vendor\": \"sppci_vendor_Apple\",\n            \"sppci_bus\": \"spdisplays_builtin\",\n            \"sppci_cores\": \"10\",\n            \"sppci_device_type\": \"spdisplays_gpu\",\n            \"sppci_model\": \"Apple M2\"\n        }\n    ]\n}\n",
+            "stderr": ""
+        },
+        "command -v ollama": {
+            "exit": 0,
+            "stdout": "/opt/homebrew/bin/ollama\n",
+            "stderr": ""
+        },
+        "'/opt/homebrew/bin/ollama' --version": {
+            "exit": 0,
+            "stdout": "ollama version is 0.34.4\n",
+            "stderr": ""
+        },
+        "df -kP *": {
+            "exit": 0,
+            "stdout": "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s5 239362496 237265344 2097152 99% /System/Volumes/Data\n",
+            "stderr": ""
+        },
+        "diskutil info -plist *": {
+            "exit": 0,
+            "stdout": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>FilesystemType</key>\n\t<string>apfs</string>\n\t<key>FilesystemName</key>\n\t<string>APFS</string>\n\t<key>VolumeName</key>\n\t<string>Data</string>\n\t<key>Internal</key>\n\t<true/>\n\t<key>RemovableMediaOrExternalDevice</key>\n\t<false/>\n\t<key>Removable</key>\n\t<false/>\n\t<key>Ejectable</key>\n\t<false/>\n\t<key>MountPoint</key>\n\t<string>/System/Volumes/Data</string>\n</dict>\n</plist>\n",
+            "stderr": ""
+        }
+    },
+    "http": {
+        "/api/version": {
+            "status": 200,
+            "json": {
+                "version": "0.34.4"
+            }
+        },
+        "/api/tags": {
+            "status": 200,
+            "json": {
+                "models": [
+                    {
+                        "name": "qwen2.5-coder:7b",
+                        "model": "qwen2.5-coder:7b",
+                        "size": 4683087561,
+                        "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+                        "details": {
+                            "parameter_size": "7.6B",
+                            "quantization_level": "Q4_K_M"
+                        }
+                    },
+                    {
+                        "name": "gpt-oss:20b",
+                        "model": "gpt-oss:20b",
+                        "size": 13793441244,
+                        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+                        "details": {
+                            "parameter_size": "20.9B",
+                            "quantization_level": "MXFP4"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/ps": {
+            "status": 200,
+            "json": {
+                "models": []
+            }
+        }
+    },
+    "expect": {
+        "disk.free_bytes": 2147483648,
+        "disk.total_bytes": 245107195904,
+        "disk.external": false
+    },
+    "expect_unknown": [],
+    "destination": "{workspace}"
+}

@@ -1,0 +1,55 @@
+{
+    "simulated": true,
+    "scenario": "probes-unknown",
+    "label": "Every probe fails: commands exit non-zero and the Ollama API refuses connections",
+    "commands": {
+        "*": {
+            "exit": 127,
+            "stdout": "",
+            "stderr": "simulated failure\n"
+        }
+    },
+    "http": [],
+    "expect": {
+        "disk.volume_missing": false
+    },
+    "expect_unknown": [
+        "platform.os",
+        "platform.macos",
+        "platform.architecture",
+        "platform.arm64_capable",
+        "platform.translated",
+        "platform.model_identifier",
+        "platform.cpu_brand",
+        "platform.os_name",
+        "platform.os_version",
+        "platform.os_build",
+        "memory.total_bytes",
+        "memory.page_size_bytes",
+        "memory.vm_pages",
+        "memory.available_bytes",
+        "memory.purgeable_bytes",
+        "memory.compressed_bytes",
+        "memory.free_percentage",
+        "memory.pressure_level",
+        "acceleration.gpu_model",
+        "acceleration.gpu_vendor",
+        "acceleration.gpu_cores",
+        "acceleration.metal_support",
+        "acceleration.metal_available",
+        "ollama.binary_path",
+        "ollama.cli_version",
+        "ollama.api_version",
+        "ollama.installed_models",
+        "ollama.loaded_models",
+        "disk.mount_point",
+        "disk.device",
+        "disk.free_bytes",
+        "disk.total_bytes",
+        "disk.filesystem",
+        "disk.volume_name",
+        "disk.external",
+        "disk.removable"
+    ],
+    "destination": "{workspace}"
+}
