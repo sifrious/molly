@@ -23,6 +23,7 @@ Restart queue workers after configuration changes too.
 | --- | --- |
 | `migration_missing` | Run `php artisan migrate`. |
 | `database_unavailable` | Fix the application's database connection. |
+| `database_unwritable` | Doctor inserted a row inside a transaction, and the database refused it. Free disk space, or make the database file and its directory writable. Doctor rolls the row back. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
 | `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
@@ -40,6 +41,8 @@ Restart queue workers after configuration changes too.
 | `jev_unconfigured` | Jev is on and capable, but `TYPESAFE_API_KEY` is empty or `config/ai.php` predates the TypeSafe provider. |
 
 Informational codes such as `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
+
+On a full disk or a read-only path, commands fail with a code and the path they could not write: `ENV_UNWRITABLE` from `molly:setup` for `.env`, `DIRECTORY_UNWRITABLE` for a directory Molly could not create, and `WORKER_START_FAILED` for `.molly/worker`. `molly:setup` leaves `.env` unchanged when it fails.
 
 ## Sandbox unavailable
 

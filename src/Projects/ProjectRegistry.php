@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Projects;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /**
  * Shared Molly project index for CLI and Bloom.
@@ -77,7 +78,7 @@ final class ProjectRegistry
         );
 
         $directory = dirname($this->projectFile($normalized->path));
-        File::ensureDirectoryExists($directory, 0700);
+        Directory::ensure($directory, 0700);
         $mask = umask(0077);
         try {
             File::put(
@@ -162,7 +163,7 @@ final class ProjectRegistry
     /** @param  list<string>  $paths */
     private function writeIndex(array $paths): void
     {
-        File::ensureDirectoryExists($this->home(), 0700);
+        Directory::ensure($this->home(), 0700);
         $mask = umask(0077);
         try {
             File::put(

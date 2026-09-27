@@ -3,7 +3,6 @@
 namespace Sifrious\Molly\Actions;
 
 use Closure;
-use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Contracts\LifecycleEventType;
@@ -14,6 +13,7 @@ use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class RunTask
@@ -109,7 +109,7 @@ class RunTask
         };
 
         try {
-            File::ensureDirectoryExists($evidence, 0700);
+            Directory::ensure($evidence, 0700);
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity before changes');
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);

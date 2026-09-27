@@ -8,6 +8,7 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
@@ -124,7 +125,7 @@ class MollyDemoCommand extends Command
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
+        Directory::ensure(dirname($path));
         File::put($path, <<<'PHP'
 <?php
 
@@ -151,7 +152,7 @@ PHP);
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
+        Directory::ensure(dirname($path));
         File::put($path, <<<'PHP'
 <?php
 

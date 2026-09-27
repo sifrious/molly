@@ -84,7 +84,7 @@ class Workspace
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory and a regular file.');
         }
         if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create the workspace lock directory.');
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create '.$directory.'. Check free disk space and that the workspace is writable.');
         }
         if (is_link($directory) || ! is_dir($directory)) {
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory.');

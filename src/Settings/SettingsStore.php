@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Settings;
 
 use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /** Persist global Molly settings under MOLLY_HOME/settings.json. */
 final class SettingsStore
@@ -59,7 +60,7 @@ final class SettingsStore
 
     public function write(MollySettings $settings): void
     {
-        File::ensureDirectoryExists($this->home(), 0700);
+        Directory::ensure($this->home(), 0700);
         $payload = [
             'schema_version' => MollySettings::SCHEMA_VERSION,
             'updated_at' => gmdate('c'),

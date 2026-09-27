@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 use Symfony\Component\Process\ExecutableFinder;
 use Throwable;
 
@@ -293,7 +294,7 @@ class ManageWorker
 
     private function directory(string $root): string
     {
-        File::ensureDirectoryExists($root.'/.molly/worker');
+        Directory::ensure($root.'/.molly/worker');
 
         return $root.'/.molly/worker';
     }
