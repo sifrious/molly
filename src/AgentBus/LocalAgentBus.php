@@ -23,6 +23,19 @@ final class LocalAgentBus
     }
 
     /**
+     * The lease a live run renews at each checkpoint. It outlasts the longest
+     * single bounded step, a model call (molly.timeout) or a Pest run
+     * (molly.test_timeout), so a worker that is still inside one step keeps
+     * its claim. A crashed worker's claim still expires after this long.
+     */
+    public function runLeaseSeconds(): int
+    {
+        $steps = array_filter([config('molly.timeout'), config('molly.test_timeout')], fn (mixed $seconds): bool => is_int($seconds) && $seconds > 0 && $seconds <= 3600);
+
+        return max($this->leaseSeconds(), ...array_map(fn (int $seconds): int => $seconds + 30, $steps));
+    }
+
+    /**
      * Atomically claim a task for one worker. Racing workers: only one succeeds.
      * Abandoned (expired lease) running tasks are recoverable into a new claim.
      */
@@ -84,9 +97,11 @@ final class LocalAgentBus
         });
     }
 
-    public function heartbeat(string $taskId, string $workerId): Task
+    public function heartbeat(string $taskId, string $workerId, ?int $seconds = null): Task
     {
-        return DB::transaction(function () use ($taskId, $workerId): Task {
+        $seconds ??= $this->leaseSeconds();
+
+        return DB::transaction(function () use ($taskId, $workerId, $seconds): Task {
             $task = Task::query()->whereKey($taskId)->lockForUpdate()->first()
                 ?? throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
 
@@ -100,7 +115,7 @@ final class LocalAgentBus
             $now = now();
             Task::query()->whereKey($task->id)->update([
                 'heartbeat_at' => $now,
-                'lease_expires_at' => $now->copy()->addSeconds($this->leaseSeconds()),
+                'lease_expires_at' => $now->copy()->addSeconds($seconds),
             ]);
 
             return $task->refresh();
