@@ -52,7 +52,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
 | `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |
 
-`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps.
+`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed.
 
 ## Queue worker
 
