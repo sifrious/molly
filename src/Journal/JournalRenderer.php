@@ -250,28 +250,38 @@ final class JournalRenderer
         ];
     }
 
+    /**
+     * The terms Molly writes into the managed section of .molly/GLOSSARY.md.
+     *
+     * @return list<array{term: string, definition: string}>
+     */
+    public function glossaryTerms(): array
+    {
+        return [
+            ['term' => 'Task', 'definition' => 'A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.'],
+            ['term' => 'Nickname', 'definition' => 'An optional readable task reference. Commands also accept the task UUID.'],
+            ['term' => 'Attempt', 'definition' => 'One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.'],
+            ['term' => 'Verification', 'definition' => 'The recorded Pest result and counts. A skipped or missing check is not a pass.'],
+            ['term' => 'Tarpit review', 'definition' => 'Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.'],
+            ['term' => 'Accidental complexity', 'definition' => 'A finding whose removal preserves the required behavior. A blocking finding prevents completion.'],
+            ['term' => 'Clever measurements', 'definition' => 'Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.'],
+            ['term' => 'Project journal', 'definition' => 'A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.'],
+            ['term' => 'Recorded pull request', 'definition' => 'A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.'],
+            ['term' => 'Recorded merge', 'definition' => 'A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.'],
+            ['term' => 'Handoff', 'definition' => 'A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.'],
+        ];
+    }
+
     public function glossaryCopy(): string
     {
-        return <<<'MARKDOWN'
-## Molly terms
+        $terms = array_map(fn (array $entry): string => '- '.$entry['term'].': '.$entry['definition'], $this->glossaryTerms());
 
-Molly updates this marked section with the project journal. Add project-specific definitions outside the section.
-
-- Task: A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.
-- Nickname: An optional readable task reference. Commands also accept the task UUID.
-- Attempt: One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.
-- Verification: The recorded Pest result and counts. A skipped or missing check is not a pass.
-- Tarpit review: Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.
-- Accidental complexity: A finding whose removal preserves the required behavior. A blocking finding prevents completion.
-- Clever measurements: Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.
-- Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.
-- Recorded pull request: A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.
-- Recorded merge: A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.
-- Handoff: A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.
-
-The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.
-
-MARKDOWN;
+        return implode("\n", [
+            '## Molly terms', '',
+            'Molly updates this marked section with the project journal. Add project-specific definitions outside the section.', '',
+            ...$terms, '',
+            'The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.', '',
+        ]);
     }
 
     /**

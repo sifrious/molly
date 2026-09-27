@@ -156,6 +156,14 @@ One class decides whether a request may classify, and every transport reports th
 
 Molly uses the application's database and queue. It has no connection settings of its own. Starts from the web interface or MCP need the database, Redis, Beanstalkd, or SQS driver with a reservation or visibility timeout above 3600 seconds; [Web interface](../web-interface.md#queue-requirements) has the details. Artisan starts need no worker.
 
+`php artisan molly:worker start` runs one `php artisan queue:work {connection} --queue={queue}` process for you, using the default queue connection and that connection's `queue` value. Molly jobs are dispatched to the same place, so the worker and the jobs always agree.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `molly.worker.php_binary` | `null` | The PHP binary used to run the worker. `null` uses the binary running the Artisan command. A bare name such as `php` is looked up on `PATH`. Environment: `MOLLY_WORKER_PHP_BINARY`. |
+
+The worker's record, `.molly/worker/worker.json`, holds its pid, process group, command line, queue, and start time. Its output goes to `.molly/worker/worker.log`. Molly signals the recorded process only while it is alive, still leads the recorded process group, and still runs the recorded command line. Stopping sends `SIGTERM` to the process group and `SIGKILL` after `--timeout` seconds (30 by default). `queue:work` finishes its current job before it exits on `SIGTERM`, so a `SIGKILL` can interrupt a running task; the task's agent-bus lease then expires and the task can be recovered.
+
 ## Environment variables
 
 | Variable | Meaning |
@@ -171,6 +179,7 @@ Molly uses the application's database and queue. It has no connection settings o
 | `MOLLY_KNOWLEDGE_DATABASE` | Graph file path |
 | `MOLLY_COMPLEXITY_ENABLED` | Force Clever on or off |
 | `MOLLY_PREVIEW_COMMAND`, `MOLLY_PREVIEW_URL`, `MOLLY_PREVIEW_VIEWPORT` | Component previews |
+| `MOLLY_WORKER_PHP_BINARY` | PHP binary for `molly:worker` |
 | `MOLLY_HOME` | Where global settings, conversations, and the graph cache live. Defaults to `~/.molly`. |
 | `APP_ENV`, `QUEUE_CONNECTION` | The application's environment and queue |
 

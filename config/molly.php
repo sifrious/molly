@@ -13,6 +13,13 @@ return [
         'lease_seconds' => 120,
         'worker_id' => null,
     ],
+    /*
+     | molly:worker runs `php artisan queue:work` with this binary.
+     | Null uses the PHP binary running the Artisan command.
+     */
+    'worker' => [
+        'php_binary' => env('MOLLY_WORKER_PHP_BINARY'),
+    ],
     'parallel_checks' => true,
     'verification' => [
         'pest' => 'required',

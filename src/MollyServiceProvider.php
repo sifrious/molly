@@ -27,6 +27,7 @@ use Sifrious\Molly\Console\MollyCreateCommand;
 use Sifrious\Molly\Console\MollyDecideCommand;
 use Sifrious\Molly\Console\MollyDemoCommand;
 use Sifrious\Molly\Console\MollyDoctorCommand;
+use Sifrious\Molly\Console\MollyGlossaryCommand;
 use Sifrious\Molly\Console\MollyGraphsBootstrapCommand;
 use Sifrious\Molly\Console\MollyGraphsRetryCommand;
 use Sifrious\Molly\Console\MollyHandoffCommand;
@@ -57,9 +58,11 @@ use Sifrious\Molly\Console\MollySettingsSetCommand;
 use Sifrious\Molly\Console\MollySetupCommand;
 use Sifrious\Molly\Console\MollyShowCommand;
 use Sifrious\Molly\Console\MollyStartCommand;
+use Sifrious\Molly\Console\MollyStatusCommand;
 use Sifrious\Molly\Console\MollyStopCommand;
 use Sifrious\Molly\Console\MollyTaskCommand;
 use Sifrious\Molly\Console\MollyTasksCommand;
+use Sifrious\Molly\Console\MollyWorkerCommand;
 use Sifrious\Molly\Knowledge\LaravelContainerGraph;
 use Sifrious\Molly\Knowledge\LaravelEloquentGraph;
 use Sifrious\Molly\Knowledge\LaravelEventsGraph;
@@ -143,6 +146,7 @@ class MollyServiceProvider extends ServiceProvider
             MollyPrBodyCommand::class, MollyPrOpenedCommand::class, MollyMergedCommand::class, MollyHandoffCommand::class, MollyNameCommand::class,
             MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
             MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
+            MollyStatusCommand::class, MollyWorkerCommand::class, MollyGlossaryCommand::class,
             MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
             MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
         ]);
