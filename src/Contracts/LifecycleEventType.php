@@ -23,4 +23,5 @@ enum LifecycleEventType: string
     case Failed = 'failed';
     case Recovered = 'recovered';
     case HandedOff = 'handed_off';
+    case StartRefused = 'start_refused';
 }

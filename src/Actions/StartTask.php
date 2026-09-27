@@ -34,38 +34,49 @@ class StartTask
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);
             if (($blocked = $task->redBaselineError()) !== null) {
+                $this->recordRefusal($task, $blocked, $retry);
                 throw new RuntimeException($blocked);
             }
             $workerId = $this->workerId();
             $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
+            $unclaimed = $task->only(['status', 'attempt_number', 'idempotency_key']);
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
             $this->journal->handle($task->refresh());
 
-            return $this->execute($task->refresh(), $progress, $retry, $workerId);
+            return $this->execute($task->refresh(), $progress, $retry, $workerId, $unclaimed);
         });
     }
 
-    private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId): Run
+    /** @param  array{status: string, attempt_number: int|null, idempotency_key: string|null}  $unclaimed */
+    private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId, array $unclaimed): Run
     {
         $id = $task->id;
+        $runCreated = false;
         try {
             $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds());
 
             if ($retry) {
                 $this->baseline->handle($task);
-                $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
             }
-            $this->lifecycle->handle($task->workspace, LifecycleEventType::WorkspacePrepared, $task->id, payload: [
-                'workspace' => $task->workspace,
-                'created_worktree' => false,
-            ]);
             $previousAttempt = $retry ? $this->previousAttempt($task) : null;
+            // Record preparation only once RunTask has passed its preconditions and saved a run.
+            $prepared = function () use ($task, $retry, &$runCreated): void {
+                $runCreated = true;
+                if ($retry) {
+                    $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
+                }
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::WorkspacePrepared, $task->id, payload: [
+                    'workspace' => $task->workspace,
+                    'created_worktree' => false,
+                ]);
+            };
             $run = $this->runTask->handle(
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,
                 ...[
                     'taskId' => $id,
                     'shouldStop' => fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
                     'heartbeat' => fn () => $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds()),
+                    'prepared' => $prepared,
                     ...($previousAttempt === null ? [] : ['previousAttempt' => $previousAttempt]),
                 ],
             );
@@ -94,6 +105,13 @@ class StartTask
 
             return $finished;
         } catch (Throwable $exception) {
+            // A start refused before any run was saved, such as GIT_MISSING or SANDBOX_UNAVAILABLE,
+            // returns the task to its earlier state and attempt count instead of failing it.
+            $released = $runCreated ? 0 : Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update($unclaimed);
+            if ($released === 1) {
+                $this->recordRefusal($task, $exception->getMessage(), $retry);
+                throw $exception;
+            }
             Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update(['status' => 'failed']);
             Task::whereKey($id)->where('status', 'running')->whereNotNull('stop_requested_at')->update(['status' => 'stopped']);
             $current = $task->fresh();
@@ -107,6 +125,15 @@ class StartTask
             $this->bus->clearClaim($task->refresh());
             $this->journal->handle($task->refresh());
         }
+    }
+
+    private function recordRefusal(Task $task, string $message, bool $retry): void
+    {
+        $this->lifecycle->handle($task->workspace, LifecycleEventType::StartRefused, $task->id, payload: [
+            'code' => preg_match('/\A([A-Z][A-Z0-9_]+):/', $message, $match) === 1 ? $match[1] : 'COMMAND_FAILED',
+            'message' => $this->boundedText($message, 512),
+            'retry' => $retry,
+        ]);
     }
 
     private function workerId(): string

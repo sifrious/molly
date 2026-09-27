@@ -7,6 +7,7 @@ use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\RecordVerificationReceipts;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Knowledge\LaravelVersion;
+use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 
 beforeEach(function (): void {
@@ -97,4 +98,52 @@ it('names both paths when a .molly entry links elsewhere and allows real directo
         ->toThrow(RuntimeException::class, 'WORKSPACE_PATH_ESCAPE: '.$this->project.'/.molly/identity.json is a symbolic link to '.$this->outside.'/identity.json');
     expect(fn () => Directory::molly($this->project, '../outside'))
         ->toThrow(RuntimeException::class, 'WORKSPACE_PATH_ESCAPE');
+});
+
+it('reports a linked .molly as WORKSPACE_PATH_ESCAPE from task, project, journal, and lock commands', function (string $command): void {
+    symlink($this->outside, $this->project.'/.molly');
+    writeProtectedTest($this->project, 'tests/Feature/GreetingTest.php');
+    File::ensureDirectoryExists($this->project.'/config');
+    File::put($this->project.'/config/molly.php', "<?php\n\nreturn [];\n");
+    File::put($this->project.'/composer.json', '{"name":"example/app","require":{"laravel/framework":"^13.0"}}');
+    File::put($this->project.'/.gitignore', ".molly/\n");
+    $before = filesUnder($this->outside);
+    $home = $this->outside.'-home';
+    putenv('MOLLY_HOME='.$home);
+
+    try {
+        $exit = match ($command) {
+            'molly:create' => Artisan::call('molly:create', ['prompt' => 'Return Hi', '--workspace' => $this->project, '--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php', '--json' => true]),
+            'molly:project-init' => Artisan::call('molly:project-init', ['path' => $this->project, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]),
+            'molly:journal' => Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->project, '--json' => true]),
+        };
+        $document = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    } finally {
+        putenv('MOLLY_HOME');
+        File::deleteDirectory($home);
+    }
+
+    expect($exit)->toBe(1)
+        ->and($document['error'] ?? $document['reason'])->toStartWith('WORKSPACE_PATH_ESCAPE: '.$this->project.'/.molly is a symbolic link to '.$this->outside.'.')
+        ->and(filesUnder($this->outside))->toBe($before);
+})->with(['molly:create', 'molly:project-init', 'molly:journal']);
+
+it('reports a linked .molly as WORKSPACE_PATH_ESCAPE before taking a workspace lock', function (): void {
+    symlink($this->outside, $this->project.'/.molly');
+
+    expect(fn () => (new Workspace($this->project))->exclusivelyForTask((string) Str::uuid(), fn (): bool => true))
+        ->toThrow(RuntimeException::class, 'WORKSPACE_PATH_ESCAPE: '.$this->project.'/.molly is a symbolic link to '.$this->outside.'.');
+    expect(filesUnder($this->outside))->toBe([]);
+});
+
+it('keeps WORKSPACE_IDENTITY_INVALID for a linked identity file inside a real .molly', function (): void {
+    File::ensureDirectoryExists($this->project.'/.molly');
+    File::put($this->outside.'/identity.json', '{}');
+    symlink($this->outside.'/identity.json', $this->project.'/.molly/identity.json');
+    writeProtectedTest($this->project, 'tests/Feature/GreetingTest.php');
+
+    $exit = Artisan::call('molly:create', ['prompt' => 'Return Hi', '--workspace' => $this->project, '--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php', '--json' => true]);
+
+    expect($exit)->toBe(1)
+        ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'])->toStartWith('WORKSPACE_IDENTITY_INVALID: '.$this->project.'/.molly/identity.json must not be a symbolic link.');
 });

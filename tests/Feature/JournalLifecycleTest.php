@@ -115,15 +115,16 @@ it('refreshes the running claim and final attempt outcome', function (string $st
         ->and(substr_count($journal, $run->id))->toBe(1);
 })->with(['completed', 'failed']);
 
-it('refreshes the failed claim when execution throws before creating an attempt', function (): void {
+it('releases the claim and refreshes the journal when execution is refused before creating an attempt', function (): void {
     $task = lifecycleTask();
     $this->mock(RunTask::class)->shouldReceive('handle')->once()->andThrow(new RuntimeException('WORKSPACE_BUSY: Another run owns the workspace.'));
 
     expect(fn () => app(StartTask::class)->handle($task->id))->toThrow(RuntimeException::class, 'WORKSPACE_BUSY');
 
-    expect($task->fresh()->status)->toBe('failed')
+    expect($task->fresh()->status)->toBe('pending')
+        ->and($task->fresh()->worker_id)->toBeNull()
         ->and($task->fresh()->journal_status['status'])->toBe('written')
-        ->and(Str::markdown(File::get($this->journalWorkspace.'/.molly/JOURNAL.md')))->toContain('Status: failed')
+        ->and(Str::markdown(File::get($this->journalWorkspace.'/.molly/JOURNAL.md')))->toContain('Status: pending')
         ->and(Run::count())->toBe(0);
 });
 

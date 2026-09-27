@@ -9,7 +9,6 @@ use Sifrious\Molly\Actions\RefreshProjectJournal;
 use Sifrious\Molly\Models\Task;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyJournalCommand extends Command
@@ -36,16 +35,18 @@ class MollyJournalCommand extends Command
                 } else {
                     $result = ['task_id' => null, ...$refresh->forWorkspace((string) ($this->option('workspace') ?: base_path()))];
                 }
+                if ($result['status'] !== 'written') {
+                    // Keep the documented journal status keys on stdout; the code goes to stderr.
+                    return $this->reportFailure((string) $result['reason'], $result);
+                }
                 if ($this->option('json')) {
                     $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-                } elseif ($result['status'] === 'written') {
+                } else {
                     note('Project journal saved: '.$result['journal_path']);
                     note('Project glossary saved: '.$result['glossary_path']);
-                } else {
-                    error('Project journal unavailable. '.$result['reason']);
                 }
 
-                return $result['status'] === 'written' ? self::SUCCESS : self::FAILURE;
+                return self::SUCCESS;
             }
 
             if (! is_string($reference) || $reference === '') {

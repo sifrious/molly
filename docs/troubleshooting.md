@@ -54,7 +54,10 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `WORKSPACE_IDENTITY_UNWRITABLE` | `.molly/identity.json`. |
 | `PROJECT_RECORD_UNWRITABLE` | `.molly/project.json`. |
 | `PROJECT_INDEX_UNWRITABLE` | `projects.json` in `MOLLY_HOME`. |
-| `DATABASE_UNWRITABLE` | The application database, from `molly:create`. No task is saved. |
+| `DATABASE_UNWRITABLE` | The application database, from `molly:create`. No task is saved. For `molly:project:index` and `molly:knowledge:index`, the knowledge database, `.molly/knowledge.sqlite` by default. |
+| `JOURNAL_WRITE_FAILED` | `.molly/JOURNAL.md`, `.molly/GLOSSARY.md`, or a file in `.molly/journal`. `molly:journal --project --json` keeps its `status: unavailable` document on stdout and prints the coded line on stderr. |
+| `KNOWLEDGE_MANIFEST_UNWRITABLE` | `.molly/graphs/manifest.json`, from `molly:graphs-bootstrap`. A missing `.molly/graphs` directory fails with `DIRECTORY_UNWRITABLE`. |
+| `SETTINGS_UNWRITABLE` | `settings.json` in `MOLLY_HOME`, from `molly:settings-set`. The file is left unchanged. |
 
 ## .molly is a link
 
@@ -72,7 +75,7 @@ MOLLY_SANDBOX_ALLOW_UNSAFE=true
 
 Run `php artisan config:clear` and `php artisan molly:doctor`. Doctor now reports `sandbox_unsafe_override` and passes. The writer and Pest run with your user's permissions from then on, so do not use this for repositories you do not trust or on shared machines. Molly still limits proposals to the allowed files.
 
-A task that already failed on the sandbox check is `failed`. Fix the host, then `php artisan molly:retry TASK`.
+A start refused with `SANDBOX_UNAVAILABLE` saves no run and leaves the task `pending`. Fix the host or the setting, then run `php artisan molly:start TASK` again. Tasks that failed this way in earlier versions are `failed`; use `php artisan molly:retry TASK` for those.
 
 ## Composer cannot find Molly
 

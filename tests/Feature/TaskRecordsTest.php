@@ -265,7 +265,8 @@ it('releases the task lock when execution throws', function () {
     expect(fn () => app(StartTask::class)->handle($task->id))
         ->toThrow(RuntimeException::class, 'WORKSPACE_BUSY');
 
-    expect($task->fresh()->status)->toBe('failed')
+    // No run was saved, so the refused start leaves the task pending.
+    expect($task->fresh()->status)->toBe('pending')
         ->and((new Workspace($this->workspace))->exclusivelyForTask($task->id, fn (): string => 'released'))->toBe('released');
 });
 

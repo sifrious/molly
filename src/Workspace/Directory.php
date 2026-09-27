@@ -15,6 +15,26 @@ final class Directory
 
         // Catch PHP's warning here: Laravel's handler would turn it into an exception without
         // the path, and a suppressed warning never reaches error_get_last().
+        [$made, $reason] = self::attempt(fn (): bool => mkdir($path, $mode, true));
+        if ($made || is_dir($path)) {
+            return;
+        }
+
+        throw new RuntimeException('DIRECTORY_UNWRITABLE: Molly could not create '.$path.($reason !== '' ? ' ('.$reason.')' : '').'. Check free disk space and that the parent directory is writable.');
+    }
+
+    /**
+     * Run one filesystem call and return its result with the reason PHP gave for a failure,
+     * such as "Permission denied" or "No space left on device". The function name and path
+     * prefix of the warning are removed, because callers name the path themselves.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $operation
+     * @return array{0: T, 1: string}
+     */
+    public static function attempt(callable $operation): array
+    {
         $error = '';
         set_error_handler(function (int $level, string $message) use (&$error): bool {
             $error = $message;
@@ -22,17 +42,49 @@ final class Directory
             return true;
         });
         try {
-            $made = mkdir($path, $mode, true);
+            $result = $operation();
         } finally {
             restore_error_handler();
         }
-        if ($made || is_dir($path)) {
-            return;
+
+        return [$result, trim((string) preg_replace('/\A[a-z_]+\(.*\): (?:Failed to open stream: )?/s', '', $error))];
+    }
+
+    /**
+     * Replace $path atomically through a new private file beside it. A failure throws with
+     * $code, the path, and the reason the system gave; the original file is left unchanged.
+     * $beforeRename runs after the contents are on disk and may throw to cancel the replace.
+     */
+    public static function replaceFile(string $path, string $contents, string $code, int $mode = 0600, ?\Closure $beforeRename = null): void
+    {
+        $failed = fn (string $reason): RuntimeException => new RuntimeException($code.': Molly could not write '.$path.' ('.$reason.'). Check free disk space and that '.dirname($path).' is writable.');
+        $temporary = dirname($path).'/.'.basename($path).'.molly-'.bin2hex(random_bytes(6));
+        [$handle, $reason] = self::attempt(fn () => fopen($temporary, 'x'));
+        if ($handle === false) {
+            throw $failed($reason !== '' ? $reason : 'the directory is not writable');
         }
 
-        $reason = str_starts_with($error, 'mkdir(): ') ? ' ('.substr($error, 9).')' : '';
-
-        throw new RuntimeException('DIRECTORY_UNWRITABLE: Molly could not create '.$path.$reason.'. Check free disk space and that the parent directory is writable.');
+        try {
+            [$written, $reason] = self::attempt(fn () => fwrite($handle, $contents));
+            [$flushed, $flushReason] = self::attempt(fn (): bool => fflush($handle));
+            fclose($handle);
+            if ($written !== strlen($contents) || ! $flushed) {
+                throw $failed(($reason ?: $flushReason) ?: 'the disk accepted only part of the contents');
+            }
+            @chmod($temporary, $mode);
+            if ($beforeRename !== null) {
+                $beforeRename();
+            }
+            [$renamed, $reason] = self::attempt(fn (): bool => rename($temporary, $path));
+            if (! $renamed) {
+                throw $failed($reason !== '' ? $reason : 'the new file could not be moved into place');
+            }
+        } finally {
+            clearstatcache(true, $temporary);
+            if (is_file($temporary) && ! is_link($temporary)) {
+                @unlink($temporary);
+            }
+        }
     }
 
     /**
