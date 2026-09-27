@@ -25,7 +25,7 @@ final class BindWorkspaceReference
         $obs = $this->observe->handle($path);
 
         if ($obs['head'] === null || ! preg_match('/\A[0-9a-f]{40}\z/', $obs['head'])) {
-            throw new RuntimeException('WORKSPACE_REVISION_MISSING: Checkout has no usable HEAD revision.');
+            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.$obs['path'].' has no commit yet. Commit your work, then try again.');
         }
 
         $gitMeta = $obs['path'].'/.git';

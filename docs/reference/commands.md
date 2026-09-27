@@ -41,7 +41,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 
 | Command | What it does |
 | --- | --- |
-| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, the sandbox, parallel checks, the agent, Clever, and the Jev gate. A `--workspace` that is not an existing directory fails with `WORKSPACE_INVALID` before any check runs. |
+| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, Git, whether the workspace is a Git repository with a commit (`git_repository` or `workspace_not_git`), the sandbox, parallel checks, the agent, Clever, and the Jev gate. A `--workspace` that is not an existing directory fails with `WORKSPACE_INVALID` before any check runs. |
 | `molly:preflight [--destination=PATH]` | Measures this Mac before a model download: architecture, Rosetta translation, macOS version, memory and memory pressure, Metal, the installed Ollama runtime and models, and free space on the volume that holds the models. Facts it cannot read are listed as unknown. It does not choose or download a model. |
 | `molly:setup --agent=ollama --model=NAME` | Saves a local Ollama model. |
 | `molly:setup --agent=amp [--no-login]` | Saves Amp as the agent and connects its MCP client. |
@@ -52,7 +52,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
 | `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |
 
-`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed.
+`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed. `project-new` does not create a Git repository; commit the new project yourself before creating a task, or task commands stop with `WORKSPACE_NOT_GIT`.
 
 ## Queue worker
 

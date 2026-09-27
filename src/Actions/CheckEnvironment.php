@@ -12,6 +12,7 @@ use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
 class CheckEnvironment
@@ -20,6 +21,7 @@ class CheckEnvironment
         private Sandbox $sandbox,
         private Clever $clever,
         private JevGate $jev,
+        private ObserveCheckout $observe,
     ) {}
 
     /** @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>} */
@@ -34,6 +36,7 @@ class CheckEnvironment
         $workspace = realpath($workspace);
         $this->checkPest($workspace, $add);
         $this->checkGit($add);
+        $this->checkGitRepository($workspace, $add);
         $this->checkSandbox($add);
         $this->checkParallel($add);
         $this->checkAgent($add);
@@ -112,6 +115,25 @@ class CheckEnvironment
         $add('Git', $git !== null, $git !== null ? 'git_ready' : 'git_missing', $git !== null
             ? 'Git is available at '.$git.'.'
             : 'Molly needs the git executable to create, run, and review tasks, and no git was found on PATH. Install Git or add it to PATH.');
+    }
+
+    /**
+     * Reads only: a workspace without a repository is reported, never initialized.
+     *
+     * @param  callable(string, bool, string, string): void  $add
+     */
+    private function checkGitRepository(string|false $workspace, callable $add): void
+    {
+        if ($workspace === false || ! ObserveCheckout::isCheckout($workspace)) {
+            $add('Git repository', false, 'workspace_not_git', ($workspace === false ? 'The workspace' : $workspace).' is not a Git repository. Molly records the commit each task runs against and never creates a repository for you. Run git init and commit your work before creating a task.');
+
+            return;
+        }
+
+        $head = $this->observe->head($workspace);
+        $add('Git repository', $head !== null, $head !== null ? 'git_repository' : 'workspace_revision_missing', $head !== null
+            ? 'The workspace is a Git checkout at commit '.$head.'.'
+            : $workspace.' is a Git repository with no commit yet. Commit your work before creating a task.');
     }
 
     /** @param  callable(string, bool, string, string): void  $add */

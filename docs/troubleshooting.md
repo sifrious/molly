@@ -26,6 +26,8 @@ Restart queue workers after configuration changes too.
 | `database_unwritable` | Doctor inserted a row inside a transaction, and the database refused it. Free disk space, or make the database file and its directory writable. Doctor rolls the row back. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
 | `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. |
+| `workspace_not_git` | The workspace is not a Git repository. Molly records the commit each task starts from and never creates a repository or a commit for you. See [Not a Git repository](#not-a-git-repository). |
+| `workspace_revision_missing` | The workspace is a Git repository with no commit yet. Commit your work, then run doctor again. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
 | `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |
 | `parallel_process_groups_unavailable` | Install POSIX support, or set `parallel_checks` to `false`. |
@@ -40,7 +42,7 @@ Restart queue workers after configuration changes too.
 | `jev_capability_missing` | Jev is on, but `laravel/ai` cannot classify. Pin the accepted commit or turn Jev off. See [Jev](reference/configuration.md#jev). |
 | `jev_unconfigured` | Jev is on and capable, but `TYPESAFE_API_KEY` is empty or `config/ai.php` predates the TypeSafe provider. |
 
-Informational codes such as `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
+Informational codes such as `git_repository`, `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
 
 On a full disk or a read-only path, commands fail with a code, the path they could not write, and the reason the system gave, such as `No space left on device` or `Permission denied`:
 
@@ -58,6 +60,24 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `JOURNAL_WRITE_FAILED` | `.molly/JOURNAL.md`, `.molly/GLOSSARY.md`, or a file in `.molly/journal`. `molly:journal --project --json` keeps its `status: unavailable` document on stdout and prints the coded line on stderr. |
 | `KNOWLEDGE_MANIFEST_UNWRITABLE` | `.molly/graphs/manifest.json`, from `molly:graphs-bootstrap`. A missing `.molly/graphs` directory fails with `DIRECTORY_UNWRITABLE`. |
 | `SETTINGS_UNWRITABLE` | `settings.json` in `MOLLY_HOME`, from `molly:settings-set`. The file is left unchanged. |
+
+## Not a Git repository
+
+Commands that create or run a task refuse a workspace that is not a Git repository: `molly:create`, `molly:demo`, `molly:story`, `molly:start`, `molly:retry`, GitHub issue import, and the web and MCP task tools. They print:
+
+```text
+WORKSPACE_NOT_GIT: /path/to/app is not a Git repository. Run git init and commit your work, then try again.
+```
+
+Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
+
+```bash
+git init
+git add -A
+git commit -m "Start"
+```
+
+A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
 
 ## .molly is a link
 

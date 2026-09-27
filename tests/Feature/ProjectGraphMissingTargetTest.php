@@ -16,6 +16,7 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->workspace.'/app/Services');
     File::put($this->workspace.'/app/Services/Greeter.php', "<?php\n");
     writeProtectedTest($this->workspace, 'tests/Feature/GreeterTest.php');
+    commitGitWorkspace($this->workspace);
     config()->set('molly.knowledge.database', $this->workspace.'/.molly/knowledge.sqlite');
 });
 

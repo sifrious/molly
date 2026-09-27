@@ -28,6 +28,7 @@ function redBaselineWorkspace(bool $realPest = true): string
         File::ensureDirectoryExists($workspace.'/vendor/bin');
         File::put($workspace.'/vendor/bin/pest', '<?php');
     }
+    commitGitWorkspace($workspace);
 
     return $workspace;
 }

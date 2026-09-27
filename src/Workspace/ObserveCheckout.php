@@ -4,7 +4,7 @@ namespace Sifrious\Molly\Workspace;
 
 use RuntimeException;
 
-/** Read-only Git observation for a checkout path — never invents identity from the path alone. */
+/** Read-only Git observation for a checkout path. It never creates a repository or invents identity from the path alone. */
 final class ObserveCheckout
 {
     /**
@@ -18,16 +18,11 @@ final class ObserveCheckout
         }
         GitBinary::require();
 
-        $gitDir = $real.'/.git';
-        if (! file_exists($gitDir)) {
-            // Fresh composer create-project apps may lack .git; mint a local checkout
-            // so revision identity can bind. Paths remain metadata, never IDs.
-            $this->initEphemeralGit($real);
-        }
+        self::requireCheckout($real);
 
-        $gitRoot = $real;
-        $head = $this->git($gitRoot, ['rev-parse', 'HEAD']);
-        $branch = $this->git($real, ['rev-parse', '--abbrev-ref', 'HEAD']);
+        // A repository with no commit yet has no HEAD; the binder reports WORKSPACE_REVISION_MISSING.
+        $head = $this->git($real, ['rev-parse', '--verify', '--quiet', 'HEAD'], allowFail: true);
+        $branch = $this->git($real, ['rev-parse', '--abbrev-ref', 'HEAD'], allowFail: true);
         if ($branch === 'HEAD') {
             $branch = null;
         }
@@ -43,9 +38,23 @@ final class ObserveCheckout
         ];
     }
 
+    /** Whether the path is the root of a Git checkout (a clone's .git directory or a worktree's .git file). */
+    public static function isCheckout(string $path): bool
+    {
+        return file_exists(rtrim($path, '/').'/.git');
+    }
+
+    /** Refuse a path that is not a Git checkout. Molly never creates a repository or a commit in the user's project. */
+    public static function requireCheckout(string $path): void
+    {
+        if (! self::isCheckout($path)) {
+            throw new RuntimeException('WORKSPACE_NOT_GIT: '.$path.' is not a Git repository. Run git init and commit your work, then try again.');
+        }
+    }
+
     /**
      * The checkout's HEAD commit, or null when the path is not a Git checkout.
-     * Unlike handle(), this never initializes a repository.
+     * Unlike handle(), this never throws for a missing repository.
      */
     public function head(string $path): ?string
     {
@@ -90,17 +99,5 @@ final class ObserveCheckout
         }
 
         return 'git:'.$url;
-    }
-
-    private function initEphemeralGit(string $path): void
-    {
-        $this->git($path, ['init'], allowFail: false);
-        $this->git($path, ['config', 'user.email', 'molly-bind@sifrious.invalid'], allowFail: false);
-        $this->git($path, ['config', 'user.name', 'Molly Bind'], allowFail: false);
-        if (! is_file($path.'/README.molly-bind')) {
-            file_put_contents($path.'/README.molly-bind', "Molly bind checkout\n");
-        }
-        $this->git($path, ['add', '-A'], allowFail: false);
-        $this->git($path, ['commit', '-m', 'molly-bind-checkout'], allowFail: false);
     }
 }

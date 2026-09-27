@@ -16,6 +16,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
     config(['molly.agent_bus.lease_seconds' => 30, 'molly.timeout' => 10, 'molly.test_timeout' => 10]);
 });
 

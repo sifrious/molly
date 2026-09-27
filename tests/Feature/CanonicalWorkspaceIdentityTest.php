@@ -25,6 +25,7 @@ beforeEach(function (): void {
     File::put($this->workspace.'/app/Hello.php', '<?php');
     File::put($this->workspace.'/app/Welcome.php', '<?php');
     writeProtectedTest($this->workspace, 'tests/HelloTest.php');
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function (): void {

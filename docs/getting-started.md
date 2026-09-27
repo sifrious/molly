@@ -7,7 +7,7 @@ This page takes you from an empty terminal to a completed Molly task. You will i
 - PHP 8.3 or later with the DOM, PDO, and PDO SQLite extensions
 - Laravel 12 or 13
 - Pest 4 in the application
-- Git, because Molly records which revision each run started from
+- Git, with the application committed to a repository, because Molly records which commit each run started from
 - A working database connection
 - [Ollama](https://ollama.com) running locally, or the Amp CLI
 
@@ -40,7 +40,7 @@ pest()->extend(Tests\TestCase::class)->in('Feature');
 
 ### No Laravel application yet?
 
-The demo installer creates a fresh application, installs Pest and the tagged Molly release, and scaffolds the demo task:
+The demo installer creates a fresh application, commits it once with your own Git identity, installs Pest and the tagged Molly release, and scaffolds the demo task:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
@@ -71,6 +71,16 @@ Add Molly's local files to `.gitignore`:
 /storage/molly/
 ```
 
+Molly never creates a repository or a commit in your application. `composer create-project` does not create one either, so if `git status` says the directory is not a Git repository, commit the application yourself before you create a task:
+
+```bash
+git init
+git add -A
+git commit -m "Start"
+```
+
+Without a repository, `molly:demo` and `molly:create` stop with `WORKSPACE_NOT_GIT` and write nothing. See [Not a Git repository](troubleshooting.md#not-a-git-repository).
+
 Molly is a development dependency. A production `composer install --no-dev` does not include it, and its commands do not register in production.
 
 ## Choose a model
@@ -95,7 +105,7 @@ To use Amp instead, see [Agents](agents.md#amp).
 php artisan molly:doctor
 ```
 
-Doctor checks the database tables, Pest, the sandbox, the model, and the Clever measurements. When everything passes it prints:
+Doctor checks the database tables, Pest, Git and the application's repository, the sandbox, the model, and the Clever measurements. When everything passes it prints:
 
 ```text
 Molly is ready.

@@ -11,6 +11,7 @@ it('scaffolds the greeting demo and saves a reusable demo-greeting task', functi
     File::ensureDirectoryExists($workspace.'/app');
     File::ensureDirectoryExists($workspace.'/tests/Feature');
     File::put($workspace.'/.gitignore', "/vendor/\n");
+    commitGitWorkspace($workspace);
 
     $exit = Artisan::call('molly:demo', [
         '--workspace' => $workspace,

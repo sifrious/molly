@@ -17,6 +17,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
     $this->knowledgeDatabase = sys_get_temp_dir().'/molly-project-'.Str::uuid().'.sqlite';
     config()->set('molly.knowledge.database', $this->knowledgeDatabase);
     $this->task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');

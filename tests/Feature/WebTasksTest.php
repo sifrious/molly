@@ -23,6 +23,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Hello.php', '<?php');
     writeProtectedTest($this->workspace, 'tests/Hello.php');
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {
