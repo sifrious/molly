@@ -118,7 +118,7 @@ class VerifyChanges
     }
 
     /**
-     * @return array{reason: string}|array{tests: int, assertions: int, failures: int, errors: int, skipped: int, identified_required_test: bool}
+     * @return array{reason: string}|array{tests: int, assertions: int, failures: int, errors: int, skipped: int, identified_required_test: bool, failing_tests: list<array<string, string>>}
      */
     private function readEvidence(string $path, string $workspace, string $testPath): array
     {
@@ -152,7 +152,38 @@ class VerifyChanges
             return ['reason' => 'junit_invalid'];
         }
 
-        return [...$counts, 'identified_required_test' => $this->identifiesRequiredTest($xpath, $workspace, $testPath)];
+        return [
+            ...$counts,
+            'identified_required_test' => $this->identifiesRequiredTest($xpath, $workspace, $testPath),
+            'failing_tests' => $this->failingTests($xpath),
+        ];
+    }
+
+    /**
+     * Failing and erroring test cases from JUnit, bounded to 50 entries.
+     * The message is diagnostic text only; identity comes from name, file, kind, and type.
+     *
+     * @return list<array{name: string, file: string, kind: string, type: string, message: string}>
+     */
+    private function failingTests(DOMXPath $xpath): array
+    {
+        $failing = [];
+        foreach ($xpath->query('//testcase[failure or error]') as $test) {
+            foreach ($xpath->query('failure | error', $test) as $problem) {
+                $failing[] = [
+                    'name' => $test->getAttribute('name'),
+                    'file' => explode('::', str_replace('\\', '/', $test->getAttribute('file')), 2)[0],
+                    'kind' => $problem->nodeName,
+                    'type' => $problem->getAttribute('type'),
+                    'message' => mb_strcut(trim($problem->getAttribute('message') ?: $problem->textContent), 0, 512, 'UTF-8'),
+                ];
+                if (count($failing) === 50) {
+                    return $failing;
+                }
+            }
+        }
+
+        return $failing;
     }
 
     private function identifiesRequiredTest(DOMXPath $xpath, string $workspace, string $testPath): bool

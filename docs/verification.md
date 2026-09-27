@@ -39,6 +39,8 @@ php artisan molly:receipt RUN_ID
 
 A receipt records the verifier, its state (`PASS`, `FAIL`, `REVIEW_REQUIRED`, or `NOT_RUN`), the policy that applied, the failure action, a digest of the evidence, and timestamps. A verifier that never ran appears as `NOT_RUN` rather than disappearing. Receipt files are written once per run; a retry gets a new run ID and a new directory. Editing a receipt does not change the saved run.
 
+When the agent is Ollama, Molly asks the configured loopback server which model answered, right after the model call: the Ollama version from `/api/version`, family, parameter size, quantization, and maximum context from `/api/show`, and the digest, loaded context length, memory size, and VRAM size from `/api/ps`. If the model is no longer loaded, the digest comes from `/api/tags`. The run report saves this as `model_identity` with the generation time in milliseconds, and every receipt carries it under `context.model_identity`. Any value Ollama did not report, including concurrency, which Ollama does not expose, is recorded as `unavailable`. `model_identity.sources` shows which requests answered.
+
 ## The Pest check
 
 Molly runs only the required test file, not your whole suite, and it wants real evidence: a JUnit report naming that file with at least one executed test and at least one assertion.
@@ -66,6 +68,21 @@ vendor/bin/pest
 The Pest test that defines a task is protected by default. Molly records its SHA-256 digest when the task is created, rejects any proposal that touches it, and fails the run if the file changes on disk during the attempt. The agent may change application code to make the test pass; it may not change the test.
 
 When you want Molly to write the test itself, create a separate task with `--allow-test-edits`, then lock the result with `molly:lock-test` before the implementation task. [Tutorials](tutorials.md#write-the-test-first) shows the whole flow.
+
+`molly:story` starts that flow from a plain-English story. It asks the configured model for numbered acceptance criteria, saves them on the task in `source.acceptance` with the model name and a prompt digest, and creates the test-authoring task. It does not run anything else.
+
+### RED baseline
+
+`molly:lock-test --approve` runs the locked test once before any implementation and saves the result in `source.test_lock.red_baseline`: the JUnit digest, test counts, failing test names, and one classification.
+
+| Classification | Meaning |
+| --- | --- |
+| `missing_behavior` | Tests failed on assertions, missing routes, or missing application classes. The implementation may start. |
+| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, zero tests, or no JUnit report. |
+| `already_passing` | The test passed before any implementation, so it proves nothing. |
+| `not_recorded` | Molly could not run the test, for example because another run held the workspace. |
+
+An implementation run of a locked task refuses to start with `RED_BASELINE_MISSING` or `RED_BASELINE_INVALID` until the baseline is `missing_behavior`. Fix the test file and run `molly:lock-test --approve` again; Molly locks the new digest and records a new baseline. A task created through `CreateTask` with `requireRedBaseline: false` skips the check. Tasks created with a hand-written test that was never locked are not checked. Run reports copy the baseline, and every receipt carries it under `context.red_baseline`.
 
 ## The Tarpit review
 

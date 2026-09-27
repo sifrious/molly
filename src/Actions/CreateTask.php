@@ -21,10 +21,13 @@ class CreateTask
     ) {}
 
     /**
+     * Pass requireRedBaseline: false to let the implementation start without a
+     * RED run of the locked test. Molly records that choice on the task.
+     *
      * @param  list<string>  $paths
      * @param  array<string, mixed>  $source
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null, bool $allowTestEdits = false): Task
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null, bool $allowTestEdits = false, bool $requireRedBaseline = true): Task
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -50,6 +53,10 @@ class CreateTask
             json_encode($source, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('SOURCE_INVALID: Source metadata must contain valid JSON values.', 0, $exception);
+        }
+
+        if (! $requireRedBaseline) {
+            $source['red_baseline_required'] = false;
         }
 
         $nickname = $nickname === null || trim($nickname) === '' ? null : Task::validateNickname($nickname);

@@ -33,10 +33,15 @@ class RunTask
         private Sandbox $sandbox,
         private ResolveEffectiveRunConfig $resolveEffectiveRunConfig,
         private BindWorkspaceReference $bindWorkspaceReference,
+        private FingerprintRunFailure $fingerprint,
+        private RecordModelIdentity $modelIdentity,
     ) {}
 
-    /** @param list<string> $paths */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null): Run
+    /**
+     * @param  list<string>  $paths
+     * @param  Closure|null  $heartbeat  Renews the caller's task lease at each checkpoint.
+     */
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null): Run
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
@@ -45,6 +50,9 @@ class RunTask
         $files = new Workspace($workspace);
         $this->sandbox->refuseSafeWorkflow();
         $task = $taskId === null ? null : Task::find($taskId);
+        if (($blocked = $task?->redBaselineError()) !== null) {
+            throw new RuntimeException($blocked);
+        }
         $allowTestEdits = (bool) ($task?->allow_test_edits);
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
         $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
@@ -55,7 +63,7 @@ class RunTask
             $files->assertProtectedTestUnchanged($testPath, $testDigest);
         }
 
-        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest): Run {
+        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat): Run {
             $before = $files->read($paths);
             // Refresh the task once under the lease; outer load stays for safe pre-lease digest/path prep.
             $taskRow = $taskId === null ? null : Task::find($taskId);
@@ -83,12 +91,12 @@ class RunTask
                 'report' => $this->initialReport($files, $before, $paths, $testPath, $testDigest, $allowTestEdits, $taskRow),
             ]);
 
-            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId);
+            return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId, $heartbeat);
         });
     }
 
     /** @param array<string, ?string> $before */
-    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt, bool $allowTestEdits, ?string $testDigest, ?string $taskId): Run
+    private function execute(Run $run, Workspace $workspace, array $before, string $testPath, ?Closure $progress, ?Closure $shouldStop, string $workspaceLease, ?array $previousAttempt, bool $allowTestEdits, ?string $testDigest, ?string $taskId, ?Closure $heartbeat): Run
     {
         $report = $run->report;
         $evidence = storage_path('molly/'.$run->id);
@@ -100,7 +108,7 @@ class RunTask
 
         try {
             File::ensureDirectoryExists($evidence, 0700);
-            $this->checkpoint($shouldStop, $recordProgress, 'Measuring complexity before changes');
+            $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity before changes');
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
             $this->requireMeasurements($report['complexity_before']);
 
@@ -108,11 +116,17 @@ class RunTask
                 'target' => 'local',
             ]);
             $this->record($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
-            $this->checkpoint($shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
-            $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+            $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
+            $generationStarted = hrtime(true);
+            try {
+                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+            } finally {
+                $report['model_identity'] = $this->modelIdentity->handle(intdiv(hrtime(true) - $generationStarted, 1_000_000));
+                $run->update(['report' => $report]);
+            }
             $this->record($workspace->path, LifecycleEventType::ProposalReceived, $taskId, $run->id);
 
-            $this->checkpoint($shouldStop, $recordProgress, 'Applying the proposed changes');
+            $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Applying the proposed changes');
             if (! $allowTestEdits && is_string($testDigest)) {
                 $workspace->assertProtectedTestUnchanged($testPath, $testDigest);
             }
@@ -137,7 +151,7 @@ class RunTask
 
             $this->record($workspace->path, LifecycleEventType::VerificationStarted, $taskId, $run->id);
             if (config('molly.parallel_checks', true)) {
-                $this->checkpoint($shouldStop, $recordProgress, 'Running Pest and Tarpit review in parallel');
+                $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Running Pest and Tarpit review in parallel');
                 $report['mode'] = 'parallel';
                 $results = $this->evaluate->handle($run->prompt, $workspace->path, $before, $after, $testPath, $evidence, $shouldStop, $workspaceLease, function (array $branches) use ($run, &$report): void {
                     $report['branches'] = $branches;
@@ -148,16 +162,16 @@ class RunTask
                 $report['branches'] = $results['branches'];
             } else {
                 $report['mode'] = 'serial';
-                $this->checkpoint($shouldStop, $recordProgress, 'Running the required Pest tests');
+                $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Running the required Pest tests');
                 $report['verification'] = $this->verify->handle($workspace->path, $testPath, $evidence);
                 $run->update(['report' => $report]);
 
-                $this->checkpoint($shouldStop, $recordProgress, 'Reviewing complexity with the seven Tarpit checks');
+                $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Reviewing complexity with the seven Tarpit checks');
                 $report['review'] = $this->review->handle($run->prompt, $before, $after);
             }
             $run->update(['report' => $report]);
 
-            $this->checkpoint($shouldStop, $recordProgress, 'Measuring complexity after changes');
+            $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity after changes');
             $report['complexity_after'] = $this->measure->handle($workspace->path, $evidence.'/after');
             $this->requireMeasurements($report['complexity_after']);
 
@@ -169,7 +183,7 @@ class RunTask
             }
 
             if ((bool) config('molly.false_green.enabled', false)) {
-                $this->checkpoint($shouldStop, $recordProgress, 'Probing for false-green Pest results');
+                $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Probing for false-green Pest results');
                 $report['false_green'] = $this->falseGreen->handle(
                     $workspace->path,
                     $testPath,
@@ -182,7 +196,7 @@ class RunTask
             }
 
             $decision = $this->decideCompletion->handle($report, $after);
-            $this->checkpoint($shouldStop, null, 'Completing the run');
+            $this->checkpoint($heartbeat, $shouldStop, null, 'Completing the run');
             $this->persistSuccessfulCompletion($run, $report, $decision, $workspace, $before, $after);
         } catch (Throwable $exception) {
             $this->persistTerminatedFinalization($run, $report, $exception, $workspace, $before);
@@ -213,6 +227,9 @@ class RunTask
         ]);
         $report['classification'] = [...$classification->toArray(), 'advisory' => true];
         $this->recordSnapshot($report, $workspace, $before, $after);
+        if (! $decision['completed']) {
+            $report['failure_fingerprint'] = $this->fingerprint->handle($report);
+        }
         $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
     }
 
@@ -240,6 +257,9 @@ class RunTask
             $report['terminated_before_completion'] = true;
         } catch (Throwable $receiptFailure) {
             $report['receipt_error'] = $receiptFailure->getMessage();
+        }
+        if (! $exception instanceof RunStopped) {
+            $report['failure_fingerprint'] = $this->fingerprint->handle($report);
         }
         $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
     }
@@ -289,8 +309,9 @@ class RunTask
         $this->lifecycle->handle($workspace, $type, $taskId, $runId, $payload);
     }
 
-    private function checkpoint(?Closure $shouldStop, ?Closure $progress, string $message): void
+    private function checkpoint(?Closure $heartbeat, ?Closure $shouldStop, ?Closure $progress, string $message): void
     {
+        $heartbeat?->__invoke();
         if ($shouldStop?->__invoke()) {
             throw new RunStopped('RUN_STOPPED: Molly stopped at an execution boundary. Applied edits remain available for review.');
         }
@@ -322,6 +343,7 @@ class RunTask
                 'digest' => $testDigest,
                 'writable' => $allowTestEdits,
             ],
+            'red_baseline' => $taskRow?->source['test_lock']['red_baseline'] ?? null,
             'provider' => config('molly.agent', 'ollama'),
             'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
             'snapshots' => [

@@ -33,6 +33,9 @@ class StartTask
 
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);
+            if (($blocked = $task->redBaselineError()) !== null) {
+                throw new RuntimeException($blocked);
+            }
             $workerId = $this->workerId();
             $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
@@ -46,7 +49,7 @@ class StartTask
     {
         $id = $task->id;
         try {
-            $this->bus->heartbeat($id, $workerId);
+            $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds());
 
             if ($retry) {
                 $this->baseline->handle($task);
@@ -62,6 +65,7 @@ class StartTask
                 ...[
                     'taskId' => $id,
                     'shouldStop' => fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                    'heartbeat' => fn () => $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds()),
                     ...($previousAttempt === null ? [] : ['previousAttempt' => $previousAttempt]),
                 ],
             );
