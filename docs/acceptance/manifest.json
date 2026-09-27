@@ -24,6 +24,16 @@
       "applies_to": [
         "M10.3"
       ]
+    },
+    "laravel-ai-pre-v1-fallback": {
+      "reason": "Two tests cover the fallback when an installed laravel/ai lacks the decide capability. composer.json requires laravel/ai ^1.0, which always has it, so the tests skip. They stay in the suite so a future constraint change re-enables them.",
+      "applies_to": [
+        "M10.3"
+      ],
+      "tests": [
+        "DetectLaravelAiClassificationTest: does not treat structured-agent support as decide support",
+        "ClassificationAdapterTest: uses fallback capability detection when Laravel AI lacks the decide capability"
+      ]
     }
   },
   "budgets": {
