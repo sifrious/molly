@@ -261,7 +261,7 @@
           "owner": "B",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "expected_exit_code": 1
+          "expected_exit_code": 2
         },
         {
           "id": "M02.7",
@@ -276,7 +276,7 @@
           "owner": "B",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "expected_exit_code": 1
+          "expected_exit_code": 100
         },
         {
           "id": "M02.8",
@@ -2358,5 +2358,17 @@
         }
       ]
     }
-  }
+  },
+  "amendments": [
+    {
+      "date": "2026-09-27",
+      "subcases": [
+        "M02.6",
+        "M02.7"
+      ],
+      "change": "expected_exit_code 1 -> 2 (M02.6) and 1 -> 100 (M02.7)",
+      "reason": "Composer, not Molly, reports these failures. Composer exits 2 for an unresolvable dependency set and 100 for a network failure. Verification against RC2 showed the correct behavior with those codes. The expected result text is unchanged.",
+      "invalidates": "none; no PASS was granted under the old value"
+    }
+  ]
 }
