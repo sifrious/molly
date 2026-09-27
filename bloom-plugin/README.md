@@ -1,23 +1,21 @@
-# Molly Bloom plugin drop
+# Molly Bloom plugin
 
-- `plugin.json` — manifest (id `sifrious.molly`, nav ids `molly.home|tasks|conversations|settings`)
-- `Surfaces.bundle` — SwiftUI factories implementing Bloom `PluginSurfaceProviding`
-  (Info.plist `BloomPluginSurfaceProvider` = `MollySurfaceProvider`)
+This folder is the plugin Bloom loads through its drop-folder seam. Bloom reads `plugin.json` and loads `Surfaces.bundle`; Molly never patches the Bloom app.
 
-Install into Bloom Application Support:
+- `plugin.json` declares id `sifrious.molly`, version `0.2.0`, `apiVersion` 1, and eight nav ids: `molly.home`, `molly.tasks`, `molly.runs`, `molly.conversations`, `molly.graph`, `molly.glossary`, `molly.settings`, and `molly.worker`. The `bloom` key records the Bloom commit the bundle was built against. Bloom's `PluginManifest` decoder ignores that key.
+- `Surfaces.bundle` holds the SwiftUI screens. Its Info.plist names `MollySurfaceProvider` under `BloomPluginSurfaceProvider` and records `MollyBuiltAgainstBloomCommit`.
+- `Surfaces/` holds the Swift sources, `build-bundle.sh`, and the core tests.
+
+Build and install:
 
 ```bash
+export BLOOM_ROOT=/path/to/bloom   # checkout with BloomPluginAPI, e.g. commit 1599f05f
+cd "$BLOOM_ROOT" && swift build -c release --target BloomPluginAPI
+cd -
+./bloom-plugin/Surfaces/build-bundle.sh
 ./bin/molly-bloom-plugin-register
 ```
 
-Rebuild the committed bundle after BloomPluginAPI API changes:
+When the module was built with `--scratch-path`, set `BLOOM_PRODUCTS` to the folder that holds `BloomPluginAPI.swiftmodule`.
 
-```bash
-export BLOOM_ROOT=/path/to/sifrious/bloom   # tip with BloomPluginAPI
-cd "$BLOOM_ROOT" && swift build -c release --target BloomPluginAPI
-./bloom-plugin/Surfaces/build-bundle.sh
-```
-
-## Surfaces.bundle
-
-The compiled Surfaces.bundle is not shipped in the Composer package archive. Rebuild with bloom-plugin/Surfaces/build-bundle.sh before bin/molly-bloom-plugin-register.
+The compiled bundle is not in the Composer package archive. Build it before running `bin/molly-bloom-plugin-register`.

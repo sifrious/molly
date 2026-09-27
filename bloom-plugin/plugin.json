@@ -1,6 +1,6 @@
 {
   "id": "sifrious.molly",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "apiVersion": 1,
   "name": "Molly",
   "nav": [
@@ -15,15 +15,39 @@
       "systemImage": "checklist"
     },
     {
+      "id": "molly.runs",
+      "title": "Runs",
+      "systemImage": "play.circle"
+    },
+    {
       "id": "molly.conversations",
       "title": "Conversations",
       "systemImage": "bubble.left.and.bubble.right"
     },
     {
+      "id": "molly.graph",
+      "title": "Graph",
+      "systemImage": "point.3.connected.trianglepath.dotted"
+    },
+    {
+      "id": "molly.glossary",
+      "title": "Glossary",
+      "systemImage": "book.closed"
+    },
+    {
       "id": "molly.settings",
       "title": "Molly Settings",
       "systemImage": "gearshape"
+    },
+    {
+      "id": "molly.worker",
+      "title": "Worker",
+      "systemImage": "gearshape.2"
     }
   ],
-  "entry": "molly.home"
+  "entry": "molly.home",
+  "bloom": {
+    "builtAgainst": "1599f05f",
+    "apiVersion": 1
+  }
 }
