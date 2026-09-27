@@ -25,7 +25,7 @@ Restart queue workers after configuration changes too.
 | `database_unavailable` | Fix the application's database connection. |
 | `database_unwritable` | Doctor inserted a row inside a transaction, and the database refused it. Free disk space, or make the database file and its directory writable. Doctor rolls the row back. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
-| `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. |
+| `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
 | `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |
 | `parallel_process_groups_unavailable` | Install POSIX support, or set `parallel_checks` to `false`. |

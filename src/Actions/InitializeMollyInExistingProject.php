@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\GitBinary;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
@@ -54,6 +55,7 @@ final class InitializeMollyInExistingProject
         };
 
         $root = $this->assertLaravelRoot($path);
+        GitBinary::require();
         $note('validate', 'Laravel application root accepted at '.$root);
 
         if ($runComposerRequire && ! $this->packageInstalled($root)) {

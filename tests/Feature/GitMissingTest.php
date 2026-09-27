@@ -68,3 +68,66 @@ it('fails molly:review-commit with GIT_MISSING instead of an invalid commit', fu
     expect($result['exit'])->toBe(1)
         ->and($result['error'])->toStartWith('GIT_MISSING');
 });
+
+it('fails molly:setup with GIT_MISSING before writing .env', function (): void {
+    File::put($this->workspace.'/.env', "APP_NAME=Example\n");
+    $environmentPath = app()->environmentPath();
+    app()->useEnvironmentPath($this->workspace);
+
+    try {
+        $result = jsonCommand('molly:setup', ['--agent' => 'ollama', '--model' => 'qwen2.5-coder:7b']);
+    } finally {
+        app()->useEnvironmentPath($environmentPath);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('GIT_MISSING')
+        ->and(File::get($this->workspace.'/.env'))->toBe("APP_NAME=Example\n");
+});
+
+it('fails molly:project-init with GIT_MISSING before writing .gitignore, project.json, or the registry', function (): void {
+    $home = $this->workspace.'/molly-home';
+    putenv('MOLLY_HOME='.$home);
+    File::put($this->workspace.'/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($this->workspace.'/composer.json', '{"name":"example/app","require":{"laravel/framework":"^13.0"}}');
+
+    try {
+        $result = jsonCommand('molly:project-init', ['path' => $this->workspace, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true]);
+    } finally {
+        putenv('MOLLY_HOME');
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('GIT_MISSING')
+        ->and(File::exists($this->workspace.'/.gitignore'))->toBeFalse()
+        ->and(File::exists($this->workspace.'/.molly'))->toBeFalse()
+        ->and(File::exists($home))->toBeFalse();
+});
+
+it('fails molly:project-new with GIT_MISSING before creating the target', function (): void {
+    $target = $this->workspace.'/fresh';
+
+    $result = jsonCommand('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true]);
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('GIT_MISSING')
+        ->and(File::exists($target))->toBeFalse();
+});
+
+it('reports git_missing from molly:status instead of failing to start git', function (): void {
+    $result = jsonCommand('molly:status', ['--workspace' => $this->workspace]);
+    $checks = array_column($result['readiness']['checks'], null, 'name');
+
+    expect($result['exit'])->toBe(0)
+        ->and($result['status'])->toBe('ok')
+        ->and($checks['Git']['code'])->toBe('git_missing')
+        ->and($result['graphs']['status'])->toBe('missing');
+});
+
+it('fails molly:run with GIT_MISSING instead of SANDBOX_UNAVAILABLE', function (): void {
+    $result = jsonCommand('molly:run', ['prompt' => 'Return Hello', '--workspace' => $this->workspace, '--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php']);
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['report']['error'])->toStartWith('GIT_MISSING')
+        ->and(File::exists($this->workspace.'/.molly'))->toBeFalse();
+});

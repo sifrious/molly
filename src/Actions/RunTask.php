@@ -14,6 +14,7 @@ use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
 class RunTask
@@ -63,6 +64,7 @@ class RunTask
         }
         // Refuse an unsafe host only after the task's own inputs are valid, so a mistyped
         // test path is reported as such and not hidden behind SANDBOX_UNAVAILABLE.
+        GitBinary::require();
         $this->sandbox->refuseSafeWorkflow();
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat): Run {
