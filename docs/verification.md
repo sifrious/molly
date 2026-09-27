@@ -39,6 +39,8 @@ php artisan molly:receipt RUN_ID
 
 A receipt records the verifier, its state (`PASS`, `FAIL`, `REVIEW_REQUIRED`, or `NOT_RUN`), the policy that applied, the failure action, a digest of the evidence, and timestamps. A verifier that never ran appears as `NOT_RUN` rather than disappearing. Receipt files are written once per run; a retry gets a new run ID and a new directory. Editing a receipt does not change the saved run.
 
+When the agent is Ollama, Molly asks the configured loopback server which model answered, right after the model call: the Ollama version from `/api/version`, family, parameter size, quantization, and maximum context from `/api/show`, and the digest, loaded context length, memory size, and VRAM size from `/api/ps`. If the model is no longer loaded, the digest comes from `/api/tags`. The run report saves this as `model_identity` with the generation time in milliseconds, and every receipt carries it under `context.model_identity`. Any value Ollama did not report, including concurrency, which Ollama does not expose, is recorded as `unavailable`. `model_identity.sources` shows which requests answered.
+
 ## The Pest check
 
 Molly runs only the required test file, not your whole suite, and it wants real evidence: a JUnit report naming that file with at least one executed test and at least one assertion.

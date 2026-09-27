@@ -34,6 +34,7 @@ class RunTask
         private ResolveEffectiveRunConfig $resolveEffectiveRunConfig,
         private BindWorkspaceReference $bindWorkspaceReference,
         private FingerprintRunFailure $fingerprint,
+        private RecordModelIdentity $modelIdentity,
     ) {}
 
     /**
@@ -116,7 +117,13 @@ class RunTask
             ]);
             $this->record($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
-            $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+            $generationStarted = hrtime(true);
+            try {
+                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+            } finally {
+                $report['model_identity'] = $this->modelIdentity->handle(intdiv(hrtime(true) - $generationStarted, 1_000_000));
+                $run->update(['report' => $report]);
+            }
             $this->record($workspace->path, LifecycleEventType::ProposalReceived, $taskId, $run->id);
 
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Applying the proposed changes');
