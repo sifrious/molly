@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
@@ -275,4 +276,22 @@ it('records optional NativePHP unit failure without aborting laravel bootstrap',
         ->and($nativeUnit['status'])->toBe('failed')
         ->and($nativeUnit['error'])->toContain('NATIVEPHP_GRAPH_FAIL')
         ->and($result['ok'])->toBeFalse();
+});
+
+it('rejects an unknown unit in molly:graphs-retry and lists the valid units', function (): void {
+    writeLock($this->project, 'v12.0.0');
+    expect(Artisan::call('molly:graphs-bootstrap', ['path' => $this->project, '--json' => true]))->toBe(0);
+    $before = File::get($this->project.'/.molly/graphs/manifest.json');
+
+    $exit = Artisan::call('molly:graphs-retry', ['unit' => 'laravel:nope', 'path' => $this->project, '--json' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['status'])->toBe('error')
+        ->and($payload['error'])->toStartWith('UNIT_UNKNOWN:')
+        ->and($payload['error'])->toContain('laravel:laravel/framework')
+        ->and($payload['error'])->toContain('project:workspace')
+        ->and(File::get($this->project.'/.molly/graphs/manifest.json'))->toBe($before);
+
+    expect(Artisan::call('molly:graphs-retry', ['unit' => 'project:workspace', 'path' => $this->project, '--json' => true]))->toBe(0);
 });

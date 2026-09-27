@@ -109,6 +109,33 @@ final class BootstrapProjectKnowledgeGraphs
     }
 
     /**
+     * Unit IDs this project can build or retry: the Laravel graph, each supported
+     * dependency present in composer.lock, the project graph, and any unit already
+     * recorded in the manifest.
+     *
+     * @return list<string>
+     */
+    public function unitIds(string $projectRoot): array
+    {
+        $root = rtrim(str_replace('\\', '/', $projectRoot), '/');
+        $lock = $this->lock->read($root);
+        $ids = ['laravel:laravel/framework'];
+        foreach (self::SUPPORTED_DEPENDENCIES as $package => $namespace) {
+            if (isset($lock['packages'][$package])) {
+                $ids[] = $namespace.':'.$package;
+            }
+        }
+        $ids[] = 'project:workspace';
+        foreach (GraphManifest::load($root)->units as $unit) {
+            if (is_string($unit['id'] ?? null)) {
+                $ids[] = $unit['id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * @param  array{packages: array<string, string>, laravel: string, laravel_major: string, lock_path: string, lock_hash: ?string}  $lock
      * @param  callable(string, string): void  $progress
      * @return array<string, mixed>

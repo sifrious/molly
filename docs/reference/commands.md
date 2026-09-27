@@ -122,7 +122,7 @@ Needs a logged-in `gh`. Saves a pending task and writes nothing to GitHub.
 | `molly:knowledge:query CONCEPT [--namespace=…] [--nativephp-version=…] [--depth=2] [--limit=20] [--relation=…] [--workspace=PATH]` | Reads a neighborhood. Depth 0 to 3, limit 1 to 40. Refuses with `GRAPH_STALE` when the graph was built for another exact package version. |
 | `molly:knowledge:pack PROMPT [--file=…] [--test=…]` | Shows the context an implementation run would receive. |
 | `molly:graphs-bootstrap [PATH]` | Builds the version-pinned graphs for a project. |
-| `molly:graphs-retry UNIT [PATH]` | Retries one failed bootstrap unit from `.molly/graphs/manifest.json`. |
+| `molly:graphs-retry UNIT [PATH]` | Retries one failed bootstrap unit from `.molly/graphs/manifest.json`. An unknown unit exits 1 with `UNIT_UNKNOWN` and lists the valid units. |
 
 NativePHP queries need `--namespace=nativephp` with `--nativephp-version=desktop-2` or `mobile-4`. Tarpit queries need `--namespace=tarpit`.
 

@@ -20,6 +20,11 @@ final class RetryProjectKnowledgeGraphUnit
             throw new RuntimeException('GRAPH_UNIT_REQUIRED: Pass a unit id from .molly/graphs/manifest.json (for example laravel:laravel/framework).');
         }
 
+        $valid = $this->bootstrap->unitIds($projectRoot);
+        if (! in_array($unitId, $valid, true)) {
+            throw new RuntimeException('UNIT_UNKNOWN: This project has no graph unit "'.$unitId.'". Valid units: '.implode(', ', $valid).'.');
+        }
+
         $result = $this->bootstrap->handle($projectRoot, $progress, $unitId);
         $result['retried_unit'] = $unitId;
 
