@@ -11,7 +11,7 @@ use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 use Sifrious\Molly\PlanningGuide;
 
 beforeEach(function (): void {
-    skipWithoutJevCapability(app(DetectLaravelAiClassification::class)->supportsChoice(), 'Live Jev classification requires the optional Laravel AI classification capability.');
+    expect(app(DetectLaravelAiClassification::class)->supportsChoice())->toBeTrue();
 
     config([
         'molly.jev.enabled' => true,

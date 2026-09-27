@@ -4,8 +4,8 @@ use Illuminate\Support\Str;
 use Sifrious\Molly\Classification\DetectLaravelAiClassification;
 
 /**
- * The exact surface Molly needs, computed independently of the detector so the
- * same test is honest on the stable baseline and on the accepted Laravel AI commit.
+ * Compute the required symbols independently of the detector. SDK integration
+ * tests separately require the stable v1 classification capability.
  */
 function choiceSurfaceInstalled(): bool
 {

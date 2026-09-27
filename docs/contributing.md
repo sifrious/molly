@@ -10,11 +10,11 @@ vendor/bin/pest
 vendor/bin/pint --format agent
 ```
 
-The package suite runs on PHP 8.3, 8.4, and 8.5 in GitHub Actions, along with the lowest and highest dependency sets, a Jev lane on the accepted Laravel AI commit, fresh Laravel 12 and 13 installs, coverage, mutation checks, the documentation build and link check, Composer validation, and a plugin security scan. `bin/molly-release-gates` runs the local subset before a release.
+The package suite runs on PHP 8.3, 8.4, and 8.5 in GitHub Actions, along with the lowest and highest dependency sets (the lowest lane must resolve `laravel/ai` 1.0.0), fresh Laravel 12 and 13 installs, coverage, mutation checks, the documentation build and link check, Composer validation, and a plugin security scan. `bin/molly-release-gates` runs the local subset before a release.
 
 ## What the tests fake
 
-Model responses are faked wherever the model is not the thing under test. Task state, file validation, the Pest subprocess, queue behavior, evidence handling, parallel checks, and the sandbox policy run for real. Jev is tested through Molly's own classifier seam in every lane, and against Laravel AI's classification fakes in the Jev lane. A live run with a configured model is recorded separately and is not part of the suite.
+Model responses are faked wherever the model is not the thing under test. Task state, file validation, the Pest subprocess, queue behavior, evidence handling, parallel checks, and the sandbox policy run for real. Jev is tested through Molly's own classifier seam and against Laravel AI's classification fakes in every lane. A live run with a configured model is recorded separately and is not part of the suite.
 
 ## Documentation
 

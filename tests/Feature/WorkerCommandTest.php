@@ -1,0 +1,190 @@
+<?php
+
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
+use Symfony\Component\Process\Process;
+
+/** A stand-in for php that runs until signalled. With $ignoreTerm it only dies to SIGKILL. */
+function fakeWorkerBinary(string $directory, bool $ignoreTerm = false): string
+{
+    $path = $directory.'/fake-php';
+    File::put($path, "#!/bin/sh\n".($ignoreTerm ? "trap '' TERM\n" : "trap 'exit 0' TERM\n")."while :; do sleep 1; done\n");
+    chmod($path, 0755);
+
+    return $path;
+}
+
+/** @return array<string, mixed> */
+function worker(string $action, string $workspace, array $options = []): array
+{
+    $exit = Artisan::call('molly:worker', ['action' => $action, '--workspace' => $workspace, '--json' => true, ...$options]);
+
+    return ['exit' => $exit, ...json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)];
+}
+
+function processAlive(int $pid): bool
+{
+    return posix_kill($pid, 0);
+}
+
+beforeEach(function (): void {
+    $this->workspace = sys_get_temp_dir().'/molly-worker-'.bin2hex(random_bytes(6));
+    File::ensureDirectoryExists($this->workspace);
+    $this->workspace = realpath($this->workspace);
+    config(['molly.worker.php_binary' => fakeWorkerBinary($this->workspace)]);
+});
+
+afterEach(function (): void {
+    $record = $this->workspace.'/.molly/worker/worker.json';
+    if (is_file($record)) {
+        $data = json_decode(File::get($record), true);
+        if (is_int($data['pgid'] ?? null) && $data['pgid'] !== posix_getpgrp()) {
+            @posix_kill(-$data['pgid'], SIGKILL);
+        }
+    }
+    File::deleteDirectory($this->workspace);
+});
+
+it('starts a worker in its own process group, reports it, and stops it with SIGTERM', function (): void {
+    $started = worker('start', $this->workspace);
+
+    expect($started['exit'])->toBe(0)
+        ->and($started['status'])->toBe('ok')
+        ->and($started['state'])->toBe('running')
+        ->and($started['alive'])->toBeTrue()
+        ->and($started['pgid'])->toBe($started['pid'])
+        ->and($started['command'])->toContain('queue:work', '--queue='.$started['queue'])
+        ->and(processAlive($started['pid']))->toBeTrue()
+        ->and(posix_getpgid($started['pid']))->toBe($started['pid'])
+        ->and(json_decode(File::get($this->workspace.'/.molly/worker/worker.json'), true)['pid'])->toBe($started['pid']);
+
+    sleep(1);
+    $status = worker('status', $this->workspace);
+    expect($status['exit'])->toBe(0)
+        ->and($status['state'])->toBe('running')
+        ->and($status['pid'])->toBe($started['pid'])
+        ->and($status['uptime_seconds'])->toBeGreaterThanOrEqual(1);
+
+    $stopped = worker('stop', $this->workspace, ['--timeout' => 5]);
+    expect($stopped['exit'])->toBe(0)
+        ->and($stopped['signal'])->toBe('SIGTERM')
+        ->and($stopped['previous_state'])->toBe('running')
+        ->and($stopped['state'])->toBe('stopped')
+        ->and(processAlive($started['pid']))->toBeFalse()
+        ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+
+    expect(worker('status', $this->workspace))->toMatchArray(['exit' => 0, 'state' => 'stopped', 'alive' => false, 'pid' => null]);
+});
+
+it('refuses a second start while the owned worker is alive', function (): void {
+    $first = worker('start', $this->workspace);
+    $second = worker('start', $this->workspace);
+
+    expect($second['exit'])->toBe(1)
+        ->and($second['status'])->toBe('error')
+        ->and($second['error'])->toStartWith('WORKER_ALREADY_RUNNING')
+        ->and(processAlive($first['pid']))->toBeTrue()
+        ->and(worker('status', $this->workspace)['pid'])->toBe($first['pid']);
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});
+
+it('sends SIGKILL to the process group when SIGTERM does not stop it in time', function (): void {
+    config(['molly.worker.php_binary' => fakeWorkerBinary($this->workspace, ignoreTerm: true)]);
+    $started = worker('start', $this->workspace);
+
+    $stopped = worker('stop', $this->workspace, ['--timeout' => 1]);
+
+    expect($stopped['exit'])->toBe(0)
+        ->and($stopped['signal'])->toBe('SIGKILL')
+        ->and(processAlive($started['pid']))->toBeFalse();
+});
+
+it('restarts the worker with a new process', function (): void {
+    $first = worker('start', $this->workspace);
+    $restarted = worker('restart', $this->workspace, ['--timeout' => 5]);
+
+    expect($restarted['exit'])->toBe(0)
+        ->and($restarted['state'])->toBe('running')
+        ->and($restarted['pid'])->not->toBe($first['pid'])
+        ->and($restarted['stop']['signal'])->toBe('SIGTERM')
+        ->and(processAlive($first['pid']))->toBeFalse()
+        ->and(processAlive($restarted['pid']))->toBeTrue();
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});
+
+it('treats a pid file for a process that has exited as stale and starts a new worker', function (): void {
+    $gone = new Process(['true']);
+    $gone->start();
+    $pid = $gone->getPid();
+    $gone->wait();
+    File::ensureDirectoryExists($this->workspace.'/.molly/worker');
+    File::put($this->workspace.'/.molly/worker/worker.json', json_encode([
+        'pid' => $pid, 'pgid' => $pid, 'command' => ['php', base_path('artisan'), 'queue:work', 'sync', '--queue=default'],
+        'connection' => 'sync', 'queue' => 'default', 'started_at' => now()->toISOString(),
+    ]));
+
+    expect(worker('status', $this->workspace))->toMatchArray(['state' => 'stale', 'stale_reason' => 'process_gone', 'alive' => false]);
+
+    $started = worker('start', $this->workspace);
+    expect($started['exit'])->toBe(0)
+        ->and($started['state'])->toBe('running')
+        ->and($started['replaced_stale'])->toBe('process_gone');
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});
+
+it('never signals a reused pid that runs a different command', function (): void {
+    $other = new Process(['sleep', '30']);
+    $other->start();
+    File::ensureDirectoryExists($this->workspace.'/.molly/worker');
+    File::put($this->workspace.'/.molly/worker/worker.json', json_encode([
+        'pid' => $other->getPid(), 'pgid' => posix_getpgid($other->getPid()), 'command' => ['php', base_path('artisan'), 'queue:work', 'sync', '--queue=default'],
+        'connection' => 'sync', 'queue' => 'default', 'started_at' => now()->toISOString(),
+    ]));
+
+    try {
+        expect(worker('status', $this->workspace))->toMatchArray(['state' => 'stale', 'stale_reason' => 'pid_reused', 'alive' => false]);
+
+        $stopped = worker('stop', $this->workspace, ['--timeout' => 1]);
+        expect($stopped['exit'])->toBe(0)
+            ->and($stopped['signal'])->toBeNull()
+            ->and($stopped['stale_reason'])->toBe('pid_reused')
+            ->and($other->isRunning())->toBeTrue()
+            ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+    } finally {
+        $other->stop(0);
+    }
+});
+
+it('reports a missing php binary without starting anything', function (): void {
+    config(['molly.worker.php_binary' => $this->workspace.'/missing/php']);
+
+    $result = worker('start', $this->workspace);
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_PHP_MISSING')
+        ->and($result['error'])->toContain($this->workspace.'/missing/php')
+        ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+});
+
+it('reports a worker that exits at once as a failed start', function (): void {
+    $binary = $this->workspace.'/exits';
+    File::put($binary, "#!/bin/sh\necho 'could not open artisan' >&2\nexit 1\n");
+    chmod($binary, 0755);
+    config(['molly.worker.php_binary' => $binary]);
+
+    $result = worker('start', $this->workspace);
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_START_FAILED')
+        ->and($result['error'])->toContain('could not open artisan')
+        ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+});
+
+it('rejects an unknown action and an invalid timeout', function (): void {
+    expect(worker('pause', $this->workspace))->toMatchArray(['exit' => 1, 'status' => 'error'])
+        ->and(worker('pause', $this->workspace)['error'])->toStartWith('WORKER_ACTION_INVALID')
+        ->and(worker('stop', $this->workspace, ['--timeout' => '0'])['error'])->toStartWith('WORKER_TIMEOUT_INVALID');
+});
