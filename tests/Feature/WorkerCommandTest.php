@@ -188,3 +188,22 @@ it('rejects an unknown action and an invalid timeout', function (): void {
         ->and(worker('pause', $this->workspace)['error'])->toStartWith('WORKER_ACTION_INVALID')
         ->and(worker('stop', $this->workspace, ['--timeout' => '0'])['error'])->toStartWith('WORKER_TIMEOUT_INVALID');
 });
+
+it('closes the caller pipe so a piped molly:worker start returns at once', function (): void {
+    $package = dirname(__DIR__, 2);
+    $pipeline = new Process(
+        ['/bin/sh', '-c', '"$0" "$1" molly:worker start --workspace="$2" --json | cat', PHP_BINARY, $package.'/vendor/bin/testbench', $this->workspace],
+        $package,
+        ['MOLLY_WORKER_PHP_BINARY' => config('molly.worker.php_binary')],
+        timeout: 15,
+    );
+
+    $started = microtime(true);
+    $pipeline->run();
+    $result = json_decode($pipeline->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($pipeline->getExitCode())->toBe(0)
+        ->and(microtime(true) - $started)->toBeLessThan(10)
+        ->and($result['state'])->toBe('running')
+        ->and(processAlive($result['pid']))->toBeTrue();
+});

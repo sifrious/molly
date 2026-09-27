@@ -22,6 +22,22 @@ class ManageWorker
 {
     public const DEFAULT_STOP_TIMEOUT = 30;
 
+    /**
+     * `set -m` puts the background job in its own process group. The shell first closes
+     * every descriptor above stderr that it inherited from the Artisan command, such as
+     * the caller's stdout pipe or worker.lock, then points the worker's stdio at the log.
+     * The shell prints the worker pid and returns at once, and the worker outlives the
+     * command without holding the caller's pipe open.
+     */
+    private const LAUNCH_SCRIPT = <<<'SH'
+        set -m
+        for fd in $(ls /dev/fd); do
+            case "$fd" in 0|1|2) ;; *) eval "exec $fd>&-" 2>/dev/null ;; esac
+        done
+        "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 &
+        echo $!
+        SH;
+
     /** @return array<string, mixed> */
     public function status(string $workspace): array
     {
@@ -116,12 +132,10 @@ class ManageWorker
         $directory = $this->directory($root);
         $logOffset = is_file($directory.'/worker.log') ? (int) filesize($directory.'/worker.log') : 0;
 
-        // `set -m` puts the background job in its own process group; stdio goes to the log
-        // so this shell returns at once and the worker outlives the Artisan command.
         $result = Process::path(base_path())
             ->env(['MOLLY_WORKER_LOG' => $directory.'/worker.log'])
             ->timeout(15)
-            ->run(['/bin/sh', '-c', 'set -m; "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 & echo $!', 'molly-worker', ...$command]);
+            ->run(['/bin/sh', '-c', self::LAUNCH_SCRIPT, 'molly-worker', ...$command]);
         $pid = (int) trim($result->output());
         if (! $result->successful() || $pid < 2) {
             throw new RuntimeException('WORKER_START_FAILED: Molly could not launch the queue worker. '.trim($result->errorOutput()));
