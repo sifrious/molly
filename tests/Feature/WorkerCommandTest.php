@@ -207,3 +207,52 @@ it('closes the caller pipe so a piped molly:worker start returns at once', funct
         ->and($result['state'])->toBe('running')
         ->and(processAlive($result['pid']))->toBeTrue();
 });
+
+/** @return list<int> Live processes whose command line names $binary. */
+function processesRunning(string $binary): array
+{
+    $found = new Process(['pgrep', '-f', $binary]);
+    $found->run();
+
+    return array_map(intval(...), array_filter(explode("\n", trim($found->getOutput()))));
+}
+
+it('refuses to start a worker it could not record and leaves no process behind', function (): void {
+    $directory = $this->workspace.'/.molly/worker';
+    File::ensureDirectoryExists($directory);
+    File::put($directory.'/worker.lock', '');
+    File::put($directory.'/worker.log', '');
+    chmod($directory, 0555);
+
+    try {
+        $result = worker('start', $this->workspace);
+    } finally {
+        chmod($directory, 0755);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_START_FAILED')
+        ->and($result['error'])->toContain($directory)
+        ->and(processesRunning(config('molly.worker.php_binary')))->toBe([])
+        ->and(worker('status', $this->workspace)['state'])->toBe('stopped');
+});
+
+it('stops a worker that started but could not be recorded', function (): void {
+    $directory = $this->workspace.'/.molly/worker';
+    $binary = $this->workspace.'/locks-its-directory';
+    File::put($binary, "#!/bin/sh\nchmod 555 '".$directory."'\ntrap 'exit 0' TERM\nwhile :; do sleep 1; done\n");
+    chmod($binary, 0755);
+    config(['molly.worker.php_binary' => $binary]);
+
+    try {
+        $result = worker('start', $this->workspace);
+    } finally {
+        chmod($directory, 0755);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_START_FAILED')
+        ->and($result['error'])->toContain($directory.'/worker.json')
+        ->and(processesRunning($binary))->toBe([])
+        ->and(worker('status', $this->workspace)['state'])->toBe('stopped');
+});

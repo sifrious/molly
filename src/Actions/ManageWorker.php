@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Workspace;
 use Symfony\Component\Process\ExecutableFinder;
+use Throwable;
 
 /**
  * Start, stop, and inspect the one queue worker Molly owns in a workspace.
@@ -130,6 +131,7 @@ class ManageWorker
         [$connection, $queue] = $this->queue();
         $command = [$this->phpBinary(), base_path('artisan'), 'queue:work', $connection, '--queue='.$queue];
         $directory = $this->directory($root);
+        $this->assertWritable($directory);
         $logOffset = is_file($directory.'/worker.log') ? (int) filesize($directory.'/worker.log') : 0;
 
         $result = Process::path(base_path())
@@ -156,9 +158,29 @@ class ManageWorker
             throw new RuntimeException('WORKER_START_FAILED: The queue worker exited or did not start. Worker log: '.$this->logExcerpt($directory.'/worker.log', $logOffset));
         }
 
-        File::put($this->recordPath($root), json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+        try {
+            File::put($this->recordPath($root), json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+        } catch (Throwable $exception) {
+            // An unrecorded worker is invisible to status and stop, so it must not outlive this command.
+            posix_kill(-$pid, SIGKILL);
+            $this->waitForExit($pid, 5);
+            throw new RuntimeException('WORKER_START_FAILED: Molly stopped the new worker because it could not write '.$this->recordPath($root).'. '.$exception->getMessage(), 0, $exception);
+        }
 
         return $record;
+    }
+
+    /**
+     * Refuse to launch when Molly could not record the worker: an unrecorded worker keeps
+     * running where molly:worker status and stop cannot see it.
+     */
+    private function assertWritable(string $directory): void
+    {
+        foreach ([$directory, $directory.'/worker.json', $directory.'/worker.log'] as $path) {
+            if (file_exists($path) ? ! is_writable($path) : ! is_writable($directory)) {
+                throw new RuntimeException('WORKER_START_FAILED: Molly cannot write '.$path.'. Make '.$directory.' writable by this user, then start the worker again.');
+            }
+        }
     }
 
     /**
