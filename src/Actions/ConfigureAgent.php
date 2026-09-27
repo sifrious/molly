@@ -54,7 +54,7 @@ class ConfigureAgent
             || array_intersect_key($candidate, $values) != $values) {
             throw new RuntimeException('ENV_LAYOUT_UNSUPPORTED: Setup cannot update this environment layout without changing other values. Edit the Molly settings manually.');
         }
-        File::replace($path, $contents, file_exists($path) ? fileperms($path) & 0777 : 0600);
+        $this->replaceEnvironmentFile($path, $contents);
         config(['molly.agent' => $agent]);
         if ($model !== null && $agent === 'ollama') {
             config(['molly.model' => $model]);
@@ -75,5 +75,41 @@ class ConfigureAgent
         }
 
         return $values;
+    }
+
+    /**
+     * Replace .env atomically through a temporary file beside it. File::replace() would fall
+     * back to the system temporary directory when that file cannot be created, for example
+     * on a full disk, and then fail with an unrelated tempnam() notice.
+     */
+    private function replaceEnvironmentFile(string $path, string $contents): void
+    {
+        $failed = fn (string $reason): RuntimeException => new RuntimeException('ENV_UNWRITABLE: Molly could not update '.$path.': '.$reason.'. Check free disk space and permissions. The file was not changed.');
+        if (file_exists($path) && ! is_writable($path)) {
+            throw $failed('the file is read-only');
+        }
+
+        $mode = file_exists($path) ? fileperms($path) & 0777 : 0600;
+        $temporary = dirname($path).'/.'.basename($path).'.molly-'.bin2hex(random_bytes(6));
+        $handle = @fopen($temporary, 'x');
+        if ($handle === false) {
+            throw $failed('it could not create a temporary file in '.dirname($path));
+        }
+
+        try {
+            $written = @fwrite($handle, $contents);
+            $flushed = @fflush($handle);
+            fclose($handle);
+            if ($written !== strlen($contents) || ! $flushed) {
+                throw $failed('the disk accepted only part of the new contents');
+            }
+            if (! @chmod($temporary, $mode) || ! @rename($temporary, $path)) {
+                throw $failed('it could not move the temporary file into place');
+            }
+        } finally {
+            if (file_exists($temporary)) {
+                @unlink($temporary);
+            }
+        }
     }
 }

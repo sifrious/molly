@@ -4,12 +4,12 @@ namespace Sifrious\Molly\Actions;
 
 use DateTimeImmutable;
 use DateTimeZone;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Contracts\LifecycleEvent;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Contracts\LifecycleLog;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class RecordLifecycleEvent
@@ -62,7 +62,7 @@ class RecordLifecycleEvent
     {
         $root = (new Workspace($workspace))->path;
         $directory = $root.'/.molly';
-        File::ensureDirectoryExists($directory, 0700);
+        Directory::ensure($directory, 0700);
         $path = $directory.'/lifecycle.jsonl';
         $mask = umask(0077);
         try {

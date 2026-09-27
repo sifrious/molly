@@ -60,12 +60,12 @@ Queued starts from the web interface and MCP need a queue worker. `molly:worker`
 
 | Command | What it does |
 | --- | --- |
-| `molly:worker start [--workspace=PATH]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
+| `molly:worker start [--workspace=PATH] [--timeout=10]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
 | `molly:worker status [--workspace=PATH]` | Reports `state` (`running`, `stopped`, or `stale`), pid, process group, uptime, queue, and log path. |
 | `molly:worker stop [--workspace=PATH] [--timeout=30]` | Sends `SIGTERM` to the worker's process group, then `SIGKILL` after the timeout. |
 | `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, then starts a new one. |
 
-The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
+The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. Only your user can read them: the directory has mode `0700` and both files `0600`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. Only one `molly:worker` command runs at a time per workspace. Another one waits up to `--timeout` seconds for `.molly/worker/worker.lock` (10 for `start`, 30 for `stop` and `restart`) and then fails with `WORKER_BUSY`. If Molly cannot write `worker.json` or `worker.log`, `start` fails with `WORKER_START_FAILED` and leaves no worker running. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
 
 With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), `graphs` (the [graph freshness](../knowledge-graph.md#stale-graphs) report for the workspace), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
 
@@ -159,6 +159,12 @@ Each probe writes its section of `storage/molly/complexity/report.json` (or the 
 ## Exit codes
 
 `0` means the command did what you asked; `1` means Molly reported a failure. A read command exits `0` even when the run it shows failed, so scripts should read the returned `status`, `ready`, or `retry_allowed` field as well. `molly:start` and `molly:retry` exit `0` only when the new run completed.
+
+## Errors
+
+A failed command prints its error on stderr, so stdout carries only the report. With `--json`, stdout still carries the JSON document with the error in it, and stderr gets one line in the form `CODE: message`. An unknown option or a missing argument fails with `ARGUMENTS_INVALID` in the same way. An error that has no Molly code is printed as `COMMAND_FAILED: message`. `molly:graphs-retry`, `molly:journal`, `molly:knowledge:query`, and `molly:project:query` still print their errors on stdout.
+
+`molly:create`, `molly:run`, `molly:import`, and `molly:story` check their own inputs before anything else. A missing prompt fails with `PROMPT_REQUIRED`, a missing story with `STORY_REQUIRED`, a missing `--test` with `TEST_REQUIRED`, a test file that does not exist with `PROTECTED_TEST_MISSING`, and a directory that is not a Laravel application with `WORKSPACE_INVALID`. `molly:run` reports these before it refuses a host without a sandbox, and `molly:import` reports them before it asks GitHub for the issue.
 
 `molly:check INPUT OUTPUT` is internal to the parallel check runner. It takes no `--json` flag; it reads its input file and writes its result to the output file. Do not call it.
 

@@ -15,7 +15,7 @@ it('requires a prompt for unattended execution and emits only JSON', function ()
         ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe([
             'id' => null,
             'status' => 'failed',
-            'report' => ['error' => 'Provide a prompt when using --json or --no-interaction.'],
+            'report' => ['error' => 'PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction, for example php artisan molly:run "Return Hello".'],
         ]);
 });
 
@@ -25,8 +25,8 @@ it('requires a test before starting work', function (array $options, string $mes
     expect($exit)->toBe(1)
         ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['report']['error'])->toBe($message);
 })->with([
-    [[], 'Use --test to name the Pest test file that must pass.'],
-    [['--file' => ['app/Greeting.php']], 'Use --test to name the Pest test file that must pass.'],
+    [[], 'TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.'],
+    [['--file' => ['app/Greeting.php']], 'TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.'],
 ]);
 
 it('returns the complete run report with the correct exit code', function (string $status, int $exit): void {

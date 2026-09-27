@@ -6,13 +6,14 @@ use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 class RestoreTaskBaseline
 {
     public function store(Task $task, array $files): void
     {
         $path = $this->path($task);
-        File::ensureDirectoryExists(dirname($path), 0700);
+        Directory::ensure(dirname($path), 0700);
         $payload = json_encode([
             'task_id' => $task->id,
             'workspace' => $task->workspace,

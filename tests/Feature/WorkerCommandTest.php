@@ -188,3 +188,101 @@ it('rejects an unknown action and an invalid timeout', function (): void {
         ->and(worker('pause', $this->workspace)['error'])->toStartWith('WORKER_ACTION_INVALID')
         ->and(worker('stop', $this->workspace, ['--timeout' => '0'])['error'])->toStartWith('WORKER_TIMEOUT_INVALID');
 });
+
+it('closes the caller pipe so a piped molly:worker start returns at once', function (): void {
+    $command = testbenchProcess(['molly:worker', 'start', '--workspace='.$this->workspace, '--json'])->getCommandLine();
+    $pipeline = Process::fromShellCommandline($command.' | cat', dirname(__DIR__, 2), [
+        ...testbenchProcess([])->getEnv(),
+        'MOLLY_WORKER_PHP_BINARY' => config('molly.worker.php_binary'),
+    ], timeout: 15);
+
+    $started = microtime(true);
+    $pipeline->run();
+    $result = json_decode($pipeline->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($pipeline->getExitCode())->toBe(0)
+        ->and(microtime(true) - $started)->toBeLessThan(10)
+        ->and($result['state'])->toBe('running')
+        ->and(processAlive($result['pid']))->toBeTrue();
+});
+
+/** @return list<int> Live processes whose command line names $binary. */
+function processesRunning(string $binary): array
+{
+    $found = new Process(['pgrep', '-f', $binary]);
+    $found->run();
+
+    return array_map(intval(...), array_filter(explode("\n", trim($found->getOutput()))));
+}
+
+it('refuses to start a worker it could not record and leaves no process behind', function (): void {
+    $directory = $this->workspace.'/.molly/worker';
+    File::ensureDirectoryExists($directory);
+    File::put($directory.'/worker.lock', '');
+    File::put($directory.'/worker.log', '');
+    chmod($directory, 0555);
+
+    try {
+        $result = worker('start', $this->workspace);
+    } finally {
+        chmod($directory, 0755);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_START_FAILED')
+        ->and($result['error'])->toContain($directory)
+        ->and(processesRunning(config('molly.worker.php_binary')))->toBe([])
+        ->and(worker('status', $this->workspace)['state'])->toBe('stopped');
+});
+
+it('stops a worker that started but could not be recorded', function (): void {
+    $directory = $this->workspace.'/.molly/worker';
+    $binary = $this->workspace.'/locks-its-directory';
+    File::put($binary, "#!/bin/sh\nchmod 555 '".$directory."'\ntrap 'exit 0' TERM\nwhile :; do sleep 1; done\n");
+    chmod($binary, 0755);
+    config(['molly.worker.php_binary' => $binary]);
+
+    try {
+        $result = worker('start', $this->workspace);
+    } finally {
+        chmod($directory, 0755);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_START_FAILED')
+        ->and($result['error'])->toContain($directory.'/worker.json')
+        ->and(processesRunning($binary))->toBe([])
+        ->and(worker('status', $this->workspace)['state'])->toBe('stopped');
+});
+
+it('reports WORKER_BUSY instead of waiting forever for worker.lock', function (): void {
+    $lock = $this->workspace.'/.molly/worker/worker.lock';
+    File::ensureDirectoryExists(dirname($lock));
+    $holder = new Process([PHP_BINARY, '-r', '$h = fopen($argv[1], "c"); flock($h, LOCK_EX); echo "locked\n"; sleep(8);', $lock]);
+    $holder->start();
+    $holder->waitUntil(fn (string $type, string $output): bool => str_contains($output, 'locked'));
+
+    try {
+        $started = microtime(true);
+        $result = worker('start', $this->workspace, ['--timeout' => 1]);
+        $elapsed = microtime(true) - $started;
+    } finally {
+        $holder->stop(0);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_BUSY')
+        ->and($result['error'])->toContain($lock)
+        ->and($elapsed)->toBeLessThan(5)
+        ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+});
+
+it('keeps the worker directory, log, and record private to the user', function (): void {
+    worker('start', $this->workspace);
+
+    expect(fileperms($this->workspace.'/.molly/worker') & 0777)->toBe(0700)
+        ->and(fileperms($this->workspace.'/.molly/worker/worker.log') & 0777)->toBe(0600)
+        ->and(fileperms($this->workspace.'/.molly/worker/worker.json') & 0777)->toBe(0600);
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});

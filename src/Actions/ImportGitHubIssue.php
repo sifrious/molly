@@ -22,6 +22,9 @@ class ImportGitHubIssue
             throw new RuntimeException('ISSUE_URL_INVALID: Use an HTTPS github.com issue URL without a query or fragment.');
         }
 
+        // Check the workspace, files, and test before asking GitHub for the issue.
+        (new Workspace($workspace))->taskPaths($paths, $testPath, $allowTestEdits);
+
         $repository = $matches[1].'/'.$matches[2];
         $number = (int) $matches[3];
 

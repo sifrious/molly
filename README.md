@@ -13,12 +13,22 @@ Molly needs PHP 8.3 or later, Laravel 12 or 13, Pest in the application, Git, an
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
+composer require --dev sifrious/molly:^0.2
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
 
 Molly is not on Packagist yet, so the first line tells Composer where the tagged releases live. Molly is a development dependency, so `composer install --no-dev` leaves it out of production.
+
+New Laravel 12 and 13 applications ship PHPUnit, not Pest. If `vendor/bin/pest` does not exist, install Pest before you run Molly:
+
+```bash
+composer remove --dev phpunit/phpunit --no-update
+composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+./vendor/bin/pest --init
+```
+
+The first line drops the PHPUnit requirement without updating yet, the second installs Pest and lets Composer pick the PHPUnit version Pest needs, and `--init` adds `tests/Pest.php`.
 
 Add Molly's local files to `.gitignore`:
 

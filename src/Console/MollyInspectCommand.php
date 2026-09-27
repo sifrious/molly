@@ -9,11 +9,12 @@ use Sifrious\Molly\Actions\ListConversations;
 use Sifrious\Molly\Actions\ShowConversation;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyInspectCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:inspect
         {target? : task:<ref>, run:<id>, conversation:<id>, or bare task ref}
         {--task= : Task name or ID}
@@ -67,13 +68,7 @@ class MollyInspectCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -8,12 +8,13 @@ use Sifrious\Molly\Journal\JournalRenderer;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyGlossaryCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:glossary
         {path? : Workspace path, the same as --workspace}
         {--workspace= : Workspace whose .molly/GLOSSARY.md the terms belong to (defaults to the application)}
@@ -26,13 +27,7 @@ class MollyGlossaryCommand extends Command
         try {
             $root = (new Workspace((string) ($this->option('workspace') ?: $this->argument('path') ?: base_path())))->path;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage(), 'terms' => []], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage(), 'terms' => []]);
         }
 
         $path = $root.'/.molly/GLOSSARY.md';

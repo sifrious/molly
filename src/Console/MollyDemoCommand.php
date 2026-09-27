@@ -8,13 +8,16 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyDemoCommand extends Command
 {
+    use ReportsFailures;
+
     public const TASK_NAME = 'demo-greeting';
 
     public const PROMPT = 'Return Hello from the greeting helper.';
@@ -33,6 +36,8 @@ class MollyDemoCommand extends Command
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $files = new Workspace($workspace);
             $root = $files->path;
+            // Creating the task needs Git; check it before writing the demo files.
+            GitBinary::require();
 
             $this->ensureMollyGitignored($root);
             $createdGreeting = $this->ensureGreetingStub($root);
@@ -91,13 +96,7 @@ class MollyDemoCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 
@@ -126,7 +125,7 @@ class MollyDemoCommand extends Command
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
+        Directory::ensure(dirname($path));
         File::put($path, <<<'PHP'
 <?php
 
@@ -153,7 +152,7 @@ PHP);
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
+        Directory::ensure(dirname($path));
         File::put($path, <<<'PHP'
 <?php
 

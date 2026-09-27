@@ -44,8 +44,10 @@ The demo installer creates a fresh application, installs Pest and the tagged Mol
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
-bash molly-demo ~/molly-demo
+MOLLY_CONSTRAINT='^0.2' bash molly-demo ~/molly-demo
 ```
+
+The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the current one.
 
 It writes only under the directory you name and refuses a non-empty directory unless you pass `--force`. When it finishes, continue from [Choose a model](#choose-a-model).
 
@@ -55,7 +57,7 @@ From the application root:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
+composer require --dev sifrious/molly:^0.2
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```

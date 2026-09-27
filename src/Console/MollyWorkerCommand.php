@@ -7,16 +7,17 @@ use RuntimeException;
 use Sifrious\Molly\Actions\ManageWorker;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyWorkerCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:worker
         {action : start, stop, status, or restart}
         {--workspace= : Workspace that records the worker under .molly/worker (defaults to the application)}
-        {--timeout= : Seconds to wait after SIGTERM before SIGKILL when stopping (default 30)}
+        {--timeout= : Seconds to wait for another molly:worker command to finish (default 10 for start), and after SIGTERM before SIGKILL when stopping (default 30)}
         {--json : Print JSON only}';
 
     protected $description = 'Start, stop, or inspect the queue worker Molly owns for this workspace';
@@ -28,20 +29,14 @@ class MollyWorkerCommand extends Command
         try {
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $result = match ($action) {
-                'start' => $worker->start($workspace),
+                'start' => $worker->start($workspace, $this->option('timeout') === null ? ManageWorker::DEFAULT_LOCK_WAIT : $this->timeout()),
                 'stop' => $worker->stop($workspace, $this->timeout()),
                 'restart' => $worker->restart($workspace, $this->timeout()),
                 'status' => $worker->status($workspace),
                 default => throw new RuntimeException('WORKER_ACTION_INVALID: Use start, stop, status, or restart.'),
             };
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['action' => $action, 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['action' => $action, 'status' => 'error', 'error' => $exception->getMessage()]);
         }
 
         if ($this->option('json')) {

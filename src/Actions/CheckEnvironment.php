@@ -2,13 +2,16 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
+use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
 class CheckEnvironment
@@ -30,6 +33,7 @@ class CheckEnvironment
         $this->checkDatabase($add);
         $workspace = realpath($workspace);
         $this->checkPest($workspace, $add);
+        $this->checkGit($add);
         $this->checkSandbox($add);
         $this->checkParallel($add);
         $this->checkAgent($add);
@@ -50,9 +54,47 @@ class CheckEnvironment
             $ready = $ready
                 && Schema::hasColumn('molly_tasks', 'test_digest')
                 && Schema::hasColumn('molly_tasks', 'allow_test_edits');
-            $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Task and run history are ready.' : 'Run php artisan migrate to update Molly task and run history.');
+            if (! $ready) {
+                $add('Run history', false, 'migration_missing', 'Run php artisan migrate to update Molly task and run history.');
+
+                return;
+            }
+            $unwritable = $this->probeDatabaseWrite();
+            $add('Run history', $unwritable === null, $unwritable === null ? 'database_ready' : 'database_unwritable', $unwritable === null
+                ? 'Task and run history are ready.'
+                : 'Molly could not write to the configured database: '.$unwritable.' Check free disk space and that the database file and its directory are writable.');
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');
+        }
+    }
+
+    /**
+     * Insert one plan inside a transaction and roll it back, so a full disk or a read-only
+     * database fails here instead of on the first saved task.
+     */
+    private function probeDatabaseWrite(): ?string
+    {
+        $connection = DB::connection();
+        try {
+            $connection->beginTransaction();
+        } catch (Throwable $exception) {
+            return $exception->getMessage();
+        }
+
+        try {
+            $connection->table('molly_plans')->insert([
+                'id' => (string) Str::uuid(),
+                'description' => 'molly:doctor write check',
+                'review_mode' => 'doctor',
+                'answers' => '[]',
+                'guide_version' => 'doctor',
+            ]);
+
+            return null;
+        } catch (Throwable $exception) {
+            return $exception->getMessage();
+        } finally {
+            $connection->rollBack();
         }
     }
 
@@ -61,6 +103,15 @@ class CheckEnvironment
     {
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkGit(callable $add): void
+    {
+        $git = GitBinary::find();
+        $add('Git', $git !== null, $git !== null ? 'git_ready' : 'git_missing', $git !== null
+            ? 'Git is available at '.$git.'.'
+            : 'Molly needs the git executable to create, run, and review tasks, and no git was found on PATH. Install Git or add it to PATH.');
     }
 
     /** @param  callable(string, bool, string, string): void  $add */

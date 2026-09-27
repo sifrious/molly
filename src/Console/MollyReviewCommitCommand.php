@@ -6,12 +6,13 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\ReviewCommit;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyReviewCommitCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:review-commit {ref? : Commit to review, defaults to HEAD} {--staged : Review staged PHP changes instead of a commit} {--workspace= : Git workspace directory} {--json : Print structured evidence}';
 
     protected $description = 'Check a PHP diff and optionally ask Jev to evaluate unnecessary complexity';
@@ -46,13 +47,7 @@ class MollyReviewCommitCommand extends Command
                     || ($evaluation['status'] === 'evaluated' && $evaluation['next_action'] === 'continue'))
                 ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

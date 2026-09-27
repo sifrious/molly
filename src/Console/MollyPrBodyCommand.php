@@ -6,10 +6,10 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\ComposePullRequestBody;
 use Throwable;
 
-use function Laravel\Prompts\error;
-
 class MollyPrBodyCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:pr-body {task : Saved task name or ID} {--close : Include Closes language after required checks pass} {--json : Print JSON only}';
 
     protected $description = 'Print a pull request body that links the issue, acceptance test, and Molly evidence';
@@ -26,13 +26,7 @@ class MollyPrBodyCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

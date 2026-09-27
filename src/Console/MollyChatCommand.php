@@ -9,6 +9,8 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class MollyChatCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:chat {--json : Print the Amp launch arguments without starting a session}';
 
     protected $description = 'Open Amp with a Molly MCP connection for this session';
@@ -17,14 +19,9 @@ class MollyChatCommand extends Command
     {
         $amp = $finder->find('amp');
         if ($amp === null) {
-            $message = 'Amp is not on PATH. Install it from https://ampcode.com, then run molly:setup --agent=amp.';
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'failed', 'error' => $message], JSON_THROW_ON_ERROR));
-            } else {
-                $this->error($message);
-            }
+            $message = 'AMP_MISSING: Amp is not on PATH. Install it from https://ampcode.com, then run molly:setup --agent=amp.';
 
-            return self::FAILURE;
+            return $this->reportFailure($message, ['status' => 'failed', 'error' => $message]);
         }
         $config = ['molly' => ['command' => PHP_BINARY, 'args' => [base_path('artisan'), 'mcp:start', 'molly']]];
         $command = [$amp, '--mcp-config', json_encode($config, JSON_THROW_ON_ERROR)];
@@ -34,10 +31,9 @@ class MollyChatCommand extends Command
             return self::SUCCESS;
         }
         if (! $this->input->isInteractive() || ! defined('STDIN') || ! stream_isatty(STDIN) || ! SymfonyProcess::isTtySupported()) {
-            $this->error('Open Amp in an interactive terminal with this command:');
             $this->line((new SymfonyProcess($command))->getCommandLine());
 
-            return self::FAILURE;
+            return $this->reportFailure('TERMINAL_REQUIRED: Open Amp in an interactive terminal with the command above.');
         }
 
         return Process::path(base_path())->forever()->tty()->run($command)->exitCode() ?? self::FAILURE;

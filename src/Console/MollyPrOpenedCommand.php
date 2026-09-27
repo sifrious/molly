@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\RecordPullRequestOpened;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyPrOpenedCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:pr-opened {task : Saved task name or ID} {--url= : HTTPS github.com pull request URL} {--approve : Confirm recording the opened pull request} {--json : Print JSON only}';
 
     protected $description = 'Record that a human opened a pull request without opening one from Molly';
@@ -27,13 +28,7 @@ class MollyPrOpenedCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -7,12 +7,13 @@ use InvalidArgumentException;
 use Sifrious\Molly\Actions\NameTask;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 
 class MollyNameCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:name {task : Saved task name or ID} {name? : Short name for the task} {--json : Print JSON only}';
 
     protected $description = 'Give a saved task a name to use in commands';
@@ -38,13 +39,7 @@ class MollyNameCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['id' => (string) $this->argument('task'), 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['id' => (string) $this->argument('task'), 'status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\PlanningGuide;
+use Sifrious\Molly\Workspace\GitBinary;
 
 class ReviewCommit
 {
@@ -17,6 +18,7 @@ class ReviewCommit
         if ($workspace === false || ! is_dir($workspace)) {
             throw new RuntimeException('COMMIT_WORKSPACE_INVALID: Choose an existing Git workspace.');
         }
+        GitBinary::require();
         $revision = null;
         if (! $staged) {
             if (! is_string($ref) || trim($ref) === '' || strlen($ref) > 256) {

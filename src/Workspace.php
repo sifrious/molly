@@ -84,7 +84,7 @@ class Workspace
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory and a regular file.');
         }
         if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create the workspace lock directory.');
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create '.$directory.'. Check free disk space and that the workspace is writable.');
         }
         if (is_link($directory) || ! is_dir($directory)) {
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory.');
@@ -163,6 +163,20 @@ class Workspace
         $contents = $this->readProtectedTest($testPath)[$testPath];
 
         return $contents === null ? null : hash('sha256', $contents);
+    }
+
+    /**
+     * The error for a required test that does not exist. When the workspace is not a Laravel
+     * application at all, the workspace is the problem, so say that instead.
+     */
+    public function missingProtectedTest(string $testPath): RuntimeException
+    {
+        $markers = array_filter(['artisan', 'composer.json', '.git', 'tests'], fn (string $marker): bool => file_exists($this->path.'/'.$marker));
+        if ($markers === []) {
+            return new RuntimeException('WORKSPACE_INVALID: '.$this->path.' is not a Laravel application: it has no artisan, composer.json, .git, or tests directory, and '.$testPath.' does not exist there. Pass --workspace with your Laravel project root.');
+        }
+
+        return new RuntimeException('PROTECTED_TEST_MISSING: '.$testPath.' does not exist in '.$this->path.'. Create and approve the required Pest test before the implementation turn.');
     }
 
     public function assertProtectedTestUnchanged(string $testPath, string $digest): void
