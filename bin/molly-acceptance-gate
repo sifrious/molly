@@ -57,6 +57,16 @@ function readJson(string $path, string $label): array
     return $data;
 }
 
+/** A reason counts only when the manifest declared it before the run and scoped it to this subcase. */
+function declaredFor(mixed $key, string $subcaseId, array $notApplicable): bool
+{
+    if (! is_string($key) || ! isset($notApplicable[$key]) || ! is_array($notApplicable[$key])) {
+        return false;
+    }
+
+    return in_array($subcaseId, (array) ($notApplicable[$key]['applies_to'] ?? []), true);
+}
+
 function isHex(mixed $value, int $length): bool
 {
     return is_string($value) && preg_match('/^[0-9a-f]{'.$length.'}$/', $value) === 1;
@@ -178,7 +188,11 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
     }
 
     // Command exit.
-    $expectedExit = $record['expected_exit_code'] ?? 0;
+    // The expected exit comes from the frozen manifest, never from the record author.
+    $expectedExit = $subcase['expected_exit_code'] ?? 0;
+    if (array_key_exists('expected_exit_code', $record) && $record['expected_exit_code'] !== $expectedExit) {
+        $reject('EXIT_CODE_MISMATCH', sprintf('record claims expected exit %s but the manifest expects %d', json_encode($record['expected_exit_code']), $expectedExit));
+    }
     if ($record['exit_code'] !== $expectedExit) {
         $reject('EXIT_CODE_MISMATCH', "exit {$record['exit_code']}, expected {$expectedExit}");
     }
@@ -197,7 +211,7 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
         if ($counts['skipped'] > 0) {
             $declared = array_values(array_filter(
                 (array) ($record['skip_reasons'] ?? []),
-                fn ($key) => is_string($key) && array_key_exists($key, $notApplicable),
+                fn ($key) => declaredFor($key, $subcase['id'], $notApplicable),
             ));
             if ($declared === []) {
                 $reject('UNDECLARED_SKIP', "{$counts['skipped']} skipped with no skip_reasons key from manifest.not_applicable");
@@ -266,8 +280,8 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
 
     // Outcome. N/A applies only with a key the manifest declared before the run.
     if (isset($record['not_applicable'])) {
-        if (! is_string($record['not_applicable']) || ! array_key_exists($record['not_applicable'], $notApplicable)) {
-            $reject('UNDECLARED_NOT_APPLICABLE', sprintf('%s is not a key in manifest.not_applicable', json_encode($record['not_applicable'])));
+        if (! declaredFor($record['not_applicable'], $subcase['id'], $notApplicable)) {
+            $reject('UNDECLARED_NOT_APPLICABLE', sprintf('%s is not a manifest.not_applicable key that applies to %s', json_encode($record['not_applicable']), $subcase['id']));
         }
     } elseif (in_array($record['outcome'], OUTCOMES, true) && $record['outcome'] !== 'PASS') {
         $reject('NOT_PASSED', "outcome {$record['outcome']}");

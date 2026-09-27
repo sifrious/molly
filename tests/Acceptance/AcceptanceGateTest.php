@@ -85,7 +85,7 @@ function gateFixture(): array
                 'lock_sha256' => hash('sha256', 'composer.lock'),
                 'timestamp' => GATE_RECORDED_AT,
                 'command' => "run check for {$subcase['id']}",
-                'exit_code' => 0,
+                'exit_code' => $subcase['expected_exit_code'] ?? 0,
                 'counts' => ['discovered' => 3, 'passed' => 3, 'failed' => 0, 'skipped' => 0],
                 'files' => $files,
                 'intervention' => null,
@@ -332,10 +332,28 @@ it('rejects a record that ran longer than the manifest timeout', function () {
 
 it('rejects a command exit code that differs from the expected one', function () {
     gateControl(fn (array $f) => gateEditRecord($f, 'M02.5', function (array $r) {
-        $r['exit_code'] = 1;
+        $r['exit_code'] = 0;
 
         return $r;
     }), 'M02.5', 'EXIT_CODE_MISMATCH', 'M02');
+});
+
+it('ignores an expected exit code written by the record author', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M01.1', function (array $r) {
+        $r['exit_code'] = 1;
+        $r['expected_exit_code'] = 1;
+
+        return $r;
+    }), 'M01.1', 'EXIT_CODE_MISMATCH', 'M01');
+});
+
+it('rejects a declared skip reason used outside the subcases it applies to', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M09.13', function (array $r) {
+        $r['counts'] = ['discovered' => 3, 'passed' => 2, 'failed' => 0, 'skipped' => 1];
+        $r['skip_reasons'] = ['landlock-linux-only'];
+
+        return $r;
+    }), 'M09.13', 'UNDECLARED_SKIP', 'M09');
 });
 
 it('rejects a not-applicable claim the manifest did not declare', function () {
@@ -358,9 +376,9 @@ it('rejects an evidence path outside the evidence directory', function () {
 it('accepts a skip whose reason the manifest declared', function () {
     $fixture = gateFixture();
     try {
-        gateEditRecord($fixture, 'M09.13', function (array $r) {
+        gateEditRecord($fixture, 'M10.3', function (array $r) {
             $r['counts'] = ['discovered' => 3, 'passed' => 2, 'failed' => 0, 'skipped' => 1];
-            $r['skip_reasons'] = ['SandboxIsolationTest on macOS'];
+            $r['skip_reasons'] = ['landlock-linux-only'];
 
             return $r;
         });

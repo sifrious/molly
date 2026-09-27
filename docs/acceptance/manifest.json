@@ -19,7 +19,12 @@
     "junit skipped": "UNVERIFIED unless the skip reason is pre-declared in not_applicable"
   },
   "not_applicable": {
-    "SandboxIsolationTest on macOS": "Landlock is Linux-only; the same tests must run and pass on the Linux CI lane"
+    "landlock-linux-only": {
+      "reason": "SandboxIsolationTest uses Linux Landlock and skips on macOS. The same tests must run and pass on the Linux CI lane recorded under M10.1.",
+      "applies_to": [
+        "M10.3"
+      ]
+    }
   },
   "budgets": {
     "manual_install_steps": {
@@ -230,7 +235,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M02.6",
@@ -244,7 +250,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M02.7",
@@ -258,7 +265,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M02.8",
@@ -272,7 +280,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M02.9",
@@ -286,7 +295,8 @@
           "timeout_s": 1800,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M02.10",
@@ -349,7 +359,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M03.4",
@@ -378,7 +389,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M03.6",
@@ -392,7 +404,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M03.7",
@@ -687,7 +700,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M04.15",
@@ -804,7 +818,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M05.7",
@@ -818,7 +833,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M05.8",
@@ -866,7 +882,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.3",
@@ -894,7 +911,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.5",
@@ -922,7 +940,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.7",
@@ -964,7 +983,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.10",
@@ -978,7 +998,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.11",
@@ -992,7 +1013,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.12",
@@ -1006,7 +1028,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.13",
@@ -1020,7 +1043,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.14",
@@ -1034,7 +1058,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.15",
@@ -1048,7 +1073,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.16",
@@ -1062,7 +1088,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.17",
@@ -1076,7 +1103,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.18",
@@ -1118,7 +1146,8 @@
           "timeout_s": 14400,
           "owner": "C/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M06.21",
@@ -1237,7 +1266,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.8",
@@ -1279,7 +1309,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.11",
@@ -1733,7 +1764,8 @@
           "timeout_s": 7200,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M10.2",
@@ -1747,7 +1779,8 @@
           "timeout_s": 7200,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M10.3",
@@ -1762,7 +1795,8 @@
           "owner": "E",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Baseline 048ad82: 1111 tests, 1083 passed, 28 skipped (25 Jev-enabled, 3 Landlock)."
+          "finding_at_freeze": "Baseline 048ad82: 1111 tests, 1083 passed, 28 skipped (25 Jev-enabled, 3 Landlock).",
+          "test_bearing": true
         },
         {
           "id": "M10.4",
@@ -1776,7 +1810,8 @@
           "timeout_s": 7200,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M10.5",
@@ -1790,7 +1825,8 @@
           "timeout_s": 7200,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M10.6",
@@ -1818,7 +1854,8 @@
           "timeout_s": 1800,
           "owner": "D/E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         }
       ]
     },
@@ -1837,7 +1874,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.2",
@@ -1851,7 +1889,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.3",
@@ -1865,7 +1904,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.4",
@@ -1879,7 +1919,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.5",
@@ -1893,7 +1934,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.6",
@@ -1907,7 +1949,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.7",
@@ -1921,7 +1964,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.8",
@@ -1935,7 +1979,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.9",
@@ -1949,7 +1994,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M11.10",
@@ -1963,7 +2009,8 @@
           "timeout_s": 1800,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         }
       ]
     },
@@ -2087,7 +2134,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.5",
@@ -2101,7 +2149,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.6",
@@ -2115,7 +2164,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.7",
@@ -2129,7 +2179,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.8",
@@ -2143,7 +2194,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.9",
@@ -2158,7 +2210,8 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Wardrobe has no unknown state; unknown data maps to unsupported with reason compatibility_unknown. Molly contract must keep unknown distinct."
+          "finding_at_freeze": "Wardrobe has no unknown state; unknown data maps to unsupported with reason compatibility_unknown. Molly contract must keep unknown distinct.",
+          "test_bearing": true
         },
         {
           "id": "M13.10",
@@ -2173,7 +2226,8 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Wardrobe HardwareSnapshot has no translation or memory-pressure field."
+          "finding_at_freeze": "Wardrobe HardwareSnapshot has no translation or memory-pressure field.",
+          "test_bearing": true
         },
         {
           "id": "M13.11",
@@ -2187,7 +2241,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.12",
@@ -2201,7 +2256,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.13",
@@ -2215,7 +2271,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.14",
@@ -2229,7 +2286,8 @@
           "timeout_s": 1800,
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "test_bearing": true
         },
         {
           "id": "M13.15",

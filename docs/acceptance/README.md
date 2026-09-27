@@ -111,11 +111,11 @@ Each rejected subcase lists every code that applies.
 | `ZERO_TESTS` | `counts.discovered` is 0. |
 | `COUNTS_INCONSISTENT` | `passed + failed + skipped` differs from `discovered`. |
 | `FAILED_BUT_PASS` | `counts.failed` is above 0 and `outcome` is `PASS`. |
-| `UNDECLARED_SKIP` | `counts.skipped` is above 0 and no `skip_reasons` key exists in `manifest.not_applicable`. |
-| `UNDECLARED_NOT_APPLICABLE` | `not_applicable` names a key missing from `manifest.not_applicable`. |
+| `UNDECLARED_SKIP` | `counts.skipped` is above 0 and no `skip_reasons` key is declared in `manifest.not_applicable` with this subcase in its `applies_to` list. |
+| `UNDECLARED_NOT_APPLICABLE` | `not_applicable` names a key that `manifest.not_applicable` does not declare for this subcase. |
 | `STALE_EVIDENCE` | `timestamp` is earlier than `candidate.json` `built_at`. |
 | `TIMED_OUT` | `timed_out` is true, or `duration_s` exceeds the manifest `timeout_s`. |
-| `EXIT_CODE_MISMATCH` | `exit_code` differs from `expected_exit_code`, which defaults to 0. |
+| `EXIT_CODE_MISMATCH` | `exit_code` differs from the manifest subcase's `expected_exit_code` (default 0), or the record claims a different expected exit. |
 | `PROTECTED_DIGEST_CHANGED` | `protected_digest_observed` differs from `protected_digest_expected`. |
 
 Gate-level errors reject the whole run:
@@ -129,9 +129,8 @@ Gate-level errors reject the whole run:
 
 ## Limitations
 
-- A record with `counts: null` skips the test-count checks. The manifest does not yet say which subcases must carry tests. The gate honors a `test_bearing: true` field on a manifest subcase once one is added.
+- A record with `counts: null` skips the test-count checks unless the manifest marks the subcase `test_bearing: true`, in which case counts are required.
 - `lock_sha256` and `intervention` are recorded and reported but not compared against anything.
-- `manifest.not_applicable` is keyed by a description, not by subcase id, so a declared reason is accepted on any subcase.
 
 ## Tests
 
