@@ -73,6 +73,28 @@ class Task extends Model
     }
 
     /**
+     * The fingerprint of the latest failed run in the implementation scope
+     * and how many runs in that scope failed with the same fingerprint.
+     *
+     * @return array{digest: string, failures: int}|null
+     */
+    public function repeatedFailure(): ?array
+    {
+        $before = $this->source['test_lock']['runs_before'] ?? 0;
+        $digests = $this->runs()->get()
+            ->slice(is_int($before) ? $before : 0)
+            ->filter(fn (Run $run): bool => $run->status === 'failed')
+            ->map(fn (Run $run): mixed => $run->report['failure_fingerprint']['digest'] ?? null)
+            ->filter(fn (mixed $digest): bool => is_string($digest))
+            ->values();
+        if ($digests->isEmpty()) {
+            return null;
+        }
+
+        return ['digest' => $digests->last(), 'failures' => $digests->filter(fn (string $digest): bool => $digest === $digests->last())->count()];
+    }
+
+    /**
      * Why an implementation run may not start yet, or null when it may.
      * A task whose Pest test was authored and locked needs a RED baseline
      * that failed for missing behavior, unless it opted out at creation.

@@ -33,6 +33,7 @@ class RunTask
         private Sandbox $sandbox,
         private ResolveEffectiveRunConfig $resolveEffectiveRunConfig,
         private BindWorkspaceReference $bindWorkspaceReference,
+        private FingerprintRunFailure $fingerprint,
     ) {}
 
     /**
@@ -219,6 +220,9 @@ class RunTask
         ]);
         $report['classification'] = [...$classification->toArray(), 'advisory' => true];
         $this->recordSnapshot($report, $workspace, $before, $after);
+        if (! $decision['completed']) {
+            $report['failure_fingerprint'] = $this->fingerprint->handle($report);
+        }
         $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
     }
 
@@ -246,6 +250,9 @@ class RunTask
             $report['terminated_before_completion'] = true;
         } catch (Throwable $receiptFailure) {
             $report['receipt_error'] = $receiptFailure->getMessage();
+        }
+        if (! $exception instanceof RunStopped) {
+            $report['failure_fingerprint'] = $this->fingerprint->handle($report);
         }
         $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
     }

@@ -61,7 +61,7 @@ php artisan molly:inspect --run=RUN_ID
 php artisan molly:retry ready-check
 ```
 
-A retry creates another run and keeps the earlier one. Molly sends the model a bounded summary of the previous failure. A task may make three attempts in total by default, counted across starts and retries; the limit is `molly.max_attempts`. Molly never retries on its own.
+A retry creates another run and keeps the earlier one. Molly sends the model a bounded summary of the previous failure. A task may make three attempts in total by default, counted across starts and retries; the limit is `molly.max_attempts`. Each failed run also records `failure_fingerprint`, a digest of the failing verifiers, error code, failing test names, and blocking Tarpit codes. Message wording is left out, so a reworded failure keeps its fingerprint. When the latest fingerprint has failed `molly.repair.per_failure` times (3 by default), Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`. Molly never retries on its own.
 
 Read the failed run before retrying. If the failure is in the test itself, fix the test in a new task rather than weakening it.
 

@@ -24,6 +24,7 @@ Restart queue workers after configuration changes.
 | `molly.timeout` | `180` | Seconds allowed for each model request. |
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
 | `molly.max_attempts` | `3` | Runs a task may make, from 1 to 10. |
+| `molly.repair.per_failure` | `3` | Failed runs with the same failure fingerprint before Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`, from 1 to 10. `molly.max_attempts` still caps the total. |
 | `molly.agent_bus.lease_seconds` | `120` | Seconds a claim lasts without renewal, from 30 to 3600. A running task renews its lease at every run step for the longer of this value and the model or Pest timeout plus 30 seconds, so a live run keeps its claim and a crashed one expires. |
 | `molly.parallel_checks` | `true` | Run Pest and Tarpit at the same time. Set `false` without POSIX process groups. |
 | `molly.max_files` | `8` | Writable files per task. The protected test is not counted. |

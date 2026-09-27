@@ -69,6 +69,7 @@ final class LocalAgentBus
             if ($task->attemptsUsed() >= $limit) {
                 throw new RuntimeException('ATTEMPT_LIMIT_REACHED: This task has used its allowed attempts.');
             }
+            $this->refuseExhaustedRepair($task);
 
             $now = now();
             $expires = $now->copy()->addSeconds($this->leaseSeconds());
@@ -176,6 +177,24 @@ final class LocalAgentBus
         $now = $now === null ? now() : $now;
 
         return $task->lease_expires_at->lt($now);
+    }
+
+    /**
+     * Refuse another attempt when the latest failure has already happened
+     * molly.repair.per_failure times in this scope. The total cap in
+     * molly.max_attempts still applies separately.
+     */
+    private function refuseExhaustedRepair(Task $task): void
+    {
+        $budget = config('molly.repair.per_failure', 3);
+        if (! is_int($budget) || $budget < 1 || $budget > 10) {
+            throw new RuntimeException('REPAIR_BUDGET_INVALID: Set molly.repair.per_failure to an integer from 1 to 10.');
+        }
+
+        $repeated = $task->repeatedFailure();
+        if ($repeated !== null && $repeated['failures'] >= $budget) {
+            throw new RuntimeException('REPAIR_BUDGET_EXHAUSTED: The same failure has happened '.$repeated['failures'].' times (fingerprint '.$repeated['digest'].'). Change the task scope, test, or model before another attempt.');
+        }
     }
 
     private function refuseDuplicateSuccess(Task $task, ?string $idempotencyKey): void
