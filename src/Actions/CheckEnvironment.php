@@ -9,6 +9,7 @@ use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
+use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
 class CheckEnvironment
@@ -30,6 +31,7 @@ class CheckEnvironment
         $this->checkDatabase($add);
         $workspace = realpath($workspace);
         $this->checkPest($workspace, $add);
+        $this->checkGit($add);
         $this->checkSandbox($add);
         $this->checkParallel($add);
         $this->checkAgent($add);
@@ -61,6 +63,15 @@ class CheckEnvironment
     {
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkGit(callable $add): void
+    {
+        $git = GitBinary::find();
+        $add('Git', $git !== null, $git !== null ? 'git_ready' : 'git_missing', $git !== null
+            ? 'Git is available at '.$git.'.'
+            : 'Molly needs the git executable to create, run, and review tasks, and no git was found on PATH. Install Git or add it to PATH.');
     }
 
     /** @param  callable(string, bool, string, string): void  $add */

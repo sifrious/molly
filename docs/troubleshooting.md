@@ -24,6 +24,7 @@ Restart queue workers after configuration changes too.
 | `migration_missing` | Run `php artisan migrate`. |
 | `database_unavailable` | Fix the application's database connection. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
+| `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
 | `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |
 | `parallel_process_groups_unavailable` | Install POSIX support, or set `parallel_checks` to `false`. |

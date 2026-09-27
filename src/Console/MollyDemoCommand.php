@@ -8,6 +8,7 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\GitBinary;
 use Throwable;
 
 use function Laravel\Prompts\error;
@@ -33,6 +34,8 @@ class MollyDemoCommand extends Command
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $files = new Workspace($workspace);
             $root = $files->path;
+            // Creating the task needs Git; check it before writing the demo files.
+            GitBinary::require();
 
             $this->ensureMollyGitignored($root);
             $createdGreeting = $this->ensureGreetingStub($root);
