@@ -58,9 +58,11 @@ it('names the directory molly:worker start could not create', function (): void 
     chmod($this->directory.'/.molly', 0555);
 
     $exit = Artisan::call('molly:worker', ['action' => 'start', '--workspace' => $this->directory, '--json' => true]);
+    $error = json_decode(Artisan::output(), true)['error'];
 
     expect($exit)->toBe(1)
-        ->and(json_decode(Artisan::output(), true)['error'])->toStartWith('DIRECTORY_UNWRITABLE: Molly could not create '.$this->directory.'/.molly/worker');
+        ->and($error)->toStartWith('DIRECTORY_UNWRITABLE: Molly could not create '.$this->directory.'/.molly/worker')
+        ->and($error)->not->toContain('unknown error');
 });
 
 it('names the directory molly:demo could not create', function (): void {
