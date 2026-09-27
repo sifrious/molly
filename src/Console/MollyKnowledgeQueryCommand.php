@@ -7,13 +7,14 @@ use RuntimeException;
 use Sifrious\Molly\Actions\QueryKnowledgeGraph;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\warning;
 
 final class MollyKnowledgeQueryCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:knowledge:query {concept : Concept or symbol to find} {--namespace=laravel : Knowledge namespace} {--nativephp-version= : NativePHP desktop-2 or mobile-4} {--laravel-version= : Installed Laravel major version} {--depth=2 : Relationship depth from 0 through 3} {--limit=20 : Node limit from 1 through 40} {--relation=* : Include only these relationships} {--workspace= : Project whose graph manifest is checked for staleness (default: current app)} {--json : Print JSON only}';
 
     protected $description = 'Read a bounded Laravel, NativePHP, or tarpit knowledge neighborhood';
@@ -64,13 +65,7 @@ final class MollyKnowledgeQueryCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage());
         }
     }
 

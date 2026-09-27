@@ -24,7 +24,7 @@ use Sifrious\Molly\Projects\ProjectRegistry;
 final class InitializeMollyInExistingProject
 {
     /** The tagged release line the initializer installs. Keep in step with bin/molly-demo. */
-    public const RELEASE_CONSTRAINT = '^0.1.1';
+    public const RELEASE_CONSTRAINT = '^0.2';
 
     /** Public VCS source used until sifrious/molly is listed on Packagist. */
     public const REPOSITORY_URL = 'https://github.com/sifrious/molly';
