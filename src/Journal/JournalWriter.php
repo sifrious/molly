@@ -78,6 +78,8 @@ class JournalWriter
     public function prepareMollyDirectory(string $root): void
     {
         $directory = rtrim($root, '/').'/.molly';
+        // Report a linked .molly as WORKSPACE_PATH_ESCAPE; links below it stay JOURNAL_PATH_INVALID.
+        Directory::molly($root);
         $this->ensureDirectory($directory);
         $gitignore = $directory.'/.gitignore';
         $existing = null;

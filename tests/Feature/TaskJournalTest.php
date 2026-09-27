@@ -171,7 +171,7 @@ it('reports an unknown task without creating a journal directory', function (): 
         ->and(is_dir($this->journalWorkspace.'/.molly'))->toBeFalse();
 });
 
-it('rejects symbolic links anywhere in the journal path without altering their targets', function (string $location): void {
+it('rejects symbolic links anywhere in the journal path without altering their targets', function (string $location, string $code): void {
     $task = journalTask(['status' => 'failed']);
     $outside = $this->journalWorkspace.'/outside';
     mkdir($outside);
@@ -184,13 +184,18 @@ it('rejects symbolic links anywhere in the journal path without altering their t
     symlink($location === 'file' ? $outside.'/untouched.md' : $outside, $link);
     $before = $task->fresh()->getRawOriginal();
 
-    expect(fn () => app(ExportTaskJournal::class)->handle($task->id))->toThrow(RuntimeException::class, 'JOURNAL_PATH_INVALID');
+    expect(fn () => app(ExportTaskJournal::class)->handle($task->id))->toThrow(RuntimeException::class, $code);
 
     expect(File::get($outside.'/untouched.md'))->toBe('Keep this file.')
         ->and(scandir($outside))->toBe(['.', '..', 'untouched.md'])
         ->and($task->fresh()->getRawOriginal())->toBe($before);
     unlink($link);
-})->with(['metadata directory' => '.molly', 'journal directory' => '.molly/journal', 'journal file' => 'file']);
+})->with([
+    // A linked .molly is a workspace escape; links below it are invalid journal paths.
+    'metadata directory' => ['.molly', 'WORKSPACE_PATH_ESCAPE: '],
+    'journal directory' => ['.molly/journal', 'JOURNAL_PATH_INVALID'],
+    'journal file' => ['file', 'JOURNAL_PATH_INVALID'],
+]);
 
 it('rejects files in place of journal directories', function (string $location): void {
     $task = journalTask();

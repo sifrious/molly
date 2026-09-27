@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class Workspace
@@ -77,6 +78,8 @@ class Workspace
         $directory = $this->path.'/.molly';
         $lockPath = $directory.'/'.$filename;
         clearstatcache();
+        // A linked .molly is reported as WORKSPACE_PATH_ESCAPE, naming the link and its target.
+        Directory::molly($this->path);
 
         if (is_link($directory) || is_link($lockPath)
             || (file_exists($directory) && ! is_dir($directory))

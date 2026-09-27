@@ -192,7 +192,11 @@ final class ProjectRegistry
     /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}|null */
     private function readIdentity(string $file): ?array
     {
-        if (is_link($file) || is_link(dirname($file))) {
+        if (is_link(dirname($file))) {
+            // A linked .molly is reported as the escape it is, naming the link and its target.
+            Directory::molly(dirname($file, 2));
+        }
+        if (is_link($file)) {
             throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' must not be a symbolic link.');
         }
         if (! is_file($file)) {
