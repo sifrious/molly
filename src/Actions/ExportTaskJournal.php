@@ -224,7 +224,7 @@ class ExportTaskJournal
     private function updateGlossary(string $root, string $path): void
     {
         $existing = $this->readExisting($path);
-        $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '');
+        $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '', $this->journalRenderer->glossarySourceLink($root));
         if ($contents !== ($existing ?? '')) {
             $this->journalWriter->replaceFile($path, $contents, $existing === null ? false : hash('sha256', $existing));
         }

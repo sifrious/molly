@@ -37,7 +37,7 @@ class MollyGlossaryCommand extends Command
             'term' => $entry['term'],
             'definition' => $entry['definition'],
             'origin' => 'molly',
-            'provenance' => ['source' => JournalRenderer::GLOSSARY_SOURCE, 'method' => 'JournalRenderer::glossaryTerms'],
+            'provenance' => ['source' => $source['ref'], 'method' => 'JournalRenderer::glossaryTerms'],
             'links' => [
                 ['kind' => 'file', 'ref' => $path],
                 $source,

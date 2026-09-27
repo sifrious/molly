@@ -94,7 +94,7 @@ it('lists the managed glossary terms with provenance and links', function (): vo
             'id' => 'task',
             'term' => 'Task',
             'origin' => 'molly',
-            'provenance' => ['source' => 'src/Journal/JournalRenderer.php', 'method' => 'JournalRenderer::glossaryTerms'],
+            'provenance' => ['source' => 'package:sifrious/molly/src/Journal/JournalRenderer.php', 'method' => 'JournalRenderer::glossaryTerms'],
         ])
         ->and($glossary['terms'][0]['links'])->toContain(['kind' => 'file', 'ref' => $this->workspace.'/.molly/GLOSSARY.md'])
         ->and(array_unique(array_column($glossary['terms'], 'id')))->toHaveCount(count($terms))
@@ -154,6 +154,10 @@ function assertGlossaryLinksResolve(string $workspace): array
             $path = str_starts_with($link['ref'], '/') ? $link['ref'] : $workspace.'/'.$link['ref'];
             expect(is_file($path))->toBeTrue("{$link['kind']} link {$link['ref']} does not resolve from {$workspace}");
         }
+        $provenance = $term['provenance']['source'];
+        if (! str_starts_with($provenance, 'package:sifrious/molly/')) {
+            expect(is_file($workspace.'/'.$provenance))->toBeTrue("provenance {$provenance} does not resolve from {$workspace}");
+        }
     }
 
     return array_values(array_unique($kinds));
@@ -171,6 +175,29 @@ it('links glossary sources through vendor/sifrious/molly when Molly is installed
         ->toBe(['kind' => 'source', 'ref' => 'vendor/sifrious/molly/src/Journal/JournalRenderer.php']);
 });
 
+it('writes GLOSSARY.md source links that resolve from the .molly directory in an installed app', function (): void {
+    File::ensureDirectoryExists($this->workspace.'/vendor/sifrious');
+    symlink(dirname(__DIR__, 2), $this->workspace.'/vendor/sifrious/molly');
+    Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
+
+    $glossary = $this->workspace.'/.molly/GLOSSARY.md';
+    preg_match_all('/\[[^\]]+\]\(([^)]+)\)/', File::get($glossary), $matches);
+
+    expect($matches[1])->toHaveCount(count(app(JournalRenderer::class)->glossaryTerms()))
+        ->and(array_unique($matches[1]))->toBe(['../vendor/sifrious/molly/src/Journal/JournalRenderer.php']);
+    foreach ($matches[1] as $target) {
+        expect(is_file(dirname($glossary).'/'.$target))->toBeTrue("{$target} does not resolve from {$glossary}");
+    }
+});
+
+it('names the package source in GLOSSARY.md without a link when Molly is not under the workspace', function (): void {
+    Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
+    $written = File::get($this->workspace.'/.molly/GLOSSARY.md');
+
+    expect($written)->toContain('Source: `package:sifrious/molly/src/Journal/JournalRenderer.php`')
+        ->and($written)->not->toMatch('/\]\(/');
+});
+
 it('scopes the glossary source link to the package when Molly is not under the workspace', function (): void {
     Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
 
@@ -180,8 +207,10 @@ it('scopes the glossary source link to the package when Molly is not under the w
 it('links glossary sources relative to a Molly checkout', function (): void {
     $checkout = realpath(dirname(__DIR__, 2));
     Artisan::call('molly:glossary', ['--workspace' => $checkout, '--json' => true]);
-    $link = json_decode(Artisan::output(), true)['terms'][0]['links'][1];
+    $term = json_decode(Artisan::output(), true)['terms'][0];
+    $link = $term['links'][1];
 
     expect($link)->toBe(['kind' => 'source', 'ref' => 'src/Journal/JournalRenderer.php'])
-        ->and(is_file($checkout.'/'.$link['ref']))->toBeTrue();
+        ->and(is_file($checkout.'/'.$link['ref']))->toBeTrue()
+        ->and($term['provenance']['source'])->toBe('src/Journal/JournalRenderer.php');
 });
