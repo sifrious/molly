@@ -1,0 +1,449 @@
+#!/usr/bin/env php
+<?php
+
+/*
+ * Check MME-5885 acceptance evidence against the frozen manifest and one candidate.
+ *
+ * Exit 0: every mandatory subcase has a passing record (or a declared N/A).
+ * Exit 1: at least one subcase or candidate check was rejected.
+ * Exit 2: the command could not read its inputs.
+ *
+ * This script has no Composer dependencies so it can run on a machine that only
+ * holds the candidate, the manifest, and the evidence directory.
+ */
+
+const OUTCOMES = ['PASS', 'FAIL', 'BLOCKED', 'UNVERIFIED'];
+const EVIDENCE_SCHEMA = 'molly.acceptance-evidence/1';
+const REPORT_SCHEMA = 'molly.acceptance-gate-report/1';
+const TIMESTAMP = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/';
+
+function usage(): string
+{
+    return <<<'TXT'
+Usage: molly-acceptance-gate --manifest <manifest.json> --evidence <dir> --candidate <candidate.json> [--json] [--report <file>]
+
+  --manifest   Frozen acceptance manifest (docs/acceptance/manifest.json).
+  --evidence   Evidence directory holding index.json and the files it lists.
+  --candidate  candidate.json written by bin/molly-candidate.
+  --json       Print the JSON report instead of the table.
+  --report     Also write the JSON report to this file.
+
+Exit codes: 0 accepted, 1 rejected, 2 unreadable input.
+
+TXT;
+}
+
+function inputError(string $message): never
+{
+    fwrite(STDERR, "molly-acceptance-gate: {$message}\n");
+    exit(2);
+}
+
+/** @return array<string, mixed> */
+function readJson(string $path, string $label): array
+{
+    if (! is_file($path)) {
+        inputError("{$label} not found at {$path}");
+    }
+    try {
+        $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        inputError("{$label} at {$path} is not valid JSON: {$e->getMessage()}");
+    }
+    if (! is_array($data)) {
+        inputError("{$label} at {$path} must be a JSON object");
+    }
+
+    return $data;
+}
+
+function isHex(mixed $value, int $length): bool
+{
+    return is_string($value) && preg_match('/^[0-9a-f]{'.$length.'}$/', $value) === 1;
+}
+
+function parseTime(mixed $value): ?DateTimeImmutable
+{
+    if (! is_string($value) || preg_match(TIMESTAMP, $value) !== 1) {
+        return null;
+    }
+    try {
+        return new DateTimeImmutable($value);
+    } catch (Exception) {
+        return null;
+    }
+}
+
+/**
+ * Evidence names a manifest subcase expects, such as ["install-l12.log", "install-l13.log"]
+ * or ["receipts/"] for a directory.
+ *
+ * @return list<string>
+ */
+function expectedEvidence(array $subcase): array
+{
+    $names = array_map('trim', explode(',', (string) ($subcase['evidence'] ?? '')));
+
+    return array_values(array_filter($names, fn (string $name) => $name !== ''));
+}
+
+/**
+ * Check one record. Returns a list of [code, detail] rejections; an empty list means the record holds.
+ *
+ * @return list<array{code: string, detail: string}>
+ */
+function checkRecord(array $record, array $subcase, array $manifest, array $candidate, DateTimeImmutable $builtAt, string $evidenceDir): array
+{
+    $reasons = [];
+    $reject = function (string $code, string $detail) use (&$reasons): void {
+        $reasons[] = ['code' => $code, 'detail' => $detail];
+    };
+    $id = $subcase['id'];
+    $notApplicable = $manifest['not_applicable'] ?? [];
+
+    // Shape. A malformed record is rejected before any other check reads it.
+    $required = ['subcase', 'outcome', 'mode', 'candidate_sha', 'artifact_sha256', 'timestamp', 'command', 'exit_code', 'files'];
+    foreach ($required as $field) {
+        if (! array_key_exists($field, $record)) {
+            $reject('MALFORMED_RECORD', "missing field {$field}");
+        }
+    }
+    foreach (['counts', 'intervention', 'lock_sha256'] as $field) {
+        if (! array_key_exists($field, $record)) {
+            $reject('MALFORMED_RECORD', "missing field {$field} (use null when it does not apply)");
+        }
+    }
+    if ($reasons !== []) {
+        return $reasons;
+    }
+    if (! is_string($record['command']) || trim($record['command']) === '') {
+        $reject('MALFORMED_RECORD', 'command must be a non-empty string');
+    }
+    if (! is_int($record['exit_code'])) {
+        $reject('MALFORMED_RECORD', 'exit_code must be an integer');
+    }
+    if ($record['lock_sha256'] !== null && ! isHex($record['lock_sha256'], 64)) {
+        $reject('MALFORMED_RECORD', 'lock_sha256 must be null or 64 lowercase hex characters');
+    }
+    if ($record['intervention'] !== null && ! is_string($record['intervention'])) {
+        $reject('MALFORMED_RECORD', 'intervention must be null or a string');
+    }
+    if (! is_array($record['files']) || ! array_is_list($record['files']) || $record['files'] === []) {
+        $reject('MALFORMED_RECORD', 'files must be a non-empty list');
+    }
+    $counts = $record['counts'];
+    $testBearing = $counts !== null || ($subcase['test_bearing'] ?? false) === true;
+    if ($counts === null && $testBearing) {
+        $reject('MALFORMED_RECORD', 'the manifest marks this subcase test_bearing, so counts are required');
+    }
+    if ($counts !== null) {
+        foreach (['discovered', 'passed', 'failed', 'skipped'] as $key) {
+            if (! is_array($counts) || ! is_int($counts[$key] ?? null) || $counts[$key] < 0) {
+                $reject('MALFORMED_RECORD', "counts.{$key} must be a non-negative integer");
+            }
+        }
+    }
+    $time = parseTime($record['timestamp']);
+    if ($time === null) {
+        $reject('MALFORMED_RECORD', 'timestamp must be ISO 8601 with a zone, such as 2026-09-27T18:00:00Z');
+    }
+    if ($reasons !== []) {
+        return $reasons;
+    }
+
+    // Outcome and mode.
+    if (! in_array($record['outcome'], OUTCOMES, true)) {
+        $reject('INVALID_OUTCOME', sprintf('outcome %s is not one of %s', json_encode($record['outcome']), implode('/', OUTCOMES)));
+    }
+    if ($record['mode'] !== ($subcase['mode'] ?? null)) {
+        $reject('MODE_MISMATCH', sprintf('record mode %s, manifest mode %s', json_encode($record['mode']), json_encode($subcase['mode'] ?? null)));
+    }
+
+    // Candidate identity.
+    if ($record['candidate_sha'] !== $candidate['commit']) {
+        $reject('CANDIDATE_SHA_MISMATCH', "record {$record['candidate_sha']}, candidate {$candidate['commit']}");
+    }
+    if ($record['artifact_sha256'] !== $candidate['sha256']) {
+        $reject('ARTIFACT_SHA_MISMATCH', "record {$record['artifact_sha256']}, candidate {$candidate['sha256']}");
+    }
+
+    // Freshness and time limits.
+    if ($time < $builtAt) {
+        $reject('STALE_EVIDENCE', "recorded {$record['timestamp']}, candidate built {$candidate['built_at']}");
+    }
+    if (($record['timed_out'] ?? false) === true) {
+        $reject('TIMED_OUT', 'record is marked timed_out');
+    } elseif (isset($record['duration_s'], $subcase['timeout_s']) && is_numeric($record['duration_s']) && $record['duration_s'] > $subcase['timeout_s']) {
+        $reject('TIMED_OUT', "duration {$record['duration_s']}s exceeds the manifest limit of {$subcase['timeout_s']}s");
+    }
+
+    // Command exit.
+    $expectedExit = $record['expected_exit_code'] ?? 0;
+    if ($record['exit_code'] !== $expectedExit) {
+        $reject('EXIT_CODE_MISMATCH', "exit {$record['exit_code']}, expected {$expectedExit}");
+    }
+
+    // Test counts.
+    if ($counts !== null) {
+        if ($counts['discovered'] === 0) {
+            $reject('ZERO_TESTS', 'counts.discovered is 0');
+        }
+        if ($counts['passed'] + $counts['failed'] + $counts['skipped'] !== $counts['discovered']) {
+            $reject('COUNTS_INCONSISTENT', sprintf('passed %d + failed %d + skipped %d does not equal discovered %d', $counts['passed'], $counts['failed'], $counts['skipped'], $counts['discovered']));
+        }
+        if ($counts['failed'] > 0 && $record['outcome'] === 'PASS') {
+            $reject('FAILED_BUT_PASS', "outcome PASS with {$counts['failed']} failed");
+        }
+        if ($counts['skipped'] > 0) {
+            $declared = array_values(array_filter(
+                (array) ($record['skip_reasons'] ?? []),
+                fn ($key) => is_string($key) && array_key_exists($key, $notApplicable),
+            ));
+            if ($declared === []) {
+                $reject('UNDECLARED_SKIP', "{$counts['skipped']} skipped with no skip_reasons key from manifest.not_applicable");
+            }
+        }
+    }
+
+    // Protected-test integrity.
+    $hasExpected = array_key_exists('protected_digest_expected', $record);
+    $hasObserved = array_key_exists('protected_digest_observed', $record);
+    if ($hasExpected || $hasObserved) {
+        $expected = $record['protected_digest_expected'] ?? null;
+        $observed = $record['protected_digest_observed'] ?? null;
+        if (! isHex($expected, 64) || ! isHex($observed, 64)) {
+            $reject('PROTECTED_DIGEST_CHANGED', 'protected_digest_expected and protected_digest_observed must both be sha256 values');
+        } elseif ($expected !== $observed) {
+            $reject('PROTECTED_DIGEST_CHANGED', "locked {$expected}, observed {$observed}");
+        }
+    }
+
+    // Files: each listed file must exist inside the evidence directory and match its sha256.
+    $root = realpath($evidenceDir);
+    $listed = [];
+    foreach ($record['files'] as $i => $file) {
+        $path = is_array($file) ? ($file['path'] ?? null) : null;
+        $sha = is_array($file) ? ($file['sha256'] ?? null) : null;
+        if (! is_string($path) || $path === '' || ! isHex($sha, 64)) {
+            $reject('MALFORMED_RECORD', "files[{$i}] needs a path and a sha256");
+
+            continue;
+        }
+        if (str_starts_with($path, '/') || in_array('..', explode('/', $path), true)) {
+            $reject('UNSAFE_PATH', "{$path} must be relative to the evidence directory");
+
+            continue;
+        }
+        $listed[] = $path;
+        $full = $root.'/'.$path;
+        $real = realpath($full);
+        if ($real === false || ! is_file($real)) {
+            $reject('FILE_MISSING', "{$path} is listed but not present");
+
+            continue;
+        }
+        if (! str_starts_with($real, $root.'/')) {
+            $reject('UNSAFE_PATH', "{$path} resolves outside the evidence directory");
+
+            continue;
+        }
+        $actual = hash_file('sha256', $real);
+        if ($actual !== $sha) {
+            $reject('CHECKSUM_MISMATCH', "{$path} listed {$sha}, actual {$actual}");
+        }
+    }
+
+    // Each evidence name in the manifest must be listed under <subcase id>/.
+    foreach (expectedEvidence($subcase) as $name) {
+        $target = $id.'/'.$name;
+        $found = str_ends_with($name, '/')
+            ? array_filter($listed, fn (string $path) => str_starts_with($path, $target))
+            : array_filter($listed, fn (string $path) => $path === $target);
+        if ($found === []) {
+            $reject('FILE_MISSING', "manifest evidence {$target} is not listed in the record");
+        }
+    }
+
+    // Outcome. N/A applies only with a key the manifest declared before the run.
+    if (isset($record['not_applicable'])) {
+        if (! is_string($record['not_applicable']) || ! array_key_exists($record['not_applicable'], $notApplicable)) {
+            $reject('UNDECLARED_NOT_APPLICABLE', sprintf('%s is not a key in manifest.not_applicable', json_encode($record['not_applicable'])));
+        }
+    } elseif (in_array($record['outcome'], OUTCOMES, true) && $record['outcome'] !== 'PASS') {
+        $reject('NOT_PASSED', "outcome {$record['outcome']}");
+    }
+
+    return $reasons;
+}
+
+/** @return array<string, mixed> */
+function evaluate(array $manifest, array $candidate, string $candidateDir, array $index, string $evidenceDir): array
+{
+    $errors = [];
+    foreach (['commit' => 40, 'sha256' => 64] as $field => $length) {
+        if (! isHex($candidate[$field] ?? null, $length)) {
+            inputError("candidate.json {$field} must be {$length} lowercase hex characters");
+        }
+    }
+    $builtAt = parseTime($candidate['built_at'] ?? null) ?? inputError('candidate.json built_at must be an ISO 8601 timestamp');
+    $artifact = $candidateDir.'/'.basename((string) ($candidate['artifact'] ?? ''));
+    if (! is_file($artifact)) {
+        $errors[] = ['code' => 'CANDIDATE_ARTIFACT_MISSING', 'detail' => "{$artifact} is not present"];
+    } elseif (($actual = hash_file('sha256', $artifact)) !== $candidate['sha256']) {
+        $errors[] = ['code' => 'CANDIDATE_ARTIFACT_MISMATCH', 'detail' => "candidate.json {$candidate['sha256']}, artifact {$actual}"];
+    }
+
+    if (($index['schema'] ?? null) !== EVIDENCE_SCHEMA) {
+        $errors[] = ['code' => 'MALFORMED_INDEX', 'detail' => 'index.json schema must be '.EVIDENCE_SCHEMA];
+    }
+    $records = $index['records'] ?? null;
+    if (! is_array($records) || ! array_is_list($records)) {
+        $errors[] = ['code' => 'MALFORMED_INDEX', 'detail' => 'index.json records must be a list'];
+        $records = [];
+    }
+
+    $bySubcase = [];
+    foreach ($records as $i => $record) {
+        $id = is_array($record) ? ($record['subcase'] ?? null) : null;
+        if (! is_string($id)) {
+            $errors[] = ['code' => 'MALFORMED_INDEX', 'detail' => "records[{$i}] has no subcase id"];
+
+            continue;
+        }
+        $bySubcase[$id][] = $record;
+    }
+
+    $known = [];
+    $criteria = [];
+    foreach ($manifest['criteria'] ?? [] as $criterionId => $criterion) {
+        $rows = [];
+        $mandatory = 0;
+        $accepted = 0;
+        foreach ($criterion['subcases'] ?? [] as $subcase) {
+            $id = $subcase['id'];
+            $known[$id] = true;
+            $isMandatory = ($subcase['mandatory'] ?? true) !== false;
+            $found = $bySubcase[$id] ?? [];
+            $record = $found[0] ?? null;
+            if ($found === []) {
+                $reasons = [['code' => 'MISSING_RECORD', 'detail' => 'no record in index.json']];
+            } elseif (count($found) > 1) {
+                $reasons = [['code' => 'DUPLICATE_RECORD', 'detail' => count($found).' records; keep one per subcase']];
+            } else {
+                $reasons = checkRecord($record, $subcase, $manifest, $candidate, $builtAt, $evidenceDir);
+            }
+            $status = $reasons !== [] ? 'REJECTED' : (isset($record['not_applicable']) ? 'N/A' : 'PASS');
+            if ($isMandatory) {
+                $mandatory++;
+                $accepted += $status === 'REJECTED' ? 0 : 1;
+            }
+            $rows[] = [
+                'id' => $id,
+                'mandatory' => $isMandatory,
+                'status' => $status,
+                'outcome' => is_array($record) ? ($record['outcome'] ?? null) : null,
+                'intervention' => is_array($record) ? ($record['intervention'] ?? null) : null,
+                'reasons' => $reasons,
+            ];
+        }
+        $criteria[$criterionId] = [
+            'title' => $criterion['title'] ?? '',
+            'status' => $accepted === $mandatory ? 'PASS' : 'REJECTED',
+            'mandatory' => $mandatory,
+            'accepted' => $accepted,
+            'subcases' => $rows,
+        ];
+    }
+
+    foreach (array_keys($bySubcase) as $id) {
+        if (! isset($known[$id])) {
+            $errors[] = ['code' => 'UNKNOWN_SUBCASE', 'detail' => "{$id} is not in the manifest"];
+        }
+    }
+
+    $accepted = $errors === [] && $criteria !== [] && array_filter($criteria, fn ($c) => $c['status'] !== 'PASS') === [];
+
+    return [
+        'schema' => REPORT_SCHEMA,
+        'verdict' => $accepted ? 'ACCEPTED' : 'REJECTED',
+        'manifest' => [
+            'epic' => $manifest['epic'] ?? null,
+            'frozen_at' => $manifest['frozen_at'] ?? null,
+            'frozen_against_commit' => $manifest['frozen_against_commit'] ?? null,
+        ],
+        'candidate' => [
+            'commit' => $candidate['commit'],
+            'version' => $candidate['version'] ?? null,
+            'sha256' => $candidate['sha256'],
+            'built_at' => $candidate['built_at'],
+        ],
+        'errors' => $errors,
+        'criteria' => $criteria,
+    ];
+}
+
+function table(array $report): string
+{
+    $lines = [];
+    $lines[] = sprintf('Candidate %s (%s), artifact sha256 %s', substr($report['candidate']['commit'], 0, 12), $report['candidate']['version'] ?? 'no version', $report['candidate']['sha256']);
+    $lines[] = '';
+    $lines[] = sprintf('%-5s %-9s %-9s %s', 'ID', 'Status', 'Accepted', 'Criterion');
+    foreach ($report['criteria'] as $id => $criterion) {
+        $lines[] = sprintf('%-5s %-9s %-9s %s', $id, $criterion['status'], $criterion['accepted'].'/'.$criterion['mandatory'], $criterion['title']);
+    }
+    $rejected = [];
+    foreach ($report['criteria'] as $criterion) {
+        foreach ($criterion['subcases'] as $row) {
+            if ($row['status'] === 'REJECTED') {
+                foreach ($row['reasons'] as $reason) {
+                    $rejected[] = sprintf('  %-7s %-26s %s', $row['id'], $reason['code'], $reason['detail']);
+                }
+            }
+        }
+    }
+    if ($rejected !== []) {
+        $lines[] = '';
+        $lines[] = 'Rejected subcases:';
+        array_push($lines, ...$rejected);
+    }
+    if ($report['errors'] !== []) {
+        $lines[] = '';
+        $lines[] = 'Gate errors:';
+        foreach ($report['errors'] as $error) {
+            $lines[] = sprintf('  %-26s %s', $error['code'], $error['detail']);
+        }
+    }
+    $lines[] = '';
+    $lines[] = 'Verdict: '.$report['verdict'];
+
+    return implode("\n", $lines)."\n";
+}
+
+$options = getopt('', ['manifest:', 'evidence:', 'candidate:', 'json', 'report:', 'help']);
+if (isset($options['help'])) {
+    echo usage();
+    exit(0);
+}
+foreach (['manifest', 'evidence', 'candidate'] as $required) {
+    if (! isset($options[$required]) || ! is_string($options[$required])) {
+        fwrite(STDERR, usage());
+        exit(2);
+    }
+}
+if (! is_dir($options['evidence'])) {
+    inputError("evidence directory not found at {$options['evidence']}");
+}
+
+$manifest = readJson($options['manifest'], 'manifest');
+$candidate = readJson($options['candidate'], 'candidate.json');
+$index = readJson(rtrim($options['evidence'], '/').'/index.json', 'evidence index');
+
+$report = evaluate($manifest, $candidate, dirname(realpath($options['candidate'])), $index, $options['evidence']);
+$json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+
+if (isset($options['report']) && is_string($options['report'])) {
+    file_put_contents($options['report'], $json);
+}
+echo isset($options['json']) ? $json : table($report);
+
+exit($report['verdict'] === 'ACCEPTED' ? 0 : 1);
