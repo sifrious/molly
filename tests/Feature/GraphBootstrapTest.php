@@ -295,3 +295,16 @@ it('rejects an unknown unit in molly:graphs-retry and lists the valid units', fu
 
     expect(Artisan::call('molly:graphs-retry', ['unit' => 'project:workspace', 'path' => $this->project, '--json' => true]))->toBe(0);
 });
+
+it('rejects an unknown unit in a fresh project without creating the manifest', function (): void {
+    writeLock($this->project, 'v12.0.0');
+
+    $exit = Artisan::call('molly:graphs-retry', ['unit' => 'nounit', 'path' => $this->project, '--json' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['status'])->toBe('error')
+        ->and($payload['error'])->toStartWith('UNIT_UNKNOWN:')
+        ->and(File::exists($this->project.'/.molly/graphs/manifest.json'))->toBeFalse()
+        ->and(File::exists($this->project.'/.molly'))->toBeFalse();
+});
