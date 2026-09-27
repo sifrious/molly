@@ -106,12 +106,12 @@ final class ProjectRegistry
             createdAt: $project->createdAt,
         );
 
-        $directory = dirname($this->projectFile($normalized->path));
-        Directory::ensure($directory, 0700);
+        $file = Directory::molly($normalized->path, 'project.json');
+        Directory::ensure(dirname($file), 0700);
         $mask = umask(0077);
         try {
             File::put(
-                $this->projectFile($normalized->path),
+                $file,
                 json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
             );
         } finally {
@@ -241,7 +241,8 @@ final class ProjectRegistry
             'checkout_id' => $this->makeId(),
         ];
 
-        File::ensureDirectoryExists(dirname($file), 0700);
+        Directory::molly(dirname($file, 2), basename($file));
+        Directory::ensure(dirname($file), 0700);
         $staged = dirname($file).'/.identity-'.bin2hex(random_bytes(8)).'.tmp';
         File::put($staged, json_encode(['schema' => 'molly.checkout-identity.v1', ...$identity], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n");
 

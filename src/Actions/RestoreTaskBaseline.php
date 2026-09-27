@@ -57,6 +57,6 @@ class RestoreTaskBaseline
 
     private function path(Task $task): string
     {
-        return $task->workspace.'/.molly/baselines/'.$task->id.'.json';
+        return Directory::molly($task->workspace, 'baselines/'.$task->id.'.json');
     }
 }

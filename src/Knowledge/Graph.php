@@ -2,9 +2,9 @@
 
 namespace Sifrious\Molly\Knowledge;
 
-use Illuminate\Support\Facades\File;
 use PDO;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 final class Graph
 {
@@ -161,7 +161,11 @@ final class Graph
             throw new RuntimeException('KNOWLEDGE_DATABASE_INVALID: Configure a database path.');
         }
 
-        return str_starts_with($path, '/') ? $path : base_path($path);
+        $path = str_starts_with($path, '/') ? $path : base_path($path);
+        $molly = base_path('.molly').'/';
+
+        // The default store lives under the application's .molly directory; never follow a link out of it.
+        return str_starts_with($path, $molly) ? Directory::molly(base_path(), substr($path, strlen($molly))) : $path;
     }
 
     private function connection(): PDO
@@ -170,8 +174,9 @@ final class Graph
             return $this->connection;
         }
 
-        File::ensureDirectoryExists(dirname($this->path()));
-        $this->connection = new PDO('sqlite:'.$this->path(), options: [
+        $path = $this->path();
+        Directory::ensure(dirname($path));
+        $this->connection = new PDO('sqlite:'.$path, options: [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);

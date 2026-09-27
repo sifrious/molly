@@ -44,6 +44,10 @@ Informational codes such as `ollama_endpoint`, `jev_disabled`, and `jev_ready` p
 
 On a full disk or a read-only path, commands fail with a code and the path they could not write: `ENV_UNWRITABLE` from `molly:setup` for `.env`, `DIRECTORY_UNWRITABLE` for a directory Molly could not create, and `WORKER_START_FAILED` for `.molly/worker`. `molly:setup` leaves `.env` unchanged when it fails.
 
+## .molly is a link
+
+Molly keeps its graph store, manifest, journal, worker record, identity, and receipts in real files under the workspace's `.molly` directory. When `.molly`, or a file or directory inside it, is a symbolic link or resolves outside the workspace, commands fail with `WORKSPACE_PATH_ESCAPE`, name the link and its target, and write nothing. Replace the link with a real directory or file and run the command again.
+
 ## Sandbox unavailable
 
 On Linux, Molly runs the writer and the Pest verifier in a Landlock sandbox with private user and network namespaces. Doctor reports it as the Sandbox check. `sandbox_unavailable` means the host lacks those features, which is always true on macOS, and `molly:start` then refuses with `SANDBOX_UNAVAILABLE`.
