@@ -14,3 +14,6 @@ vendor/
 bloom-plugin/Surfaces/.build-direct/
 bloom-plugin/Surfaces/.build/
 bloom-plugin/Surfaces/.swiftpm/
+
+# macOS Finder metadata
+.DS_Store
