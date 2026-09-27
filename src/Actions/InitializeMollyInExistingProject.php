@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
+use Throwable;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
@@ -67,7 +69,11 @@ final class InitializeMollyInExistingProject
                 : 'Skipped Composer require');
         }
 
-        $createdGitignore = $this->ensureGitignored($root);
+        try {
+            $createdGitignore = $this->ensureGitignored($root);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('GITIGNORE_UNWRITABLE: Molly could not add .molly/ to '.$root.'/.gitignore'.$this->reason($exception).'. Check free disk space and that the file is writable.', 0, $exception);
+        }
         $note('gitignore', $createdGitignore ? 'Added .molly/ to .gitignore' : '.molly/ already ignored');
 
         $createdConfig = false;
@@ -226,8 +232,15 @@ final class InitializeMollyInExistingProject
             throw new RuntimeException('CONFIG_STUB_MISSING: Packaged config/molly.php was not found.');
         }
 
-        File::ensureDirectoryExists($root.'/config');
-        File::copy($stub, $destination);
+        Directory::ensure($root.'/config');
+        try {
+            $copied = File::copy($stub, $destination);
+        } catch (Throwable $exception) {
+            $copied = false;
+        }
+        if (! $copied) {
+            throw new RuntimeException('CONFIG_UNWRITABLE: Molly could not write '.$destination.(isset($exception) ? $this->reason($exception) : '').'. Check free disk space and that the config directory is writable.');
+        }
 
         return true;
     }
@@ -273,6 +286,12 @@ final class InitializeMollyInExistingProject
         File::append($gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n");
 
         return true;
+    }
+
+    /** PHP's reason without the function name and path, which the message already names. */
+    private function reason(Throwable $exception): string
+    {
+        return preg_match('/\): (?:Failed to open stream: )?(.+)\z/', $exception->getMessage(), $match) === 1 ? ' ('.$match[1].')' : '';
     }
 
     private function processError(string $output): string

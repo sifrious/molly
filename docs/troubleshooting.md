@@ -42,7 +42,19 @@ Restart queue workers after configuration changes too.
 
 Informational codes such as `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
 
-On a full disk or a read-only path, commands fail with a code and the path they could not write: `ENV_UNWRITABLE` from `molly:setup` for `.env`, `DIRECTORY_UNWRITABLE` for a directory Molly could not create, and `WORKER_START_FAILED` for `.molly/worker`. `molly:setup` leaves `.env` unchanged when it fails.
+On a full disk or a read-only path, commands fail with a code, the path they could not write, and the reason the system gave, such as `No space left on device` or `Permission denied`:
+
+| Code | Path |
+| --- | --- |
+| `ENV_UNWRITABLE` | `.env`, from `molly:setup`. `.env` is left unchanged. |
+| `DIRECTORY_UNWRITABLE` | A directory Molly could not create, such as `.molly`. |
+| `WORKER_START_FAILED` | `.molly/worker`. |
+| `GITIGNORE_UNWRITABLE` | `.gitignore`, from `molly:project-init`. |
+| `CONFIG_UNWRITABLE` | `config/molly.php`, from `molly:project-init`. |
+| `WORKSPACE_IDENTITY_UNWRITABLE` | `.molly/identity.json`. |
+| `PROJECT_RECORD_UNWRITABLE` | `.molly/project.json`. |
+| `PROJECT_INDEX_UNWRITABLE` | `projects.json` in `MOLLY_HOME`. |
+| `DATABASE_UNWRITABLE` | The application database, from `molly:create`. No task is saved. |
 
 ## .molly is a link
 

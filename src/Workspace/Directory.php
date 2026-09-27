@@ -9,13 +9,27 @@ final class Directory
 {
     public static function ensure(string $path, int $mode = 0755): void
     {
-        error_clear_last();
-        if (is_dir($path) || @mkdir($path, $mode, true) || is_dir($path)) {
+        if (is_dir($path)) {
             return;
         }
 
-        // Laravel's error handler swallows suppressed warnings, so PHP's reason is not always recorded.
-        $error = error_get_last()['message'] ?? '';
+        // Catch PHP's warning here: Laravel's handler would turn it into an exception without
+        // the path, and a suppressed warning never reaches error_get_last().
+        $error = '';
+        set_error_handler(function (int $level, string $message) use (&$error): bool {
+            $error = $message;
+
+            return true;
+        });
+        try {
+            $made = mkdir($path, $mode, true);
+        } finally {
+            restore_error_handler();
+        }
+        if ($made || is_dir($path)) {
+            return;
+        }
+
         $reason = str_starts_with($error, 'mkdir(): ') ? ' ('.substr($error, 9).')' : '';
 
         throw new RuntimeException('DIRECTORY_UNWRITABLE: Molly could not create '.$path.$reason.'. Check free disk space and that the parent directory is writable.');

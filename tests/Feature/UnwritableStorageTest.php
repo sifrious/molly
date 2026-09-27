@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CheckEnvironment;
+use Sifrious\Molly\Workspace\Directory;
 
 /*
  * A full disk and a read-only directory fail the same system calls (tempnam, mkdir, and
@@ -101,4 +102,102 @@ it('reports database_unwritable when the database cannot accept a write', functi
         ->and($check['status'])->toBe('failed')
         ->and($check['code'])->toBe('database_unwritable')
         ->and($check['message'])->toContain('free disk space');
+});
+
+it('names the path and the reason when Directory::ensure cannot create a directory', function (): void {
+    chmod($this->directory, 0555);
+
+    expect(fn () => Directory::ensure($this->directory.'/nested/deeper'))
+        ->toThrow(RuntimeException::class, 'DIRECTORY_UNWRITABLE: Molly could not create '.$this->directory.'/nested/deeper (Permission denied).');
+});
+
+/** @return array{exit: int, error: string} */
+function initProject(string $root, string $home): array
+{
+    putenv('MOLLY_HOME='.$home);
+    try {
+        $exit = Artisan::call('molly:project-init', ['path' => $root, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+    } finally {
+        putenv('MOLLY_HOME');
+    }
+
+    return ['exit' => $exit, 'error' => json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'] ?? ''];
+}
+
+function laravelRoot(string $root): string
+{
+    File::ensureDirectoryExists($root.'/config');
+    File::put($root.'/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($root.'/composer.json', '{"name":"example/app","require":{"laravel/framework":"^13.0"}}');
+    File::put($root.'/.gitignore', ".molly/\n");
+
+    return $root;
+}
+
+it('fails molly:project-init with a code naming the .molly file it could not write when .molly is read-only', function (bool $identified, string $code, string $file): void {
+    $root = laravelRoot($this->directory.'/app');
+    File::put($root.'/config/molly.php', "<?php\n\nreturn [];\n");
+    File::ensureDirectoryExists($root.'/.molly');
+    if ($identified) {
+        File::put($root.'/.molly/identity.json', json_encode(array_fill_keys(['project_id', 'workspace_id', 'repository_id', 'checkout_id'], (string) Str::uuid())));
+    }
+    chmod($root.'/.molly', 0555);
+
+    $result = initProject($root, $this->directory.'/home');
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toBe($code.': Molly could not write '.$root.'/.molly/'.$file.' (Permission denied). Check free disk space and that the directory is writable.');
+})->with([
+    'new checkout' => [false, 'WORKSPACE_IDENTITY_UNWRITABLE', 'identity.json'],
+    'identified checkout' => [true, 'PROJECT_RECORD_UNWRITABLE', 'project.json'],
+]);
+
+it('fails molly:project-init with CONFIG_UNWRITABLE naming config/molly.php when config is read-only', function (): void {
+    $root = laravelRoot($this->directory.'/app');
+    chmod($root.'/config', 0555);
+
+    $result = initProject($root, $this->directory.'/home');
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('CONFIG_UNWRITABLE: Molly could not write '.$root.'/config/molly.php (Permission denied).')
+        ->and(File::exists($root.'/.molly/project.json'))->toBeFalse();
+});
+
+it('fails molly:project-init with PROJECT_INDEX_UNWRITABLE naming projects.json when MOLLY_HOME is read-only', function (): void {
+    $root = laravelRoot($this->directory.'/app');
+    File::put($root.'/config/molly.php', "<?php\n\nreturn [];\n");
+    File::ensureDirectoryExists($this->directory.'/home');
+    chmod($this->directory.'/home', 0555);
+
+    $result = initProject($root, $this->directory.'/home');
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('PROJECT_INDEX_UNWRITABLE: Molly could not write '.$this->directory.'/home/projects.json (Permission denied).');
+});
+
+it('fails molly:create with DATABASE_UNWRITABLE naming the database when it is read-only', function (): void {
+    $workspace = $this->directory.'/app';
+    File::ensureDirectoryExists($workspace.'/app');
+    writeProtectedTest($workspace, 'tests/Feature/GreetingTest.php');
+    $database = $this->directory.'/database.sqlite';
+    touch($database);
+    config(['database.connections.readonly' => ['driver' => 'sqlite', 'database' => $database, 'foreign_key_constraints' => true]]);
+    Artisan::call('migrate', ['--database' => 'readonly', '--path' => realpath(__DIR__.'/../../database/migrations'), '--realpath' => true]);
+    DB::purge('readonly');
+    chmod($database, 0444);
+    $default = config('database.default');
+    config(['database.default' => 'readonly']);
+
+    try {
+        $exit = Artisan::call('molly:create', ['prompt' => 'Return Hi', '--workspace' => $workspace, '--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php', '--json' => true]);
+        $error = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'];
+    } finally {
+        config(['database.default' => $default]);
+        DB::purge('readonly');
+    }
+
+    expect($exit)->toBe(1)
+        ->and($error)->toStartWith('DATABASE_UNWRITABLE: Molly could not save the task in '.$database.' (')
+        ->and($error)->toContain('readonly database')
+        ->and($error)->not->toContain('SQL: insert');
 });

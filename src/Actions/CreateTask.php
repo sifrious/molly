@@ -2,7 +2,9 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
@@ -86,6 +88,14 @@ class CreateTask
             ]);
         } catch (UniqueConstraintViolationException $exception) {
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
+        } catch (QueryException $exception) {
+            $reason = $exception->getPrevious()?->getMessage() ?? $exception->getMessage();
+            if (preg_match('/readonly database|read-only|disk I\/O error|database or disk is full|unable to open database file/i', $reason) !== 1) {
+                throw $exception;
+            }
+            $database = DB::connection($exception->getConnectionName())->getDatabaseName();
+
+            throw new RuntimeException('DATABASE_UNWRITABLE: Molly could not save the task in '.$database.' ('.$reason.'). Check free disk space and that the database file and its directory are writable.', 0, $exception);
         }
 
         $task = $this->journal->handle($task);

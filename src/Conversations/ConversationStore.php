@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Conversations;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\Directory;
 
 final class ConversationStore
 {
@@ -72,9 +73,7 @@ final class ConversationStore
     public function put(Conversation $conversation): Conversation
     {
         $dir = $this->root();
-        if (! is_dir($dir) && ! mkdir($dir, 0775, true) && ! is_dir($dir)) {
-            throw new RuntimeException('CONVERSATION_STORE: Could not create '.$dir);
-        }
+        Directory::ensure($dir, 0775);
 
         $path = $this->path($conversation->id);
         $json = json_encode($conversation->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
