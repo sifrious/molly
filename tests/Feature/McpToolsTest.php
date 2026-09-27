@@ -36,6 +36,7 @@ function mcpTaskScope(): array
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Hello.php', '<?php');
     writeProtectedTest($workspace, 'tests/Hello.php');
+    commitGitWorkspace($workspace);
     test()->mcpWorkspace = $workspace;
 
     return ['workspace' => $workspace, 'paths' => ['app/Hello.php'], 'test_path' => 'tests/Hello.php'];

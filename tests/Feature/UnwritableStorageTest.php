@@ -68,6 +68,7 @@ it('names the directory molly:worker start could not create', function (): void 
 
 it('names the directory molly:demo could not create', function (): void {
     File::put($this->directory.'/.gitignore', ".molly/\n");
+    commitGitWorkspace($this->directory);
     chmod($this->directory, 0555);
 
     $exit = Artisan::call('molly:demo', ['--workspace' => $this->directory, '--json' => true]);
@@ -179,6 +180,7 @@ it('fails molly:create with DATABASE_UNWRITABLE naming the database when it is r
     $workspace = $this->directory.'/app';
     File::ensureDirectoryExists($workspace.'/app');
     writeProtectedTest($workspace, 'tests/Feature/GreetingTest.php');
+    commitGitWorkspace($workspace);
     $database = $this->directory.'/database.sqlite';
     touch($database);
     config(['database.connections.readonly' => ['driver' => 'sqlite', 'database' => $database, 'foreign_key_constraints' => true]]);

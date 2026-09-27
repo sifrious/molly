@@ -14,6 +14,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     $this->digest = writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {

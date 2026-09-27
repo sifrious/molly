@@ -10,6 +10,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/resources/views/components');
     File::put($this->workspace.'/resources/views/components/status.blade.php', '<p>Waiting</p>');
     writeProtectedTest($this->workspace, 'tests/StatusTest.php');
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {

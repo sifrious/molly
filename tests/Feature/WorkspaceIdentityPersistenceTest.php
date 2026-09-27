@@ -9,6 +9,7 @@ it('persists Molly workspace identity on create and keeps path as metadata', fun
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Hello.php', '<?php');
     writeProtectedTest($workspace, 'tests/Hello.php');
+    commitGitWorkspace($workspace);
 
     $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Hello.php'], 'tests/Hello.php');
 
@@ -27,6 +28,7 @@ it('does not fabricate identity ids from the absolute path string', function () 
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Hello.php', '<?php');
     writeProtectedTest($workspace, 'tests/Hello.php');
+    commitGitWorkspace($workspace);
 
     $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Hello.php'], 'tests/Hello.php');
 

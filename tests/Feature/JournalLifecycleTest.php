@@ -39,6 +39,7 @@ function lifecycleWorkspace(): string
     File::ensureDirectoryExists($path);
     writeProtectedTest($path, 'tests/StatusTest.php');
     writeProtectedTest($path, 'tests/HealthTest.php');
+    commitGitWorkspace($path);
 
     return test()->journalWorkspace = realpath($path);
 }
@@ -174,6 +175,7 @@ it('keeps a newly saved task when a linked project journal cannot be written', f
 
     try {
         writeProtectedTest($workspace, 'tests/StatusTest.php');
+        commitGitWorkspace($workspace);
         $task = app(CreateTask::class)->handle('Test the current status.', $workspace, [], 'tests/StatusTest.php', allowTestEdits: true);
 
         expect($task->fresh()->status)->toBe('pending')

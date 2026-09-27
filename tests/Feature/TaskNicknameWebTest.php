@@ -18,6 +18,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/routes');
     File::put($this->workspace.'/routes/web.php', '<?php');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {

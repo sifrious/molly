@@ -12,6 +12,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-story-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/routes');
     File::put($this->workspace.'/routes/web.php', '<?php');
+    commitGitWorkspace($this->workspace);
     config(['ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'], 'molly.agent' => 'ollama']);
     $this->story = 'Visitors see a greeting. Signed-in people can press a button to count up; guests cannot.';
     $this->criteria = [

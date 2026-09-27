@@ -26,6 +26,7 @@ final class QueuedFlagTest extends PHPUnit\Framework\TestCase
     }
 }
 PHPTEST));
+    commitGitWorkspace($root);
     try {
         $setup = Process::path($root)->timeout(15)->run([PHP_BINARY, $root.'/artisan', 'fixture:setup', '--no-interaction']);
         expect($setup->successful())->toBeTrue($setup->output().$setup->errorOutput());

@@ -18,6 +18,7 @@ beforeEach(function (): void {
     File::put($this->project.'/artisan', "#!/usr/bin/env php\n<?php\n");
     File::put($this->project.'/composer.json', '{"name":"example/app"}');
     File::put($this->project.'/composer.lock', json_encode(['packages' => [['name' => 'laravel/framework', 'version' => 'v13.0.0']], 'packages-dev' => []]));
+    commitGitWorkspace($this->project);
 
     $this->basePath = base_path();
     app()->setBasePath($this->project);

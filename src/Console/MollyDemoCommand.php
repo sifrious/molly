@@ -10,6 +10,7 @@ use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
 use function Laravel\Prompts\note;
@@ -36,8 +37,9 @@ class MollyDemoCommand extends Command
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $files = new Workspace($workspace);
             $root = $files->path;
-            // Creating the task needs Git; check it before writing the demo files.
+            // Creating the task needs Git and a checkout; check both before writing the demo files.
             GitBinary::require();
+            ObserveCheckout::requireCheckout($root);
 
             $this->ensureMollyGitignored($root);
             $createdGreeting = $this->ensureGreetingStub($root);

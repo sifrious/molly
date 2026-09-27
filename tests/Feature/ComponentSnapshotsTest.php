@@ -19,6 +19,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/resources/views/components');
     File::put($this->workspace.'/resources/views/components/status.blade.php', '<p>Waiting</p>');
     writeProtectedTest($this->workspace, 'tests/StatusTest.php');
+    commitGitWorkspace($this->workspace);
     config([
         'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
         'app.key' => 'base64:'.base64_encode(str_repeat('a', 32)),

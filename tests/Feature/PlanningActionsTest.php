@@ -87,6 +87,7 @@ it('copies completed planning decisions and source provenance into a pending tas
         }
 
         writeProtectedTest($directory, 'tests/TaskListTest.php');
+        commitGitWorkspace($directory);
         $task = app(CreateTaskFromPlan::class)->handle($plan->id, 'Render pending tasks.', $directory, ['app/TaskList.php'], 'tests/TaskListTest.php');
 
         expect($plan->completed())->toBeTrue()

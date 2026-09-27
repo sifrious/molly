@@ -19,6 +19,7 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->planningWorkspace.'/app');
     File::put($this->planningWorkspace.'/app/Greeting.php', '<?php');
     writeProtectedTest($this->planningWorkspace);
+    commitGitWorkspace($this->planningWorkspace);
 });
 
 afterEach(function (): void {
