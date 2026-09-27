@@ -4,6 +4,7 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 use Sifrious\Molly\Actions\InitializeMollyInExistingProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
 
@@ -33,7 +34,7 @@ function writeComposerJson(string $root, array $extra = []): void
 
 function initializeWithComposer(ProjectRegistry $registry, string $root): void
 {
-    (new InitializeMollyInExistingProject($registry))->handle(
+    (new InitializeMollyInExistingProject($registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
         path: $root,
         runComposerRequire: true,
         runMigrations: false,

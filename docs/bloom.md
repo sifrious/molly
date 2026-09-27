@@ -17,7 +17,7 @@ The Molly plugin adds eight screens to Bloom's sidebar. Each screen runs an Arti
 | Runs | `molly:task` for a task's attempts, `molly:inspect --run`, `molly:receipt`, and `git -C WORKSPACE diff` |
 | Conversations | `molly:inspect --conversations` and `molly:inspect --conversation` |
 | Graph | `molly:project:query`, with the sources recorded for every node and edge |
-| Glossary | `molly:glossary` |
+| Glossary | `molly:glossary`, read only |
 | Molly Settings | `molly:settings` and `molly:settings-set --patch` |
 | Worker | `molly:worker status`, `start`, `stop`, `restart`, and `molly:status` |
 
@@ -36,6 +36,7 @@ Bloom starts with the short PATH macOS gives apps opened from the Finder, so the
 - Molly has no command that lists runs across tasks. The Runs screen lists the attempts of one task at a time, or opens a run by ID.
 - The diff is `git diff` of the run's workspace as it is now. It is not a snapshot saved with the run.
 - `molly:glossary`, `molly:status`, and `molly:worker` are newer than some Molly versions. When the installed Molly does not define one, its screen says so instead of showing data.
+- The Glossary screen is read only. Molly has no command that writes glossary terms; add project terms to `.molly/GLOSSARY.md` outside the Molly section.
 - Commands run to completion. Start and Retry can take several minutes, and the screen cannot cancel them.
 - The plugin cannot switch Bloom's sidebar selection. Links between records open inside the current Molly screen.
 - Bloom logs a failed plugin load but not a successful one. The plugin logs its own registration under the subsystem `app.sifrious.molly.surfaces`.

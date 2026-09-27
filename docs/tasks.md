@@ -48,6 +48,12 @@ php artisan molly:receipt RUN_ID
 
 `molly:tasks` lists the newest tasks. `molly:task` shows one task, its display status (for example `awaiting_approval` after a completed run), any recorded pull request, and every attempt. `molly:show` reads a run's evidence, and `molly:receipt` reads its verification receipts. Reading never calls the model.
 
+### Task and run identity
+
+Every task and run in one checkout carries the same `project_id`, `workspace_id`, `repository_id`, and `checkout_id`. Molly creates these UUIDs the first time it binds the checkout, stores them in `.molly/identity.json`, and reads them back on every later command. When the checkout is a registered project, `project_id` is the ID from `.molly/project.json` and `molly:projects`. `base_sha` records the Git HEAD when the task was created; on a run it records the HEAD when that run started.
+
+Molly never rewrites the IDs of saved rows. Tasks created before this file existed keep the IDs they were given. A damaged `.molly/identity.json` stops task creation with `WORKSPACE_IDENTITY_INVALID` instead of minting new IDs.
+
 `molly:inspect` follows the links between a task, its runs, and the saved conversations:
 
 ```bash

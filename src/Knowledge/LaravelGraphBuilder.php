@@ -2,6 +2,7 @@
 
 namespace Sifrious\Molly\Knowledge;
 
+use Composer\InstalledVersions;
 use ReflectionClass;
 use RuntimeException;
 
@@ -111,16 +112,24 @@ final class LaravelGraphBuilder
             default => 'class',
         };
 
+        $package = $this->packageFile($file);
+
         $source = $this->addSource(new GraphSource(
             $this->namespace,
             $this->version,
             'framework_source',
             $class,
             $class,
-            $file,
+            $package['location'],
             $this->version,
             hash_file('sha256', $file) ?: null,
-            ['symbol' => $class, 'installed_version' => $this->version],
+            [
+                'symbol' => $class,
+                'installed_version' => $this->version,
+                'package' => $package['name'],
+                'package_version' => $package['version'],
+                'package_path' => $package['path'],
+            ],
         ));
 
         $node = $this->addNode(
@@ -177,6 +186,47 @@ final class LaravelGraphBuilder
             'sources' => array_values($this->sources),
             'nodes' => array_values($this->nodes),
             'edges' => array_values($this->edges),
+        ];
+    }
+
+    /**
+     * Name the Composer package that owns a reflected file and the file's path inside it.
+     *
+     * Locations are stored as `vendor/<package>/<path>` (or the plain path for the root
+     * package) so a graph cached by one project never points into another project's tree.
+     *
+     * @return array{name: string, version: ?string, path: string, location: string}
+     */
+    private function packageFile(string $file): array
+    {
+        $real = str_replace('\\', '/', realpath($file) ?: $file);
+        $root = InstalledVersions::getRootPackage()['name'];
+        $owner = null;
+        $ownerPath = '';
+        foreach (InstalledVersions::getInstalledPackages() as $name) {
+            $installPath = InstalledVersions::getInstallPath($name);
+            $installPath = is_string($installPath) ? realpath($installPath) : false;
+            if ($installPath === false) {
+                continue;
+            }
+            $installPath = rtrim(str_replace('\\', '/', $installPath), '/').'/';
+            if (str_starts_with($real, $installPath) && strlen($installPath) > strlen($ownerPath)) {
+                $owner = $name;
+                $ownerPath = $installPath;
+            }
+        }
+
+        if ($owner === null) {
+            throw new RuntimeException('KNOWLEDGE_SYMBOL_SOURCE_MISSING: '.basename($file).' is not inside an installed Composer package.');
+        }
+
+        $path = substr($real, strlen($ownerPath));
+
+        return [
+            'name' => $owner,
+            'version' => InstalledVersions::getPrettyVersion($owner),
+            'path' => $path,
+            'location' => $owner === $root ? $path : 'vendor/'.$owner.'/'.$path,
         ];
     }
 

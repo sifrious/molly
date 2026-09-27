@@ -250,6 +250,35 @@ final class JournalRenderer
         ];
     }
 
+    /** The file that defines glossaryTerms(), relative to the Molly package root. */
+    public const GLOSSARY_SOURCE = 'src/Journal/JournalRenderer.php';
+
+    /**
+     * A link to the glossary source that resolves from the workspace where it is shown.
+     *
+     * Inside a Laravel app that installed Molly with Composer the link is
+     * `vendor/sifrious/molly/src/...`; inside a Molly checkout it is `src/...`. When
+     * neither exists under the workspace, the link is scoped to the package as
+     * `package:sifrious/molly/src/...` with kind `package_source`, so nobody reads it as a
+     * workspace path.
+     *
+     * @return array{kind: string, ref: string}
+     */
+    public function glossarySourceLink(string $workspace): array
+    {
+        $root = rtrim($workspace, '/');
+        if (is_file($root.'/vendor/sifrious/molly/'.self::GLOSSARY_SOURCE)) {
+            return ['kind' => 'source', 'ref' => 'vendor/sifrious/molly/'.self::GLOSSARY_SOURCE];
+        }
+
+        $composer = is_file($root.'/composer.json') ? json_decode((string) file_get_contents($root.'/composer.json'), true) : null;
+        if (is_array($composer) && ($composer['name'] ?? null) === 'sifrious/molly' && is_file($root.'/'.self::GLOSSARY_SOURCE)) {
+            return ['kind' => 'source', 'ref' => self::GLOSSARY_SOURCE];
+        }
+
+        return ['kind' => 'package_source', 'ref' => 'package:sifrious/molly/'.self::GLOSSARY_SOURCE];
+    }
+
     /**
      * The terms Molly writes into the managed section of .molly/GLOSSARY.md.
      *

@@ -52,7 +52,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
 | `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |
 
-`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps.
+`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed.
 
 ## Queue worker
 
@@ -67,7 +67,7 @@ Queued starts from the web interface and MCP need a queue worker. `molly:worker`
 
 The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
 
-With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
+With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), `graphs` (the [graph freshness](../knowledge-graph.md#stale-graphs) report for the workspace), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
 
 ## Agents and MCP
 
@@ -119,26 +119,29 @@ Needs a logged-in `gh`. Saves a pending task and writes nothing to GitHub.
 | Command | What it does |
 | --- | --- |
 | `molly:knowledge:index [laravel\|nativephp\|tarpit] [--laravel-version=N]` | Builds one namespace of the knowledge graph. |
-| `molly:knowledge:query CONCEPT [--namespace=…] [--nativephp-version=…] [--depth=2] [--limit=20] [--relation=…]` | Reads a neighborhood. Depth 0 to 3, limit 1 to 40. |
+| `molly:knowledge:query CONCEPT [--namespace=…] [--nativephp-version=…] [--depth=2] [--limit=20] [--relation=…] [--workspace=PATH]` | Reads a neighborhood. Depth 0 to 3, limit 1 to 40. Refuses with `GRAPH_STALE` when the graph was built for another exact package version. |
 | `molly:knowledge:pack PROMPT [--file=…] [--test=…]` | Shows the context an implementation run would receive. |
 | `molly:graphs-bootstrap [PATH]` | Builds the version-pinned graphs for a project. |
-| `molly:graphs-retry UNIT [PATH]` | Retries one failed bootstrap unit from `.molly/graphs/manifest.json`. |
+| `molly:graphs-retry UNIT [PATH]` | Retries one failed bootstrap unit from `.molly/graphs/manifest.json`. An unknown unit exits 1 with `UNIT_UNKNOWN` and lists the valid units. |
 
 NativePHP queries need `--namespace=nativephp` with `--nativephp-version=desktop-2` or `mobile-4`. Tarpit queries need `--namespace=tarpit`.
+
+Laravel and NativePHP query results include a `freshness` object; see [Stale graphs](../knowledge-graph.md#stale-graphs).
 
 ## Project graph
 
 | Command | What it does |
 | --- | --- |
 | `molly:project:index [--workspace=PATH]` | Rebuilds the graph from saved tasks and runs. |
-| `molly:project:query CONCEPT [--depth=2] [--limit=20] [--relation=…]` | Reads a neighborhood around a task, test, file, run, or blocker. |
+| `molly:project:query CONCEPT [--depth=2] [--limit=20] [--relation=…] [--workspace=PATH]` | Reads a neighborhood around a task, test, file, run, or blocker. The result includes `freshness`. |
 
 ## Journals and decisions
 
 | Command | What it does |
 | --- | --- |
 | `molly:journal TASK [--project]` | Writes `.molly/journal/TASK_UUID.md`; `--project` also refreshes the workspace journal and glossary. |
-| `molly:glossary [PATH] [--workspace=PATH]` | Lists the Molly terms that `molly:journal --project` writes to `.molly/GLOSSARY.md`. Each term has `id`, `term`, `definition`, `origin`, `provenance`, and `links`. Reads only; `exported` says whether the file exists yet. Definitions you add outside the managed section are not included. |
+| `molly:journal --project [--workspace=PATH]` | Refreshes `.molly/JOURNAL.md` and `.molly/GLOSSARY.md` without naming a task. |
+| `molly:glossary [PATH] [--workspace=PATH]` | Lists the Molly terms that `molly:journal --project` writes to `.molly/GLOSSARY.md`. Each term has `id`, `term`, `definition`, `origin`, `provenance`, and `links`. Links resolve from the workspace; see [Journals](../journal.md#the-project-journal-and-glossary). Reads only; `exported` says whether the file exists yet. Definitions you add outside the managed section are not included. |
 | `molly:decide --title=… --body=… [--task=TASK]` | Writes a decision record under `docs/decisions/`. |
 
 ## Clever

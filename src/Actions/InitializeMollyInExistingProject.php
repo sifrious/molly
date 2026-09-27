@@ -17,7 +17,8 @@ use Sifrious\Molly\Projects\ProjectRegistry;
  * - Appends `.molly/` to `.gitignore` only when absent
  * - Publishes `config/molly.php` only when the destination file does not exist
  * - Does not rewrite `.env` agent settings (that remains `molly:setup`)
- * - Registers the path in the shared `~/.molly/projects.json` index Bloom also reads
+ * - Registers the path in the shared `~/.molly/projects.json` index Bloom also reads,
+ *   and only after migrations and the graph bootstrap succeed
  * - Requires a tagged release constraint, never a development branch
  */
 final class InitializeMollyInExistingProject
@@ -28,7 +29,10 @@ final class InitializeMollyInExistingProject
     /** Public VCS source used until sifrious/molly is listed on Packagist. */
     public const REPOSITORY_URL = 'https://github.com/sifrious/molly';
 
-    public function __construct(private ProjectRegistry $registry) {}
+    public function __construct(
+        private ProjectRegistry $registry,
+        private BootstrapProjectKnowledgeGraphs $bootstrapGraphs,
+    ) {}
 
     /**
      * @param  (callable(string, string): void)|null  $progress
@@ -81,11 +85,33 @@ final class InitializeMollyInExistingProject
             $note('migrate', 'Skipped migrations');
         }
 
+        $graphs = null;
+        if ($bootstrapGraphs) {
+            $note('graphs', 'Bootstrapping version-pinned knowledge graphs');
+            $graphs = $this->bootstrapGraphs->handle(
+                $root,
+                function (string $step, string $message) use ($note): void {
+                    $note('graphs:'.$step, $message);
+                },
+            );
+            $note(
+                'graphs',
+                $graphs['ok']
+                    ? 'Knowledge graphs ready (Laravel '.$graphs['laravel_exact'].')'
+                    : 'Knowledge graphs finished with retryable failures; see .molly/graphs/manifest.json',
+            );
+        } else {
+            $note('graphs', 'Skipped knowledge graph bootstrap');
+        }
+
+        // Register only after every step succeeded, so a failed init never leaves a
+        // project listed as ready. A bootstrap failure throws before this point.
         $existing = $this->registry->readProject($root);
         $createdMetadata = false;
         if ($existing === null) {
             $project = new MollyProject(
-                id: $this->registry->makeId(),
+                // Reuse the checkout identity so tasks created before init keep their project ID.
+                id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
                 source: 'existing',
@@ -110,25 +136,6 @@ final class InitializeMollyInExistingProject
                 $this->registry->registerPath($root);
                 $note('register', 'Project already initialized; refreshed global index');
             }
-        }
-
-        $graphs = null;
-        if ($bootstrapGraphs) {
-            $note('graphs', 'Bootstrapping version-pinned knowledge graphs');
-            $graphs = (new BootstrapProjectKnowledgeGraphs)->handle(
-                $root,
-                function (string $step, string $message) use ($note): void {
-                    $note('graphs:'.$step, $message);
-                },
-            );
-            $note(
-                'graphs',
-                $graphs['ok']
-                    ? 'Knowledge graphs ready (Laravel '.$graphs['laravel_exact'].')'
-                    : 'Knowledge graphs finished with retryable failures — see .molly/graphs/manifest.json',
-            );
-        } else {
-            $note('graphs', 'Skipped knowledge graph bootstrap');
         }
 
         return [

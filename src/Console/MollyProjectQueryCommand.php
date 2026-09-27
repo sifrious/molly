@@ -9,6 +9,7 @@ use Throwable;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 final class MollyProjectQueryCommand extends Command
 {
@@ -30,6 +31,10 @@ final class MollyProjectQueryCommand extends Command
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
                 return self::SUCCESS;
+            }
+
+            if (($result['freshness']['stale'] ?? false) === true) {
+                warning('This graph is stale ('.implode(', ', $result['freshness']['reasons']).'). Run '.$result['freshness']['fix'].' to rebuild it.');
             }
 
             if ($result['nodes'] === []) {

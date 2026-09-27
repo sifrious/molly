@@ -188,11 +188,9 @@ struct ProvenanceList: View {
 }
 
 /// `molly.glossary`: `molly:glossary <project> --json`.
+/// Read-only: the CLI has no command that writes glossary terms.
 struct MollyGlossaryScreen: View {
     @State private var model = MollyModel.shared
-    @State private var term = ""
-    @State private var definition = ""
-    @State private var action = ActionState()
 
     var body: some View {
         MollyStack {
@@ -227,19 +225,10 @@ struct MollyGlossaryScreen: View {
                                 }
                             }
                         }
-                        Section("Add a term") {
-                            TextField("Term", text: $term)
-                            TextField("Definition", text: $definition, axis: .vertical)
-                            Button("Add Term") {
-                                Task {
-                                    await action.run(["molly:glossary", path, "--term=\(term)", "--definition=\(definition)", "--json"]) { _ in
-                                        term = ""
-                                        definition = ""
-                                    }
-                                }
-                            }
-                            .disabled(term.isEmpty || definition.isEmpty || action.running != nil)
-                            ActionStatusView(state: action)
+                        Section {
+                            Text("Molly writes its terms with php artisan molly:journal --project. Add project terms to .molly/GLOSSARY.md outside the Molly section.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .formStyle(.grouped)

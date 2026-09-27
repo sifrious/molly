@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 use Sifrious\Molly\Actions\CreateMollyProject;
 use Sifrious\Molly\Actions\InitializeMollyInExistingProject;
 use Sifrious\Molly\Actions\ListMollyProjects;
@@ -39,7 +40,7 @@ afterEach(function (): void {
 it('initializes an existing Laravel app without overwriting env or existing molly config', function (): void {
     File::put($this->laravelRoot.'/config/molly.php', "<?php\n\nreturn ['agent' => 'custom'];\n");
 
-    $result = (new InitializeMollyInExistingProject($this->registry))->handle(
+    $result = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
         path: $this->laravelRoot,
         name: 'Example App',
         runComposerRequire: false,
@@ -66,7 +67,7 @@ it('refuses a non-laravel directory', function (): void {
     $empty = sys_get_temp_dir().'/molly-not-laravel-'.Str::uuid();
     File::ensureDirectoryExists($empty);
 
-    expect(fn () => (new InitializeMollyInExistingProject($this->registry))->handle(
+    expect(fn () => (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
         path: $empty,
         runComposerRequire: false,
         runMigrations: false,
@@ -80,7 +81,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
     $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
 
     $result = (new CreateMollyProject(
-        new InitializeMollyInExistingProject($this->registry),
+        new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)),
         $this->registry,
     ))->handle(
         path: $target,

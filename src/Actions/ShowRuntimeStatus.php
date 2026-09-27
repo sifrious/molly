@@ -12,7 +12,11 @@ use Sifrious\Molly\Workspace;
  */
 class ShowRuntimeStatus
 {
-    public function __construct(private CheckEnvironment $check, private ManageWorker $worker) {}
+    public function __construct(
+        private CheckEnvironment $check,
+        private ManageWorker $worker,
+        private CheckGraphFreshness $graphs,
+    ) {}
 
     /** @return array<string, mixed> */
     public function handle(?string $workspace): array
@@ -48,6 +52,7 @@ class ShowRuntimeStatus
                 'pending' => array_values(array_filter($tasks, fn (array $task): bool => $task['status'] === 'pending')),
             ],
             'worker' => $this->worker->status($root),
+            'graphs' => $this->graphs->handle($root),
             'config' => [
                 'molly' => Arr::only((array) config('molly'), [
                     'agent', 'model', 'timeout', 'test_timeout', 'max_files', 'max_file_bytes', 'max_attempts', 'agent_bus',

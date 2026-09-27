@@ -14,17 +14,26 @@ use function Laravel\Prompts\note;
 
 class MollyJournalCommand extends Command
 {
-    protected $signature = 'molly:journal {task : Saved task name or ID} {--project : Refresh the workspace journal and glossary} {--json : Print JSON only}';
+    protected $signature = 'molly:journal
+        {task? : Saved task name or ID (optional with --project)}
+        {--project : Refresh the workspace journal and glossary}
+        {--workspace= : Workspace for --project without a task (default: current app)}
+        {--json : Print JSON only}';
 
     protected $description = 'Export saved task evidence to a local Markdown journal';
 
     public function handle(ExportTaskJournal $action, RefreshProjectJournal $refresh): int
     {
         try {
+            $reference = $this->argument('task');
             if ($this->option('project')) {
-                $task = Task::findByReference((string) $this->argument('task'))
-                    ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
-                $result = ['task_id' => $task->id, ...$refresh->handle($task)->journal_status];
+                if (is_string($reference) && $reference !== '') {
+                    $task = Task::findByReference($reference)
+                        ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
+                    $result = ['task_id' => $task->id, ...$refresh->handle($task)->journal_status];
+                } else {
+                    $result = ['task_id' => null, ...$refresh->forWorkspace((string) ($this->option('workspace') ?: base_path()))];
+                }
                 if ($this->option('json')) {
                     $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
                 } elseif ($result['status'] === 'written') {
@@ -37,7 +46,10 @@ class MollyJournalCommand extends Command
                 return $result['status'] === 'written' ? self::SUCCESS : self::FAILURE;
             }
 
-            $result = $action->handle((string) $this->argument('task'));
+            if (! is_string($reference) || $reference === '') {
+                throw new RuntimeException('TASK_REQUIRED: Name a task to export its journal, or pass --project to refresh the workspace journal and glossary.');
+            }
+            $result = $action->handle($reference);
             if ($this->option('json')) {
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {

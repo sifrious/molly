@@ -14,13 +14,14 @@ final class QueryKnowledgeGraph
         private Graph $graph,
         private LaravelVersion $versions,
         private TarpitGraph $tarpit,
+        private CheckGraphFreshness $freshness,
     ) {}
 
     /**
      * @param  list<string>  $relations
      * @return array<string, mixed>
      */
-    public function handle(string $concept, ?string $requestedVersion = null, int $depth = 2, int $limit = 20, array $relations = [], string $namespace = 'laravel'): array
+    public function handle(string $concept, ?string $requestedVersion = null, int $depth = 2, int $limit = 20, array $relations = [], string $namespace = 'laravel', ?string $workspace = null): array
     {
         $namespace = $namespace === '' ? 'laravel' : $namespace;
         $version = match ($namespace) {
@@ -30,7 +31,26 @@ final class QueryKnowledgeGraph
             default => throw new RuntimeException('KNOWLEDGE_NAMESPACE_INVALID: Choose laravel, nativephp, or tarpit.'),
         };
 
-        return $this->graph->query(new GraphQuery($namespace, $version, $concept, $depth, $limit, $relations))->toArray();
+        $unit = match ($namespace) {
+            'laravel' => 'laravel:laravel/framework',
+            'nativephp' => $version === 'mobile-4' ? 'nativephp:nativephp/mobile' : 'nativephp:nativephp/desktop',
+            default => null,
+        };
+        $freshness = $unit === null ? null : $this->freshness->handle($workspace ?? base_path(), [$unit]);
+        if ($freshness !== null && in_array('version_changed', $freshness['reasons'], true)) {
+            $recorded = $freshness['units'][0];
+            throw new RuntimeException(sprintf(
+                'GRAPH_STALE: The %s graph was built for %s, but composer.lock now has %s. Run %s to rebuild it.',
+                $namespace,
+                $recorded['recorded']['exact_version'] ?? 'an unrecorded version',
+                $recorded['current_version'] ?? 'no entry for the package',
+                $freshness['fix'],
+            ));
+        }
+
+        $result = $this->graph->query(new GraphQuery($namespace, $version, $concept, $depth, $limit, $relations))->toArray();
+
+        return $freshness === null ? $result : [...$result, 'freshness' => $freshness];
     }
 
     private function nativephpVersion(?string $requested): string
