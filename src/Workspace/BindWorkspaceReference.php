@@ -2,16 +2,23 @@
 
 namespace Sifrious\Molly\Workspace;
 
-use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Projects\ProjectRegistry;
 
 /**
- * Mint Molly-owned identities for a checkout observation.
- * Paths are never used as canonical IDs — UUIDs are minted; observation supplies revision metadata.
+ * Bind a checkout observation to canonical Molly identities.
+ *
+ * The same checkout root always yields the same project, workspace, repository, and
+ * checkout IDs, read from `.molly/identity.json`. A registered project supplies its
+ * registry ID as the project ID. Paths are never IDs; the observation supplies the
+ * revision and branch for this call.
  */
 final class BindWorkspaceReference
 {
-    public function __construct(private ObserveCheckout $observe) {}
+    public function __construct(
+        private ObserveCheckout $observe,
+        private ProjectRegistry $registry,
+    ) {}
 
     public function handle(string $path, ?string $bloomWorkspaceId = null): WorkspaceReference
     {
@@ -24,12 +31,15 @@ final class BindWorkspaceReference
         $gitMeta = $obs['path'].'/.git';
         $checkoutKind = is_file($gitMeta) ? 'worktree' : (is_dir($gitMeta) ? 'clone' : 'unknown');
 
+        $root = realpath($obs['path']);
+        $identity = $this->registry->checkoutIdentity($root === false ? $obs['path'] : $root);
+
         return new WorkspaceReference(
-            project: ProjectIdentity::mint(),
-            workspace: WorkspaceIdentity::mint(),
-            repositoryId: (string) Str::uuid(),
+            project: ProjectIdentity::fromString($identity['project_id']),
+            workspace: WorkspaceIdentity::fromString($identity['workspace_id']),
+            repositoryId: $identity['repository_id'],
             repositoryRemoteIdentity: $obs['remote_identity'],
-            checkoutId: (string) Str::uuid(),
+            checkoutId: $identity['checkout_id'],
             checkoutKind: $checkoutKind,
             availability: 'available',
             currentPath: $obs['path'],

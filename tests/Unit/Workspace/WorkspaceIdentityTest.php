@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Str;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Sifrious\Molly\Workspace\ObserveCheckout;
 use Sifrious\Molly\Workspace\ProjectIdentity;
@@ -31,9 +32,9 @@ it('round-trips workspace reference json without treating path as id', function 
     $reference = new WorkspaceReference(
         project: ProjectIdentity::mint(),
         workspace: WorkspaceIdentity::mint(),
-        repositoryId: (string) Illuminate\Support\Str::uuid(),
+        repositoryId: (string) Str::uuid(),
         repositoryRemoteIdentity: 'github:sifrious/molly',
-        checkoutId: (string) Illuminate\Support\Str::uuid(),
+        checkoutId: (string) Str::uuid(),
         checkoutKind: 'clone',
         availability: 'available',
         currentPath: '/tmp/observed-path-only',
@@ -51,9 +52,9 @@ it('captures provenance only when available with a head', function () {
     $reference = new WorkspaceReference(
         project: ProjectIdentity::mint(),
         workspace: WorkspaceIdentity::mint(),
-        repositoryId: (string) Illuminate\Support\Str::uuid(),
+        repositoryId: (string) Str::uuid(),
         repositoryRemoteIdentity: null,
-        checkoutId: (string) Illuminate\Support\Str::uuid(),
+        checkoutId: (string) Str::uuid(),
         checkoutKind: 'clone',
         availability: 'ambiguous',
         currentPath: '/tmp/x',
@@ -75,7 +76,8 @@ it('observes git head from the Molly worktree without using path as identity', f
         ->and($bound->project->id)->not->toBe($bound->currentPath);
 
     $again = app(BindWorkspaceReference::class)->handle(base_path());
-    // Fresh mint each bind until a registry exists — path never becomes the id.
-    expect($again->workspace->id)->not->toBe($bound->workspace->id)
+    // The same checkout binds to the same stored IDs; the path is still never the ID.
+    expect($again->workspace->id)->toBe($bound->workspace->id)
+        ->and($again->project->id)->toBe($bound->project->id)
         ->and($again->currentPath)->toBe($bound->currentPath);
 });

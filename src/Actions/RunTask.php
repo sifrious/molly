@@ -355,9 +355,17 @@ class RunTask
         ];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Stored task IDs are kept as they are. The run records the revision and branch
+     * observed when it starts, so each attempt names the commit it ran against.
+     *
+     * @return array<string, mixed>
+     */
     private function runIdentity(?Task $task, string $path): array
     {
+        $reference = $this->bindWorkspaceReference->handle($path);
+        $reference->assertAvailableForExecution();
+
         if ($task !== null && $task->identity_status === 'bound' && is_string($task->workspace_id) && $task->workspace_id !== '') {
             return [
                 'project_id' => $task->project_id,
@@ -366,15 +374,12 @@ class RunTask
                 'repository_remote_identity' => $task->repository_remote_identity,
                 'checkout_id' => $task->checkout_id,
                 'checkout_kind' => $task->checkout_kind,
-                'base_sha' => $task->base_sha,
-                'branch' => $task->branch,
+                'base_sha' => $reference->head->sha,
+                'branch' => $reference->branch,
                 'bloom_workspace_id' => $task->bloom_workspace_id,
                 'identity_status' => 'bound',
             ];
         }
-
-        $reference = $this->bindWorkspaceReference->handle($path);
-        $reference->assertAvailableForExecution();
 
         return [
             'project_id' => $reference->project->id,

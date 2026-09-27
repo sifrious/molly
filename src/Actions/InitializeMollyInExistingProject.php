@@ -110,7 +110,8 @@ final class InitializeMollyInExistingProject
         $createdMetadata = false;
         if ($existing === null) {
             $project = new MollyProject(
-                id: $this->registry->makeId(),
+                // Reuse the checkout identity so tasks created before init keep their project ID.
+                id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
                 source: 'existing',

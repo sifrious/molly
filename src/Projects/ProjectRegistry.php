@@ -10,6 +10,7 @@ use RuntimeException;
  * Shared Molly project index for CLI and Bloom.
  *
  * Per-project: `<path>/.molly/project.json`
+ * Per-checkout identity: `<path>/.molly/identity.json`
  * Global: `~/.molly/projects.json` (JSON array of absolute paths)
  */
 final class ProjectRegistry
@@ -45,6 +46,34 @@ final class ProjectRegistry
     public function makeId(): string
     {
         return (string) Str::uuid();
+    }
+
+    public function identityFile(string $path): string
+    {
+        return rtrim(str_replace('\\', '/', $path), '/').'/.molly/identity.json';
+    }
+
+    /**
+     * Canonical Molly identities for one checkout root.
+     *
+     * The IDs are minted once, stored in `.molly/identity.json`, and read back by every
+     * later call and process. The path is never the ID. When the checkout is a registered
+     * project, `project_id` is the registry ID from `.molly/project.json`.
+     *
+     * @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}
+     */
+    public function checkoutIdentity(string $path): array
+    {
+        $root = $this->normalizePath($path);
+        $file = $this->identityFile($root);
+        $identity = $this->readIdentity($file) ?? $this->createIdentity($file);
+
+        $project = $this->readProject($root);
+        if ($project instanceof MollyProject) {
+            $identity['project_id'] = $project->id;
+        }
+
+        return $identity;
     }
 
     public function readProject(string $path): ?MollyProject
@@ -172,6 +201,60 @@ final class ProjectRegistry
         } finally {
             umask($mask);
         }
+    }
+
+    /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}|null */
+    private function readIdentity(string $file): ?array
+    {
+        if (is_link($file) || is_link(dirname($file))) {
+            throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' must not be a symbolic link.');
+        }
+        if (! is_file($file)) {
+            return null;
+        }
+
+        try {
+            $data = json_decode(File::get($file), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' is not valid JSON.');
+        }
+
+        $identity = [];
+        foreach (['project_id', 'workspace_id', 'repository_id', 'checkout_id'] as $key) {
+            if (! is_array($data) || ! is_string($data[$key] ?? null) || ! Str::isUuid($data[$key])) {
+                throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' needs a UUID '.$key.'. Molly does not replace a damaged identity file.');
+            }
+            $identity[$key] = strtolower($data[$key]);
+        }
+
+        return $identity;
+    }
+
+    /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string} */
+    private function createIdentity(string $file): array
+    {
+        $identity = [
+            'project_id' => $this->makeId(),
+            'workspace_id' => $this->makeId(),
+            'repository_id' => $this->makeId(),
+            'checkout_id' => $this->makeId(),
+        ];
+
+        File::ensureDirectoryExists(dirname($file), 0700);
+        $staged = dirname($file).'/.identity-'.bin2hex(random_bytes(8)).'.tmp';
+        File::put($staged, json_encode(['schema' => 'molly.checkout-identity.v1', ...$identity], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n");
+
+        try {
+            // link() fails when another process already wrote the file; that file wins.
+            if (! @link($staged, $file)) {
+                return $this->readIdentity($file)
+                    ?? throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: Molly could not write '.$file.'.');
+            }
+        } finally {
+            @unlink($staged);
+        }
+
+        return $identity;
     }
 
     private function normalizePath(string $path): string
