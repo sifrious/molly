@@ -70,6 +70,15 @@ With the [web interface](web-interface.md) enabled, open `/molly/graph`, enter t
 
 Nodes are tasks, acceptance tests, files, runs, verifier evidence, blockers, the workspace, and imported GitHub issues. Relationships are `implements`, `verified_by`, `changes`, `runs_in`, `blocked_by`, `approved_by`, and `produced`. Depth runs from 0 to 3 and the limit from 1 to 40, the same as the Laravel knowledge graph.
 
+### Moved or deleted files
+
+Each index checks the files that `changes` and `verified_by` relationships point to. When a file is gone, for example after `git mv`, Molly keeps the relationship and the file node so the history stays readable, and marks them:
+
+- the relationship metadata becomes `{"status": "unresolved", "reason": "target_missing", "path": "app/Services/Greeter.php"}`
+- the file node metadata becomes `{"exists": false}`
+
+Molly does not guess the new path. Run `molly:project:index` again after restoring the file and the marks disappear.
+
 The graph is stored in `.molly/knowledge.sqlite` next to the Laravel knowledge, in its own namespace. It is disposable; delete the file and index again.
 
 ## What it does not do
