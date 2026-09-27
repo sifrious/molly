@@ -1,13 +1,11 @@
 <?php
 
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Sifrious\Molly\Actions\InspectHardware;
-use Sifrious\Molly\Console\MollyPreflightCommand;
 use Sifrious\Molly\Hardware\HardwareProbe;
 use Sifrious\Molly\Hardware\HardwareSnapshot;
 use Sifrious\Molly\Hardware\ProbeOutput;
@@ -164,7 +162,6 @@ it('parses df rows whose mount point contains spaces', function () {
 });
 
 describe('molly:preflight', function () {
-    beforeEach(fn () => $this->app[Kernel::class]->registerCommand($this->app->make(MollyPreflightCommand::class)));
 
     it('prints the snapshot as JSON and exits 0 with unknowns', function () {
         $fixture = replayHardwareFixture('probes-unknown');
