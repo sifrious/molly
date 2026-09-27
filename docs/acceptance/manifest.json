@@ -88,7 +88,7 @@
           "requirement": "Documented examples run as written",
           "mode": "package",
           "starting_state": "fresh consumer",
-          "action": "execute each fenced example in README and QuickStarts",
+          "action": "execute each fenced example in README and QuickStarts; for the package install, run the 'Install a prelaunch candidate' commands against the candidate artifact",
           "expected": "each example exits as documented",
           "method": "doc-example runner with recorded exit codes",
           "evidence": "examples.jsonl",
@@ -161,7 +161,7 @@
           "mode": "both",
           "starting_state": "docs",
           "action": "compare documented constraint to candidate version",
-          "expected": "documented install resolves to the candidate",
+          "expected": "the documented prelaunch install resolves to the candidate artifact; the public release line names the series the candidate belongs to",
           "method": "constraint resolution in empty consumer",
           "evidence": "constraint.log",
           "timeout_s": 300,
@@ -2369,6 +2369,16 @@
       "change": "expected_exit_code 1 -> 2 (M02.6) and 1 -> 100 (M02.7)",
       "reason": "Composer, not Molly, reports these failures. Composer exits 2 for an unresolvable dependency set and 100 for a network failure. Verification against RC2 showed the correct behavior with those codes. The expected result text is unchanged.",
       "invalidates": "none; no PASS was granted under the old value"
+    },
+    {
+      "date": "2026-09-27",
+      "subcases": [
+        "M01.2",
+        "M01.7"
+      ],
+      "change": "Prelaunch acceptance runs the documented 'Install a prelaunch candidate' commands. The public registry install line is checked after publication under MME-5341.",
+      "reason": "The public line (^0.2 from the GitHub VCS repository) cannot resolve until a 0.2 release is tagged, and tagging is not authorized before human prelaunch review. The MME-5885 handoff keeps public-registry installation as a postpublication check and forbids a circular dependency on publication.",
+      "invalidates": "RC3 records for M01.2 and M01.7 must be rerun under the amended action"
     }
   ]
 }

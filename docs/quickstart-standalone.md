@@ -50,7 +50,7 @@ Acceptance testers install a candidate build instead of a tagged release. Point 
 
 ```bash
 composer config repositories.molly-candidate artifact ~/molly-acceptance/0.2.0-RC1
-composer require sifrious/molly:0.2.0-RC1
+composer require --dev sifrious/molly:0.2.0-RC1
 ```
 
 Use the directory and version of the candidate you were given. [Acceptance](acceptance/README.md) explains how candidates are built and checked.
