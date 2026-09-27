@@ -299,15 +299,16 @@ class ManageWorker
     {
         // The log and record can hold paths and queue output, so only this user may read them.
         // Drop group and other access from an older directory but keep the owner's bits.
-        Directory::ensure($root.'/.molly/worker', 0700);
-        @chmod($root.'/.molly/worker', fileperms($root.'/.molly/worker') & 0700);
+        $directory = Directory::molly($root, 'worker');
+        Directory::ensure($directory, 0700);
+        @chmod($directory, fileperms($directory) & 0700);
 
-        return $root.'/.molly/worker';
+        return $directory;
     }
 
     private function recordPath(string $root): string
     {
-        return $root.'/.molly/worker/worker.json';
+        return Directory::molly($root, 'worker/worker.json');
     }
 
     private function logExcerpt(string $path, int $offset): string

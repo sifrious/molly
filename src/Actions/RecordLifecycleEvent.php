@@ -61,9 +61,8 @@ class RecordLifecycleEvent
     private function write(string $workspace, LifecycleEvent $event): void
     {
         $root = (new Workspace($workspace))->path;
-        $directory = $root.'/.molly';
-        Directory::ensure($directory, 0700);
-        $path = $directory.'/lifecycle.jsonl';
+        $path = Directory::molly($root, 'lifecycle.jsonl');
+        Directory::ensure(dirname($path), 0700);
         $mask = umask(0077);
         try {
             if (file_put_contents($path, $event->toJson()."\n", FILE_APPEND | LOCK_EX) === false) {

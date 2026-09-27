@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Actions\ConfigureAgent;
+use Sifrious\Molly\Workspace\GitBinary;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process as SymfonyProcess;
 use Throwable;
@@ -23,6 +24,8 @@ class MollySetupCommand extends Command
     public function handle(ConfigureAgent $configure, ExecutableFinder $finder): int
     {
         try {
+            // Molly cannot create or run tasks without Git, so refuse before writing .env.
+            GitBinary::require();
             $interactive = $this->input->isInteractive() && ! $this->option('json');
             $agent = $this->option('agent');
             if ($agent === null && $interactive) {

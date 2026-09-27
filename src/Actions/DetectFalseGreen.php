@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\File;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Verification\VerificationState;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 /**
@@ -69,6 +70,7 @@ final class DetectFalseGreen implements FalseGreenVerifier
                         'outcome' => 'skipped_missing_file',
                         'pest_status' => null,
                     ];
+
                     continue;
                 }
 
@@ -79,7 +81,7 @@ final class DetectFalseGreen implements FalseGreenVerifier
                 $budgets['mutations_attempted']++;
 
                 $probeEvidence = rtrim($evidenceDirectory, '/').'/false-green-'.$budgets['mutations_attempted'];
-                File::ensureDirectoryExists($probeEvidence, 0700);
+                Directory::ensure($probeEvidence, 0700);
 
                 $previousTimeout = config('molly.test_timeout');
                 config(['molly.test_timeout' => min((int) $previousTimeout, $budgets['timeout_seconds'])]);

@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Knowledge;
 
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /** Load and validate graph bootstrap manifests under `.molly/graphs/manifest.json`. */
 final class GraphManifest
@@ -276,7 +277,8 @@ final class GraphManifest
      */
     public function write(string $root): string
     {
-        $directory = rtrim($root, '/').'/.molly/graphs';
+        $directory = Directory::molly($root, 'graphs/manifest.json');
+        $directory = dirname($directory);
         clearstatcache(true, $directory);
         if (is_link($directory) || (file_exists($directory) && ! is_dir($directory))) {
             throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Graph manifest directories must be real directories, not links or files.');

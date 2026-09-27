@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
 
 /**
  * Create a new Laravel application and initialize Molly inside it.
@@ -41,6 +43,7 @@ final class CreateMollyProject
         };
 
         $path = $this->expand($path);
+        GitBinary::require();
         $name ??= basename($path);
         $note('path', 'Target directory '.$path);
 
@@ -60,7 +63,7 @@ final class CreateMollyProject
         if ($runComposer) {
             $note('laravel', 'Creating Laravel application with Composer');
             $parent = dirname($path);
-            File::ensureDirectoryExists($parent);
+            Directory::ensure($parent);
             $result = Process::path($parent)->timeout(900)->run([
                 'composer', 'create-project', 'laravel/laravel', basename($path), '--no-interaction',
             ]);
@@ -69,7 +72,7 @@ final class CreateMollyProject
             }
         } else {
             $note('laravel', 'Skipped Composer create-project (test/scaffold mode)');
-            File::ensureDirectoryExists($path);
+            Directory::ensure($path);
             if (! is_file($path.'/artisan')) {
                 File::put($path.'/artisan', "#!/usr/bin/env php\n<?php\n// scaffold\n");
             }

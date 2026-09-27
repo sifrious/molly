@@ -33,7 +33,7 @@ class CaptureComponentPreview
         }
 
         $root = (new Workspace($workspace))->path;
-        $directory = $root.'/.molly/previews';
+        $directory = Directory::molly($root, 'previews');
         Directory::ensure($directory, 0700);
         $fixture = $directory.'/'.$phase.'-'.bin2hex(random_bytes(8)).'.html';
         $image = $directory.'/'.$phase.'-'.bin2hex(random_bytes(8)).'.png';

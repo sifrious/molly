@@ -301,9 +301,18 @@ final class JournalRenderer
         ];
     }
 
-    public function glossaryCopy(): string
+    /**
+     * @param  array{kind: string, ref: string}|null  $source  glossarySourceLink() for the workspace; a
+     *                                                         `source` ref is linked relative to `.molly/GLOSSARY.md`
+     */
+    public function glossaryCopy(?array $source = null): string
     {
-        $terms = array_map(fn (array $entry): string => '- '.$entry['term'].': '.$entry['definition'], $this->glossaryTerms());
+        $link = match ($source['kind'] ?? null) {
+            'source' => ' Source: ['.$source['ref'].'](../'.$source['ref'].')',
+            'package_source' => ' Source: `'.$source['ref'].'`',
+            default => '',
+        };
+        $terms = array_map(fn (array $entry): string => '- '.$entry['term'].': '.$entry['definition'].$link, $this->glossaryTerms());
 
         return implode("\n", [
             '## Molly terms', '',
@@ -316,12 +325,14 @@ final class JournalRenderer
     /**
      * Replace the managed glossary section; preserve user-authored content outside markers.
      * Pure string transform — no filesystem.
+     *
+     * @param  array{kind: string, ref: string}|null  $source
      */
-    public function replaceManagedGlossary(string $existing): string
+    public function replaceManagedGlossary(string $existing, ?array $source = null): string
     {
         $start = self::GLOSSARY_START;
         $end = self::GLOSSARY_END;
-        $section = $start."\n".$this->glossaryCopy().$end;
+        $section = $start."\n".$this->glossaryCopy($source).$end;
         $contents = $existing !== '' ? $existing : "# Project glossary\n";
 
         if (str_contains($contents, $start) || str_contains($contents, $end)) {

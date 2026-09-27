@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Knowledge;
 
 use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /**
  * Exact-version graph cache under ~/.molly/graph-cache.
@@ -97,7 +98,7 @@ final class GraphCache
 
         $path = $this->path($namespace, $package, $exactVersion);
         $directory = dirname($path);
-        File::ensureDirectoryExists($directory, 0700);
+        Directory::ensure($directory, 0700);
         @chmod($directory, 0700);
 
         $json = json_encode($candidate, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";

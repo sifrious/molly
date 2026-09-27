@@ -12,6 +12,7 @@ use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSnapshot;
 use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Knowledge\NativePhpGraph;
+use Sifrious\Molly\Workspace\Directory;
 
 /**
  * Build version-pinned knowledge graphs during project initialization.
@@ -55,6 +56,9 @@ final class BootstrapProjectKnowledgeGraphs
         if (is_string($resolved)) {
             $root = $resolved;
         }
+        // Refuse a linked .molly, graph directory, or database before any graph is written.
+        Directory::molly($root, 'graphs/manifest.json');
+        $this->graph->path();
         $lock = $this->lock->read($root);
 
         if ($lock['laravel'] === null || $lock['laravel_major'] === null) {

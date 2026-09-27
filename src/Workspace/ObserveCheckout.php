@@ -49,7 +49,7 @@ final class ObserveCheckout
      */
     public function head(string $path): ?string
     {
-        if (! is_dir($path)) {
+        if (! is_dir($path) || GitBinary::find() === null) {
             return null;
         }
         $head = strtolower($this->git($path, ['rev-parse', '--verify', '--quiet', 'HEAD'], allowFail: true));

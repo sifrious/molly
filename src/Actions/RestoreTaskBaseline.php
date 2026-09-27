@@ -50,13 +50,13 @@ class RestoreTaskBaseline
 
                 continue;
             }
-            File::ensureDirectoryExists(dirname($absolute));
+            Directory::ensure(dirname($absolute));
             File::replace($absolute, $contents, is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
         }
     }
 
     private function path(Task $task): string
     {
-        return $task->workspace.'/.molly/baselines/'.$task->id.'.json';
+        return Directory::molly($task->workspace, 'baselines/'.$task->id.'.json');
     }
 }

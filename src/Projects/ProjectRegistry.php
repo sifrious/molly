@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Workspace\Directory;
+use Throwable;
 
 /**
  * Shared Molly project index for CLI and Bloom.
@@ -106,17 +107,9 @@ final class ProjectRegistry
             createdAt: $project->createdAt,
         );
 
-        $directory = dirname($this->projectFile($normalized->path));
-        Directory::ensure($directory, 0700);
-        $mask = umask(0077);
-        try {
-            File::put(
-                $this->projectFile($normalized->path),
-                json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
-            );
-        } finally {
-            umask($mask);
-        }
+        $file = Directory::molly($normalized->path, 'project.json');
+        Directory::ensure(dirname($file), 0700);
+        $this->put($file, json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
 
         $this->registerPath($normalized->path);
     }
@@ -193,15 +186,7 @@ final class ProjectRegistry
     private function writeIndex(array $paths): void
     {
         Directory::ensure($this->home(), 0700);
-        $mask = umask(0077);
-        try {
-            File::put(
-                $this->globalIndexPath(),
-                json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
-            );
-        } finally {
-            umask($mask);
-        }
+        $this->put($this->globalIndexPath(), json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_INDEX_UNWRITABLE');
     }
 
     /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}|null */
@@ -241,9 +226,10 @@ final class ProjectRegistry
             'checkout_id' => $this->makeId(),
         ];
 
-        File::ensureDirectoryExists(dirname($file), 0700);
+        Directory::molly(dirname($file, 2), basename($file));
+        Directory::ensure(dirname($file), 0700);
         $staged = dirname($file).'/.identity-'.bin2hex(random_bytes(8)).'.tmp';
-        File::put($staged, json_encode(['schema' => 'molly.checkout-identity.v1', ...$identity], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n");
+        $this->put($staged, json_encode(['schema' => 'molly.checkout-identity.v1', ...$identity], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n", 'WORKSPACE_IDENTITY_UNWRITABLE', $file);
 
         try {
             // link() fails when another process already wrote the file; that file wins.
@@ -256,6 +242,27 @@ final class ProjectRegistry
         }
 
         return $identity;
+    }
+
+    /** Write a private file, or fail with a code that names the path and the reason. */
+    private function put(string $path, string $contents, string $code, ?string $named = null): void
+    {
+        $mask = umask(0077);
+        try {
+            $written = File::put($path, $contents);
+        } catch (Throwable $exception) {
+            $written = false;
+            $error = $exception->getMessage();
+        } finally {
+            umask($mask);
+        }
+        if ($written === strlen($contents)) {
+            return;
+        }
+
+        $reason = isset($error) && preg_match('/\): (?:Failed to open stream: )?(.+)\z/', $error, $match) === 1 ? ' ('.$match[1].')' : '';
+
+        throw new RuntimeException($code.': Molly could not write '.($named ?? $path).$reason.'. Check free disk space and that the directory is writable.');
     }
 
     private function normalizePath(string $path): string

@@ -11,6 +11,7 @@ use Sifrious\Molly\Verification\FailureAction;
 use Sifrious\Molly\Verification\VerificationState;
 use Sifrious\Molly\Verification\VerifierPolicy;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 final class RecordVerificationReceipts
 {
@@ -178,8 +179,8 @@ final class RecordVerificationReceipts
 
     private function directory(string $workspace, string $runId): string
     {
-        $directory = (new Workspace($workspace))->path.'/.molly/receipts/'.$runId;
-        File::ensureDirectoryExists($directory, 0700);
+        $directory = Directory::molly((new Workspace($workspace))->path, 'receipts/'.$runId);
+        Directory::ensure($directory, 0700);
 
         return $directory;
     }

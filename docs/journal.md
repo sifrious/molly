@@ -29,7 +29,9 @@ php artisan molly:journal ready-check --project
 
 Without a task, `--project` refreshes the workspace of the current app, or the one named by `--workspace`. With a task, it refreshes that task's workspace and records the result on the task.
 
-`php artisan molly:glossary --json` lists the Molly terms with their links. The source link resolves from the workspace: `vendor/sifrious/molly/src/Journal/JournalRenderer.php` when Molly is installed with Composer, or `src/Journal/JournalRenderer.php` in a Molly checkout. When Molly's source is not under the workspace, the link has kind `package_source` and a `package:sifrious/molly/` prefix instead of a path.
+`php artisan molly:glossary --json` lists the Molly terms with their links. The source link resolves from the workspace: `vendor/sifrious/molly/src/Journal/JournalRenderer.php` when Molly is installed with Composer, or `src/Journal/JournalRenderer.php` in a Molly checkout. When Molly's source is not under the workspace, the link has kind `package_source` and a `package:sifrious/molly/` prefix instead of a path. Each term's `provenance.source` uses the same path.
+
+In `.molly/GLOSSARY.md`, each Molly term ends with its source. The Markdown link is relative to `.molly`, such as `../vendor/sifrious/molly/src/Journal/JournalRenderer.php`, so it opens from the file. A `package:` source is shown as text, not a link.
 
 A journal write failure never changes a run's result.
 

@@ -2,13 +2,17 @@
 # Build the MollySurfaces dylib against a Bloom checkout's BloomPluginAPI module and pack
 # Surfaces.bundle.
 #
-# Requires BloomPluginAPI built first, for example:
+# Requires BLOOM_ROOT, the Bloom checkout, with BloomPluginAPI built first, for example:
 #   cd "$BLOOM_ROOT" && swift build -c release --target BloomPluginAPI
 # Set BLOOM_PRODUCTS when the module lives elsewhere (a --scratch-path build or Xcode output).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT_BUNDLE="${1:-$ROOT/../Surfaces.bundle}"
-BLOOM_ROOT="${BLOOM_ROOT:-/Users/mme/gits/sifrious/bloom-worktrees/mme-5353-loader}"
+if [[ -z "${BLOOM_ROOT:-}" ]]; then
+  echo "Set BLOOM_ROOT to the Bloom checkout that holds BloomPluginAPI, for example:" >&2
+  echo "  BLOOM_ROOT=/path/to/bloom $0" >&2
+  exit 1
+fi
 SRC="$ROOT/Sources/MollySurfaces"
 BUILD_DIR="$ROOT/.build-direct"
 VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/../plugin.json")"
