@@ -41,7 +41,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 
 | Command | What it does |
 | --- | --- |
-| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, the sandbox, parallel checks, the agent, Clever, and the Jev gate. |
+| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, the sandbox, parallel checks, the agent, Clever, and the Jev gate. A `--workspace` that is not an existing directory fails with `WORKSPACE_INVALID` before any check runs. |
 | `molly:preflight [--destination=PATH]` | Measures this Mac before a model download: architecture, Rosetta translation, macOS version, memory and memory pressure, Metal, the installed Ollama runtime and models, and free space on the volume that holds the models. Facts it cannot read are listed as unknown. It does not choose or download a model. |
 | `molly:setup --agent=ollama --model=NAME` | Saves a local Ollama model. |
 | `molly:setup --agent=amp [--no-login]` | Saves Amp as the agent and connects its MCP client. |
@@ -162,7 +162,7 @@ Each probe writes its section of `storage/molly/complexity/report.json` (or the 
 
 ## Errors
 
-A failed command prints its error on stderr, so stdout carries only the report. With `--json`, stdout still carries the JSON document with the error in it, and stderr gets one line in the form `CODE: message`. An unknown option or a missing argument fails with `ARGUMENTS_INVALID` in the same way. An error that has no Molly code is printed as `COMMAND_FAILED: message`.
+A failed command prints its error on stderr, so stdout carries only the report. With `--json`, stdout still carries the JSON document with the error in it, and stderr gets one line in the form `CODE: message`. An unknown option or a missing argument fails with `ARGUMENTS_INVALID` in the same way, for the `molly:` and `clever:` commands. An error that has no Molly code is printed as `COMMAND_FAILED: message`.
 
 `molly:create`, `molly:run`, `molly:import`, and `molly:story` check their own inputs before anything else. A missing prompt fails with `PROMPT_REQUIRED`, a missing story with `STORY_REQUIRED`, a missing `--test` with `TEST_REQUIRED`, a test file that does not exist with `PROTECTED_TEST_MISSING`, and a directory that is not a Laravel application with `WORKSPACE_INVALID`. `molly:run` reports these before it refuses a host without a sandbox, and `molly:import` reports them before it asks GitHub for the issue.
 

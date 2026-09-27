@@ -10,12 +10,14 @@ use Sifrious\Molly\Complexity\Console\Concerns\RendersProbeResults;
 use Sifrious\Molly\Complexity\Probes\ProbeResult;
 use Sifrious\Molly\Complexity\Probes\ProbeStatus;
 use Sifrious\Molly\Complexity\Report\ReportRepository;
+use Sifrious\Molly\Console\ReportsFailures;
 
 use function Laravel\Prompts\info;
 
 final class ScanCommand extends Command
 {
     use RendersProbeResults;
+    use ReportsFailures;
 
     /**
      * The command signature.

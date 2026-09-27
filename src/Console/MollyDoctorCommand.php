@@ -20,7 +20,13 @@ class MollyDoctorCommand extends Command
 
     public function handle(CheckEnvironment $check): int
     {
-        $run = fn (): array => $check->handle((string) ($this->option('workspace') ?: base_path()));
+        $workspace = (string) ($this->option('workspace') ?: base_path());
+        if (! is_dir($workspace)) {
+            $message = 'WORKSPACE_INVALID: '.$workspace.' is not an existing directory. Pass --workspace with your Laravel project root.';
+
+            return $this->reportFailure($message, ['ready' => false, 'status' => 'error', 'error' => $message]);
+        }
+        $run = fn (): array => $check->handle($workspace);
         if ($this->option('json')) {
             $result = $run();
             $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
