@@ -16,6 +16,6 @@ cd -
 ./bin/molly-bloom-plugin-register
 ```
 
-When the module was built with `--scratch-path`, set `BLOOM_PRODUCTS` to the folder that holds `BloomPluginAPI.swiftmodule`.
+`build-bundle.sh` requires `BLOOM_ROOT` and exits with a message when it is not set. When the module was built with `--scratch-path`, also set `BLOOM_PRODUCTS` to the folder that holds `BloomPluginAPI.swiftmodule`.
 
 The compiled bundle is not in the Composer package archive. Build it before running `bin/molly-bloom-plugin-register`.

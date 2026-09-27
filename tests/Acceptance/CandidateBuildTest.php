@@ -166,3 +166,39 @@ it('refuses a version composer cannot read', function () {
         candidateCleanup($repo, $out);
     }
 });
+
+it('packages the current HEAD without development paths or absolute user paths', function () {
+    $root = dirname(__DIR__, 2);
+    $head = trim((new Process(['git', 'rev-parse', 'HEAD'], $root))->mustRun()->getOutput());
+    // A clean clone of HEAD, so uncommitted work in the checkout running the suite does not block the build.
+    $repo = sys_get_temp_dir().'/molly-candidate-head-'.bin2hex(random_bytes(6));
+    $out = $repo.'-out';
+    $unpacked = $repo.'-unpacked';
+    try {
+        (new Process(['git', 'clone', '-q', '--no-checkout', $root, $repo]))->mustRun();
+        (new Process(['git', '-c', 'advice.detachedHead=false', 'checkout', '-q', $head], $repo))->mustRun();
+        candidateBuild($repo, $head, $out)->mustRun();
+        $zip = $out.'/sifrious-molly-'.substr($head, 0, 8).'.zip';
+        $entries = array_filter(array_map('trim', explode("\n", (new Process(['zipinfo', '-1', $zip]))->mustRun()->getOutput())));
+        (new Process(['unzip', '-q', $zip, '-d', $unpacked]))->mustRun();
+
+        $development = array_values(array_filter($entries, fn (string $entry): bool => preg_match('~\A(work|tests|docs|\.molly|vendor)/~', $entry) === 1));
+        $userPaths = [];
+        foreach ($entries as $entry) {
+            $path = $unpacked.'/'.$entry;
+            if (! is_file($path)) {
+                continue;
+            }
+            $contents = (string) file_get_contents($path);
+            if (! str_contains($contents, "\0") && str_contains($contents, '/Users/')) {
+                $userPaths[] = $entry;
+            }
+        }
+
+        expect($entries)->toContain('composer.json', 'src/MollyServiceProvider.php')
+            ->and($development)->toBe([])
+            ->and($userPaths)->toBe([]);
+    } finally {
+        candidateCleanup($repo, $out, $unpacked);
+    }
+});

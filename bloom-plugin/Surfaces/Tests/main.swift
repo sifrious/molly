@@ -67,8 +67,8 @@ check(MollyProjectIndex(environment: ["MOLLY_HOME": temp.appendingPathComponent(
 try? FileManager.default.removeItem(at: temp)
 
 // Invocation display
-let invocation = Invocation(executable: "/Users/x/Library/Application Support/Herd/bin/php", arguments: ["artisan", "molly:create", "Fix the greeting", "--json"], cwd: "/tmp/app")
-check(invocation.display == "cd /tmp/app && '/Users/x/Library/Application Support/Herd/bin/php' artisan molly:create 'Fix the greeting' --json", "display quotes paths and prompts")
+let invocation = Invocation(executable: "/opt/example/Application Support/Herd/bin/php", arguments: ["artisan", "molly:create", "Fix the greeting", "--json"], cwd: "/tmp/app")
+check(invocation.display == "cd /tmp/app && '/opt/example/Application Support/Herd/bin/php' artisan molly:create 'Fix the greeting' --json", "display quotes paths and prompts")
 
 // Runner
 let noHostOutcome = await MollyRunner().artisan(["molly:tasks", "--json"], host: nil)
