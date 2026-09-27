@@ -45,6 +45,9 @@ class RunTask
         $files = new Workspace($workspace);
         $this->sandbox->refuseSafeWorkflow();
         $task = $taskId === null ? null : Task::find($taskId);
+        if (($blocked = $task?->redBaselineError()) !== null) {
+            throw new RuntimeException($blocked);
+        }
         $allowTestEdits = (bool) ($task?->allow_test_edits);
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
         $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
@@ -322,6 +325,7 @@ class RunTask
                 'digest' => $testDigest,
                 'writable' => $allowTestEdits,
             ],
+            'red_baseline' => $taskRow?->source['test_lock']['red_baseline'] ?? null,
             'provider' => config('molly.agent', 'ollama'),
             'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
             'snapshots' => [

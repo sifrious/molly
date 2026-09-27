@@ -33,6 +33,9 @@ class StartTask
 
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
             $task = Task::findOrFail($id);
+            if (($blocked = $task->redBaselineError()) !== null) {
+                throw new RuntimeException($blocked);
+            }
             $workerId = $this->workerId();
             $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);

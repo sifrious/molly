@@ -30,12 +30,15 @@ final class RecordVerificationReceipts
             $directory = $this->directory($workspace, $runId);
             $path = $directory.'/'.$name.'.json';
             if (is_file($path) && ! is_link($path)) {
-                $receipts[] = [...VerificationOutcome::fromJson(trim((string) File::get($path)))->toArray(), 'path' => $path];
+                $json = trim((string) File::get($path));
+                $saved = JsonDocument::decode($json)['context'] ?? null;
+                $receipts[] = [...VerificationOutcome::fromJson($json)->toArray(), ...(is_array($saved) ? ['context' => $saved] : []), 'path' => $path];
 
                 continue;
             }
 
-            $payload = $this->payload($name, $report);
+            $context = $this->context($report);
+            $payload = [...$this->payload($name, $report), ...($context === [] ? [] : ['context' => $context])];
             $digest = hash('sha256', JsonDocument::encode($payload));
             $startedAt = $this->startedAt($name, $report, $finishedAt);
             $receipt = new VerificationOutcome(
@@ -49,8 +52,8 @@ final class RecordVerificationReceipts
                 $finishedAt,
                 $this->anotherAttemptPermitted($outcome),
             );
-            $this->write($path, $receipt);
-            $receipts[] = [...$receipt->toArray(), 'path' => $path];
+            $this->write($path, $receipt, $context);
+            $receipts[] = [...$receipt->toArray(), ...($context === [] ? [] : ['context' => $context]), 'path' => $path];
         }
 
         return $receipts;
@@ -98,6 +101,29 @@ final class RecordVerificationReceipts
             ],
             default => $report['verification_outcomes'][$name] ?? [],
         };
+    }
+
+    /**
+     * Run facts every receipt carries beside the verifier outcome: the RED
+     * baseline of the locked test and the identity of the model that wrote
+     * the changes. The evidence digest covers them.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    private function context(array $report): array
+    {
+        $context = [];
+        if (is_array($report['red_baseline'] ?? null)) {
+            $context['red_baseline'] = array_intersect_key($report['red_baseline'], array_flip([
+                'classification', 'reason', 'tests', 'failures', 'errors', 'junit_digest', 'test_digest', 'recorded_at',
+            ]));
+        }
+        if (is_array($report['model_identity'] ?? null)) {
+            $context['model_identity'] = $report['model_identity'];
+        }
+
+        return $context;
     }
 
     /**
@@ -158,11 +184,13 @@ final class RecordVerificationReceipts
         return $directory;
     }
 
-    private function write(string $path, VerificationOutcome $receipt): void
+    /** @param  array<string, mixed>  $context */
+    private function write(string $path, VerificationOutcome $receipt, array $context): void
     {
+        $json = $context === [] ? $receipt->toJson() : JsonDocument::encode([...$receipt->toArray(), 'context' => $context]);
         $mask = umask(0077);
         try {
-            if (file_put_contents($path, $receipt->toJson()."\n", LOCK_EX) === false) {
+            if (file_put_contents($path, $json."\n", LOCK_EX) === false) {
                 throw new \RuntimeException('RECEIPT_UNWRITABLE: Molly could not record the verification receipt.');
             }
         } finally {

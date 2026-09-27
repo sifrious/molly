@@ -71,4 +71,32 @@ class Task extends Model
 
         return max(0, $this->runs()->count() - (is_int($before) ? $before : 0));
     }
+
+    /**
+     * Why an implementation run may not start yet, or null when it may.
+     * A task whose Pest test was authored and locked needs a RED baseline
+     * that failed for missing behavior, unless it opted out at creation.
+     */
+    public function redBaselineError(): ?string
+    {
+        $lock = $this->source['test_lock'] ?? null;
+        if ($this->allow_test_edits || ! is_array($lock) || ($this->source['red_baseline_required'] ?? true) === false) {
+            return null;
+        }
+
+        $baseline = $lock['red_baseline'] ?? null;
+        if (! is_array($baseline) || ! is_string($baseline['classification'] ?? null)) {
+            return 'RED_BASELINE_MISSING: Molly has no RED run of the locked Pest test. Run molly:lock-test --approve to record one before implementation.';
+        }
+        if ($baseline['classification'] !== 'missing_behavior') {
+            return 'RED_BASELINE_INVALID: The locked Pest test run was classified as '.$baseline['classification']
+                .(is_string($baseline['reason'] ?? null) ? ' ('.$baseline['reason'].')' : '')
+                .'. Fix the test so it fails only for missing behavior, then run molly:lock-test --approve again.';
+        }
+        if (($baseline['test_digest'] ?? null) !== $this->test_digest) {
+            return 'RED_BASELINE_INVALID: The RED baseline was recorded against a different test digest. Run molly:lock-test --approve again.';
+        }
+
+        return null;
+    }
 }
