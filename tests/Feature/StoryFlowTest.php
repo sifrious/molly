@@ -6,7 +6,6 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Sifrious\Molly\Actions\CreateTaskFromStory;
 use Sifrious\Molly\Agents\AcceptanceWriter;
-use Sifrious\Molly\Console\MollyStoryCommand;
 use Sifrious\Molly\Models\Task;
 
 beforeEach(function () {
@@ -14,7 +13,6 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/routes');
     File::put($this->workspace.'/routes/web.php', '<?php');
     config(['ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'], 'molly.agent' => 'ollama']);
-    Artisan::registerCommand(app(MollyStoryCommand::class));
     $this->story = 'Visitors see a greeting. Signed-in people can press a button to count up; guests cannot.';
     $this->criteria = [
         'A guest who visits the home page sees a greeting.',
