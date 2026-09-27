@@ -42,6 +42,20 @@ final class ObserveCheckout
         ];
     }
 
+    /**
+     * The checkout's HEAD commit, or null when the path is not a Git checkout.
+     * Unlike handle(), this never initializes a repository.
+     */
+    public function head(string $path): ?string
+    {
+        if (! is_dir($path)) {
+            return null;
+        }
+        $head = strtolower($this->git($path, ['rev-parse', '--verify', '--quiet', 'HEAD'], allowFail: true));
+
+        return preg_match('/\A[0-9a-f]{40}\z/', $head) === 1 ? $head : null;
+    }
+
     /** @param  list<string>  $args */
     private function git(string $cwd, array $args, bool $allowFail = false): string
     {

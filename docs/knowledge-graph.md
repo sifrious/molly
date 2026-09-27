@@ -74,6 +74,22 @@ php artisan molly:graphs-retry UNIT_ID
 
 Unit IDs are in `.molly/graphs/manifest.json`. Exact package versions are cached under `~/.molly/graph-cache` so a second project on the same Laravel version indexes quickly.
 
+## Stale graphs
+
+`molly:graphs-bootstrap` records, for each unit in `.molly/graphs/manifest.json`, the Git HEAD it was built at (`revision`, or `no-git` outside a Git checkout) and the SHA-256 of `composer.lock` (`lock_hash`). `molly:knowledge:query`, `molly:project:query`, and `molly:status` compare those values with the checkout and report a `freshness` object (`graphs` in `molly:status`):
+
+| Field | Meaning |
+| --- | --- |
+| `status` | `fresh`, `stale`, `missing` (no bootstrap recorded), or `invalid` (the manifest could not be read). |
+| `stale` | `true` or `false`; `null` when `status` is `missing` or `invalid`. |
+| `reasons` | Any of `revision_changed`, `revision_unrecorded` (built before Molly recorded revisions), `lock_changed`, and `version_changed`. |
+| `units` | Each checked unit with its reasons, what it recorded, and the package version `composer.lock` has now. |
+| `fix` | The command that rebuilds the graphs. |
+
+A new commit or a changed `composer.lock` only marks the answer as stale. A changed exact package version is different: the framework source behind the graph is no longer what the project runs, so `molly:knowledge:query` refuses with `GRAPH_STALE`, names both versions, and exits 1. Run `php artisan molly:graphs-bootstrap` to rebuild. `molly:project:index` rebuilds the project graph without updating the manifest, so the stale report clears after the next bootstrap.
+
+`molly:knowledge:query` checks the manifest of the current app. Pass `--workspace=PATH` to check another project.
+
 ## Storage
 
 The graph lives in `.molly/knowledge.sqlite`, read through PDO SQLite in WAL mode. It is disposable: delete it and index again.

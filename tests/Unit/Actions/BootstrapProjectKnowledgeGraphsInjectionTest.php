@@ -134,7 +134,7 @@ it('delegates manifest persistence and retry merging to GraphManifest', function
 
     $write = $r->getMethod('writeManifest');
     $write->setAccessible(true);
-    $path = $write->invoke($action, $root, $lock, [$unit]);
+    $path = $write->invoke($action, $root, $lock, [$unit], str_repeat('a', 40));
     expect($path)->toBe(GraphManifest::pathFor($root))
         ->and(is_file($path))->toBeTrue();
 
@@ -142,6 +142,7 @@ it('delegates manifest persistence and retry merging to GraphManifest', function
     expect($loaded->schemaVersion)->toBe(GraphManifest::SCHEMA_VERSION)
         ->and($loaded->laravelExact)->toBe('12.0.0')
         ->and($loaded->laravelMajor)->toBe(12)
+        ->and($loaded->revision)->toBe(str_repeat('a', 40))
         ->and($loaded->units)->toHaveCount(1)
         ->and($loaded->allReady())->toBeTrue();
 

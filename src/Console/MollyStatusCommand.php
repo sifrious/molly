@@ -49,6 +49,14 @@ class MollyStatusCommand extends Command
             ], $tasks));
         }
 
+        $graphs = $result['graphs'];
+        note(match ($graphs['status']) {
+            'fresh' => 'Knowledge graphs match the checkout.',
+            'stale' => 'Knowledge graphs are stale ('.implode(', ', $graphs['reasons']).'). Run '.$graphs['fix'].'.',
+            'missing' => 'No knowledge graphs are recorded for this workspace. Run '.$graphs['fix'].'.',
+            default => 'The graph manifest could not be read: '.($graphs['error'] ?? 'unknown error').'.',
+        });
+
         $worker = $result['worker'];
         note('Worker: '.$worker['state'].($worker['pid'] === null ? '' : ', pid '.$worker['pid']).', queue '.$worker['connection'].' / '.$worker['queue'].'.');
 

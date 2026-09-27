@@ -24,6 +24,7 @@ final class GraphManifest
         public readonly array $units,
         public readonly ?string $updatedAt,
         public readonly ?string $path,
+        public readonly ?string $revision = null,
     ) {}
 
     public static function empty(?string $path = null): self
@@ -129,6 +130,7 @@ final class GraphManifest
             units: array_values($units),
             updatedAt: self::stringOrNull($payload['updated_at'] ?? null),
             path: $path,
+            revision: self::stringOrNull($payload['revision'] ?? null),
         );
     }
 
@@ -185,6 +187,7 @@ final class GraphManifest
             units: $units,
             updatedAt: $this->updatedAt,
             path: $this->path,
+            revision: $this->revision,
         );
     }
 
@@ -200,6 +203,71 @@ final class GraphManifest
         }
 
         return true;
+    }
+
+    /**
+     * Compare what each ready unit recorded when it was built with the checkout now.
+     *
+     * Reasons: `revision_changed` (Git HEAD moved), `revision_unrecorded` (built before
+     * Molly recorded revisions), `lock_changed` (composer.lock bytes differ), and
+     * `version_changed` (the unit's package is no longer at the recorded exact version).
+     *
+     * @param  array<string, string>  $packages  current composer.lock versions by package name
+     * @param  list<string>|null  $unitIds  only these units; null checks every unit
+     * @return array{status: string, stale: ?bool, reasons: list<string>, units: list<array<string, mixed>>, current: array{revision: string, lock_hash: ?string}, fix: ?string}
+     */
+    public function freshness(string $revision, ?string $lockHash, array $packages, ?array $unitIds = null): array
+    {
+        $checked = [];
+        $reasons = [];
+        foreach ($this->units as $unit) {
+            $id = is_string($unit['id'] ?? null) ? $unit['id'] : null;
+            if ($id === null || ($unitIds !== null && ! in_array($id, $unitIds, true)) || ($unit['status'] ?? null) !== 'ready') {
+                continue;
+            }
+
+            $recordedRevision = is_string($unit['revision'] ?? null) ? $unit['revision'] : null;
+            $recordedLock = is_string($unit['lock_hash'] ?? null) ? $unit['lock_hash'] : $this->lockHash;
+            $package = is_string($unit['package'] ?? null) ? $unit['package'] : null;
+            $unitReasons = [];
+            if ($recordedRevision === null) {
+                $unitReasons[] = 'revision_unrecorded';
+            } elseif ($recordedRevision !== $revision) {
+                $unitReasons[] = 'revision_changed';
+            }
+            if ($recordedLock !== $lockHash) {
+                $unitReasons[] = 'lock_changed';
+            }
+            if ($package !== null && $package !== 'project' && ($packages[$package] ?? null) !== ($unit['exact_version'] ?? null)) {
+                $unitReasons[] = 'version_changed';
+            }
+
+            $checked[] = [
+                'id' => $id,
+                'stale' => $unitReasons !== [],
+                'reasons' => $unitReasons,
+                'recorded' => [
+                    'revision' => $recordedRevision,
+                    'lock_hash' => $recordedLock,
+                    'exact_version' => $unit['exact_version'] ?? null,
+                ],
+                'current_version' => $package === null || $package === 'project' ? null : ($packages[$package] ?? null),
+            ];
+            array_push($reasons, ...$unitReasons);
+        }
+
+        $reasons = array_values(array_unique($reasons));
+        sort($reasons);
+        $status = $checked === [] ? 'missing' : ($reasons === [] ? 'fresh' : 'stale');
+
+        return [
+            'status' => $status,
+            'stale' => $status === 'missing' ? null : $reasons !== [],
+            'reasons' => $reasons,
+            'units' => $checked,
+            'current' => ['revision' => $revision, 'lock_hash' => $lockHash],
+            'fix' => $status === 'fresh' ? null : 'php artisan molly:graphs-bootstrap',
+        ];
     }
 
     /**
@@ -260,6 +328,7 @@ final class GraphManifest
             'lock_hash' => $this->lockHash,
             'laravel_exact' => $this->laravelExact,
             'laravel_major' => $this->laravelMajor,
+            'revision' => $this->revision,
             'packages' => $this->packages,
             'units' => $this->units,
             'updated_at' => $this->updatedAt,
