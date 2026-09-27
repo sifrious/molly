@@ -1,6 +1,6 @@
 # Commands
 
-Every Molly command takes `--json` for structured output. Add `--no-interaction` in scripts. `TASK` is a task nickname or UUID; `RUN_ID` is a run UUID.
+Every `molly:` and `clever:` command in this reference takes `--json` for structured output. The exception is `molly:check`, which the parallel check runner calls with an input and an output file and which you should not call yourself. Add `--no-interaction` in scripts. `TASK` is a task nickname or UUID; `RUN_ID` is a run UUID.
 
 For a first run, read [Getting started](../getting-started.md) instead of this page.
 
@@ -22,15 +22,17 @@ For a first run, read [Getting started](../getting-started.md) instead of this p
 | `molly:run PROMPT --test=… --file=…` | Makes one change without saving a reusable task. |
 | `molly:demo` | Writes the greeting demo files and saves `demo-greeting`. |
 
-### Options shared by `create`, `run`, and `import`
+### Options for `create`, `run`, and `import`
 
-| Option | Meaning |
-| --- | --- |
-| `--test=PATH` | The required Pest test under `tests/`. Protected unless `--allow-test-edits` is set. |
-| `--file=PATH` | A file the agent may change. Repeat for several. |
-| `--allow-test-edits` | Let this task write the required test. Use it for a test-authoring task only. |
-| `--workspace=PATH` | Another checkout to work in. Defaults to the application. |
-| `--name=NAME` | A nickname. |
+| Option | Accepted by | Meaning |
+| --- | --- | --- |
+| `--test=PATH` | `create`, `run`, `import` | The required Pest test under `tests/`. Protected unless `--allow-test-edits` is set. |
+| `--file=PATH` | `create`, `run`, `import` | A file the agent may change. Repeat for several. |
+| `--workspace=PATH` | `create`, `run`, `import` | Another checkout to work in. Defaults to the application. |
+| `--allow-test-edits` | `create`, `import` | Let this task write the required test. Use it for a test-authoring task only. |
+| `--name=NAME` | `create`, `import` | A nickname. |
+
+`molly:run` always protects the required test and saves no nickname. To let a run write its test, or to name it, save it with `molly:create` and start it with `molly:start`.
 
 Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 
@@ -46,8 +48,24 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:project-init [PATH]` | Adds Molly to an existing Laravel project: Composer, config, migrations, graphs. |
 | `molly:project-new [PATH]` | Creates a new Laravel project with Molly installed. |
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
+| `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |
 
 `project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps.
+
+## Queue worker
+
+Queued starts from the web interface and MCP need a queue worker. `molly:worker` runs one for you:
+
+| Command | What it does |
+| --- | --- |
+| `molly:worker start [--workspace=PATH]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
+| `molly:worker status [--workspace=PATH]` | Reports `state` (`running`, `stopped`, or `stale`), pid, process group, uptime, queue, and log path. |
+| `molly:worker stop [--workspace=PATH] [--timeout=30]` | Sends `SIGTERM` to the worker's process group, then `SIGKILL` after the timeout. |
+| `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, then starts a new one. |
+
+The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
+
+With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
 
 ## Agents and MCP
 
@@ -118,6 +136,7 @@ NativePHP queries need `--namespace=nativephp` with `--nativephp-version=desktop
 | Command | What it does |
 | --- | --- |
 | `molly:journal TASK [--project]` | Writes `.molly/journal/TASK_UUID.md`; `--project` also refreshes the workspace journal and glossary. |
+| `molly:glossary [PATH] [--workspace=PATH]` | Lists the Molly terms that `molly:journal --project` writes to `.molly/GLOSSARY.md`. Each term has `id`, `term`, `definition`, `origin`, `provenance`, and `links`. Reads only; `exported` says whether the file exists yet. Definitions you add outside the managed section are not included. |
 | `molly:decide --title=… --body=… [--task=TASK]` | Writes a decision record under `docs/decisions/`. |
 
 ## Clever
@@ -136,7 +155,7 @@ Each probe writes its section of `storage/molly/complexity/report.json` (or the 
 
 `0` means the command did what you asked; `1` means Molly reported a failure. A read command exits `0` even when the run it shows failed, so scripts should read the returned `status`, `ready`, or `retry_allowed` field as well. `molly:start` and `molly:retry` exit `0` only when the new run completed.
 
-`molly:check` is internal to the parallel check runner. Do not call it.
+`molly:check INPUT OUTPUT` is internal to the parallel check runner. It takes no `--json` flag; it reads its input file and writes its result to the output file. Do not call it.
 
 ## Related
 
