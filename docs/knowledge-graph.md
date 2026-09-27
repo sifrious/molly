@@ -50,6 +50,8 @@ The notes are reading material for the agent and for you. They are not a score a
 
 Every node and relationship records where it came from: the Laravel version, whether it is documentation or source, the URL or file path, a pinned revision and digest, and the PHP symbol when there is one. A query returns only relationships the indexer created; nothing is invented at query time.
 
+Framework source paths are relative to the project, such as `vendor/laravel/framework/src/Illuminate/Queue/Middleware/WithoutOverlapping.php`, and the source metadata names the Composer `package`, its `package_version`, and the `package_path` inside it. Two projects that share a cache entry therefore never see each other's absolute paths. Older cache entries stored absolute paths; Molly ignores them and builds a new entry on the next bootstrap.
+
 ## What the agent sees
 
 For each implementation run, Molly selects a small neighborhood from the task text, the allowed files, and the required test and attaches it to the prompt as `laravel_knowledge`. A task that mentions desktop or mobile also gets `nativephp_knowledge`; one that mentions cleverness or complexity gets `tarpit_knowledge`. To see what a task would get without running it:

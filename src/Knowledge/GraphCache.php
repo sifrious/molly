@@ -14,7 +14,8 @@ use RuntimeException;
  */
 final class GraphCache
 {
-    public const SCHEMA_VERSION = 1;
+    /** Version 2 stores framework source locations relative to the package, not absolute paths. */
+    public const SCHEMA_VERSION = 2;
 
     public function __construct(private ?string $root = null) {}
 
