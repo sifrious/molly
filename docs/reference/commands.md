@@ -60,12 +60,12 @@ Queued starts from the web interface and MCP need a queue worker. `molly:worker`
 
 | Command | What it does |
 | --- | --- |
-| `molly:worker start [--workspace=PATH]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
+| `molly:worker start [--workspace=PATH] [--timeout=10]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
 | `molly:worker status [--workspace=PATH]` | Reports `state` (`running`, `stopped`, or `stale`), pid, process group, uptime, queue, and log path. |
 | `molly:worker stop [--workspace=PATH] [--timeout=30]` | Sends `SIGTERM` to the worker's process group, then `SIGKILL` after the timeout. |
 | `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, then starts a new one. |
 
-The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
+The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. Only one `molly:worker` command runs at a time per workspace. Another one waits up to `--timeout` seconds for `.molly/worker/worker.lock` (10 for `start`, 30 for `stop` and `restart`) and then fails with `WORKER_BUSY`. If Molly cannot write `worker.json` or `worker.log`, `start` fails with `WORKER_START_FAILED` and leaves no worker running. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
 
 With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
 

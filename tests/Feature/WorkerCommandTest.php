@@ -256,3 +256,25 @@ it('stops a worker that started but could not be recorded', function (): void {
         ->and(processesRunning($binary))->toBe([])
         ->and(worker('status', $this->workspace)['state'])->toBe('stopped');
 });
+
+it('reports WORKER_BUSY instead of waiting forever for worker.lock', function (): void {
+    $lock = $this->workspace.'/.molly/worker/worker.lock';
+    File::ensureDirectoryExists(dirname($lock));
+    $holder = new Process([PHP_BINARY, '-r', '$h = fopen($argv[1], "c"); flock($h, LOCK_EX); echo "locked\n"; sleep(8);', $lock]);
+    $holder->start();
+    $holder->waitUntil(fn (string $type, string $output): bool => str_contains($output, 'locked'));
+
+    try {
+        $started = microtime(true);
+        $result = worker('start', $this->workspace, ['--timeout' => 1]);
+        $elapsed = microtime(true) - $started;
+    } finally {
+        $holder->stop(0);
+    }
+
+    expect($result['exit'])->toBe(1)
+        ->and($result['error'])->toStartWith('WORKER_BUSY')
+        ->and($result['error'])->toContain($lock)
+        ->and($elapsed)->toBeLessThan(5)
+        ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
+});

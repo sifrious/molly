@@ -23,6 +23,9 @@ class ManageWorker
 {
     public const DEFAULT_STOP_TIMEOUT = 30;
 
+    /** Seconds molly:worker start waits for another molly:worker command to release worker.lock. */
+    public const DEFAULT_LOCK_WAIT = 10;
+
     /**
      * `set -m` puts the background job in its own process group. The shell first closes
      * every descriptor above stderr that it inherited from the Artisan command, such as
@@ -50,11 +53,11 @@ class ManageWorker
     }
 
     /** @return array<string, mixed> */
-    public function start(string $workspace): array
+    public function start(string $workspace, int $lockWait = self::DEFAULT_LOCK_WAIT): array
     {
         $root = (new Workspace($workspace))->path;
 
-        return $this->locked($root, function () use ($root): array {
+        return $this->locked($root, $lockWait, function () use ($root): array {
             $record = $this->readRecord($root);
             $state = $this->inspect($record);
             if ($state['state'] === 'running') {
@@ -74,7 +77,7 @@ class ManageWorker
     {
         $root = (new Workspace($workspace))->path;
 
-        return $this->locked($root, fn (): array => $this->stopLocked($root, $timeout));
+        return $this->locked($root, $timeout, fn (): array => $this->stopLocked($root, $timeout));
     }
 
     /** @return array<string, mixed> */
@@ -82,7 +85,7 @@ class ManageWorker
     {
         $root = (new Workspace($workspace))->path;
 
-        return $this->locked($root, function () use ($root, $timeout): array {
+        return $this->locked($root, $timeout, function () use ($root, $timeout): array {
             $stopped = $this->stopLocked($root, $timeout);
             $record = $this->launch($root);
 
@@ -314,11 +317,25 @@ class ManageWorker
      * @param  callable(): T  $callback
      * @return T
      */
-    private function locked(string $root, callable $callback): mixed
+    private function locked(string $root, int $wait, callable $callback): mixed
     {
-        $handle = fopen($this->directory($root).'/worker.lock', 'c');
-        if ($handle === false || ! flock($handle, LOCK_EX)) {
-            throw new RuntimeException('WORKER_LOCK_FAILED: Molly could not lock .molly/worker/worker.lock.');
+        $path = $this->directory($root).'/worker.lock';
+        $handle = @fopen($path, 'c');
+        if ($handle === false) {
+            throw new RuntimeException('WORKER_LOCK_FAILED: Molly could not open '.$path.'. Make '.dirname($path).' writable by this user.');
+        }
+
+        $deadline = microtime(true) + max(0, $wait);
+        while (! flock($handle, LOCK_EX | LOCK_NB, $wouldBlock)) {
+            if (! $wouldBlock) {
+                fclose($handle);
+                throw new RuntimeException('WORKER_LOCK_FAILED: Molly could not lock '.$path.'.');
+            }
+            if (microtime(true) >= $deadline) {
+                fclose($handle);
+                throw new RuntimeException('WORKER_BUSY: Another molly:worker command has held '.$path.' for '.$wait.' seconds. Wait for it to finish, or pass a longer --timeout.');
+            }
+            usleep(100_000);
         }
 
         try {
