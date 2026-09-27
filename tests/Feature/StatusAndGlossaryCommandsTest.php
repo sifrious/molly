@@ -121,3 +121,67 @@ it('reports an invalid glossary workspace as a JSON error', function (): void {
     expect(Artisan::call('molly:glossary', ['--workspace' => $this->workspace.'/missing', '--json' => true]))->toBe(1)
         ->and(json_decode(Artisan::output(), true))->toMatchArray(['status' => 'error', 'terms' => []]);
 });
+
+it('refreshes the project journal and glossary with molly:journal --project and no task', function (): void {
+    $exit = Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(0)
+        ->and($result['task_id'])->toBeNull()
+        ->and($result['status'])->toBe('written')
+        ->and($result['glossary_path'])->toBe($this->workspace.'/.molly/GLOSSARY.md')
+        ->and(File::exists($this->workspace.'/.molly/JOURNAL.md'))->toBeTrue()
+        ->and(File::get($this->workspace.'/.molly/GLOSSARY.md'))->toContain('<!-- molly:glossary:start -->');
+
+    expect(Artisan::call('molly:journal', ['--json' => true]))->toBe(1)
+        ->and(Artisan::output())->toContain('TASK_REQUIRED');
+});
+
+/** Every glossary link must resolve from the workspace, or say it belongs to the package. */
+function assertGlossaryLinksResolve(string $workspace): array
+{
+    Artisan::call('molly:glossary', ['--workspace' => $workspace, '--json' => true]);
+    $glossary = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    $kinds = [];
+    foreach ($glossary['terms'] as $term) {
+        foreach ($term['links'] as $link) {
+            $kinds[] = $link['kind'];
+            if ($link['kind'] === 'package_source') {
+                expect($link['ref'])->toStartWith('package:sifrious/molly/');
+
+                continue;
+            }
+            $path = str_starts_with($link['ref'], '/') ? $link['ref'] : $workspace.'/'.$link['ref'];
+            expect(is_file($path))->toBeTrue("{$link['kind']} link {$link['ref']} does not resolve from {$workspace}");
+        }
+    }
+
+    return array_values(array_unique($kinds));
+}
+
+it('links glossary sources through vendor/sifrious/molly when Molly is installed in the workspace', function (): void {
+    File::ensureDirectoryExists($this->workspace.'/vendor/sifrious');
+    symlink(dirname(__DIR__, 2), $this->workspace.'/vendor/sifrious/molly');
+    Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
+
+    expect(assertGlossaryLinksResolve($this->workspace))->toBe(['file', 'source']);
+
+    Artisan::call('molly:glossary', ['--workspace' => $this->workspace, '--json' => true]);
+    expect(json_decode(Artisan::output(), true)['terms'][0]['links'][1])
+        ->toBe(['kind' => 'source', 'ref' => 'vendor/sifrious/molly/src/Journal/JournalRenderer.php']);
+});
+
+it('scopes the glossary source link to the package when Molly is not under the workspace', function (): void {
+    Artisan::call('molly:journal', ['--project' => true, '--workspace' => $this->workspace, '--json' => true]);
+
+    expect(assertGlossaryLinksResolve($this->workspace))->toBe(['file', 'package_source']);
+});
+
+it('links glossary sources relative to a Molly checkout', function (): void {
+    $checkout = realpath(dirname(__DIR__, 2));
+    Artisan::call('molly:glossary', ['--workspace' => $checkout, '--json' => true]);
+    $link = json_decode(Artisan::output(), true)['terms'][0]['links'][1];
+
+    expect($link)->toBe(['kind' => 'source', 'ref' => 'src/Journal/JournalRenderer.php'])
+        ->and(is_file($checkout.'/'.$link['ref']))->toBeTrue();
+});

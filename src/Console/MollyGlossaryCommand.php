@@ -36,15 +36,16 @@ class MollyGlossaryCommand extends Command
         }
 
         $path = $root.'/.molly/GLOSSARY.md';
+        $source = $renderer->glossarySourceLink($root);
         $terms = array_map(fn (array $entry): array => [
             'id' => Str::slug($entry['term']),
             'term' => $entry['term'],
             'definition' => $entry['definition'],
             'origin' => 'molly',
-            'provenance' => ['source' => 'src/Journal/JournalRenderer.php', 'method' => 'JournalRenderer::glossaryTerms'],
+            'provenance' => ['source' => JournalRenderer::GLOSSARY_SOURCE, 'method' => 'JournalRenderer::glossaryTerms'],
             'links' => [
                 ['kind' => 'file', 'ref' => $path],
-                ['kind' => 'source', 'ref' => 'src/Journal/JournalRenderer.php'],
+                $source,
             ],
         ], $renderer->glossaryTerms());
 
@@ -55,7 +56,7 @@ class MollyGlossaryCommand extends Command
         }
 
         table(['Term', 'Definition'], array_map(fn (array $term): array => [$term['term'], $term['definition']], $terms));
-        note(is_file($path) ? 'Exported to '.$path.'.' : 'Not exported yet. Run php artisan molly:journal TASK --project to write '.$path.'.');
+        note(is_file($path) ? 'Exported to '.$path.'.' : 'Not exported yet. Run php artisan molly:journal --project to write '.$path.'.');
 
         return self::SUCCESS;
     }

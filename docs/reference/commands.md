@@ -140,7 +140,8 @@ Laravel and NativePHP query results include a `freshness` object; see [Stale gra
 | Command | What it does |
 | --- | --- |
 | `molly:journal TASK [--project]` | Writes `.molly/journal/TASK_UUID.md`; `--project` also refreshes the workspace journal and glossary. |
-| `molly:glossary [PATH] [--workspace=PATH]` | Lists the Molly terms that `molly:journal --project` writes to `.molly/GLOSSARY.md`. Each term has `id`, `term`, `definition`, `origin`, `provenance`, and `links`. Reads only; `exported` says whether the file exists yet. Definitions you add outside the managed section are not included. |
+| `molly:journal --project [--workspace=PATH]` | Refreshes `.molly/JOURNAL.md` and `.molly/GLOSSARY.md` without naming a task. |
+| `molly:glossary [PATH] [--workspace=PATH]` | Lists the Molly terms that `molly:journal --project` writes to `.molly/GLOSSARY.md`. Each term has `id`, `term`, `definition`, `origin`, `provenance`, and `links`. Links resolve from the workspace; see [Journals](../journal.md#the-project-journal-and-glossary). Reads only; `exported` says whether the file exists yet. Definitions you add outside the managed section are not included. |
 | `molly:decide --title=… --body=… [--task=TASK]` | Writes a decision record under `docs/decisions/`. |
 
 ## Clever

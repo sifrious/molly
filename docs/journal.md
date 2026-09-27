@@ -19,11 +19,17 @@ Every run also refreshes two files for the workspace:
 .molly/GLOSSARY.md
 ```
 
-The journal lists the saved tasks and their attempts. The glossary has a section Molly maintains and room for your own project terms outside it. If a task page warns that the project journal could not be refreshed:
+The journal lists the saved tasks and their attempts. The glossary has a section Molly maintains and room for your own project terms outside it. To write both files, for example before the first task or after a task page warns that the project journal could not be refreshed:
 
 ```bash
+php artisan molly:journal --project
+php artisan molly:journal --project --workspace=/path/to/app
 php artisan molly:journal ready-check --project
 ```
+
+Without a task, `--project` refreshes the workspace of the current app, or the one named by `--workspace`. With a task, it refreshes that task's workspace and records the result on the task.
+
+`php artisan molly:glossary --json` lists the Molly terms with their links. The source link resolves from the workspace: `vendor/sifrious/molly/src/Journal/JournalRenderer.php` when Molly is installed with Composer, or `src/Journal/JournalRenderer.php` in a Molly checkout. When Molly's source is not under the workspace, the link has kind `package_source` and a `package:sifrious/molly/` prefix instead of a path.
 
 A journal write failure never changes a run's result.
 
