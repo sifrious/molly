@@ -276,3 +276,13 @@ it('reports WORKER_BUSY instead of waiting forever for worker.lock', function ()
         ->and($elapsed)->toBeLessThan(5)
         ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
 });
+
+it('keeps the worker directory, log, and record private to the user', function (): void {
+    worker('start', $this->workspace);
+
+    expect(fileperms($this->workspace.'/.molly/worker') & 0777)->toBe(0700)
+        ->and(fileperms($this->workspace.'/.molly/worker/worker.log') & 0777)->toBe(0600)
+        ->and(fileperms($this->workspace.'/.molly/worker/worker.json') & 0777)->toBe(0600);
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});

@@ -36,7 +36,7 @@ php artisan config:clear
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/molly`. The pages are the task list, a task page with its attempts and an advice button, the run evidence page, plans, the project graph, and a create form. The web interface accepts loopback connections in the `local` and `testing` environments only, and it has no login. Starting a task from the browser needs a queue worker; [Web interface](web-interface.md) explains the queue requirements.
+Open `/molly` at the address `php artisan serve` prints, usually `http://127.0.0.1:8000/molly`. When port 8000 is taken, `serve` moves to the next free port, such as 8001, and prints that address instead. To choose the port, run `php artisan serve --port=8080` and open `http://127.0.0.1:8080/molly`. The pages are the task list, a task page with its attempts and an advice button, the run evidence page, plans, the project graph, and a create form. The web interface accepts loopback connections in the `local` and `testing` environments only, and it has no login. Starting a task from the browser needs a queue worker; [Web interface](web-interface.md) explains the queue requirements.
 
 ## Plans
 

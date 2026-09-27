@@ -137,6 +137,8 @@ class ManageWorker
         $directory = $this->directory($root);
         $this->assertWritable($directory);
         $logOffset = is_file($directory.'/worker.log') ? (int) filesize($directory.'/worker.log') : 0;
+        @touch($directory.'/worker.log');
+        @chmod($directory.'/worker.log', 0600);
 
         $result = Process::path(base_path())
             ->env(['MOLLY_WORKER_LOG' => $directory.'/worker.log'])
@@ -164,6 +166,7 @@ class ManageWorker
 
         try {
             File::put($this->recordPath($root), json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+            @chmod($this->recordPath($root), 0600);
         } catch (Throwable $exception) {
             // An unrecorded worker is invisible to status and stop, so it must not outlive this command.
             posix_kill(-$pid, SIGKILL);
@@ -294,7 +297,10 @@ class ManageWorker
 
     private function directory(string $root): string
     {
-        Directory::ensure($root.'/.molly/worker');
+        // The log and record can hold paths and queue output, so only this user may read them.
+        // Drop group and other access from an older directory but keep the owner's bits.
+        Directory::ensure($root.'/.molly/worker', 0700);
+        @chmod($root.'/.molly/worker', fileperms($root.'/.molly/worker') & 0700);
 
         return $root.'/.molly/worker';
     }
