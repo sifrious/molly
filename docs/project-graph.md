@@ -68,7 +68,27 @@ With the [web interface](web-interface.md) enabled, open `/molly/graph`, enter t
 
 ## What is in it
 
-Nodes are tasks, acceptance tests, files, runs, verifier evidence, blockers, the workspace, and imported GitHub issues. Relationships are `implements`, `verified_by`, `changes`, `runs_in`, `blocked_by`, `approved_by`, and `produced`. Depth runs from 0 to 3 and the limit from 1 to 40, the same as the Laravel knowledge graph.
+`molly:project:index` reads Molly's saved records for one workspace: tasks, their runs, run reports, test locks, and recorded pull requests. It does not read your application's PHP source.
+
+| Relationship | From | To | Comes from |
+| --- | --- | --- | --- |
+| `runs_in` | task | workspace | the task's workspace |
+| `verified_by` | task or run | acceptance test | the task's protected Pest test |
+| `approved_by` | acceptance test | approval | a person locking a test the agent wrote |
+| `approved_by` | task | approval | a recorded pull request |
+| `changes` | task | file | the task's file scope |
+| `changes` | run | file | files the run report lists as changed |
+| `implements` | task | GitHub issue | a task imported from an issue |
+| `produced` | task | run, pull request | attempts and the recorded pull request |
+| `produced` | run | verifier evidence | Pest, Tarpit, and parallel-join outcomes |
+| `produced` | pull request | commit | the recorded merge SHA |
+| `blocked_by` | run | blocker | a required verifier that did not pass, or a changed protected test |
+
+Every node and relationship carries one source record for the workspace. Depth runs from 0 to 3 and the limit from 1 to 40, the same as the Laravel knowledge graph.
+
+### What it does not cover
+
+The project graph has no nodes for your classes, methods, routes, or container bindings, and no relationships between them. A file appears only because a task or run named it. Calls in your code, including dynamic ones such as `app($name)` or `$class::make()`, produce no node and no relationship, resolved or unresolved. The [Laravel knowledge graph](knowledge-graph.md) covers framework symbols, not your application code. Whether Molly should index application source is an open product decision.
 
 ### Moved or deleted files
 
