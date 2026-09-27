@@ -29,9 +29,7 @@ final class Graph
         $snapshot = new GraphSnapshot($namespace, $version, $sources, $nodes, $edges);
         $database = $this->connection();
 
-        $database->beginTransaction();
-
-        try {
+        $this->schema->immediately($database, function () use ($database, $namespace, $version, $snapshot): void {
             foreach (['edges', 'nodes', 'sources'] as $table) {
                 $statement = $database->prepare("DELETE FROM {$table} WHERE namespace = :namespace AND version = :version");
                 $statement->execute(compact('namespace', 'version'));
@@ -40,11 +38,7 @@ final class Graph
             $this->insertSources($database, $snapshot->sources);
             $this->insertNodes($database, $snapshot->nodes);
             $this->insertEdges($database, $snapshot->edges);
-            $database->commit();
-        } catch (\Throwable $exception) {
-            $database->rollBack();
-            throw $exception;
-        }
+        });
 
         return ['sources' => count($snapshot->sources), 'nodes' => count($snapshot->nodes), 'edges' => count($snapshot->edges)];
     }

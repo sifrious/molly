@@ -76,7 +76,9 @@ Unit IDs are in `.molly/graphs/manifest.json`. Exact package versions are cached
 
 ## Storage
 
-The graph lives in `.molly/knowledge.sqlite`, read through PDO SQLite. It is disposable: delete it and index again. To use another path:
+The graph lives in `.molly/knowledge.sqlite`, read through PDO SQLite in WAL mode. It is disposable: delete it and index again.
+
+Several commands can use the file at once. A bootstrap or index that finds another process writing waits up to 5 seconds for the write lock, then fails with `database is locked` and leaves the previous snapshot in place. Queries only read, so they keep answering while another process writes. To use another path:
 
 ```dotenv
 MOLLY_KNOWLEDGE_DATABASE=.molly/another-name.sqlite
