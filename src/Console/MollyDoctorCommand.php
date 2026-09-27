@@ -12,6 +12,8 @@ use function Laravel\Prompts\table;
 
 class MollyDoctorCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:doctor {--workspace= : Workspace containing Pest} {--json : Print JSON only}';
 
     protected $description = 'Check Ollama readiness, Pest, run history, sandbox, and Clever without printing secrets';

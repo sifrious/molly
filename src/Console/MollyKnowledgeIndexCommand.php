@@ -9,12 +9,13 @@ use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
 use Sifrious\Molly\Actions\IndexTarpitKnowledge;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 final class MollyKnowledgeIndexCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:knowledge:index {namespace=laravel : Knowledge namespace} {--laravel-version= : Installed Laravel major version} {--json : Print JSON only}';
 
     protected $description = 'Build the local Laravel, NativePHP, or tarpit knowledge graph';
@@ -47,13 +48,7 @@ final class MollyKnowledgeIndexCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 

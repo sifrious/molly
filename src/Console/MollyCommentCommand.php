@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\PublishGitHubIssueStatus;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyCommentCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:comment {task : Saved task name or ID} {--approve : Confirm posting or updating the GitHub status comment} {--close : Include closing language after required checks pass} {--json : Print JSON only}';
 
     protected $description = 'Post a concise GitHub issue comment after explicit approval';
@@ -27,13 +28,7 @@ class MollyCommentCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

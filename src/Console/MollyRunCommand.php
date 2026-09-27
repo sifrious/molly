@@ -8,13 +8,14 @@ use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Models\Run;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\intro;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 
 class MollyRunCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:run {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file that must pass} {--json : Print JSON only}';
 
     protected $description = 'Make a bounded local change and report tests and complexity';
@@ -50,13 +51,7 @@ class MollyRunCommand extends Command
 
             return $run->status === 'completed' ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            if ($json) {
-                $this->writeJson(['id' => null, 'status' => 'failed', 'report' => ['error' => $exception->getMessage()]]);
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'failed', 'report' => ['error' => $exception->getMessage()]]);
         }
     }
 

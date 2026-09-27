@@ -14,6 +14,8 @@ use function Laravel\Prompts\select;
 
 class MollySetupCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:setup {--agent= : amp or ollama} {--model= : Installed local Ollama model} {--no-login : Configure Amp without opening its login flow} {--json : Print setup results without interactive prompts}';
 
     protected $description = 'Choose an agent and connect Amp to Molly or select a local Ollama model';
@@ -79,13 +81,7 @@ class MollySetupCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'failed', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                $this->error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'failed', 'error' => $exception->getMessage()]);
         }
     }
 }

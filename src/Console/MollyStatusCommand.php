@@ -6,12 +6,13 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\ShowRuntimeStatus;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyStatusCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:status {--workspace= : Limit tasks to this workspace and read its worker record} {--json : Print JSON only}';
 
     protected $description = 'Show readiness, open tasks, the Molly queue worker, and effective settings without changing anything';
@@ -21,13 +22,7 @@ class MollyStatusCommand extends Command
         try {
             $result = $status->handle($this->option('workspace') ?: null);
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
 
         if ($this->option('json')) {

@@ -11,12 +11,13 @@ use Sifrious\Molly\PlanningGuide;
 use Throwable;
 
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 
 class MollyPlanCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:plan {description? : Describe the project or collection of tasks}
         {--skip-review : Save the plan without guided questions}
         {--resume= : Resume a saved plan ID without changing its description}
@@ -92,13 +93,7 @@ class MollyPlanCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['id' => $this->option('resume'), 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['id' => $this->option('resume'), 'status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 

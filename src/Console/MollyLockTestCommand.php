@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\LockProtectedTest;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyLockTestCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:lock-test {task : Saved task name or ID} {--approve : Confirm the Pest file is the locked acceptance test} {--reason= : Why this digest is locked} {--file=* : Implementation files the next run may change} {--json : Print JSON only}';
 
     protected $description = 'Lock the required Pest test after a test-authoring task and drop it from the writer scope';
@@ -32,13 +33,7 @@ class MollyLockTestCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

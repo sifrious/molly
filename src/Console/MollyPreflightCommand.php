@@ -6,7 +6,6 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\InspectHardware;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\intro;
 use function Laravel\Prompts\outro;
 use function Laravel\Prompts\spin;
@@ -15,6 +14,8 @@ use function Laravel\Prompts\warning;
 
 class MollyPreflightCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:preflight {--destination= : Directory that will hold Ollama models (default: OLLAMA_MODELS or ~/.ollama/models)} {--json : Print the snapshot as JSON only}';
 
     protected $description = 'Measure memory, acceleration, Ollama, and model disk space on this host without choosing a model';
@@ -27,11 +28,7 @@ class MollyPreflightCommand extends Command
         try {
             $snapshot = $this->option('json') ? $run() : spin($run, 'Measuring this host');
         } catch (Throwable $e) {
-            $this->option('json')
-                ? $this->line(json_encode(['error' => 'preflight_failed', 'message' => $e->getMessage()], JSON_UNESCAPED_SLASHES))
-                : error('Molly could not produce a hardware snapshot: '.$e->getMessage());
-
-            return self::FAILURE;
+            return $this->reportFailure('PREFLIGHT_FAILED: Molly could not produce a hardware snapshot. '.$e->getMessage(), ['error' => 'preflight_failed', 'message' => $e->getMessage()]);
         }
 
         if ($this->option('json')) {

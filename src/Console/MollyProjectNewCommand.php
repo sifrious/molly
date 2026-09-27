@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\CreateMollyProject;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyProjectNewCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:project-new
         {path? : Directory for the new Laravel + Molly project}
         {--name= : Display name}
@@ -58,13 +59,7 @@ class MollyProjectNewCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -11,6 +11,8 @@ use Throwable;
 
 class MollyCheckCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:check {input} {output}';
 
     protected $description = 'Execute one internal verification or review branch';

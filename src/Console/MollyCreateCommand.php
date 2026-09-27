@@ -8,12 +8,13 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Models\Task;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 
 class MollyCreateCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:create {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file that must pass} {--allow-test-edits : Permit this task to change the required Pest test} {--name= : Task nickname} {--json : Print JSON only}';
 
     protected $description = 'Save a task without running the model or changing files';
@@ -36,13 +37,7 @@ class MollyCreateCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['id' => null, 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 

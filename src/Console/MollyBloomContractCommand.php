@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\ExportBloomContract;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyBloomContractCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:bloom-contract {task : Saved task name or ID} {--workspace-id= : Bloom workspace UUID} {--branch= : Existing Bloom branch} {--base-sha= : 40-character merge-base SHA} {--json : Print JSON only}';
 
     protected $description = 'Print the versioned task contract for an existing Bloom workspace';
@@ -36,13 +37,7 @@ class MollyBloomContractCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -190,13 +190,11 @@ it('rejects an unknown action and an invalid timeout', function (): void {
 });
 
 it('closes the caller pipe so a piped molly:worker start returns at once', function (): void {
-    $package = dirname(__DIR__, 2);
-    $pipeline = new Process(
-        ['/bin/sh', '-c', '"$0" "$1" molly:worker start --workspace="$2" --json | cat', PHP_BINARY, $package.'/vendor/bin/testbench', $this->workspace],
-        $package,
-        ['MOLLY_WORKER_PHP_BINARY' => config('molly.worker.php_binary')],
-        timeout: 15,
-    );
+    $command = testbenchProcess(['molly:worker', 'start', '--workspace='.$this->workspace, '--json'])->getCommandLine();
+    $pipeline = Process::fromShellCommandline($command.' | cat', dirname(__DIR__, 2), [
+        ...testbenchProcess([])->getEnv(),
+        'MOLLY_WORKER_PHP_BINARY' => config('molly.worker.php_binary'),
+    ], timeout: 15);
 
     $started = microtime(true);
     $pipeline->run();

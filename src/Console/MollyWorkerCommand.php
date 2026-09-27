@@ -7,12 +7,13 @@ use RuntimeException;
 use Sifrious\Molly\Actions\ManageWorker;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyWorkerCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:worker
         {action : start, stop, status, or restart}
         {--workspace= : Workspace that records the worker under .molly/worker (defaults to the application)}
@@ -35,13 +36,7 @@ class MollyWorkerCommand extends Command
                 default => throw new RuntimeException('WORKER_ACTION_INVALID: Use start, stop, status, or restart.'),
             };
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['action' => $action, 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['action' => $action, 'status' => 'error', 'error' => $exception->getMessage()]);
         }
 
         if ($this->option('json')) {

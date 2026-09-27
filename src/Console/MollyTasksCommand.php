@@ -8,12 +8,13 @@ use Sifrious\Molly\Actions\ListTasks;
 use Sifrious\Molly\Models\Task;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyTasksCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:tasks {--limit=20 : Maximum tasks to show} {--json : Print JSON only}';
 
     protected $description = 'List saved tasks with the newest first';
@@ -36,13 +37,7 @@ class MollyTasksCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['tasks' => [], 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['tasks' => [], 'error' => $exception->getMessage()]);
         }
     }
 }
