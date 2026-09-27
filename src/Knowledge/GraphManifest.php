@@ -283,39 +283,14 @@ final class GraphManifest
         if (is_link($directory) || (file_exists($directory) && ! is_dir($directory))) {
             throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Graph manifest directories must be real directories, not links or files.');
         }
-        if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not create the graph manifest directory.');
-        }
+        Directory::ensure($directory, 0700);
         @chmod($directory, 0700);
 
         $path = $directory.'/manifest.json';
         $payload = $this->toArray();
         // Deterministic formatting for reproducible digests.
         $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
-
-        $temporary = @tempnam($directory, '.manifest-');
-        if ($temporary === false || dirname($temporary) !== $directory) {
-            if (is_string($temporary) && is_file($temporary)) {
-                @unlink($temporary);
-            }
-            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not stage the graph manifest.');
-        }
-
-        try {
-            $written = @file_put_contents($temporary, $json);
-            if ($written !== strlen($json)) {
-                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be written in full.');
-            }
-            @chmod($temporary, 0600);
-            if (! @rename($temporary, $path)) {
-                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be replaced atomically.');
-            }
-            @chmod($path, 0600);
-        } finally {
-            if (isset($temporary) && is_file($temporary) && ! is_link($temporary)) {
-                @unlink($temporary);
-            }
-        }
+        Directory::replaceFile($path, $json, 'KNOWLEDGE_MANIFEST_UNWRITABLE');
 
         return $path;
     }

@@ -66,14 +66,14 @@ final class SettingsStore
             'updated_at' => gmdate('c'),
             'settings' => $settings->toArray(),
         ];
-        $mask = umask(0077);
-        try {
-            File::put(
-                $this->path(),
-                json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n",
-            );
-        } finally {
-            umask($mask);
+        $path = $this->path();
+        if (file_exists($path) && ! is_writable($path)) {
+            throw new RuntimeException('SETTINGS_UNWRITABLE: Molly could not write '.$path.' (the file is read-only). Make it writable, then run the command again. The file was not changed.');
         }
+        Directory::replaceFile(
+            $path,
+            json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n",
+            'SETTINGS_UNWRITABLE',
+        );
     }
 }

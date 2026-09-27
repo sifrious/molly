@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Knowledge;
 
 use PDO;
+use PDOException;
 use RuntimeException;
 use Sifrious\Molly\Workspace\Directory;
 
@@ -176,15 +177,37 @@ final class Graph
 
         $path = $this->path();
         Directory::ensure(dirname($path));
-        $this->connection = new PDO('sqlite:'.$path, options: [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
-        $this->schema->configureConnection($this->connection);
-        $this->schema->migrate($this->connection);
-        $this->schema->assertCompatible($this->connection);
+        // SQLite writes the database, its journal, and its WAL files beside each other, so
+        // both the directory and an existing file must be writable before the schema check.
+        clearstatcache(true, $path);
+        if (file_exists($path) && ! is_writable($path)) {
+            throw $this->unwritable($path, 'the file is read-only');
+        }
+        if (! file_exists($path) && ! is_writable(dirname($path))) {
+            throw $this->unwritable($path, dirname($path).' is read-only');
+        }
 
-        return $this->connection;
+        try {
+            $connection = new PDO('sqlite:'.$path, options: [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+            $this->schema->configureConnection($connection);
+            $this->schema->migrate($connection);
+        } catch (PDOException $exception) {
+            if (preg_match('/unable to open database file|readonly database|disk is full|disk I\/O error/i', $exception->getMessage(), $match) === 1) {
+                throw $this->unwritable($path, strtolower($match[0]), $exception);
+            }
+            throw $exception;
+        }
+        $this->schema->assertCompatible($connection);
+
+        return $this->connection = $connection;
+    }
+
+    private function unwritable(string $path, string $reason, ?PDOException $previous = null): RuntimeException
+    {
+        return new RuntimeException('DATABASE_UNWRITABLE: Molly could not open the knowledge database '.$path.' ('.$reason.'). Check free disk space and that '.dirname($path).' is writable.', previous: $previous);
     }
 
     /** @param  list<GraphSource>  $sources */

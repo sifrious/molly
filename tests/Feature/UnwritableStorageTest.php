@@ -201,3 +201,110 @@ it('fails molly:create with DATABASE_UNWRITABLE naming the database when it is r
         ->and($error)->toContain('readonly database')
         ->and($error)->not->toContain('SQL: insert');
 });
+
+it('fails molly:journal --project with the file, the reason, and a coded stderr line when .molly is read-only', function (): void {
+    $workspace = $this->directory.'/app';
+    File::ensureDirectoryExists($workspace.'/.molly');
+    File::put($workspace.'/.molly/.gitignore', "*\n");
+    $database = $this->directory.'/database.sqlite';
+    touch($database);
+    $environment = ['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => $database];
+    testbenchProcess(['migrate', '--force'], $environment)->mustRun();
+    chmod($workspace.'/.molly', 0555);
+
+    $process = testbenchProcess(['molly:journal', '--project', '--workspace='.$workspace, '--json', '--no-interaction'], $environment);
+    $process->run();
+    $document = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($process->getExitCode())->toBe(1)
+        ->and(array_keys($document))->toBe(['task_id', 'status', 'reason', 'checked_at'])
+        ->and($document['status'])->toBe('unavailable')
+        ->and($document['reason'])->toStartWith('JOURNAL_WRITE_FAILED: Molly could not write '.$workspace.'/.molly/GLOSSARY.md (Permission denied).')
+        ->and(trim($process->getErrorOutput()))->toBe($document['reason']);
+});
+
+it('fails molly:graphs-bootstrap with DIRECTORY_UNWRITABLE naming the graphs directory when .molly is read-only', function (): void {
+    $root = laravelRoot($this->directory.'/app');
+    File::put($root.'/composer.lock', json_encode(['packages' => [['name' => 'laravel/framework', 'version' => 'v13.0.0']], 'packages-dev' => []]));
+    File::ensureDirectoryExists($root.'/.molly');
+    chmod($root.'/.molly', 0555);
+    config(['molly.knowledge.database' => $this->directory.'/knowledge.sqlite']);
+    putenv('MOLLY_HOME='.$this->directory.'/home');
+
+    try {
+        $exit = Artisan::call('molly:graphs-bootstrap', ['path' => $root, '--json' => true]);
+    } finally {
+        putenv('MOLLY_HOME');
+    }
+    $error = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'];
+
+    expect($exit)->toBe(1)
+        ->and($error)->toStartWith('DIRECTORY_UNWRITABLE: Molly could not create '.$root.'/.molly/graphs (Permission denied).')
+        ->and($error)->not->toContain('KNOWLEDGE_MANIFEST_INVALID');
+});
+
+it('fails graph indexing with DATABASE_UNWRITABLE naming the knowledge database when its directory is read-only', function (array $command): void {
+    File::ensureDirectoryExists($this->directory.'/store');
+    chmod($this->directory.'/store', 0555);
+    config(['molly.knowledge.database' => $this->directory.'/store/knowledge.sqlite']);
+
+    $exit = Artisan::call($command[0], [...$command[1], '--json' => true]);
+    $error = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'];
+
+    expect($exit)->toBe(1)
+        ->and($error)->toStartWith('DATABASE_UNWRITABLE: Molly could not open the knowledge database '.$this->directory.'/store/knowledge.sqlite (')
+        ->and($error)->not->toContain('SQLSTATE');
+})->with([
+    'project index' => [['molly:project:index', []]],
+    'laravel knowledge index' => [['molly:knowledge:index', ['namespace' => 'laravel']]],
+]);
+
+it('fails graph indexing with DATABASE_UNWRITABLE when the knowledge database file is read-only', function (): void {
+    $database = $this->directory.'/knowledge.sqlite';
+    touch($database);
+    chmod($database, 0444);
+    config(['molly.knowledge.database' => $database]);
+
+    $exit = Artisan::call('molly:project:index', ['--json' => true]);
+
+    expect($exit)->toBe(1)
+        ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'])
+        ->toBe('DATABASE_UNWRITABLE: Molly could not open the knowledge database '.$database.' (the file is read-only). Check free disk space and that '.$this->directory.' is writable.');
+});
+
+it('fails molly:settings-set with SETTINGS_UNWRITABLE naming settings.json when MOLLY_HOME is read-only', function (): void {
+    $home = $this->directory.'/home';
+    File::ensureDirectoryExists($home);
+    chmod($home, 0555);
+    putenv('MOLLY_HOME='.$home);
+
+    try {
+        $exit = Artisan::call('molly:settings-set', ['--patch' => '{"loop":{"max_iterations":2}}', '--json' => true]);
+    } finally {
+        putenv('MOLLY_HOME');
+    }
+    $error = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'];
+
+    expect($exit)->toBe(1)
+        ->and($error)->toBe('SETTINGS_UNWRITABLE: Molly could not write '.$home.'/settings.json (Permission denied). Check free disk space and that '.$home.' is writable.')
+        ->and(File::exists($home.'/settings.json'))->toBeFalse()
+        ->and(File::files($home))->toBe([]);
+});
+
+it('keeps settings.json unchanged when the file is read-only', function (): void {
+    $home = $this->directory.'/home';
+    File::ensureDirectoryExists($home);
+    File::put($home.'/settings.json', "{}\n");
+    chmod($home.'/settings.json', 0444);
+    putenv('MOLLY_HOME='.$home);
+
+    try {
+        $exit = Artisan::call('molly:settings-set', ['--patch' => '{"loop":{"max_iterations":2}}', '--json' => true]);
+    } finally {
+        putenv('MOLLY_HOME');
+    }
+
+    expect($exit)->toBe(1)
+        ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'])->toStartWith('SETTINGS_UNWRITABLE: Molly could not write '.$home.'/settings.json (the file is read-only).')
+        ->and(File::get($home.'/settings.json'))->toBe("{}\n");
+});
