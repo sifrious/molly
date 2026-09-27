@@ -161,6 +161,8 @@ Each probe writes its section of `storage/molly/complexity/report.json` (or the 
 
 A failed command prints its error on stderr, so stdout carries only the report. With `--json`, stdout still carries the JSON document with the error in it, and stderr gets one line in the form `CODE: message`. An unknown option or a missing argument fails with `ARGUMENTS_INVALID` in the same way. An error that has no Molly code is printed as `COMMAND_FAILED: message`. `molly:graphs-retry`, `molly:journal`, `molly:knowledge:query`, and `molly:project:query` still print their errors on stdout.
 
+`molly:create`, `molly:run`, `molly:import`, and `molly:story` check their own inputs before anything else. A missing prompt fails with `PROMPT_REQUIRED`, a missing story with `STORY_REQUIRED`, a missing `--test` with `TEST_REQUIRED`, a test file that does not exist with `PROTECTED_TEST_MISSING`, and a directory that is not a Laravel application with `WORKSPACE_INVALID`. `molly:run` reports these before it refuses a host without a sandbox, and `molly:import` reports them before it asks GitHub for the issue.
+
 `molly:check INPUT OUTPUT` is internal to the parallel check runner. It takes no `--json` flag; it reads its input file and writes its result to the output file. Do not call it.
 
 ## Related

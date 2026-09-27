@@ -27,14 +27,14 @@ class MollyRunCommand extends Command
             $prompt = trim((string) $this->argument('prompt'));
             if ($prompt === '') {
                 if ($json || ! $this->input->isInteractive()) {
-                    throw new InvalidArgumentException('Provide a prompt when using --json or --no-interaction.');
+                    throw new InvalidArgumentException('PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction, for example php artisan molly:run "Return Hello".');
                 }
                 $prompt = text('What should Molly work on?', required: 'Describe the change Molly should make.', transform: fn (string $value): string => trim($value));
             }
             $paths = $this->option('file');
             $test = trim((string) $this->option('test'));
             if ($test === '') {
-                throw new InvalidArgumentException('Use --test to name the Pest test file that must pass.');
+                throw new InvalidArgumentException('TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.');
             }
             $workspace = (string) ($this->option('workspace') ?: base_path());
             if (! $json) {

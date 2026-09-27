@@ -27,14 +27,14 @@ class MollyStoryCommand extends Command
             $story = trim((string) $this->argument('story'));
             if ($story === '') {
                 if (! $interactive) {
-                    throw new InvalidArgumentException('Provide a story when using --json or --no-interaction.');
+                    throw new InvalidArgumentException('STORY_REQUIRED: Pass the story as the first argument when using --json or --no-interaction.');
                 }
                 $story = textarea('Describe the feature as a story', required: 'Describe what people should be able to do.', transform: trim(...));
             }
             $test = trim((string) $this->option('test'));
             if ($test === '') {
                 if (! $interactive) {
-                    throw new InvalidArgumentException('Use --test to name the Pest test file the authoring run writes.');
+                    throw new InvalidArgumentException('TEST_REQUIRED: Use --test to name the Pest test file the authoring run writes, for example --test=tests/Feature/StoryTest.php.');
                 }
                 $test = text('Which Pest test should Molly write?', placeholder: 'tests/Feature/StoryTest.php', required: true, transform: trim(...));
             }

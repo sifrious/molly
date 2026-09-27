@@ -48,7 +48,7 @@ class MollyCreateCommand extends Command
             return $prompt;
         }
         if (! $interactive) {
-            throw new InvalidArgumentException('Provide a prompt when using --json or --no-interaction.');
+            throw new InvalidArgumentException('PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction, for example php artisan molly:create "Return Hello".');
         }
 
         return text('What should Molly work on?', required: 'Describe the change Molly should make.', transform: trim(...));
@@ -86,7 +86,7 @@ class MollyCreateCommand extends Command
         $test = trim((string) $this->option('test'));
         if ($test === '') {
             if (! $interactive) {
-                throw new InvalidArgumentException('Use --test to name the Pest test file that must pass.');
+                throw new InvalidArgumentException('TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.');
             }
             $test = text('Which Pest test should pass?', placeholder: 'tests/Feature/HealthTest.php', required: true, hint: 'This test is read-only unless you pass --allow-test-edits.', transform: trim(...));
         }

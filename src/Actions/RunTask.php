@@ -48,7 +48,6 @@ class RunTask
         }
 
         $files = new Workspace($workspace);
-        $this->sandbox->refuseSafeWorkflow();
         $task = $taskId === null ? null : Task::find($taskId);
         if (($blocked = $task?->redBaselineError()) !== null) {
             throw new RuntimeException($blocked);
@@ -58,10 +57,13 @@ class RunTask
         $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
         if (! $allowTestEdits) {
             if ($testDigest === null) {
-                throw new RuntimeException('PROTECTED_TEST_MISSING: Create and approve the required Pest test before the implementation turn.');
+                throw $files->missingProtectedTest($testPath);
             }
             $files->assertProtectedTestUnchanged($testPath, $testDigest);
         }
+        // Refuse an unsafe host only after the task's own inputs are valid, so a mistyped
+        // test path is reported as such and not hidden behind SANDBOX_UNAVAILABLE.
+        $this->sandbox->refuseSafeWorkflow();
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat): Run {
             $before = $files->read($paths);
