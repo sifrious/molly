@@ -37,6 +37,8 @@ Add Molly's local files to `.gitignore`:
 /storage/molly/
 ```
 
+Molly records the commit each task starts from, so the application must be a Git repository with at least one commit. Molly never runs `git init` or commits for you. For a fresh `composer create-project` app, run `git init && git add -A && git commit -m "Start"` before `molly:demo`; otherwise Molly stops with `WORKSPACE_NOT_GIT`.
+
 ## Run the demo with a local model
 
 You do not need a paid AI account. With [Ollama](https://ollama.com) installed:

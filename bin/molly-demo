@@ -9,8 +9,8 @@ usage() {
   cat <<EOF
 Usage: molly-demo [TARGET_DIR] [--force]
 
-Creates a new Laravel project, installs sifrious/molly (${MOLLY_CONSTRAINT}),
-and scaffolds demo-greeting with php artisan molly:demo.
+Creates a new Laravel project, commits it with your Git identity, installs
+sifrious/molly (${MOLLY_CONSTRAINT}), and scaffolds demo-greeting with php artisan molly:demo.
 
 Environment:
   MOLLY_CONSTRAINT   Composer constraint (default: ^0.2)
@@ -20,7 +20,7 @@ Arguments:
   --force      Allow non-empty TARGET_DIR (deletes it first)
   -h, --help   Show this help
 
-Requirements: PHP 8.3+, Composer. Prefers Packagist; falls back to public GitHub VCS tags.
+Requirements: PHP 8.3+, Composer, Git with user.name and user.email set. Prefers Packagist; falls back to public GitHub VCS tags.
 EOF
 }
 
@@ -51,6 +51,11 @@ TARGET=${TARGET/#\~/$HOME}
 
 command -v php >/dev/null || { echo "PHP is required (8.3 or later)." >&2; exit 1; }
 command -v composer >/dev/null || { echo "Composer is required." >&2; exit 1; }
+command -v git >/dev/null || { echo "Git is required." >&2; exit 1; }
+if [[ -z "$(git config user.email || true)" || -z "$(git config user.name || true)" ]]; then
+  echo "Set your Git identity first: git config --global user.name \"Your Name\" and git config --global user.email you@example.com" >&2
+  exit 1
+fi
 
 if [[ -e "$TARGET" ]]; then
   if [[ ! -d "$TARGET" ]]; then
@@ -71,13 +76,13 @@ echo "Creating Laravel app at $TARGET …"
 composer create-project laravel/laravel "$TARGET" --no-interaction
 cd "$TARGET"
 
-# Molly binds revision identity from Git — ensure the new app is a checkout.
-if [[ ! -d .git ]]; then
-  git init
-  git config user.email "molly-demo@sifrious.invalid"
-  git config user.name "Molly Demo"
+# Molly records the commit each task starts from and never creates a repository itself.
+# This installer created the app, so it commits it once with your own Git identity.
+if [[ ! -e .git ]]; then
+  echo "Committing the new app with your Git identity ($(git config user.email)) …"
+  git init --quiet
   git add -A
-  git commit -m "Initial Molly demo app" --quiet
+  git commit -m "Start" --quiet
 fi
 
 echo "Installing Pest (Molly needs it) …"
