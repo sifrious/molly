@@ -134,8 +134,9 @@ class RunTask
         try {
             Directory::ensure($evidence, 0700);
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity before changes');
+            // Clever is advisory: an unavailable or failed measurement is recorded with its
+            // status and reason, never as passing, and the run continues.
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
-            $this->requireMeasurements($report['complexity_before']);
 
             $this->record($workspace->path, LifecycleEventType::DispatchRequested, $taskId, $run->id, [
                 'target' => 'local',
@@ -201,7 +202,6 @@ class RunTask
 
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity after changes');
             $report['complexity_after'] = $this->measure->handle($workspace->path, $evidence.'/after');
-            $this->requireMeasurements($report['complexity_after']);
 
             if ($workspace->read(array_keys($before)) !== $after) {
                 throw new RuntimeException('WORKSPACE_CHANGED: Files changed after implementation. Run verification again.');
@@ -386,14 +386,6 @@ class RunTask
             return $workspace->readProtectedTest('tests/Pest.php');
         } catch (Throwable) {
             return [];
-        }
-    }
-
-    /** @param array<string, mixed> $measurement */
-    private function requireMeasurements(array $measurement): void
-    {
-        if (! in_array($measurement['status'] ?? null, ['ok', 'skipped'], true)) {
-            throw new RuntimeException('CLEVER_UNAVAILABLE: '.($measurement['reason'] ?? 'Clever did not produce a usable report.'));
         }
     }
 
