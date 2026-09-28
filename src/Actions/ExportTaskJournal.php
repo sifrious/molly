@@ -9,6 +9,7 @@ use Sifrious\Molly\Journal\JournalRenderer;
 use Sifrious\Molly\Journal\JournalWriter;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -19,6 +20,7 @@ class ExportTaskJournal
         private RecordLifecycleEvent $lifecycleEvents,
         private JournalRenderer $journalRenderer,
         private JournalWriter $journalWriter,
+        private SecretRedactor $redactor,
     ) {}
 
     /** @return array{path: string, task_id: string, attempt_count: int} */
@@ -259,6 +261,6 @@ class ExportTaskJournal
     private function write(string $root, string $path, string $markdown, string|false|null $expectedHash = null): void
     {
         $this->journalWriter->ensureDirectory($root.'/.molly');
-        $this->journalWriter->replaceFile($path, $markdown, $expectedHash);
+        $this->journalWriter->replaceFile($path, $this->redactor->text($markdown, $root), $expectedHash);
     }
 }

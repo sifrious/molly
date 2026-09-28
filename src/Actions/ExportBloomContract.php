@@ -10,11 +10,14 @@ use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 use Sifrious\Molly\Contracts\RepositoryIdentity;
 use Sifrious\Molly\Contracts\TaskContract;
 use Sifrious\Molly\Contracts\VerifierPolicyMap;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 
 class ExportBloomContract
 {
+    public function __construct(private SecretRedactor $redactor) {}
+
     public function handle(string $reference, string $bloomWorkspaceId, string $branch, string $baseSha, string $owner = 'local', string $name = 'workspace'): TaskContract
     {
         $task = app(ShowTask::class)->handle($reference);
@@ -30,7 +33,7 @@ class ExportBloomContract
 
         $contract = new TaskContract(
             $task->id,
-            $task->prompt,
+            $this->redactor->text($task->prompt, $task->workspace),
             new RepositoryIdentity('git', $owner, $name, $task->workspace),
             $bloomWorkspaceId,
             $task->workspace,

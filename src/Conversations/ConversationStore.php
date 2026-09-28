@@ -5,10 +5,13 @@ namespace Sifrious\Molly\Conversations;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace\Directory;
 
 final class ConversationStore
 {
+    public function __construct(private SecretRedactor $redactor) {}
+
     public function root(): string
     {
         return (new ProjectRegistry)->home().'/conversations';
@@ -76,7 +79,7 @@ final class ConversationStore
         Directory::ensure($dir, 0775);
 
         $path = $this->path($conversation->id);
-        $json = json_encode($conversation->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $json = json_encode($this->redactor->value($conversation->toArray()), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if (file_put_contents($path, $json."\n") === false) {
             throw new RuntimeException('CONVERSATION_STORE: Could not write '.$path);
         }

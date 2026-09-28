@@ -6,6 +6,7 @@ use Closure;
 use Laravel\Prompts\Prompt;
 use Sifrious\Molly\AuthoredTestBroken;
 use Sifrious\Molly\ChoiceRequired;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
@@ -51,6 +52,9 @@ trait ReportsFailures
     /** @param  array<string, mixed>|null  $document  printed on stdout when the caller asked for --json */
     protected function reportFailure(string $message, ?array $document = null): int
     {
+        $redactor = app(SecretRedactor::class);
+        $message = $redactor->text($message);
+        $document = $document === null ? null : $redactor->value($document);
         $json = $this->hasOption('json') && $this->option('json');
         $console = $this->output->getOutput();
         $stderr = $console instanceof ConsoleOutputInterface ? $console->getErrorOutput() : null;

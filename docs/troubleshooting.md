@@ -38,7 +38,7 @@ Restart queue workers after configuration changes too.
 | `ollama_config_invalid` | Use a loopback HTTP URL, the Ollama driver, and a positive `molly.timeout`. |
 | `amp_unavailable` | Run `amp usage` and log in to Amp. |
 | `clever_disabled` | Use the `local` or `testing` environment, or remove an explicit `false` in `config/molly-complexity.php`. |
-| `clever_unavailable` | Check the package install and the application log. |
+| `clever_unavailable` | Check the package install and the application log. Runs still proceed and record Clever as `unavailable`. |
 | `jev_capability_missing` | Jev is on, but `laravel/ai` cannot classify. Pin the accepted commit or turn Jev off. See [Jev](reference/configuration.md#jev). |
 | `jev_unconfigured` | Jev is on and capable, but `TYPESAFE_API_KEY` is empty or `config/ai.php` predates the TypeSafe provider. |
 

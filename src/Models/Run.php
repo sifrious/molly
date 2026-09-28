@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Sifrious\Molly\Redaction\RedactedJson;
 
 class Run extends Model
 {
@@ -21,6 +22,6 @@ class Run extends Model
 
     protected function casts(): array
     {
-        return ['report' => 'array', 'effective_config' => 'array'];
+        return ['report' => RedactedJson::class, 'effective_config' => RedactedJson::class.':settings'];
     }
 }

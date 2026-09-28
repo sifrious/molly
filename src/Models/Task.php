@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Redaction\RedactedJson;
 
 class Task extends Model
 {
@@ -52,7 +53,7 @@ class Task extends Model
 
     protected function casts(): array
     {
-        return ['paths' => 'array', 'allow_test_edits' => 'boolean', 'source' => 'array', 'stop_requested_at' => 'datetime', 'context_snapshot' => 'array', 'journal_status' => 'array', 'claimed_at' => 'datetime', 'lease_expires_at' => 'datetime', 'heartbeat_at' => 'datetime', 'attempt_number' => 'integer'];
+        return ['paths' => 'array', 'allow_test_edits' => 'boolean', 'source' => RedactedJson::class, 'stop_requested_at' => 'datetime', 'context_snapshot' => RedactedJson::class.':settings', 'journal_status' => RedactedJson::class, 'claimed_at' => 'datetime', 'lease_expires_at' => 'datetime', 'heartbeat_at' => 'datetime', 'attempt_number' => 'integer'];
     }
 
     public function runs(): HasMany
