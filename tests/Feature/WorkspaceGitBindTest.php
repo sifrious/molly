@@ -54,6 +54,23 @@ it('refuses molly:demo before writing the demo files', function () {
         ->and(Task::count())->toBe(0);
 });
 
+it('refuses molly:demo in a repository with no commit before writing the demo files', function () {
+    (new Process(['git', 'init', '--quiet', $this->workspace]))->mustRun();
+    $before = File::allFiles($this->workspace, true);
+
+    $exit = Artisan::call('molly:demo', ['--workspace' => $this->workspace, '--json' => true, '--no-interaction' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['error'])->toStartWith('WORKSPACE_REVISION_MISSING: ')
+        ->and(File::allFiles($this->workspace, true))->toEqual($before)
+        ->and(file_exists($this->workspace.'/app/Greeting.php'))->toBeFalse()
+        ->and(file_exists($this->workspace.'/tests/Feature/GreetingTest.php'))->toBeFalse()
+        ->and(file_exists($this->workspace.'/.gitignore'))->toBeFalse()
+        ->and(file_exists($this->workspace.'/.molly'))->toBeFalse()
+        ->and(Task::count())->toBe(0);
+});
+
 it('refuses a repository with no commit without committing for the user', function () {
     (new Process(['git', 'init', '--quiet', $this->workspace]))->mustRun();
 

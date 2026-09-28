@@ -31,15 +31,15 @@ class MollyDemoCommand extends Command
 
     protected $description = 'Scaffold the first greeting demo task for Terminal and Bloom';
 
-    public function handle(CreateTask $create, ShowTask $show): int
+    public function handle(CreateTask $create, ShowTask $show, ObserveCheckout $observe): int
     {
         try {
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $files = new Workspace($workspace);
             $root = $files->path;
-            // Creating the task needs Git and a checkout; check both before writing the demo files.
+            // Creating the task needs Git and a committed checkout; check both before writing the demo files.
             GitBinary::require();
-            ObserveCheckout::requireCheckout($root);
+            $observe->requireCommit($root);
 
             $this->ensureMollyGitignored($root);
             $createdGreeting = $this->ensureGreetingStub($root);
