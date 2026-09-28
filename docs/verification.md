@@ -41,6 +41,16 @@ A receipt records the verifier, its state (`PASS`, `FAIL`, `REVIEW_REQUIRED`, or
 
 When the agent is Ollama, Molly asks the configured loopback server which model answered, right after the model call: the Ollama version from `/api/version`, family, parameter size, quantization, and maximum context from `/api/show`, and the digest, loaded context length, memory size, and VRAM size from `/api/ps`. If the model is no longer loaded, the digest comes from `/api/tags`. The run report saves this as `model_identity` with the generation time in milliseconds, and every receipt carries it under `context.model_identity`. Any value Ollama did not report, including concurrency, which Ollama does not expose, is recorded as `unavailable`. `model_identity.sources` shows which requests answered.
 
+## Secret redaction
+
+Molly replaces secrets with `[redacted:NAME]` before it saves or prints run evidence. Three passes run in order:
+
+- Values of environment variables whose names look secret, such as `APP_KEY`, `DB_PASSWORD`, `TYPESAFE_API_KEY`, `AWS_*`, or any name with a `KEY`, `SECRET`, `TOKEN`, `PASSWORD`, or `CREDENTIALS` segment. Molly reads them from its own process and from the workspace `.env`, which it never writes. Values shorter than 8 characters, and letter-only values shorter than 16, are left alone so ordinary words are not rewritten.
+- Token shapes: GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), `sk-` API keys, `base64:` Laravel keys, JWTs, AWS access key IDs, and PEM private key blocks. The replacement names the kind, such as `[redacted:github_token]`.
+- In `effective_config` and the task settings snapshot, the whole value under a secret-named key, such as `api_key` or `webhook_secret`.
+
+The pass runs on the run report and `effective_config` when they are saved and again when they are read, so reports saved by an older Molly are also redacted in `molly:show`, `molly:task`, the web pages, MCP, journals, and handoffs. It also runs on receipts before the evidence digest is computed, on lifecycle event payloads, on exported journals, on the Bloom contract request, on saved conversations, and on command error messages. Files in `storage/molly/RUN_ID`, such as the raw JUnit report, are kept as the tools wrote them. Task prompts are stored as typed, because the model needs them; they are redacted in journals and the Bloom contract.
+
 ## The Pest check
 
 Molly runs only the required test file, not your whole suite, and it wants real evidence: a JUnit report naming that file with at least one executed test and at least one assertion.
@@ -106,7 +116,7 @@ Each finding is classified as essential, pragmatic, or accidental. Only unresolv
 
 ## Clever measurements
 
-Molly measures the code before and after the change with the bundled Clever probes and keeps each number separate. They describe the change; they are not a score and never block completion on their own. You can run them yourself:
+Molly measures the code before and after the change with the bundled Clever probes and keeps each number separate. They describe the change; they are not a score and never block completion on their own. When Clever is disabled, missing, or fails, the run continues and the report records `complexity_before` and `complexity_after` with the status `unavailable` or `error` and the reason. Molly never reports a missing measurement as passing. You can run them yourself:
 
 ```bash
 php artisan clever:scan

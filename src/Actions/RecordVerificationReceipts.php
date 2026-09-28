@@ -7,6 +7,7 @@ use DateTimeZone;
 use Illuminate\Support\Facades\File;
 use Sifrious\Molly\Contracts\JsonDocument;
 use Sifrious\Molly\Contracts\VerificationOutcome;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Verification\FailureAction;
 use Sifrious\Molly\Verification\VerificationState;
 use Sifrious\Molly\Verification\VerifierPolicy;
@@ -15,13 +16,19 @@ use Sifrious\Molly\Workspace\Directory;
 
 final class RecordVerificationReceipts
 {
+    public function __construct(private SecretRedactor $redactor) {}
+
     /**
+     * Receipts are immutable and digest-covered, so the report is redacted before
+     * any payload is digested or written.
+     *
      * @param  array<string, mixed>  $report
      * @return list<array<string, mixed>>
      */
     public function handle(string $workspace, string $runId, array $report): array
     {
         $finishedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $report = $this->redactor->value($report, $workspace);
         $receipts = [];
         foreach ($report['verification_outcomes'] ?? [] as $name => $outcome) {
             if (! is_string($name) || ! is_array($outcome)) {

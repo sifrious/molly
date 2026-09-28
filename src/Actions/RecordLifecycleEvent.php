@@ -8,12 +8,15 @@ use Illuminate\Support\Str;
 use Sifrious\Molly\Contracts\LifecycleEvent;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Contracts\LifecycleLog;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class RecordLifecycleEvent
 {
+    public function __construct(private SecretRedactor $redactor) {}
+
     /** @param  array<string, mixed>  $payload */
     public function handle(string $workspace, LifecycleEventType $type, string $taskId, ?string $runId = null, array $payload = [], ?string $eventId = null): bool
     {
@@ -23,7 +26,7 @@ class RecordLifecycleEvent
             new DateTimeImmutable('now', new DateTimeZone('UTC')),
             $taskId,
             $runId,
-            $payload,
+            $this->redactor->value($payload, $workspace),
         );
 
         $log = $this->load($workspace);
