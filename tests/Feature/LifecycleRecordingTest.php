@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CreateTask;
@@ -11,6 +12,7 @@ use Sifrious\Molly\Actions\ShowRuntimeStatus;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\Actions\StopTask;
 use Sifrious\Molly\Actions\VerifyChanges;
+use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Contracts\DispatchDecision;
 use Sifrious\Molly\Contracts\DisplayStatus;
@@ -273,4 +275,46 @@ it('leaves an abandoned task failed and retryable when its retry is refused', fu
         ->and($task->fresh()->status)->toBe('completed')
         ->and($task->fresh()->attempt_number)->toBe(2)
         ->and($task->fresh()->worker_id)->toBeNull();
+});
+
+it('shows an abandoned task as failed in molly:task after a refused molly:retry recovers it', function (): void {
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::AgentStarted, $task->id);
+    $task->update([
+        'status' => 'running',
+        'attempt_number' => 1,
+        'worker_id' => 'dead-worker',
+        'claimed_at' => now()->subMinutes(30),
+        'heartbeat_at' => now()->subMinutes(12),
+        'lease_expires_at' => now()->subMinutes(10),
+    ]);
+    $unsafe = new Sandbox;
+    (fn () => $this->available = false)->call($unsafe);
+    app()->instance(Sandbox::class, $unsafe);
+    config(['molly.sandbox.allow_unsafe' => false]);
+
+    expect(Artisan::call('molly:retry', ['task' => $task->id, '--json' => true]))->toBe(1)
+        ->and(Artisan::call('molly:task', ['task' => $task->id, '--json' => true]))->toBe(0);
+    $shown = json_decode(Artisan::output(), true);
+
+    $recovered = app(RecordLifecycleEvent::class)->load($this->workspace)->latestOf($task->id, LifecycleEventType::Failed);
+    expect($task->fresh()->status)->toBe('failed')
+        ->and($shown['status'])->toBe('failed')
+        ->and($shown['display_status'])->toBe('failed')
+        ->and($recovered->payload)->toMatchArray(['reason' => 'lease_expired', 'worker_id' => 'dead-worker'])
+        ->and(lifecycleTypes($this->workspace, $task->id))->toBe(['created', 'agent_started', 'failed', 'start_refused']);
+
+    expect(Artisan::call('molly:retry', ['task' => $task->id, '--json' => true]))->toBe(1)
+        ->and(lifecycleTypes($this->workspace, $task->id))->toBe(['created', 'agent_started', 'failed', 'start_refused', 'start_refused']);
+});
+
+it('records no lease recovery when the workspace has no lifecycle log', function (): void {
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    File::delete($this->workspace.'/.molly/lifecycle.jsonl');
+    $task->update(['status' => 'running', 'attempt_number' => 1, 'worker_id' => 'dead-worker', 'lease_expires_at' => now()->subMinutes(10)]);
+
+    app(LocalAgentBus::class)->recoverIfAbandoned($task);
+
+    expect($task->fresh()->status)->toBe('failed')
+        ->and(is_file($this->workspace.'/.molly/lifecycle.jsonl'))->toBeFalse();
 });

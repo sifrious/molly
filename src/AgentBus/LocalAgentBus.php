@@ -5,6 +5,8 @@ namespace Sifrious\Molly\AgentBus;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Sifrious\Molly\Actions\RecordLifecycleEvent;
+use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 
 /**
@@ -12,6 +14,8 @@ use Sifrious\Molly\Models\Task;
  */
 final class LocalAgentBus
 {
+    public function __construct(private RecordLifecycleEvent $lifecycle) {}
+
     public function leaseSeconds(): int
     {
         $seconds = config('molly.agent_bus.lease_seconds', 120);
@@ -223,11 +227,15 @@ final class LocalAgentBus
     /**
      * Mark a running task whose lease has expired as failed so it can be retried.
      * Callers snapshot the task after this, so a refused start restores the recovered state.
+     * When .molly/lifecycle.jsonl already exists, a failed event with reason lease_expired is
+     * appended once the recovery commits, so the displayed status matches the task row.
      */
     public function recoverIfAbandoned(Task $task): Task
     {
         if ($task->status === 'running' && $this->leaseExpired($task)) {
-            Task::query()
+            $workerId = $task->worker_id;
+            $leaseExpiresAt = $task->lease_expires_at?->toIso8601String();
+            $recovered = Task::query()
                 ->whereKey($task->id)
                 ->where('status', 'running')
                 ->where('lease_expires_at', '<', now())
@@ -238,8 +246,23 @@ final class LocalAgentBus
                     'heartbeat_at' => null,
                 ]);
             $task->refresh();
+            if ($recovered === 1) {
+                DB::afterCommit(fn () => $this->recordRecovery($task, $workerId, $leaseExpiresAt));
+            }
         }
 
         return $task;
+    }
+
+    private function recordRecovery(Task $task, ?string $workerId, ?string $leaseExpiresAt): void
+    {
+        if (! is_file(rtrim($task->workspace, '/').'/.molly/lifecycle.jsonl')) {
+            return;
+        }
+        $this->lifecycle->handle($task->workspace, LifecycleEventType::Failed, $task->id, payload: [
+            'reason' => 'lease_expired',
+            'worker_id' => $workerId,
+            'lease_expires_at' => $leaseExpiresAt,
+        ]);
     }
 }
