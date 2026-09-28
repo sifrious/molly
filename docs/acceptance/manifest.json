@@ -31,8 +31,8 @@
         "M10.3"
       ],
       "tests": [
-        "DetectLaravelAiClassificationTest: does not treat structured-agent support as decide support",
-        "ClassificationAdapterTest: uses fallback capability detection when Laravel AI lacks the decide capability"
+        "tests/Unit/Classification/DetectLaravelAiClassificationTest.php: does not treat structured-agent support or package presence as choice capability",
+        "tests/Unit/ClassificationAdapterTest.php: uses fallback capability detection when Laravel AI lacks the decide capability"
       ]
     },
     "no-application-source-index": {
@@ -1804,7 +1804,7 @@
           "mode": "package",
           "starting_state": "junit",
           "action": "gate reads counts",
-          "expected": "counts equal frozen expectation; skips only with declared reason",
+          "expected": "The suite at the candidate commit exits 0 with 0 failed. Every skip carries a declared key that applies to M10.3. The discovered count is at least the 048ad82 baseline of 1111, and it equals the count recorded when the same candidate runs in CI, once CI runs. A lower count than the previous candidate needs a written reason.",
           "method": "gate",
           "evidence": "counts.json",
           "timeout_s": 300,
@@ -2394,6 +2394,15 @@
       "change": "M08.7 may be recorded as not applicable with key no-application-source-index.",
       "reason": "Scope decision in Mary's MVP completion prompt (2026-09-28), recorded on Todoist task 6hfCHHR7PmXGRrwH. No source-indexing capability is part of the launch contract.",
       "invalidates": "none; M08.7 was never PASS"
+    },
+    {
+      "date": "2026-09-28",
+      "subcases": [
+        "M10.3"
+      ],
+      "change": "The expected test count is now a rule rather than a single frozen number. The two declared fallback tests are listed by their current names.",
+      "reason": "The manifest froze only the 048ad82 baseline (1111 tests). Every candidate since then adds tests, so the expected count must follow the candidate. Otherwise a count check can never pass, or it passes against a stale number.",
+      "invalidates": "RC9 M10.3 record (BLOCKED for a missing expectation) must be rerun on the next candidate"
     }
   ]
 }
