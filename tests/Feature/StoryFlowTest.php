@@ -89,7 +89,7 @@ it('prints the criteria and the next commands from molly:story', function () {
         '--name' => 'counter-story',
     ])->expectsOutputToContain('1. '.$this->criteria[0])
         ->expectsOutputToContain('php artisan molly:start counter-story')
-        ->expectsOutputToContain('php artisan molly:lock-test counter-story --approve --file=routes/web.php')
+        ->expectsOutputToContain('php artisan molly:lock-test counter-story --approve locks it')
         ->assertSuccessful();
 
     Artisan::call('molly:story', [
@@ -181,4 +181,19 @@ it('prints the derived implementation files and the dropped paths from molly:sto
         ->expectsOutputToContain('routes/web.php')
         ->expectsOutputToContain('Molly left out config/app.php. PATH_INVALID')
         ->assertSuccessful();
+});
+
+it('shows the derived files and the lock command in molly:task after the authoring run', function () {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files]])->preventStrayPrompts();
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php', 'counter-story');
+
+    Artisan::call('molly:task', ['task' => 'counter-story']);
+    expect(Artisan::output())->toContain('File derived for the implementation', 'resources/views/counter.blade.php', 'php artisan molly:start counter-story')
+        ->not->toContain('molly:lock-test');
+
+    $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => []]);
+    Task::whereKey($task->id)->update(['status' => 'failed']);
+
+    Artisan::call('molly:task', ['task' => 'counter-story']);
+    expect(Artisan::output())->toContain('lock it with php artisan molly:lock-test counter-story --approve.');
 });

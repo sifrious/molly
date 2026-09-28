@@ -9,7 +9,7 @@ For a first run, read [Getting started](../getting-started.md) instead of this p
 | Command | What it does |
 | --- | --- |
 | `molly:create [PROMPT]` | Saves a pending task. Does not call the model. |
-| `molly:story [STORY] --test=… [--file=…]` | Asks the configured model for numbered acceptance criteria, saves them on a new test-authoring task, and prints the next three commands. |
+| `molly:story [STORY] --test=… [--file=…]` | Asks the configured model for numbered acceptance criteria and the files the implementation will change, saves them on a new test-authoring task, and prints the next three commands. Run them as printed. |
 | `molly:start TASK` | Runs a pending task in the terminal. Exits `0` only when the run completes. |
 | `molly:retry TASK` | Starts another attempt for a failed or stopped task. |
 | `molly:stop TASK` | Stops a pending task, or asks a running one to stop at its next step. |
@@ -83,7 +83,7 @@ With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (th
 | Command | What it does |
 | --- | --- |
 | `molly:approve TASK --approve` | Records that a person approved the verified change. |
-| `molly:lock-test TASK --approve [--file=PATH] [--reason=TEXT]` | Locks a written Pest test, runs it once to record the RED baseline, and starts the implementation scope. Run it again to record a new baseline after fixing the test. |
+| `molly:lock-test TASK --approve [--file=PATH] [--reason=TEXT]` | Locks a written Pest test, runs it once to record the RED baseline, and starts the implementation scope. Without `--file`, the scope is the files `molly:story` derived; `--file` replaces them. Prints the files the implementation may change. Run it again to record a new baseline after fixing the test. |
 | `molly:pr-body TASK [--close]` | Prints a pull request description after approval. `--close` adds closing language for an imported issue. |
 | `molly:comment TASK --approve [--close]` | Posts or updates one GitHub issue comment. |
 | `molly:pr-opened TASK --url URL --approve` | Records a pull request a person opened. |

@@ -13,7 +13,7 @@ Create or add a disposable project. Submit this story with `php artisan molly:st
 
 "Build a minimal authentication page and Livewire counter. Guests see “Hello stranger” and cannot use the counter. Authenticated users see “Hello world” and can increment the counter. Login and logout must work."
 
-Inspect the derived acceptance criteria. Run the authoring task, approve the test lock, and read the RED baseline. Run the implementation through Molly's configured local model.
+Inspect the derived acceptance criteria and implementation files. Run the three commands `molly:story` prints, in order: `php artisan molly:start TASK` writes the test, `php artisan molly:lock-test TASK --approve` locks it with the derived files and records the RED baseline, and `php artisan molly:start TASK` runs the implementation. Read the RED baseline before the last command. Run the implementation through Molly's configured local model.
 
 Verify the result independently, inspect the diff and receipts, demonstrate stop and resume or one recovery case, and export the handoff with `php artisan molly:handoff`.
 

@@ -43,8 +43,8 @@ class MollyStoryCommand extends Command
 
             $task = $action->handle($story, (string) ($this->option('workspace') ?: base_path()), $paths, $test, $this->option('name'));
             $reference = $task->reference();
-            $lock = 'php artisan molly:lock-test '.$reference.' --approve'.implode('', array_map(fn (string $path): string => ' --file='.$path, $paths));
-            $next = ['php artisan molly:start '.$reference, $lock, 'php artisan molly:start '.$reference];
+            // The lock uses the task's files and the derived scope, so the printed command needs no --file.
+            $next = ['php artisan molly:start '.$reference, 'php artisan molly:lock-test '.$reference.' --approve', 'php artisan molly:start '.$reference];
 
             if ($this->option('json')) {
                 $this->line(json_encode([
@@ -69,7 +69,7 @@ class MollyStoryCommand extends Command
             }
             note('Saved test-authoring task '.$reference.'. Review the criteria, then run these commands in order.');
             $this->line('1. '.$next[0].' writes the Pest test.');
-            $this->line('2. '.$next[1].' locks it and records the RED baseline.');
+            $this->line('2. '.$next[1].' locks it, allows the implementation files above, and records the RED baseline.');
             $this->line('3. '.$next[2].' implements against the locked test.');
 
             return self::SUCCESS;
