@@ -29,7 +29,7 @@ function laravelShapedWorkspace(): string
     File::put($workspace.'/vendor/autoload.php', "<?php\n\n\$loader = require ".var_export($vendor.'/autoload.php', true).";\n\$loader->addPsr4('Tests\\\\', __DIR__.'/../tests/');\n\$loader->addPsr4('App\\\\', __DIR__.'/../app/');\n\nreturn \$loader;\n");
     File::put($workspace.'/phpunit.xml', '<?xml version="1.0" encoding="UTF-8"?><phpunit bootstrap="vendor/autoload.php"><testsuites><testsuite name="Workspace"><directory>tests</directory></testsuite></testsuites></phpunit>');
     File::put($workspace.'/tests/TestCase.php', "<?php\n\nnamespace Tests;\n\nabstract class TestCase extends \\Orchestra\\Testbench\\TestCase {}\n");
-    File::put($workspace.'/tests/Pest.php', "<?php\n\npest()->extend(Tests\\TestCase::class)\n    // ->use(Illuminate\\Foundation\\Testing\\RefreshDatabase::class)\n    ->in('Feature');\n");
+    File::put($workspace.'/tests/Pest.php', "<?php\n\nuse Illuminate\\Foundation\\Testing\\RefreshDatabase;\nuse Tests\\TestCase;\n\npest()->extend(TestCase::class)\n // ->use(RefreshDatabase::class)\n    ->in('Feature');\n");
     commitGitWorkspace($workspace);
 
     return $workspace;

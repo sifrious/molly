@@ -229,7 +229,7 @@ class RecordRedBaseline
         };
     }
 
-    /** Whether the test file or tests/Pest.php applies a trait that migrates the database, ignoring comments. */
+    /** Whether the test file or tests/Pest.php applies a trait that migrates the database. */
     private function appliesDatabaseTrait(string $workspace, string $testPath): bool
     {
         $files = new Workspace($workspace);
@@ -239,15 +239,56 @@ class RecordRedBaseline
             } catch (Throwable) {
                 continue;
             }
-            foreach (token_get_all((string) $contents) as $token) {
-                if (is_array($token) && in_array($token[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)
-                    && in_array(substr((string) strrchr('\\'.$token[1], '\\'), 1), self::DATABASE_TRAITS, true)) {
-                    return true;
-                }
+            if ($this->namesDatabaseTrait(token_get_all((string) $contents))) {
+                return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Whether code names a database trait outside comments and outside
+     * top-level `use` imports, which name a trait without applying it.
+     *
+     * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
+     */
+    private function namesDatabaseTrait(array $tokens): bool
+    {
+        $depth = 0;
+        $importing = false;
+        foreach ($tokens as $index => $token) {
+            $text = is_array($token) ? $token[1] : $token;
+            if ($importing) {
+                $importing = $text !== ';';
+
+                continue;
+            }
+            if ($text === '{' || (is_array($token) && in_array($token[0], [T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES], true))) {
+                $depth++;
+            } elseif ($text === '}') {
+                $depth--;
+            } elseif (is_array($token) && $token[0] === T_USE && $depth === 0 && $this->nextCode($tokens, $index) !== '(') {
+                $importing = true;
+            } elseif (is_array($token) && in_array($token[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)
+                && in_array(substr((string) strrchr('\\'.$token[1], '\\'), 1), self::DATABASE_TRAITS, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param  list<array{0: int, 1: string, 2: int}|string>  $tokens */
+    private function nextCode(array $tokens, int $index): ?string
+    {
+        foreach (array_slice($tokens, $index + 1) as $token) {
+            if (! is_array($token) || ! in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                return is_array($token) ? $token[1] : $token;
+            }
+        }
+
+        return null;
     }
 
     private function digest(mixed $path): ?string
