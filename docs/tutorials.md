@@ -50,6 +50,8 @@ php artisan molly:import https://github.com/OWNER/REPO/issues/42 \
 
 Molly reads the issue title and body and saves them with the task. It does not start the task or write anything to GitHub. Write the test (or use the [test-first flow](#write-the-test-first) with `--allow-test-edits`), then start the task as usual.
 
+When the issue lists acceptance criteria, add `--allow-test-edits --todos` and Molly writes one Pest todo per criterion to the new test file. [Acceptance criteria to Pest todos](github-todos.md) follows that flow from the issue to a locked test.
+
 After a completed run and your review, record the approval and let Molly write the pull request text:
 
 ```bash

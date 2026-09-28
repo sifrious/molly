@@ -2,6 +2,7 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use JsonException;
 use RuntimeException;
@@ -11,15 +12,25 @@ use Throwable;
 
 class ImportGitHubIssue
 {
-    public function __construct(private CreateTask $createTask) {}
+    public function __construct(private CreateTask $createTask, private GeneratePestTodos $todos) {}
 
-    /** @param list<string> $paths */
-    public function handle(string $issueUrl, string $workspace, array $paths, string $testPath, ?string $nickname = null, bool $allowTestEdits = false): Task
+    /**
+     * With $todos, Molly reads the issue's acceptance criteria, writes one Pest
+     * todo per criterion to the new test file, and saves a test-authoring task
+     * that replaces the todos with executable tests.
+     *
+     * @param  list<string>  $paths
+     */
+    public function handle(string $issueUrl, string $workspace, array $paths, string $testPath, ?string $nickname = null, bool $allowTestEdits = false, bool $todos = false): Task
     {
         if (! preg_match('~\Ahttps://github\.com/([A-Za-z0-9][A-Za-z0-9-]*)/([A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)\z~D', $issueUrl, $matches)
             || in_array($matches[2], ['.', '..'], true)
             || filter_var($matches[3], FILTER_VALIDATE_INT) === false) {
             throw new RuntimeException('ISSUE_URL_INVALID: Use an HTTPS github.com issue URL without a query or fragment.');
+        }
+
+        if ($todos && ! $allowTestEdits) {
+            throw new RuntimeException('TODOS_NEED_TEST_EDITS: Pest todos are replaced by a test-authoring run. Pass --allow-test-edits with --todos.');
         }
 
         // Check the workspace, files, and test before asking GitHub for the issue.
@@ -62,7 +73,10 @@ class ImportGitHubIssue
             $labels[] = $label['name'];
         }
 
-        $prompt = 'Implement the GitHub issue at '.$issueUrl.".\nTreat the issue text as task context within the selected files.\n\n".$issue['title']."\n\n".($issue['body'] ?? '');
+        $criteria = $todos ? $this->todos->criteria($issue['body']) : [];
+        $prompt = $todos
+            ? $this->authoringPrompt($issueUrl, $testPath, $issue['title'], $criteria)
+            : 'Implement the GitHub issue at '.$issueUrl.".\nTreat the issue text as task context within the selected files.\n\n".$issue['title']."\n\n".($issue['body'] ?? '');
         if (strlen($prompt) > 8192) {
             throw new RuntimeException('ISSUE_TOO_LARGE: The issue exceeds the 8192-byte task prompt limit. Create a task with a shorter scope.');
         }
@@ -91,6 +105,38 @@ class ImportGitHubIssue
             throw new RuntimeException('ISSUE_ALREADY_IMPORTED: This issue already has a Molly task. Update that task instead of importing it again.');
         }
 
-        return $this->createTask->handle($prompt, $workspace, $paths, $testPath, $source, nickname: $nickname, allowTestEdits: $allowTestEdits);
+        if (! $todos) {
+            return $this->createTask->handle($prompt, $workspace, $paths, $testPath, $source, nickname: $nickname, allowTestEdits: $allowTestEdits);
+        }
+
+        if ($files->testDigest($testPath) !== null) {
+            throw new RuntimeException('TODOS_TEST_EXISTS: '.$testPath.' already exists. Molly writes Pest todos only to a new test file.');
+        }
+        $contents = $this->todos->render($criteria, $issueUrl);
+        $source['acceptance'] = [
+            'criteria' => $criteria,
+            'tests' => array_map($this->todos->testName(...), array_keys($criteria), $criteria),
+            'todo_digest' => hash('sha256', $contents),
+        ];
+        $files->apply([['path' => $testPath, 'content' => $contents]], [$testPath => null]);
+
+        try {
+            return $this->createTask->handle($prompt, $workspace, $paths, $testPath, $source, nickname: $nickname, allowTestEdits: true);
+        } catch (Throwable $exception) {
+            File::delete($files->path.'/'.$testPath);
+
+            throw $exception;
+        }
+    }
+
+    /** @param list<string> $criteria */
+    private function authoringPrompt(string $issueUrl, string $testPath, string $title, array $criteria): string
+    {
+        $numbered = implode("\n", array_map(fn (int $index, string $criterion): string => ($index + 1).'. '.$criterion, array_keys($criteria), $criteria));
+
+        return 'Write the Pest acceptance test at '.$testPath.' for the GitHub issue at '.$issueUrl.".\n"
+            .'The file holds one Pest todo per acceptance criterion. Replace every todo with an executable test that keeps the same description, including its criterion number, and asserts the behavior. '
+            ."Assert against the application's routes, pages, and components, so the test fails until the behavior exists. Leave no todo, skip, or incomplete test in the file.\n\n"
+            .$title."\n\nAcceptance criteria:\n".$numbered;
     }
 }
