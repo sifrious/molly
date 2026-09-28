@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\InspectProjectGraph;
 use Sifrious\Molly\Actions\RetryTask;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\Jobs\StartSavedTask;
@@ -248,4 +249,24 @@ it('keeps absent evidence distinct from zero measurements', function () {
         ->assertSee('0 of 7 checks recorded.')->assertSee('Tests: Not recorded')->assertSee('No Clever measurements recorded.')->assertSee('No changed files recorded.');
     $run->update(['status' => 'failed']);
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertDontSee('Run status: failed. Reviewing complexity.');
+});
+
+it('says the relationships table is empty when a snapshot has no edges', function () {
+    $this->mock(InspectProjectGraph::class)
+        ->shouldReceive('handle')
+        ->andReturn([
+            'workspace' => $this->workspace, 'namespace' => 'project', 'version' => '1', 'database' => 'db',
+            'sources' => 0, 'nodes' => [], 'edges' => [], 'blockers' => [], 'truncated' => false,
+        ]);
+
+    $this->get('/molly/graph?workspace='.urlencode($this->workspace))
+        ->assertOk()
+        ->assertSeeText('This snapshot has no relationships yet.');
+});
+
+it('keeps checkbox inputs inline and table text wrapping at word boundaries', function () {
+    $css = File::get(dirname(__DIR__, 2).'/resources/views/layout.blade.php');
+
+    expect($css)->toContain('input[type="checkbox"] { display: inline-block')
+        ->and($css)->not->toContain('border-bottom: 1px solid #bac2ba; overflow-wrap: anywhere;');
 });
