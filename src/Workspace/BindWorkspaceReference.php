@@ -28,7 +28,8 @@ final class BindWorkspaceReference
             throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.$obs['path'].' has no commit yet. Commit your work, then try again.');
         }
 
-        $gitMeta = $obs['path'].'/.git';
+        // The app may sit in a subdirectory; the checkout kind comes from the repository root.
+        $gitMeta = $obs['repository_root'].'/.git';
         $checkoutKind = is_file($gitMeta) ? 'worktree' : (is_dir($gitMeta) ? 'clone' : 'unknown');
 
         $root = realpath($obs['path']);

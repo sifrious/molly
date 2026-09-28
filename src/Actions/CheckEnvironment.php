@@ -124,7 +124,13 @@ class CheckEnvironment
      */
     private function checkGitRepository(string|false $workspace, callable $add): void
     {
-        if ($workspace === false || ! ObserveCheckout::isCheckout($workspace)) {
+        $location = $workspace === false ? ['root' => null, 'ignored_by' => null] : ObserveCheckout::locate($workspace);
+        if ($location['ignored_by'] !== null) {
+            $add('Git repository', false, 'workspace_not_git', $workspace.' is ignored by the Git repository at '.$location['ignored_by'].', so its files are not in any commit. Stop ignoring it and commit it before creating a task.');
+
+            return;
+        }
+        if ($location['root'] === null) {
             $add('Git repository', false, 'workspace_not_git', ($workspace === false ? 'The workspace' : $workspace).' is not a Git repository. Molly records the commit each task runs against and never creates a repository for you. Run git init and commit your work before creating a task.');
 
             return;
@@ -132,7 +138,7 @@ class CheckEnvironment
 
         $head = $this->observe->head($workspace);
         $add('Git repository', $head !== null, $head !== null ? 'git_repository' : 'workspace_revision_missing', $head !== null
-            ? 'The workspace is a Git checkout at commit '.$head.'.'
+            ? 'The workspace is a Git checkout at commit '.$head.($location['root'] !== $workspace ? ' in the repository at '.$location['root'] : '').'.'
             : $workspace.' is a Git repository with no commit yet. Commit your work before creating a task.');
     }
 
