@@ -27,6 +27,35 @@ The test must already exist. Molly records its digest and protects it from the a
 
 Molly accepts paths under `app/`, `routes/`, `resources/`, and `tests/`. By default a task may name up to eight writable files, each up to 64 KB, and the protected test does not count toward that limit. Hidden paths, symlinks, directories, and paths that leave the workspace are rejected. `--workspace=PATH` points the task at another checkout; the default is the application itself.
 
+## Start from a story
+
+`molly:story` turns a plain-English story into a test-authoring task:
+
+```bash
+php artisan molly:story 'Guests see "Hello stranger". Signed-in users see "Hello world".' \
+  --test=tests/Feature/HelloTest.php
+```
+
+The configured model returns three things, and Molly saves each on the task:
+
+- Numbered acceptance criteria, in `source.acceptance`.
+- The application files the implementation will create or change, in `source.scope.files`. Molly checks each path with the [file scope](#file-scope) rules and keeps the ones that pass. A path it drops, such as `config/app.php`, a migration, or the test itself, is listed in `source.scope.rejected` with the reason. The authoring run cannot write these files; it writes only the test.
+- The Composer packages the behavior needs, in `source.scope.required_packages`. Molly compares each name with the `require` list in `composer.json` and with `composer.lock`, and marks it `required`, `dev_only`, `transitive`, or `missing`.
+
+The command prints the criteria, the files, and three commands. Run them as printed:
+
+```bash
+php artisan molly:start TASK
+php artisan molly:lock-test TASK --approve
+php artisan molly:start TASK
+```
+
+The first run writes the test. Read it before the second command. `molly:lock-test --approve` locks the test, allows the implementation to change the derived files, prints them, and records the RED baseline. Pass `--file` to replace the derived files with your own. The last command runs the implementation against the locked test.
+
+When a package is not in `require`, `molly:story` prints a command such as `composer require livewire/livewire`. Run it before the implementation run, which cannot add packages. Molly never runs Composer for you. Molly depends on `livewire/livewire`, so when Molly is installed with `--dev`, Livewire is present during development but shows as `dev_only`: your application does not declare it, and a production install leaves it out.
+
+When the model names no usable file, `molly:story` fails with `SCOPE_EMPTY` and saves no task. See [Troubleshooting](troubleshooting.md#the-story-has-no-implementation-files).
+
 ## Start a task
 
 ```bash

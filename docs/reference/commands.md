@@ -166,6 +166,8 @@ A failed command prints its error on stderr, so stdout carries only the report. 
 
 `molly:create`, `molly:run`, `molly:import`, and `molly:story` check their own inputs before anything else. A missing prompt fails with `PROMPT_REQUIRED`, a missing story with `STORY_REQUIRED`, a missing `--test` with `TEST_REQUIRED`, a test file that does not exist with `PROTECTED_TEST_MISSING`, and a directory that is not a Laravel application with `WORKSPACE_INVALID`. `molly:run` reports these before it refuses a host without a sandbox, and `molly:import` reports them before it asks GitHub for the issue.
 
+`molly:story` fails with `SCOPE_EMPTY` when the model names no file the implementation may change, and saves no task. `molly:lock-test` fails with `SCOPE_REQUIRED` when the task has no derived files and no `--file` was given; the message includes a command to run. See [Troubleshooting](../troubleshooting.md#the-story-has-no-implementation-files).
+
 `molly:check INPUT OUTPUT` is internal to the parallel check runner. It takes no `--json` flag; it reads its input file and writes its result to the output file. Do not call it.
 
 ## Related

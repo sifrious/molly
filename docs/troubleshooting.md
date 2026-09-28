@@ -140,6 +140,22 @@ vendor/bin/pest tests/Feature/YourTest.php
 
 Do not weaken the assertions to get a retry through.
 
+## The story has no implementation files
+
+`SCOPE_EMPTY` from `molly:story` means the model named no file Molly may change. The message lists each path it named and why Molly dropped it. Molly lets the implementation change files under `app/`, `routes/`, `resources/`, and `tests/` only, so a story that the model answers with only `config/` or `database/` paths ends here. No task is saved. Run the story again, reword it to name the page or route, or pass the files yourself:
+
+```bash
+php artisan molly:story 'STORY' --test=tests/Feature/StoryTest.php --file=routes/web.php
+```
+
+## The lock has no implementation files
+
+`SCOPE_REQUIRED` from `molly:lock-test` means the task has no files for the implementation: it has no files derived from a story and you passed no `--file`. The test stays unlocked. The message ends with a command that names existing files from `routes/`, `app/`, and `resources/views/`. Check those files, change them if needed, and run it:
+
+```bash
+php artisan molly:lock-test TASK --approve --file=routes/web.php
+```
+
 ## Tarpit blocks completion
 
 Read the finding: file, line, problem, classification, and recommendation. Only unresolved accidental complexity blocks. `REVIEW_INVALID` means the model returned an incomplete or inconsistent review, so Molly has no review evidence; small models do this often, and a larger one usually fixes it. A passing review never overrides a failed test.

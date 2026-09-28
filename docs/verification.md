@@ -69,7 +69,7 @@ The Pest test that defines a task is protected by default. Molly records its SHA
 
 When you want Molly to write the test itself, create a separate task with `--allow-test-edits`, then lock the result with `molly:lock-test` before the implementation task. [Tutorials](tutorials.md#write-the-test-first) shows the whole flow.
 
-`molly:story` starts that flow from a plain-English story. It asks the configured model for numbered acceptance criteria, saves them on the task in `source.acceptance` with the model name and a prompt digest, and creates the test-authoring task. It does not run anything else.
+`molly:story` starts that flow from a plain-English story. It asks the configured model for numbered acceptance criteria, the files the implementation will change, and the Composer packages the behavior needs. It saves them on the task in `source.acceptance` and `source.scope` with the model name and a prompt digest, and creates the test-authoring task. It does not run anything else. `molly:lock-test --approve` then uses the derived files as the implementation scope. [Tasks](tasks.md#start-from-a-story) shows the commands.
 
 ### RED baseline
 

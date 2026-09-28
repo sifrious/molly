@@ -43,6 +43,17 @@ git diff
 vendor/bin/pest
 ```
 
+To build a feature from a story instead of the demo, let Molly write the test, lock it, and implement it. `molly:story` prints the same three commands with the task name filled in:
+
+```bash
+php artisan molly:story 'Guests see "Hello stranger". Signed-in users see "Hello world".' --test=tests/Feature/HelloTest.php
+php artisan molly:start TASK
+php artisan molly:lock-test TASK --approve
+php artisan molly:start TASK
+```
+
+Run any `composer require` command that `molly:story` prints before the last command. [Tasks](tasks.md#start-from-a-story) explains each step.
+
 No Laravel application yet? The demo installer creates one:
 
 ```bash
