@@ -11,6 +11,7 @@ use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 use function Laravel\Prompts\textarea;
+use function Laravel\Prompts\warning;
 
 class MollyStoryCommand extends Command
 {
@@ -50,6 +51,7 @@ class MollyStoryCommand extends Command
                     'id' => $task->id,
                     'status' => $task->status,
                     'acceptance' => $task->source['acceptance'],
+                    'scope' => $task->source['scope'],
                     'next' => $next,
                     'task' => $task->toArray(),
                 ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
@@ -59,6 +61,12 @@ class MollyStoryCommand extends Command
 
             info('Acceptance criteria');
             $this->line($task->source['acceptance']['text']);
+            $scope = $task->source['scope'];
+            info('Implementation files');
+            $this->line(implode("\n", [...$paths, ...$scope['files']]));
+            foreach ($scope['rejected'] as $rejected) {
+                warning('Molly left out '.$rejected['path'].'. '.$rejected['reason']);
+            }
             note('Saved test-authoring task '.$reference.'. Review the criteria, then run these commands in order.');
             $this->line('1. '.$next[0].' writes the Pest test.');
             $this->line('2. '.$next[1].' locks it and records the RED baseline.');

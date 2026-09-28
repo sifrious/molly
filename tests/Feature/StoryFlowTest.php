@@ -20,6 +20,7 @@ beforeEach(function () {
         'A signed-in user who presses the counter button sees the count go up by one.',
         'A guest who tries to press the counter button receives HTTP 403.',
     ];
+    $this->files = ['routes/web.php', 'resources/views/counter.blade.php'];
 });
 
 afterEach(function () {
@@ -27,7 +28,7 @@ afterEach(function () {
 });
 
 it('saves model-derived acceptance criteria verbatim on a test-authoring task', function () {
-    AcceptanceWriter::fake([['criteria' => $this->criteria]])->preventStrayPrompts();
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files]])->preventStrayPrompts();
 
     $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, ['routes/web.php'], 'tests/Feature/StoryTest.php', 'counter-story');
     $acceptance = $task->source['acceptance'];
@@ -78,7 +79,7 @@ it('checks the story, workspace, and provider before asking the model', function
 });
 
 it('prints the criteria and the next commands from molly:story', function () {
-    AcceptanceWriter::fake([['criteria' => $this->criteria], ['criteria' => $this->criteria]])->preventStrayPrompts();
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files], ['criteria' => $this->criteria, 'files' => $this->files]])->preventStrayPrompts();
 
     $this->artisan('molly:story', [
         'story' => $this->story,
@@ -102,4 +103,82 @@ it('prints the criteria and the next commands from molly:story', function () {
     expect($json['acceptance']['criteria'])->toBe($this->criteria)
         ->and($json['next'][0])->toBe('php artisan molly:start '.$json['id'])
         ->and($json['task']['allow_test_edits'])->toBeTrue();
+});
+
+it('saves the model-derived implementation files on the task without making them writable for authoring', function () {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files]])->preventStrayPrompts();
+
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+    $scope = $task->source['scope'];
+
+    expect($task->paths)->toBe(['tests/Feature/StoryTest.php'])
+        ->and($scope['files'])->toBe($this->files)
+        ->and($scope['rejected'])->toBe([])
+        ->and($scope['provenance']['model'])->toBe('local-test-model')
+        ->and($scope['provenance']['prompt_digest'])->toBe($task->source['acceptance']['provenance']['prompt_digest'])
+        ->and($scope['provenance']['derived_at'])->toBeString();
+
+    AcceptanceWriter::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('"test_path":"tests/Feature/StoryTest.php"')
+        && $prompt->contains('"existing_files":["routes/web.php"]'));
+});
+
+it('drops derived files outside the workspace rules and records why', function () {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => [
+        'routes/web.php',
+        '/etc/passwd',
+        'app/../.env',
+        'tests/Feature/StoryTest.php',
+        'vendor/livewire/livewire/src/Component.php',
+        '.env',
+        '.molly/identity.json',
+        '.git/config',
+        'database/migrations/2026_01_01_000000_create_counts_table.php',
+        'routes/web.php',
+        'app/Livewire/Counter.php',
+    ]]])->preventStrayPrompts();
+
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+    $rejected = collect($task->source['scope']['rejected'])->pluck('reason', 'path');
+
+    expect($task->source['scope']['files'])->toBe(['routes/web.php', 'app/Livewire/Counter.php'])
+        ->and($rejected->keys()->all())->toBe(['/etc/passwd', 'app/../.env', 'tests/Feature/StoryTest.php', 'vendor/livewire/livewire/src/Component.php', '.env', '.molly/identity.json', '.git/config', 'database/migrations/2026_01_01_000000_create_counts_table.php'])
+        ->and($rejected['tests/Feature/StoryTest.php'])->toStartWith('TEST_PROTECTED:')
+        ->and($rejected['app/../.env'])->toStartWith('PATH_INVALID:')
+        ->and($rejected['database/migrations/2026_01_01_000000_create_counts_table.php'])->toStartWith('PATH_INVALID:')
+        ->and($task->paths)->toBe(['tests/Feature/StoryTest.php']);
+});
+
+it('keeps at most the configured number of implementation files', function () {
+    config(['molly.max_files' => 2]);
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => ['routes/web.php', 'app/Counter.php', 'app/Other.php']]])->preventStrayPrompts();
+
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+
+    expect($task->source['scope']['files'])->toBe(['routes/web.php', 'app/Counter.php'])
+        ->and($task->source['scope']['rejected'][0]['path'])->toBe('app/Other.php')
+        ->and($task->source['scope']['rejected'][0]['reason'])->toStartWith('FILES_INVALID:');
+});
+
+it('fails with SCOPE_EMPTY and saves no task when no derived file is usable', function (array $files) {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $files]])->preventStrayPrompts();
+
+    expect(fn () => app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php'))
+        ->toThrow(RuntimeException::class, 'SCOPE_EMPTY');
+    expect(Task::count())->toBe(0);
+})->with([
+    'no files' => [[]],
+    'only invalid files' => [['.env', 'vendor/autoload.php', 'tests/Feature/StoryTest.php']],
+]);
+
+it('prints the derived implementation files and the dropped paths from molly:story', function () {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => ['routes/web.php', 'config/app.php']]])->preventStrayPrompts();
+
+    $this->artisan('molly:story', [
+        'story' => $this->story,
+        '--workspace' => $this->workspace,
+        '--test' => 'tests/Feature/StoryTest.php',
+    ])->expectsOutputToContain('Implementation files')
+        ->expectsOutputToContain('routes/web.php')
+        ->expectsOutputToContain('Molly left out config/app.php. PATH_INVALID')
+        ->assertSuccessful();
 });

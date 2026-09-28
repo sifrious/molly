@@ -141,6 +141,55 @@ class Workspace
         return $paths;
     }
 
+    /**
+     * Why an implementation run may not write this path, or null when it may.
+     * Uses the same rules as every task file: a relative path under app, routes,
+     * resources, or tests, with no hidden segments or symbolic links.
+     */
+    public function implementationPathError(string $path, string $testPath): ?string
+    {
+        if ($path === $testPath) {
+            return 'TEST_PROTECTED: The required Pest test is read-only for the implementation.';
+        }
+
+        try {
+            $this->resolve($path);
+        } catch (RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * Existing files under routes, app, and resources/views that a task could
+     * select, in that order and sorted within each directory.
+     *
+     * @return list<string>
+     */
+    public function sourceFiles(int $limit = 200): array
+    {
+        $files = [];
+        foreach (['routes', 'app', 'resources/views'] as $root) {
+            $directory = $this->path.'/'.$root;
+            if (is_link($directory) || ! is_dir($directory)) {
+                continue;
+            }
+            $paths = array_map(fn ($file): string => $root.'/'.str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()), File::allFiles($directory));
+            sort($paths, SORT_STRING);
+            foreach ($paths as $path) {
+                if ($this->implementationPathError($path, '') === null) {
+                    $files[] = $path;
+                }
+                if (count($files) >= $limit) {
+                    return $files;
+                }
+            }
+        }
+
+        return $files;
+    }
+
     /** @return array<string, ?string> */
     public function readProtectedTest(string $testPath): array
     {

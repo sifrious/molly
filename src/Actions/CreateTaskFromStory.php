@@ -12,10 +12,10 @@ use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 
 /**
- * Derive numbered acceptance criteria from a plain-English story with the
- * configured model, then save a test-authoring task that carries them.
- * Molly stops there: a human runs the authoring task, approves the lock,
- * and starts the implementation.
+ * Derive numbered acceptance criteria and the implementation files from a
+ * plain-English story with the configured model, then save a test-authoring
+ * task that carries them. Molly stops there: a human runs the authoring task,
+ * approves the lock with the derived files, and starts the implementation.
  */
 class CreateTaskFromStory
 {
@@ -27,33 +27,44 @@ class CreateTaskFromStory
         if (trim($story) === '' || strlen($story) > 4000 || ! mb_check_encoding($story, 'UTF-8')) {
             throw new RuntimeException('STORY_INVALID: Describe the story in 1 to 4000 UTF-8 bytes.');
         }
-        (new Workspace($workspace))->taskPaths($paths, $testPath, true);
+        $files = new Workspace($workspace);
+        $files->taskPaths($paths, $testPath, true);
         if ($nickname !== null && trim($nickname) !== '') {
             Task::validateNickname($nickname);
         }
 
         $agent = new AcceptanceWriter;
-        $input = json_encode(['story' => $story], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $criteria = $this->criteria($this->acquire($agent, $input));
+        $input = json_encode([
+            'story' => $story,
+            'test_path' => $testPath,
+            'existing_files' => $files->sourceFiles(),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $result = $this->acquire($agent, $input);
+        $criteria = $this->criteria($result);
+        $scope = $this->scope($result, $files, $paths, $testPath);
         $numbered = implode("\n", array_map(fn (string $criterion, int $index): string => ($index + 1).'. '.$criterion, $criteria, array_keys($criteria)));
 
         $prompt = 'Write the Pest acceptance test at '.$testPath." for the story below. Cover every numbered acceptance criterion with at least one Pest test that names its number. Assert against the application's routes, pages, and components that the implementation will add, so the test fails until the behavior exists.\n\n"
             ."Story:\n".$story."\n\nAcceptance criteria:\n".$numbered;
 
+        $provenance = [
+            'agent' => config('molly.agent', 'ollama'),
+            'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
+            'prompt_digest' => hash('sha256', json_encode(['instructions' => $agent->instructions(), 'input' => $input], JSON_THROW_ON_ERROR)),
+            'story_digest' => hash('sha256', $story),
+            'derived_at' => now()->toIso8601String(),
+        ];
+
+        // The derived files stay out of the authoring task's paths: authoring writes only the test.
         return $this->create->handle($prompt, $workspace, $paths, $testPath, [
             'provider' => 'molly-story',
             'story' => $story,
             'acceptance' => [
                 'criteria' => $criteria,
                 'text' => $numbered,
-                'provenance' => [
-                    'agent' => config('molly.agent', 'ollama'),
-                    'model' => config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null,
-                    'prompt_digest' => hash('sha256', json_encode(['instructions' => $agent->instructions(), 'input' => $input], JSON_THROW_ON_ERROR)),
-                    'story_digest' => hash('sha256', $story),
-                    'derived_at' => now()->toIso8601String(),
-                ],
+                'provenance' => $provenance,
             ],
+            'scope' => [...$scope, 'provenance' => $provenance],
         ], nickname: $nickname, allowTestEdits: true);
     }
 
@@ -89,5 +100,48 @@ class CreateTaskFromStory
         }
 
         return $result['criteria'];
+    }
+
+    /**
+     * Keep the model's implementation files that pass the workspace path rules.
+     * Each dropped path is recorded with its reason instead of failing the story.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  list<string>  $paths
+     * @return array{files: list<string>, rejected: list<array{path: string, reason: string}>}
+     */
+    private function scope(array $result, Workspace $workspace, array $paths, string $testPath): array
+    {
+        $proposed = is_array($result['files'] ?? null) && array_is_list($result['files']) ? $result['files'] : [];
+        $room = max(0, (int) config('molly.max_files', 8) - count($paths));
+        $files = [];
+        $rejected = [];
+        foreach ($proposed as $path) {
+            if (! is_string($path) || trim($path) === '' || strlen($path) > 255) {
+                $rejected[] = ['path' => is_string($path) ? substr($path, 0, 255) : get_debug_type($path), 'reason' => 'PATH_INVALID: The model returned an empty, oversized, or non-text path.'];
+
+                continue;
+            }
+            $path = trim($path);
+            if (in_array($path, $files, true) || in_array($path, $paths, true)) {
+                continue;
+            }
+            $reason = $workspace->implementationPathError($path, $testPath)
+                ?? (count($files) >= $room ? 'FILES_INVALID: The task already has the maximum of '.config('molly.max_files', 8).' implementation files.' : null);
+            if ($reason !== null) {
+                $rejected[] = ['path' => $path, 'reason' => $reason];
+
+                continue;
+            }
+            $files[] = $path;
+        }
+
+        if ($files === [] && $paths === []) {
+            throw new RuntimeException('SCOPE_EMPTY: The model named no implementation file Molly may change'
+                .($rejected === [] ? '.' : '. Rejected: '.implode('; ', array_map(fn (array $entry): string => $entry['path'].' ('.$entry['reason'].')', $rejected)).'.')
+                .' Run molly:story again, or name the files with --file.');
+        }
+
+        return ['files' => $files, 'rejected' => $rejected];
     }
 }
