@@ -3,7 +3,6 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Validator;
-use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Sifrious\Molly\Agents\AcceptanceWriter;
 use Sifrious\Molly\Agents\AmpResponse;
@@ -19,7 +18,7 @@ use Sifrious\Molly\Workspace;
  */
 class CreateTaskFromStory
 {
-    public function __construct(private CreateTask $create, private AmpResponse $amp) {}
+    public function __construct(private CreateTask $create, private AmpResponse $amp, private LocalOllama $ollama) {}
 
     /** @param  list<string>  $paths */
     public function handle(string $story, string $workspace, array $paths, string $testPath, ?string $nickname = null): Task
@@ -76,10 +75,7 @@ class CreateTaskFromStory
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            LocalOllama::validate();
-            $response = $agent->prompt($input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'));
-
-            return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+            return $this->ollama->prompt($agent, $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');

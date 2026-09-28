@@ -198,6 +198,14 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | `NO_CHANGES` | The proposal left the selected files as they were. |
 | `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. |
 
+## The model request fails
+
+`molly:story`, `molly:start`, and the Tarpit review send every local model request through one place, so a provider failure reads the same from each of them. The request fails before anything is saved; a run records the message as its error.
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. Molly never pulls a model. |
+
 ## A parallel check fails
 
 `molly:show RUN_ID --verbose` names the branch. `branch_start_failed`, `branch_timeout`, `branch_cancelled`, `branch_result_invalid`, and `CHECK_PROCESS_GROUP_UNAVAILABLE` all mean one branch did not produce valid evidence. Both branches must; one passing branch cannot stand in for the other. If process groups are the problem, set `parallel_checks` to `false`.

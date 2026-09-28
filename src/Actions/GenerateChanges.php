@@ -3,7 +3,6 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Validator;
-use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\ChangeWriter;
@@ -18,6 +17,7 @@ class GenerateChanges
         private CollectTarpitKnowledge $tarpit,
         private AmpResponse $amp,
         private PestTestAuthoring $pestTestAuthoring,
+        private LocalOllama $ollama,
     ) {}
 
     /**
@@ -56,12 +56,7 @@ class GenerateChanges
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            LocalOllama::validate();
-            $response = ChangeWriter::make()->prompt(
-                $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
-            );
-
-            return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+            return $this->ollama->prompt(new ChangeWriter, $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');

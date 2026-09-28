@@ -2,8 +2,17 @@
 
 namespace Sifrious\Molly\Agents;
 
+use Illuminate\Http\Client\RequestException;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
+use Throwable;
 
+/**
+ * The one place Molly prompts the local Ollama provider. Every model call site
+ * sends its agent through prompt(), which checks the configuration first and
+ * turns provider failures into coded messages without class names or paths.
+ */
 class LocalOllama
 {
     public static function validate(?string $model = null): void
@@ -25,5 +34,52 @@ class LocalOllama
             || ! is_int(config('molly.timeout')) || config('molly.timeout') < 1) {
             throw new RuntimeException('LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.');
         }
+    }
+
+    /**
+     * Prompt the configured local model with a structured agent and return its answer.
+     *
+     * @return array<string, mixed>
+     */
+    public function prompt(Agent $agent, string $input): array
+    {
+        self::validate();
+        $model = (string) config('molly.model');
+
+        try {
+            $response = $agent->prompt($input, provider: 'ollama', model: $model, timeout: config('molly.timeout'));
+        } catch (Throwable $exception) {
+            throw $this->translate($exception, $model);
+        }
+
+        return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+    }
+
+    private function translate(Throwable $exception, string $model): Throwable
+    {
+        $request = $this->find($exception, RequestException::class);
+        if ($request instanceof RequestException && $request->response->status() === 404
+            && str_contains(strtolower((string) $request->response->json('error')), 'not found')) {
+            return new RuntimeException('MODEL_MISSING: Ollama has no model named '.$model.'. Run ollama list, or choose an installed model with php artisan molly:setup.', 0, $exception);
+        }
+
+        return $exception;
+    }
+
+    /**
+     * @template T of Throwable
+     *
+     * @param  class-string<T>  $class
+     * @return T|null
+     */
+    private function find(Throwable $exception, string $class): ?Throwable
+    {
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            if ($current instanceof $class) {
+                return $current;
+            }
+        }
+
+        return null;
     }
 }
