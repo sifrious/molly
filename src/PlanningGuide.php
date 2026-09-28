@@ -90,6 +90,6 @@ class PlanningGuide
             return [...$source, 'content' => $content];
         }
 
-        throw new RuntimeException('GUIDE_SOURCE_NOT_FOUND: Choose a source from the bundled graph.');
+        throw ChoiceRequired::fromList('GUIDE_SOURCE_NOT_FOUND: Choose a source from the bundled graph.', array_column($this->graph()['sources'], 'id'), 'id');
     }
 }

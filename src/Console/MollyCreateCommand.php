@@ -26,8 +26,11 @@ class MollyCreateCommand extends Command
             $guided = $interactive && (trim((string) $this->argument('prompt')) === '' || ! $this->option('test') || $this->option('file') === []);
             $prompt = $this->taskPrompt($interactive);
             $nickname = $this->taskNickname($guided);
-            [$paths, $test] = $this->taskFiles($interactive);
-            $task = $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
+            $task = $this->offeringChoices(function () use ($action, $interactive, $prompt, $nickname): Task {
+                [$paths, $test] = $this->taskFiles($interactive);
+
+                return $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
+            });
             if ($this->option('json')) {
                 $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {
@@ -37,7 +40,7 @@ class MollyCreateCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'error', 'error' => $exception->getMessage()]);
+            return $this->reportException($exception, ['id' => null, 'status' => 'error']);
         }
     }
 

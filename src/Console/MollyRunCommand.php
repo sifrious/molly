@@ -31,7 +31,6 @@ class MollyRunCommand extends Command
                 }
                 $prompt = text('What should Molly work on?', required: 'Describe the change Molly should make.', transform: fn (string $value): string => trim($value));
             }
-            $paths = $this->option('file');
             $test = trim((string) $this->option('test'));
             if ($test === '') {
                 throw new InvalidArgumentException('TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.');
@@ -41,8 +40,7 @@ class MollyRunCommand extends Command
                 intro('Molly');
                 note('Molly will check tests and review unnecessary complexity before completing the task.');
             }
-            $work = fn (): Run => $action->handle($prompt, $workspace, $paths, $test, $json ? null : fn (string $message) => note($message));
-            $run = $work();
+            $run = $this->offeringChoices(fn (): Run => $action->handle($prompt, $workspace, $this->option('file'), trim((string) $this->option('test')), $json ? null : fn (string $message) => note($message)));
             if ($json) {
                 $this->writeJson(['id' => $run->id, 'status' => $run->status, 'report' => $run->report]);
             } else {
@@ -51,7 +49,9 @@ class MollyRunCommand extends Command
 
             return $run->status === 'completed' ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'failed', 'report' => ['error' => $exception->getMessage()]]);
+            [$message, $choices] = $this->failureDetails($exception);
+
+            return $this->reportFailure($message, ['id' => null, 'status' => 'failed', 'report' => ['error' => $message, ...$choices]]);
         }
     }
 

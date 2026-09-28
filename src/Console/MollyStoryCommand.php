@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Console;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 use Sifrious\Molly\Actions\CreateTaskFromStory;
+use Sifrious\Molly\Models\Task;
 use Throwable;
 
 use function Laravel\Prompts\info;
@@ -39,9 +40,12 @@ class MollyStoryCommand extends Command
                 }
                 $test = text('Which Pest test should Molly write?', placeholder: 'tests/Feature/StoryTest.php', required: true, transform: trim(...));
             }
-            $paths = array_values(array_filter(array_map(trim(...), $this->option('file'))));
+            $paths = [];
+            $task = $this->offeringChoices(function () use ($action, $story, $test, &$paths): Task {
+                $paths = array_values(array_filter(array_map(trim(...), $this->option('file'))));
 
-            $task = $action->handle($story, (string) ($this->option('workspace') ?: base_path()), $paths, $test, $this->option('name'));
+                return $action->handle($story, (string) ($this->option('workspace') ?: base_path()), $paths, trim((string) $this->option('test')) ?: $test, $this->option('name'));
+            });
             $reference = $task->reference();
             $packages = array_values(array_filter($task->source['scope']['required_packages'], fn (array $package): bool => $package['command'] !== null));
             // The lock uses the task's files and the derived scope, so the printed command needs no --file.
@@ -89,7 +93,7 @@ class MollyStoryCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'error', 'error' => $exception->getMessage()]);
+            return $this->reportException($exception, ['id' => null, 'status' => 'error']);
         }
     }
 }

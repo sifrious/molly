@@ -2,13 +2,19 @@
 
 namespace Sifrious\Molly\Console;
 
+use Closure;
 use Laravel\Prompts\Prompt;
+use Sifrious\Molly\ChoiceRequired;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Throwable;
 
 use function Laravel\Prompts\error;
+use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\search;
+use function Laravel\Prompts\warning;
 
 /**
  * Keep diagnostics on stderr. A failed Molly command prints its message on stderr; with
@@ -69,6 +75,93 @@ trait ReportsFailures
         }
 
         return self::FAILURE;
+    }
+
+    /**
+     * Run the action. When it asks for a choice on a terminal without --json,
+     * offer the choices with Laravel Prompts, fill the argument or option, and
+     * run it again.
+     */
+    protected function offeringChoices(Closure $action): mixed
+    {
+        for ($asked = 0; ; $asked++) {
+            try {
+                return $action();
+            } catch (ChoiceRequired $exception) {
+                $definition = $this->getNativeDefinition();
+                $fillable = $definition->hasOption($exception->input) || $definition->hasArgument($exception->input);
+                $json = $this->hasOption('json') && $this->option('json');
+                if ($json || ! $this->input->isInteractive() || ! $fillable || $exception->choices === [] || $asked >= 3) {
+                    throw $exception;
+                }
+
+                warning(strtok($exception->getMessage(), '.').'.');
+                $label = 'Choose '.($exception->multiple ? 'one or more values' : 'a value').' for '.$exception->input;
+                $answer = $exception->multiple
+                    ? multiselect($label, $exception->choices, required: true, scroll: 10)
+                    : search($label, fn (string $value): array => array_filter($exception->choices, fn (string $choice): bool => $value === '' || str_contains(strtolower($choice), strtolower($value))), scroll: 10);
+                $definition->hasOption($exception->input)
+                    ? $this->input->setOption($exception->input, $answer)
+                    : $this->input->setArgument($exception->input, $answer);
+            }
+        }
+    }
+
+    /**
+     * Report a failure. An error that asks for a choice adds the choices and a
+     * command to run again, to the message and to the JSON document.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    protected function reportException(Throwable $exception, array $document = ['status' => 'error']): int
+    {
+        [$message, $choices] = $this->failureDetails($exception);
+
+        return $this->reportFailure($message, [...$document, 'error' => $message, ...$choices]);
+    }
+
+    /**
+     * The failure message and, for an error that asks for a choice, the
+     * choices and the command to run again.
+     *
+     * @return array{0: string, 1: array{choices?: list<array{value: string, label: string}>, rerun?: string}}
+     */
+    protected function failureDetails(Throwable $exception): array
+    {
+        if (! $exception instanceof ChoiceRequired) {
+            return [$exception->getMessage(), []];
+        }
+        $rerun = $exception->rerun ?? $this->rerunCommand($exception);
+
+        return [$exception->getMessage().' Run: '.$rerun, ['choices' => $exception->choiceList(), 'rerun' => $rerun]];
+    }
+
+    /** This command as typed, with the first choice filled in. */
+    private function rerunCommand(ChoiceRequired $exception): string
+    {
+        $words = ['php', 'artisan', (string) $this->getName()];
+        $first = array_key_first($exception->choices);
+        $quote = fn (string $value): string => preg_match('~\A[A-Za-z0-9_/.:=@%+,-]+\z~', $value) === 1 ? $value : escapeshellarg($value);
+        $definition = $this->getNativeDefinition();
+        foreach ($definition->getArguments() as $name => $argument) {
+            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getArgument($name);
+            foreach ((array) $value as $item) {
+                if (is_string($item) && $item !== '') {
+                    $words[] = $quote($item);
+                }
+            }
+        }
+        foreach ($definition->getOptions() as $name => $option) {
+            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getOption($name);
+            if ($value === true) {
+                $words[] = '--'.$name;
+            }
+            foreach (is_bool($value) || $value === null ? [] : (array) $value as $item) {
+                $words[] = '--'.$name.'='.$quote((string) $item);
+            }
+        }
+
+        return implode(' ', $words);
     }
 
     private static function diagnosticLine(string $message): string

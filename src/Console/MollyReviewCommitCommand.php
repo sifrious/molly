@@ -23,7 +23,7 @@ class MollyReviewCommitCommand extends Command
             if ($this->option('staged') && $this->argument('ref') !== null) {
                 throw new \InvalidArgumentException('Choose --staged or a commit reference.');
             }
-            $result = $review->handle((string) ($this->option('workspace') ?: base_path()), $this->argument('ref') ?? 'HEAD', (bool) $this->option('staged'));
+            $result = $this->offeringChoices(fn (): array => $review->handle((string) ($this->option('workspace') ?: base_path()), $this->argument('ref') ?? 'HEAD', (bool) $this->option('staged')));
             if ($this->option('json')) {
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
             } else {
@@ -47,7 +47,7 @@ class MollyReviewCommitCommand extends Command
                     || ($evaluation['status'] === 'evaluated' && $evaluation['next_action'] === 'continue'))
                 ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
+            return $this->reportException($exception);
         }
     }
 }

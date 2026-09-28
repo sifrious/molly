@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Actions;
 
 use RuntimeException;
+use Sifrious\Molly\ChoiceRequired;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
@@ -46,11 +47,14 @@ class LockProtectedTest
 
         $before = is_string($task->test_digest) && $task->test_digest !== '' ? $task->test_digest : null;
         [$paths, $scopeSource] = $this->scope($task, $implementationPaths);
-        if ($paths === []) {
-            $suggested = array_slice($workspace->sourceFiles(), 0, 3);
+        if (array_diff($paths, [$task->test_path]) === []) {
+            // Files derived from the story come first, then existing files.
+            $choices = array_values(array_unique([...$this->scope($task, [])[0], ...$workspace->sourceFiles()]));
+            $suggested = array_slice($choices, 0, 3);
+            $command = 'php artisan molly:lock-test '.$task->reference().' --approve'
+                .($suggested === [] ? ' --file=app/Example.php' : implode('', array_map(fn (string $path): string => ' --file='.$path, $suggested)));
 
-            throw new RuntimeException('SCOPE_REQUIRED: Task '.$task->reference().' has no implementation files. Name the files the implementation may change, for example: php artisan molly:lock-test '.$task->reference().' --approve'
-                .($suggested === [] ? ' --file=app/Example.php' : implode('', array_map(fn (string $path): string => ' --file='.$path, $suggested))));
+            throw ChoiceRequired::fromList('SCOPE_REQUIRED: Task '.$task->reference().' has no implementation files. Name the files the implementation may change, for example: '.$command.'.', $choices, 'file', multiple: true, rerun: $command);
         }
         $paths = $workspace->taskPaths($paths, $task->test_path, false);
 

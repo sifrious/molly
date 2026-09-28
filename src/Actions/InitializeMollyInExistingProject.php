@@ -168,7 +168,7 @@ final class InitializeMollyInExistingProject
     {
         $root = realpath($path);
         if ($root === false || ! is_dir($root)) {
-            throw new RuntimeException('PROJECT_PATH_INVALID: Choose an existing Laravel project directory.');
+            throw new RuntimeException('PROJECT_PATH_INVALID: '.$path.(file_exists($path) ? ' is not a directory' : ' does not exist').'. Choose an existing Laravel project directory.');
         }
 
         if (! is_file($root.'/artisan') || ! is_file($root.'/composer.json')) {

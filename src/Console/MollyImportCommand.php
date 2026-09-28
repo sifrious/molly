@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\ImportGitHubIssue;
+use Sifrious\Molly\Models\Task;
 use Throwable;
 
 use function Laravel\Prompts\note;
@@ -19,7 +20,7 @@ class MollyImportCommand extends Command
     public function handle(ImportGitHubIssue $action, TaskReport $report): int
     {
         try {
-            $task = $action->handle((string) $this->argument('issue'), (string) ($this->option('workspace') ?: base_path()), $this->option('file'), trim((string) $this->option('test')), nickname: $this->option('name') === null ? null : (string) $this->option('name'), allowTestEdits: (bool) $this->option('allow-test-edits'));
+            $task = $this->offeringChoices(fn (): Task => $action->handle((string) $this->argument('issue'), (string) ($this->option('workspace') ?: base_path()), $this->option('file'), trim((string) $this->option('test')), nickname: $this->option('name') === null ? null : (string) $this->option('name'), allowTestEdits: (bool) $this->option('allow-test-edits')));
             if ($this->option('json')) {
                 $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {
@@ -29,7 +30,7 @@ class MollyImportCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['id' => null, 'status' => 'error', 'error' => $exception->getMessage()]);
+            return $this->reportException($exception, ['id' => null, 'status' => 'error']);
         }
     }
 }

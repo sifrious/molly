@@ -58,7 +58,7 @@ final class CreateMollyProject
 
         if (file_exists($path)) {
             if (! is_dir($path)) {
-                throw new RuntimeException('PROJECT_PATH_INVALID: Target exists and is not a directory.');
+                throw new RuntimeException('PROJECT_PATH_INVALID: '.$path.' exists and is not a directory. Choose a new or empty directory.');
             }
             if ($this->directoryNotEmpty($path)) {
                 if (! $force) {

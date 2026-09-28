@@ -18,7 +18,7 @@ class Workspace
         $root = realpath($path);
 
         if ($root === false || ! is_dir($root)) {
-            throw new RuntimeException('WORKSPACE_INVALID: Choose an existing project directory.');
+            throw new RuntimeException('WORKSPACE_INVALID: '.$path.(file_exists($path) ? ' is not a directory' : ' does not exist').'. Choose an existing project directory.');
         }
 
         $this->path = $root;
@@ -119,7 +119,7 @@ class Workspace
             throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
         }
         if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
+            throw ChoiceRequired::fromList('TEST_PATH_INVALID: Select a PHP test file under tests/.', $this->testFiles(), 'test');
         }
 
         $this->resolve($testPath);
@@ -135,7 +135,7 @@ class Workspace
 
         $paths = array_values(array_filter($paths, fn (string $path): bool => $path !== $testPath));
         if ($paths === []) {
-            throw new RuntimeException('TEST_PROTECTED: Choose implementation files Molly may change. The required Pest test is read-only unless test edits are explicitly allowed.');
+            throw ChoiceRequired::fromList('TEST_PROTECTED: Choose implementation files Molly may change. The required Pest test is read-only unless test edits are explicitly allowed.', $this->sourceFiles(), 'file', multiple: true);
         }
 
         return $paths;
@@ -190,11 +190,29 @@ class Workspace
         return $files;
     }
 
+    /**
+     * Existing Pest files under tests/, sorted.
+     *
+     * @return list<string>
+     */
+    public function testFiles(int $limit = 200): array
+    {
+        $directory = $this->path.'/tests';
+        if (is_link($directory) || ! is_dir($directory)) {
+            return [];
+        }
+        $paths = array_map(fn ($file): string => 'tests/'.str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()), File::allFiles($directory));
+        $paths = array_values(array_filter($paths, fn (string $path): bool => str_ends_with($path, 'Test.php') && $this->implementationPathError($path, '') === null));
+        sort($paths, SORT_STRING);
+
+        return array_slice($paths, 0, $limit);
+    }
+
     /** @return array<string, ?string> */
     public function readProtectedTest(string $testPath): array
     {
         if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
+            throw ChoiceRequired::fromList('TEST_PATH_INVALID: Select a PHP test file under tests/.', $this->testFiles(), 'test');
         }
 
         $absolute = $this->resolve($testPath);

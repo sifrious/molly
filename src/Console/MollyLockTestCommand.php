@@ -20,12 +20,12 @@ class MollyLockTestCommand extends Command
     public function handle(LockProtectedTest $lock): int
     {
         try {
-            $result = $lock->handle(
+            $result = $this->offeringChoices(fn (): array => $lock->handle(
                 (string) $this->argument('task'),
                 (bool) $this->option('approve'),
                 array_values(array_filter(array_map(trim(...), $this->option('file')))),
                 (string) ($this->option('reason') ?: 'Human approved the Pest test as the locked acceptance test.'),
-            );
+            ));
             if ($this->option('json')) {
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             } else {
@@ -35,7 +35,7 @@ class MollyLockTestCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
+            return $this->reportException($exception);
         }
     }
 }

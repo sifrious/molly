@@ -17,7 +17,7 @@ final class ObserveCheckout
     {
         $real = realpath($path);
         if ($real === false || ! is_dir($real)) {
-            throw new RuntimeException('WORKSPACE_INVALID: Workspace path must be an existing directory.');
+            throw new RuntimeException('WORKSPACE_INVALID: '.$path.(file_exists($path) ? ' is not a directory' : ' does not exist').'. Workspace path must be an existing directory.');
         }
         GitBinary::require();
 
