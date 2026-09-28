@@ -90,7 +90,7 @@ This reads a bounded PHP diff, runs Git's whitespace check, and, when Jev is ena
 
 ## Limits
 
-An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is planned and described in [Execution targets](execution-targets.md).
+An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is not part of this release; [Execution targets](execution-targets.md) explains the `ORB_UNVERIFIED` refusal.
 
 ## Next
 

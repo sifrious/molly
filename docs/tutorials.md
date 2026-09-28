@@ -154,6 +154,6 @@ Open `http://127.0.0.1:8000/molly`. Creating a task from the form saves it exact
 
 The two setups share every record. [Molly on its own](standalone.md) tours Artisan and the web interface. [Molly with Bloom](bloom.md) explains what Bloom adds and what still runs outside it.
 
-## Not yet: running on an Orb
+## Local execution, and why not an Orb
 
-Molly can save a link between a task and an Amp thread and read Amp's reported connection state, but it cannot send a task to a remote machine or verify that an executor is an Orb. That work is planned and described in [Execution targets](execution-targets.md). Until it ships, every run executes on the machine where you run Artisan.
+Every run executes on the machine where you run Artisan, and `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review. Remote execution on an Orb is not part of this release: Molly refuses any Orb request with `ORB_UNVERIFIED`, and an Amp thread link does not change where a run executes. [Execution targets](execution-targets.md) shows the local evidence, the refusal, and the design notes for remote execution.

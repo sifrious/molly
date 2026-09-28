@@ -24,6 +24,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 | [Journals and decisions](journal.md) | You want Markdown views of tasks or a committed decision record. |
 | [Inspecting tasks and runs](inspection.md) | You want to follow a task to its runs and conversations. |
 | [Component snapshots](component-snapshots.md) | You want before-and-after evidence for views and components. |
+| [Execution targets](execution-targets.md) | You want to know where a run executes and why Orb requests are refused. |
 | [Amp thread links](connections.md) | You want to tie a task to an Amp conversation. |
 | [Settings](settings.md) | You want global defaults across projects. |
 | [Compatibility](compatibility.md) | You want the tested PHP, Laravel, and Pest versions. |
@@ -38,7 +39,6 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 ## For maintainers
 
 - [Contributing](contributing.md) covers the package tests and CI.
-- [Execution targets](execution-targets.md) is a design note for remote execution, which is not shipped.
 - [Publishing](publishing.md) covers the docs link check and the checklist for switching the install line to v1.
 - [Work packages](work-packages.md) is the alpha backlog.
 - The `v0.1/` pages and the Bloom handoffs under `handoffs/` record earlier release work and are not current guidance.

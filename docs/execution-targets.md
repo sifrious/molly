@@ -1,12 +1,56 @@
-# Execution targets (planned)
+# Execution targets
 
-> This is a design note for maintainers. None of the Orb or remote execution controls on this page exist yet. Every Molly run executes on the machine where you run Artisan.
+Every Molly run executes on the machine where you run Artisan. That machine is the local execution target, and it is the only target this release supports. Remote execution on an Orb is not part of this release. Whether it joins a later release is a release-scope decision that has not been made.
 
-Today, Molly can save an Amp thread association and read Amp's reported executor connection state. Local execution is the default. Molly refuses an Orb request unless a capability-checked target is supplied. An Amp thread ID is not that target.
+## Local execution
 
-For current behavior, read [Task connections](connections.md).
+Nothing needs to be configured. `molly:start`, `molly:retry`, a queued start from the web interface or MCP, and `molly:worker` all run the writer, Pest, and the Tarpit review on the machine that runs the command or the queue worker.
 
-## What works today
+Each run records where its checks ran. Start a task and read the run:
+
+```bash
+php artisan molly:start ready-check
+php artisan molly:show RUN_ID
+```
+
+The report has one row per check, and the `Target` column says `local` for both. Abbreviated, without the table borders:
+
+```text
+Execution mode: parallel
+Branch        Status  Target  Provider / model
+verification  passed  local   Pest
+review        passed  local   ollama / qwen2.5-coder:7b
+```
+
+The same value is saved in the run report as `branches[].execution_target`, so `molly:show RUN_ID --json` and the web run page show it too. With `molly.parallel_checks` set to `false`, the table says `Execution mode: serial` and the target is still `local`.
+
+Local execution uses the sandbox the host provides. On Linux with Landlock and user namespaces the writer and Pest run isolated; on macOS they need the override described in [macOS and the sandbox](getting-started.md#macos-and-the-sandbox).
+
+Claims of the same task are coordinated through a lease in the application database. Two workers racing for the same task produce one claim; the other sees `WORKSPACE_BUSY`. An expired lease is recovered into a failed, retryable task without any coordinator. A queued start or retry is delivered once per task attempt, so a duplicate job cannot succeed twice.
+
+## Orb requests are refused
+
+No Artisan command, MCP tool, or web page asks for an Orb. The only way to request one is in PHP, through `Sifrious\Molly\Execution\SelectExecutionTarget`. From `php artisan tinker` in your application:
+
+```php
+use Sifrious\Molly\Contracts\ExecutionTargetKind;
+use Sifrious\Molly\Contracts\ExecutionTargetRequest;
+use Sifrious\Molly\Execution\SelectExecutionTarget;
+
+app(SelectExecutionTarget::class)->handle(new ExecutionTargetRequest(ExecutionTargetKind::Orb, 'orb-build-1'));
+```
+
+Molly refuses every Orb request, whatever target it names:
+
+```text
+ORB_UNVERIFIED: This Molly release runs tasks only on the local machine. An Amp thread or connected executor is not a verified Orb. Select local execution.
+```
+
+An Orb request without a target fails earlier, when the request is built, with `CONTRACT_FIELD_INVALID: An Orb execution target needs a target_id.` Calling `handle()` with no request selects local execution. `tests/Feature/SelectExecutionTargetTest.php` makes each of these calls.
+
+## Amp threads are not Orbs
+
+Molly can save a link between a task and an Amp thread and read Amp's reported connection state:
 
 ```bash
 php artisan molly:link-thread TASK THREAD_ID
@@ -14,9 +58,13 @@ php artisan molly:connections TASK
 php artisan molly:connections TASK --stored --json
 ```
 
-These commands record user-supplied thread links and read connection evidence. They do not start remote work.
+These commands record user-supplied thread links and read connection evidence. They do not start remote work, and a linked thread does not change where a run executes. [Task connections](connections.md) covers them.
 
-## What is still planned
+## Planned remote execution
+
+> This section is a design note for maintainers. None of these controls exist, and none are promised for a release.
+
+### What is still planned
 
 Future work needs a provider protocol that can prove:
 
@@ -29,7 +77,7 @@ Future work needs a provider protocol that can prove:
 
 A thread ID, display name, socket, process ID, or raw executor type is not enough on its own.
 
-## Presence and assignment are different
+### Presence and assignment are different
 
 Future code should keep these facts separate:
 
@@ -41,7 +89,7 @@ Future code should keep these facts separate:
 
 A connected executor is not automatically available. Reconnecting should not silently restore an old task assignment.
 
-## Proposed user operations
+### Proposed user operations
 
 These names are examples for future work. They are not registered commands today.
 
@@ -54,14 +102,10 @@ These names are examples for future work. They are not registered commands today
 
 Before any future dispatch, Molly should recheck identity, connection, required capabilities, workspace access, and capacity. The selection reason and actual execution target should be recorded as evidence.
 
-## Verification needed before shipping
+### Verification needed before shipping
 
 A real connector should be tested against reconnects, delayed events, stale observations, explicit disconnects, task renames, and preserved association history.
 
 CLI, MCP, and web should report the same underlying evidence once those interfaces exist.
 
 Until that work lands, do not describe current Amp thread observations as verified Orb execution.
-
-## What Molly does today
-
-Molly claims a task through a lease in the application database. Two workers racing for the same task produce one claim; the other sees `WORKSPACE_BUSY`. An expired lease is recovered into a failed, retryable task without any coordinator. A queued start or retry is delivered once per task attempt, so a duplicate job cannot succeed twice.
