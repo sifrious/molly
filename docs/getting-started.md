@@ -28,13 +28,12 @@ ollama list
 If the application does not have Pest yet, install it:
 
 ```bash
-composer config allow-plugins.pestphp/pest-plugin true
-composer remove --dev phpunit/phpunit
-composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
-vendor/bin/pest --init
+composer remove --dev phpunit/phpunit --no-update
+composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+./vendor/bin/pest --init
 ```
 
-Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin first. Skip it if `composer.json` does not list `phpunit/phpunit`.
+New Laravel 12 and 13 applications list `phpunit/phpunit` (12 pins PHPUnit 11, and Pest 4 needs PHPUnit 12), so the first line removes it without resolving, and `-W` lets the second line resolve Pest and PHPUnit together. These applications already allow the `pestphp/pest-plugin` Composer plugin; an older application may need `composer config allow-plugins.pestphp/pest-plugin true` first. `./vendor/bin/pest --init` writes `tests/Pest.php`.
 
 Feature tests need the application test case. Check that `tests/Pest.php` contains:
 
@@ -224,7 +223,7 @@ Molly asks four questions:
 | What should Molly work on? | `Add GET /ready returning exactly {"ready":true}. Preserve existing routes.` |
 | Task nickname | `ready-check` |
 | Which Pest test should pass? | `tests/Feature/ReadyTest.php` |
-| Which other files may Molly change? | `routes/web.php` |
+| Which files may Molly change? | `routes/web.php` |
 
 The same task without prompts:
 
