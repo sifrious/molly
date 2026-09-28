@@ -7,6 +7,7 @@ use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Actions\RetryTask;
 use Sifrious\Molly\Actions\ReviewChanges;
+use Sifrious\Molly\Actions\ShowRuntimeStatus;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\Actions\StopTask;
 use Sifrious\Molly\Actions\VerifyChanges;
@@ -217,4 +218,59 @@ it('keeps a refused retry failed without scheduling it', function (): void {
         ->and($task->runs()->count())->toBe(1)
         ->and(lifecycleTypes($this->workspace, $task->id))->toBe(['created', 'start_refused'])
         ->and($refused->payload['retry'])->toBeTrue();
+});
+
+it('leaves an abandoned task failed and retryable when its retry is refused', function (): void {
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    $task->update([
+        'status' => 'running',
+        'attempt_number' => 1,
+        'worker_id' => 'dead-worker',
+        'claimed_at' => now()->subMinutes(30),
+        'heartbeat_at' => now()->subMinutes(12),
+        'lease_expires_at' => now()->subMinutes(10),
+    ]);
+    $safe = app(Sandbox::class);
+    $allowUnsafe = config('molly.sandbox.allow_unsafe');
+    $unsafe = new Sandbox;
+    (fn () => $this->available = false)->call($unsafe);
+    app()->instance(Sandbox::class, $unsafe);
+    config(['molly.sandbox.allow_unsafe' => false]);
+
+    expect(fn () => app(RetryTask::class)->handle($task->id))->toThrow(RuntimeException::class, 'SANDBOX_UNAVAILABLE:');
+
+    $task->refresh();
+    $status = app(ShowRuntimeStatus::class)->handle($this->workspace);
+    expect($task->status)->toBe('failed')
+        ->and($task->attempt_number)->toBe(1)
+        ->and($task->worker_id)->toBeNull()
+        ->and($task->lease_expires_at)->toBeNull()
+        ->and($task->heartbeat_at)->toBeNull()
+        ->and($task->runs()->count())->toBe(0)
+        ->and($status['tasks']['running'])->toBe([])
+        ->and(app(RecordLifecycleEvent::class)->load($this->workspace)->latestOf($task->id, LifecycleEventType::StartRefused)->payload['code'])->toBe('SANDBOX_UNAVAILABLE');
+
+    expect(fn () => app(StartTask::class)->handle($task->id))->toThrow(RuntimeException::class, 'TASK_NOT_PENDING:');
+    $pending = app(CreateTask::class)->handle('Return Hello again.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+    expect(fn () => app(StartTask::class)->handle($pending->id))->toThrow(RuntimeException::class, 'SANDBOX_UNAVAILABLE:')
+        ->and($pending->fresh()->only(['status', 'attempt_number', 'worker_id', 'claimed_at', 'lease_expires_at']))
+        ->toBe(['status' => 'pending', 'attempt_number' => 0, 'worker_id' => null, 'claimed_at' => null, 'lease_expires_at' => null]);
+
+    app()->instance(Sandbox::class, $safe);
+    config(['molly.sandbox.allow_unsafe' => $allowUnsafe]);
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
+    $this->mock(ReviewChanges::class)->makePartial()->shouldReceive('handle')->once()->andReturn([
+        'checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding.']),
+        'findings' => [],
+    ]);
+    ChangeWriter::fake([['summary' => 'Return Hello.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']]]])->preventStrayPrompts();
+    config(['molly.parallel_checks' => false]);
+
+    $run = app(RetryTask::class)->handle($task->id);
+
+    expect($run->status)->toBe('completed')
+        ->and($task->fresh()->status)->toBe('completed')
+        ->and($task->fresh()->attempt_number)->toBe(2)
+        ->and($task->fresh()->worker_id)->toBeNull();
 });

@@ -214,7 +214,11 @@ final class LocalAgentBus
         }
     }
 
-    private function recoverIfAbandoned(Task $task): void
+    /**
+     * Mark a running task whose lease has expired as failed so it can be retried.
+     * Callers snapshot the task after this, so a refused start restores the recovered state.
+     */
+    public function recoverIfAbandoned(Task $task): Task
     {
         if ($task->status === 'running' && $this->leaseExpired($task)) {
             Task::query()
@@ -229,5 +233,7 @@ final class LocalAgentBus
                 ]);
             $task->refresh();
         }
+
+        return $task;
     }
 }

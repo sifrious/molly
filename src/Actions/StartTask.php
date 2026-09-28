@@ -14,6 +14,9 @@ use Throwable;
 
 class StartTask
 {
+    /** Columns a claim changes. A refused start writes these back exactly. */
+    private const CLAIM_COLUMNS = ['status', 'attempt_number', 'idempotency_key', 'stop_requested_at', 'worker_id', 'claimed_at', 'heartbeat_at', 'lease_expires_at'];
+
     public function __construct(
         private RunTask $runTask,
         private RefreshProjectJournal $journal,
@@ -32,14 +35,15 @@ class StartTask
         $id = $task->id;
 
         return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
-            $task = Task::findOrFail($id);
+            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id));
             if (($blocked = $task->redBaselineError()) !== null) {
                 $this->recordRefusal($task, $blocked, $retry);
                 throw new RuntimeException($blocked);
             }
             $workerId = $this->workerId();
             $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
-            $unclaimed = $task->only(['status', 'attempt_number', 'idempotency_key']);
+            // Snapshot after recovering an abandoned claim, so a refusal restores the recovered state.
+            $unclaimed = $task->only(self::CLAIM_COLUMNS);
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
             $this->journal->handle($task->refresh());
 
@@ -47,11 +51,12 @@ class StartTask
         });
     }
 
-    /** @param  array{status: string, attempt_number: int|null, idempotency_key: string|null}  $unclaimed */
+    /** @param  array<string, mixed>  $unclaimed  The task's claim columns before this claim. */
     private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId, array $unclaimed): Run
     {
         $id = $task->id;
         $runCreated = false;
+        $released = false;
         try {
             $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds());
 
@@ -105,10 +110,11 @@ class StartTask
 
             return $finished;
         } catch (Throwable $exception) {
-            // A start refused before any run was saved, such as GIT_MISSING or SANDBOX_UNAVAILABLE,
-            // returns the task to its earlier state and attempt count instead of failing it.
-            $released = $runCreated ? 0 : Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update($unclaimed);
-            if ($released === 1) {
+            // A start refused before any run was saved, such as WORKSPACE_BUSY or BASELINE_MISSING,
+            // writes back the task's claim columns exactly as they were instead of failing it.
+            $released = ! $runCreated && Task::whereKey($id)->where('status', 'running')->where('worker_id', $workerId)
+                ->whereNull('stop_requested_at')->update($unclaimed) === 1;
+            if ($released) {
                 $this->recordRefusal($task, $exception->getMessage(), $retry);
                 throw $exception;
             }
@@ -122,7 +128,9 @@ class StartTask
             );
             throw $exception;
         } finally {
-            $this->bus->clearClaim($task->refresh());
+            if (! $released) {
+                $this->bus->clearClaim($task->refresh());
+            }
             $this->journal->handle($task->refresh());
         }
     }
