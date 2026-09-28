@@ -33,7 +33,7 @@ class CreateTaskFromStory
             Task::validateNickname($nickname);
         }
 
-        $agent = new AcceptanceWriter;
+        $agent = AcceptanceWriter::make();
         $input = json_encode([
             'story' => $story,
             'test_path' => $testPath,

@@ -111,6 +111,16 @@ TYPESAFE_API_KEY=...
 
 `molly.jev.confidence_threshold` (0.8) decides when Molly keeps its own guidance instead of Jev's.
 
+## Replace a step with your own agent
+
+Settings change where a request goes. To change what the change writer, the Tarpit reviewer, or the story step asks the model, bind a subclass of the Molly agent class in your service provider:
+
+```php
+$this->app->bind(ChangeWriter::class, TeamChangeWriter::class);
+```
+
+[Customize a step](customize-steps.md) builds `TeamChangeWriter`, runs a task with it, and lists what Molly still rejects: files outside the task, edits to the protected test, and claims of success without a passing Pest run.
+
 ## Jev in the loop
 
 With Jev enabled, three commands consult it:

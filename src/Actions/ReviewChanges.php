@@ -35,7 +35,7 @@ class ReviewChanges
     private function acquireReviewResult(string $input): array
     {
         if (config('molly.agent', 'ollama') === 'amp') {
-            return $this->ampResponse->prompt(new TarpitReviewer, $input);
+            return $this->ampResponse->prompt(TarpitReviewer::make(), $input);
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {

@@ -14,6 +14,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 | [Molly with Bloom](bloom.md) | You use Bloom and want to know what it adds today. |
 | [Ollama](ollama-quickstart.md) | You are choosing a local model or reading doctor's Ollama codes. |
 | [Agents and MCP](agents.md) | You want Amp, MCP tools, or Jev. |
+| [Customize a step](customize-steps.md) | You want Molly's change writer, reviewer, or story step to use your own Laravel AI agent class. |
 | [Web interface](web-interface.md) | You want to read and start tasks in a browser. |
 | [Planning](planning.md) | A request is too big for one task. |
 | [Task advice](task-advice.md) | You want to know what a task allows next. |
