@@ -11,13 +11,19 @@ This page takes you from an empty terminal to a completed Molly task. You will i
 - A working database connection
 - [Ollama](https://ollama.com) running locally, or the Amp CLI
 
-To check the application:
+To check each requirement from the application root:
 
 ```bash
 php --version
+php -m | grep -Ei '^(dom|pdo_sqlite)$'
 composer show laravel/framework
 vendor/bin/pest --version
+git rev-parse HEAD
+php artisan migrate:status
+ollama list
 ```
+
+`php -m` should print `dom` and `pdo_sqlite`. `git rev-parse HEAD` prints a commit SHA once the application has one commit; [Install Molly](#install-molly) shows how to make it. `php artisan migrate:status` fails when the database connection does not work. `ollama list` fails when Ollama is not running; start it with `ollama serve` or the Ollama app. With Amp instead, `amp --version` must work.
 
 If the application does not have Pest yet, install it:
 
@@ -47,11 +53,22 @@ curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-dem
 MOLLY_CONSTRAINT='^0.2' bash molly-demo ~/molly-demo
 ```
 
-The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the current one.
+The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the 0.2 series. Until `v0.2.0` is tagged, that constraint does not resolve and the installer stops at `composer require`; use `MOLLY_CONSTRAINT='^0.1'` for the tagged release, or see [Release status](#release-status).
 
 It writes only under the directory you name and refuses a non-empty directory unless you pass `--force`. When it finishes, continue from [Choose a model](#choose-a-model).
 
 ## Install Molly
+
+### Release status
+
+The latest tag is `v0.1.3`. Molly 0.2 is in prelaunch acceptance testing, and no 0.2 release is tagged yet, so `composer require --dev sifrious/molly:^0.2` fails until `v0.2.0` is published. Until then you have two choices:
+
+- Install an acceptance candidate, named `0.2.0-RC<n>`, from the zip you were given. [Install a prelaunch candidate](quickstart-standalone.md#install-a-prelaunch-candidate) has the commands.
+- Install the tagged release with `composer require --dev sifrious/molly:^0.1`. It lacks the behavior that [Molly documentation](overview.md) lists as arriving after `v0.1.3`.
+
+These pages describe `main`, which `v0.2.0` will publish.
+
+### Install from GitHub
 
 From the application root:
 
@@ -178,6 +195,24 @@ Molly keeps the earlier run and starts a new one. A task may make three attempts
 
 ## Create your own task
 
+A task needs a Pest test that fails until the change exists. Create `tests/Feature/ReadyTest.php`:
+
+```php
+<?php
+
+it('reports that the application is ready', function () {
+    $this->get('/ready')->assertOk()->assertExactJson(['ready' => true]);
+});
+```
+
+Run it and confirm it fails with a 404, not an error in the test:
+
+```bash
+vendor/bin/pest tests/Feature/ReadyTest.php
+```
+
+Then create the task:
+
 ```bash
 php artisan molly:create
 ```
@@ -190,6 +225,15 @@ Molly asks four questions:
 | Task nickname | `ready-check` |
 | Which Pest test should pass? | `tests/Feature/ReadyTest.php` |
 | Which other files may Molly change? | `routes/web.php` |
+
+The same task without prompts:
+
+```bash
+php artisan molly:create 'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
+  --name=ready-check \
+  --test=tests/Feature/ReadyTest.php \
+  --file=routes/web.php
+```
 
 The Pest test must exist before you create the task, and Molly locks its content. The model may change the files you listed, never the test. Creating a task saves it without calling the model.
 

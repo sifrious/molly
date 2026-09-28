@@ -80,17 +80,37 @@ The report labels each file `added`, `removed`, `modified`, or `unchanged`. A ch
 
 ## Two tasks at once
 
-Pest and the Tarpit review already run in parallel inside one run. Two runs cannot share a workspace: the second start reports `WORKSPACE_BUSY` and does nothing. To run tasks side by side, give each its own checkout:
+Pest and the Tarpit review already run in parallel inside one run. Two runs cannot share a workspace: the second start reports `WORKSPACE_BUSY` and does nothing. To run tasks side by side, give each its own checkout.
+
+This example uses the `demo-greeting` task and the `tests/Feature/ReadyTest.php` file from [Getting started](getting-started.md). From the application root, create a second checkout on a new branch and give it the files Git does not track:
 
 ```bash
-git worktree add ../app-ready main
+git worktree add -b ready ../app-ready
 composer install --working-dir=../app-ready
-php artisan molly:create 'Add GET /ready ...' --workspace=../app-ready --name=ready \
+cp .env ../app-ready/.env
+mkdir -p ../app-ready/tests/Feature
+cp tests/Feature/ReadyTest.php ../app-ready/tests/Feature/ReadyTest.php
+```
+
+The second checkout needs its own `vendor` directory, because Pest runs there, and its own `.env`, because the application's tests read `APP_KEY` from it. Save a task for it:
+
+```bash
+php artisan molly:create 'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
+  --workspace=../app-ready --name=ready \
   --test=tests/Feature/ReadyTest.php --file=routes/web.php
+```
+
+Then start one task in each of two terminals, both from the application root:
+
+```bash
+php artisan molly:start demo-greeting
+```
+
+```bash
 php artisan molly:start ready
 ```
 
-The other checkout needs its own `vendor` directory, because Pest runs there. Each workspace keeps its own `.molly/` directory, receipts, and lock. The tasks still share the application database, so `molly:tasks` lists both.
+Each workspace keeps its own `.molly/` directory, receipts, and lock, so neither start sees `WORKSPACE_BUSY`. The tasks share the application database, so `php artisan molly:tasks` lists both. Review and merge the `ready` branch as you would any other, then remove the checkout with `git worktree remove ../app-ready`.
 
 ## Tune Laravel AI
 

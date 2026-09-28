@@ -43,6 +43,24 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 - [Work packages](work-packages.md) is the alpha backlog.
 - The `v0.1/` pages and the Bloom handoffs under `handoffs/` record earlier release work and are not current guidance.
 
+## Ownership and support
+
+Molly owns the task, the protected test, verification, the Tarpit review, the Clever measurements, and every evidence record. Nothing else can mark a Molly task complete. The table says what each other project does for Molly on `main` and whether Molly supports it.
+
+| Project | What it does for Molly | Status |
+| --- | --- | --- |
+| Laravel AI (`laravel/ai`) | Sends the change writer, Tarpit reviewer, and story prompts to Ollama, and Jev questions to TypeSafe. [Customize a step](customize-steps.md) replaces those agent classes. | Supported. Required dependency |
+| Ollama | Runs the default local model. | Supported. Default agent |
+| Amp CLI | Runs the change writer and reviewer with tools turned off, as an alternative to Ollama. | Supported. Optional |
+| TypeSafe (Jev) | Answers optional advisory questions through Laravel AI. Never changes a result. | Supported. Off by default |
+| Pest | Runs the required test. A task completes only after Pest passes. | Supported. Required in the application |
+| GitHub (`gh`) | Reads issues for `molly:import` and posts approved comments. Molly never opens or merges a pull request. | Supported. Optional |
+| Flux (free) and Livewire | Render the optional web interface. | Supported. Bundled |
+| Bloom | Owns the checkout, diff, and pull request screens when you use it. | Optional. The plugin is built against Bloom commit `1599f05f`; host-level acceptance is pending. See [Molly with Bloom](bloom.md) |
+| Orbs | Remote execution. | Not part of this release. Molly refuses Orb requests. See [Execution targets](execution-targets.md) |
+| Prism | None. Molly has no Prism dependency and no Prism code; model calls go through Laravel AI. | Not supported. Optional Prism routing is in the documentation plan, with no code and no release |
+| Rudy and Super Native | None. No Rudy or Super Native client exists, and Molly has no code for one. A future client would use the interfaces Molly has today: Artisan commands with `--json`, the MCP server, and the local web routes. | Planned, with no release scope |
+
 ## How Molly decides
 
 1. The agent proposes a change to the files you allowed.
@@ -54,4 +72,4 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 
 A model saying its work is correct is never evidence. A passing review never rescues a failing test.
 
-These pages describe the current `main` branch. The install lines use the latest tag, and a few things on these pages shipped after v0.1.3 and arrive with the next tag: doctor's Jev check, the fresh attempt budget after `molly:lock-test`, the approval requirement on `molly:pr-body`, and the `<?php` check on written tests. Everything on these pages works without Bloom.
+These pages describe the current `main` branch. The install lines use `^0.2`, which resolves once `v0.2.0` is tagged; the latest tag is `v0.1.3`, and prelaunch candidates are named `0.2.0-RC<n>`. [Release status](getting-started.md#release-status) says what to install today. A few things on these pages shipped after v0.1.3 and arrive with the next tag: doctor's Jev check, the fresh attempt budget after `molly:lock-test`, the approval requirement on `molly:pr-body`, and the `<?php` check on written tests. Everything on these pages works without Bloom.

@@ -118,6 +118,8 @@ composer check-platform-reqs
 
 Molly needs PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, not a branch.
 
+`^0.2` does not resolve until `v0.2.0` is tagged; the latest tag is `v0.1.3`. [Release status](getting-started.md#release-status) lists what to install until then.
+
 ## Pest fails
 
 Read the recorded output, then run the test yourself:

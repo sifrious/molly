@@ -128,6 +128,8 @@ If the report looks the same as before, run `php artisan config:clear` and check
 | Provider, model, timeouts | Ollama with `molly.model` | `config/ai.php` and `config/molly.php` | Supported. Configuration, not a custom step |
 | Pest verification, protected tests, completion | `VerifyChanges`, `DecideRunCompletion` | None | Not an extension point. These decide whether a task is done, and a binding that replaces them is unsupported |
 
+[Ownership and support](overview.md#ownership-and-support) lists what each integration does for Molly, including Prism and Rudy.
+
 ## Next
 
 - [Agents and MCP](agents.md) explains the Ollama and Amp paths.
