@@ -197,11 +197,43 @@ final class InitializeMollyInExistingProject
 
     private function composerRequire(string $root): void
     {
-        if (! $this->hasMollyRepository($root)) {
-            $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
+        // A failed step, such as an authentication error in composer require, puts composer.json
+        // and composer.lock back byte for byte, so no repositories entry is left behind.
+        $saved = $this->composerFiles($root);
+        try {
+            if (! $this->hasMollyRepository($root)) {
+                $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
+            }
+
+            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+        } catch (Throwable $exception) {
+            $this->restoreComposerFiles($root, $saved);
+            throw $exception;
+        }
+    }
+
+    /** @return array<string, ?string> composer.json and composer.lock contents, null when absent */
+    private function composerFiles(string $root): array
+    {
+        $files = [];
+        foreach (['composer.json', 'composer.lock'] as $name) {
+            $files[$name] = is_file($root.'/'.$name) ? File::get($root.'/'.$name) : null;
         }
 
-        $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+        return $files;
+    }
+
+    /** @param  array<string, ?string>  $saved */
+    private function restoreComposerFiles(string $root, array $saved): void
+    {
+        foreach ($saved as $name => $contents) {
+            $path = $root.'/'.$name;
+            if ($contents === null) {
+                File::delete($path);
+            } elseif (! is_file($path) || File::get($path) !== $contents) {
+                File::put($path, $contents);
+            }
+        }
     }
 
     /** @param  list<string>  $arguments */
