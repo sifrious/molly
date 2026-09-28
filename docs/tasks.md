@@ -50,7 +50,17 @@ php artisan molly:lock-test TASK --approve
 php artisan molly:start TASK
 ```
 
-The first run writes the test. Read it before the second command. `molly:lock-test --approve` locks the test, allows the implementation to change the derived files, prints them, and records the RED baseline. Pass `--file` to replace the derived files with your own. The last command runs the implementation against the locked test.
+The first run writes the test. When it finishes, Molly runs the test and checks why it fails. The check is saved on the run as `report.authored_test`, and `molly:start` and `molly:task` print it with the next command:
+
+| Classification | What Molly prints next |
+| --- | --- |
+| `missing_behavior` | The tests fail because the behavior is not built yet. Review the test, then run `php artisan molly:lock-test TASK --approve`. |
+| `bootstrap_error` | Some tests cannot run. Molly names each cause, such as `database_not_migrated`, lists the affected tests, and prints `php artisan molly:retry TASK`. The retry sends the model Molly's guidance for that cause. |
+| `already_passing` | The test passed before any implementation, so it proves nothing. Molly still prints the lock command, and the implementation run then refuses with `RED_BASELINE_INVALID`. Edit the test so it asserts the new behavior, then lock it again. |
+
+For example, a test that creates a user in a fresh Laravel app fails with `no such table: users` when neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. That is `database_not_migrated`, not missing behavior, and the retry asks the model to add `uses(RefreshDatabase::class);` to the test file. The authoring run also gives the model `tests/Pest.php` to read, so it can see which `TestCase` and traits apply to every test. See [Troubleshooting](troubleshooting.md#the-authored-test-cannot-run) for each cause.
+
+Read the test before the second command. `molly:lock-test --approve` locks the test, allows the implementation to change the derived files, prints them, and records the RED baseline. Pass `--file` to replace the derived files with your own. The last command runs the implementation against the locked test.
 
 When a package is not in `require`, `molly:story` prints a command such as `composer require livewire/livewire`. Run it before the implementation run, which cannot add packages. Molly never runs Composer for you. Molly depends on `livewire/livewire`, so when Molly is installed with `--dev`, Livewire is present during development but shows as `dev_only`: your application does not declare it, and a production install leaves it out.
 
@@ -96,7 +106,7 @@ php artisan molly:inspect --run=RUN_ID
 php artisan molly:retry ready-check
 ```
 
-A retry creates another run and keeps the earlier one. Molly sends the model a bounded summary of the previous failure. A task may make three attempts in total by default, counted across starts and retries; the limit is `molly.max_attempts`. Each failed run also records `failure_fingerprint`, a digest of the failing verifiers, error code, failing test names, and blocking Tarpit codes. Message wording is left out, so a reworded failure keeps its fingerprint. When the latest fingerprint has failed `molly.repair.per_failure` times (3 by default), Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`. Molly never retries on its own.
+A retry creates another run and keeps the earlier one. Molly sends the model a bounded summary of the previous failure. A task may make three attempts in total by default, counted across starts and retries; the limit is `molly.max_attempts`. Each failed run also records `failure_fingerprint`, a digest of the failing verifiers, error code, failing test names, and blocking Tarpit codes. Message wording is left out, so a reworded failure keeps its fingerprint. When the latest fingerprint has failed `molly.repair.per_failure` times (3 by default), Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`. A test-authoring run whose test cannot run is fingerprinted by the causes of its authored test check alone, so a model that renames tests but keeps the same mistake reaches the budget too. The message then names the cause and tells you to edit the test and lock it. Molly never retries on its own.
 
 Read the failed run before retrying. If the failure is in the test itself, fix the test in a new task rather than weakening it.
 

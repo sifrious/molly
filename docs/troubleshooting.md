@@ -140,6 +140,32 @@ vendor/bin/pest tests/Feature/YourTest.php
 
 Do not weaken the assertions to get a retry through.
 
+## The authored test cannot run
+
+After a test-authoring run, `molly:start` and `molly:task` print `Authored test check: bootstrap_error` when some tests cannot run, with each cause and the affected tests. `molly:lock-test --approve` refuses such a test with `AUTHORED_TEST_BROKEN` and locks nothing. With `--json`, the error document adds `authored_test`, the check, and `next`, the command and reason. Run the printed command, usually:
+
+```bash
+php artisan molly:retry TASK
+```
+
+The retry sends the model the cause and Molly's guidance for it in `previous_attempt.authored_test`. The model may change only the test file, so the guidance puts every fix there:
+
+| Cause | Meaning | Guidance sent to the model |
+| --- | --- | --- |
+| `database_not_migrated` | A test hit a missing table, and neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. | Add `uses(RefreshDatabase::class);` to the test file. |
+| `test_case_not_bound` | Laravel helpers such as `get()` are undefined because the file is not bound to `Tests\TestCase`. | Add `uses(Tests\TestCase::class);` to the test file. |
+| `test_support_missing` | A test helper class or Pest function is not loaded. | Import it or stop depending on it. |
+| `parse_error` | The file does not parse. | Return one complete PHP file. |
+| `no_tests` | Pest found no tests in the file. | Declare cases with `it()` or `test()`. |
+| `no_assertions` | The tests asserted nothing. | Assert the expected behavior. |
+| `tests_skipped` | Pest skipped the tests or marked them incomplete. | Remove `skip()` and `todo()`. |
+
+When a test that already applies `RefreshDatabase` hits a missing table, Molly counts it as missing behavior: the implementation has to add the migration.
+
+You can also fix the test yourself and run `molly:lock-test TASK --approve` again. The lock runs the test again before it locks anything. When the same cause keeps coming back, the retry stops at `molly.repair.per_failure` with `REPAIR_BUDGET_EXHAUSTED`, and the message tells you to edit the test and lock it.
+
+`pest_run_failed` means Pest did not finish a usable run for a reason outside the test, such as `pest_missing` or `test_timeout`. A rewrite will not fix that, so Molly does not block the lock on it; see [Pest fails](#pest-fails).
+
 ## The story has no implementation files
 
 `SCOPE_EMPTY` from `molly:story` means the model named no file Molly may change. The message lists each path it named and why Molly dropped it. Molly lets the implementation change files under `app/`, `routes/`, `resources/`, and `tests/` only, so a story that the model answers with only `config/` or `database/` paths ends here. No task is saved. Run the story again, reword it to name the page or route, or pass the files yourself:
@@ -188,7 +214,7 @@ php artisan molly:task TASK
 
 ## Retry is rejected
 
-`molly:start` is for pending tasks and `molly:retry` for failed or stopped ones. `ATTEMPT_LIMIT_REACHED` means the task used its attempts (three by default). `COMMAND_ALREADY_SUCCEEDED` means the task already completed. `php artisan molly:advice TASK` says what is allowed.
+`molly:start` is for pending tasks and `molly:retry` for failed or stopped ones. `ATTEMPT_LIMIT_REACHED` means the task used its attempts (three by default). `REPAIR_BUDGET_EXHAUSTED` means the same failure came back `molly.repair.per_failure` times; for an authored test that cannot run, edit the test and lock it. `COMMAND_ALREADY_SUCCEEDED` means the task already completed. `php artisan molly:advice TASK` says what is allowed.
 
 ## The web interface returns 404 or no run appears
 

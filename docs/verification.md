@@ -78,9 +78,11 @@ When you want Molly to write the test itself, create a separate task with `--all
 | Classification | Meaning |
 | --- | --- |
 | `missing_behavior` | Tests failed on assertions, missing routes, or missing application classes. The implementation may start. |
-| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, zero tests, or no JUnit report. |
+| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, an unbound `TestCase`, a missing table without `RefreshDatabase`, zero tests, or no JUnit report. |
 | `already_passing` | The test passed before any implementation, so it proves nothing. |
 | `not_recorded` | Molly could not run the test, for example because another run held the workspace. |
+
+The same classifier checks the test at the end of every test-authoring run and saves the result in `report.authored_test`, with a cause and the affected tests for each test that cannot run. `molly:lock-test --approve` refuses a test that cannot run with `AUTHORED_TEST_BROKEN`, so a new lock records only `missing_behavior`, `already_passing`, `not_recorded`, or a `bootstrap_error` from a cause outside the test, such as `pest_missing`. See [Troubleshooting](troubleshooting.md#the-authored-test-cannot-run).
 
 An implementation run of a locked task refuses to start with `RED_BASELINE_MISSING` or `RED_BASELINE_INVALID` until the baseline is `missing_behavior`. Fix the test file and run `molly:lock-test --approve` again; Molly locks the new digest and records a new baseline. A task created through `CreateTask` with `requireRedBaseline: false` skips the check. Tasks created with a hand-written test that was never locked are not checked. Run reports copy the baseline, and every receipt carries it under `context.red_baseline`.
 
