@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PHP="${PHP_BINARY:-$(command -v php)}"
 echo "==> PHP: $($PHP -v | head -1)"
+echo "==> documentation links and required alpha docs"
+python3 bin/molly-docs-check
 echo "==> composer validate --strict"
 composer validate --strict
 echo "==> composer install (locked)"
