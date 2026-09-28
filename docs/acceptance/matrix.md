@@ -276,3 +276,44 @@ Owners A to F are the MME-5885 workstreams named in the manifest. "Mary" rows na
 | M13.16 | Digest and runtime provenance verified; partial/corrupt/concurrent handled (MME-5885) | NOT_RUN | absent<br>none | none | none | No gate record. | No gate record exists. Run the manifest action on the current candidate and write a record. | B/C/D; Mary (Todoist `6hf9rCgPmCVCW5MH`) |
 | M13.17 | Useful execution: bounded inference plus representative Molly task with latency/memory (MME-5885) | NOT_RUN | absent<br>none | none | none | No gate record. | No gate record exists. Run the manifest action on the current candidate and write a record. | B/C/D; Mary (Todoist `6hf9rCgPmCVCW5MH`) |
 | M13.18 | Bloom and CLI reach equivalent decision from same snapshot (MME-5885) | NOT_RUN | absent<br>none | none | none | No gate record. | No gate record exists. Run the manifest action on the current candidate and write a record. | B/C/D; Mary (Todoist `6hf9rCjqgJw4c2pq`) |
+
+## Launch claims (M01.5)
+
+[`claims.json`](claims.json) lists each launch claim in `README.md`, `docs/getting-started.md`, `docs/quickstart-standalone.md`, `docs/quickstart-bloom.md`, `docs/compatibility.md`, `docs/standalone.md`, `docs/bloom.md`, and `docs/index.html`, with its source lines. A claim maps to a Pest test (file and exact test name) only when the test body checks the claim, or to a manifest subcase whose requirement covers it. Test names were checked word for word against the test files at `2835b93`. A subcase-only mapping counts as mapped, but most of those subcases are NOT_RUN, so the claim has no current evidence yet.
+
+- 111 claims: 31 mapped to tests and subcases, 39 to tests only, 18 to subcases only.
+- 23 unmapped. These are gaps. M01.5 expects no unmapped claim, so it cannot PASS until each one is mapped to a test or removed from the docs:
+
+  - C009: Any working Laravel database connection is supported (`README.md:12`, `docs/getting-started.md:11`, `docs/compatibility.md:12`, `docs/index.html:219`). Tests run only on the Testbench SQLite connection; CommandsTest 'requires every task history migration before declaring the database ready' checks migrations, not driver coverage. M01.6 reviews this kind of claim but does not verify it.
+  - C023: qwen2.5-coder:7b needs about 8 GB of free memory (`docs/getting-started.md:96`). No test or subcase checks this figure.
+  - C030: MOLLY_SANDBOX_ALLOW_UNSAFE=true turns isolation off and doctor then reports sandbox_unsafe_override; the writer and Pest run with the user's permissions (`docs/getting-started.md:120`, `docs/getting-started.md:123`, `docs/getting-started.md:126`, `docs/quickstart-standalone.md:36`). SandboxCapabilityTest 'includes sandbox availability in doctor checks' accepts any of three codes, so it does not verify the override code. Unit/WalkthroughAssetsTest only checks the docs mention the variable.
+  - C035: Molly never retries on its own (`docs/getting-started.md:177`). No test asserts that a failed run does not trigger another attempt automatically.
+  - C042: A completed run means the required test passed and the review found nothing blocking; it does not mean the whole application is correct (`docs/getting-started.md:161`, `docs/index.html:78`). Scope limitation statement; no behavior to test.
+  - C059: The Bloom desktop integration is unfinished: the Bloom adapter has not shipped as a compiled Bloom release, and visual previews inside Bloom are not available (`README.md:92`, `docs/bloom.md:48`, `docs/index.html:207`). Negative status claim; no test. M02.2 and M04.x assume a compiled host exists, so the subcases and this claim should be reconciled.
+  - C073: Knowledge is advisory: it cannot widen files, touch a protected test, or declare a task complete (`docs/index.html:177`). KnowledgeGraphTest 'collects bounded advisory knowledge for a run without requiring an index' only asserts an advisory status; no test checks that knowledge cannot change scope or completion.
+  - C086: When a command fails, the plugin screen shows the command line, working directory, exit code, and stderr (`docs/bloom.md:11`). No test or subcase covers failure display.
+  - C088: Without a pick, the plugin uses MOLLY_ARTISAN_HOST, then the first project in ~/.molly/projects.json with an artisan file; MOLLY_HOME selects a different index (`docs/bloom.md:30`). Plugin-side resolution; no test or subcase.
+  - C089: The plugin looks for PHP at MOLLY_PHP_BINARY, Herd, /opt/homebrew/bin/php, /usr/local/bin/php, then /usr/bin/env php, and each screen says PHP was not found and names those paths if none starts (`docs/quickstart-bloom.md:21`, `docs/bloom.md:32`). No test or subcase covers PHP lookup.
+  - C092: Molly has no command that lists runs across tasks; the Runs screen lists one task's attempts or opens a run by ID (`docs/bloom.md:36`). Limitation; no test.
+  - C093: The Runs diff is the live git diff of the run's workspace, not a snapshot saved with the run (`docs/bloom.md:37`). Limitation; no test.
+  - C094: When the installed Molly lacks molly:glossary, molly:status, or molly:worker, the screen says so instead of showing data (`docs/bloom.md:38`). No test or subcase.
+  - C096: Plugin commands run to completion; Start and Retry cannot be cancelled from the screen (`docs/bloom.md:40`). Limitation; no test.
+  - C097: The plugin cannot switch Bloom's sidebar selection; links open inside the current Molly screen (`docs/bloom.md:41`). Limitation; no test.
+  - C098: The plugin logs its own registration under the subsystem app.sifrious.molly.surfaces (`docs/bloom.md:42`). No test or subcase.
+  - C099: Plans, Laravel knowledge queries, task advice, locking a written test, and exporting the Bloom contract stay in the terminal or local web interface (`docs/bloom.md:46`). Limitation; no test.
+  - C100: The plugin bundle is not in the Composer package; you build it from a Bloom checkout (`docs/bloom.md:48`). .gitattributes export-ignores /bloom-plugin/Surfaces.bundle, but CandidateBuildTest 'packages the current HEAD without development paths or absolute user paths' does not check for it.
+  - C102: molly:bloom-contract fails with TASK_NOT_FOUND, PROTECTED_TEST_MISSING (no locked test digest), or TEST_PROTECTED (task allows test edits) (`docs/bloom.md:65`, `docs/bloom.md:67`, `docs/bloom.md:68`, `docs/bloom.md:69`). src/Actions/ExportBloomContract.php throws these codes, but no test drives the command into them. TaskContractTest 'rejects an acceptance test that is also writable' checks the contract value only.
+  - C103: Molly never creates a worktree; it attaches to the one Bloom already has (`docs/bloom.md:71`, `docs/index.html:134`). ExportBloomContractTest records the existing workspace path but does not assert that no worktree is created.
+  - C106: A plugin bundle only loads in a Bloom that exports the same BloomPluginAPI symbols it was linked against (`docs/bloom.md:119`). No test; M04.13 covers apiVersion mismatch, not symbol mismatch.
+  - C107: Bloom owns the worktree, branch, diff, agent session screens, and pull request controls; Molly owns the task and allowed files, the protected test, attempts, Pest/Tarpit/Clever evidence, completion, approval, and receipts (`docs/bloom.md:3`, `docs/bloom.md:123`, `docs/index.html:132`). Ownership statement; no single test or subcase.
+  - C111: Molly is available under the MIT license (`README.md:98`). composer.json declares MIT; no test or subcase.
+
+Doc problems found while mapping:
+
+- `docs/index.html:221` says "v1 is not tagged yet" while the install line beside it uses `^0.2`.
+- The Pest install recipes differ: `README.md` and `docs/quickstart-standalone.md` use `^4.7` with `--no-update`; `docs/getting-started.md` and `docs/compatibility.md` use `^4` with `allow-plugins`.
+- `docs/getting-started.md:192` shows the prompt "Which other files may Molly change?"; the test asserts "Which files may Molly change?".
+- `README.md:92` and `docs/index.html:207` call the compiled Bloom integration unfinished, while M02.2 and M04 assume a compiled host with the plugin loaded.
+- `RunTaskTest` "does not edit files or call the model when Clever is unavailable" shows an unavailable Clever fails the run, while the docs describe Clever as advisory measurement.
+
+Subcase-only claims with no Pest test: C005, C006, C007, C008, C010, C014, C016, C017, C018, C026, C052, C054, C083, C084, C105, C108, C109, C110. Most of them concern platform coverage (CI never ran at the candidate) or the Bloom plugin (M04 not run).
