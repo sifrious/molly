@@ -21,7 +21,7 @@ class MollyRetryCommand extends Command
         try {
             $run = $action->handle((string) $this->argument('task'), $this->option('json') ? null : fn (string $message) => note($message));
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $run->id, 'task_id' => $run->task_id, 'status' => $run->status, 'report' => $run->report], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->line(json_encode(['id' => $run->id, 'task_id' => $run->task_id, 'status' => $run->status, 'report' => $run->report, ...array_filter(['next' => $report->next($run)])], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {
                 $report->show($run, $this->output->isVerbose());
             }

@@ -144,7 +144,7 @@ class RunTask
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $generationStarted = hrtime(true);
             try {
-                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest);
+                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest, $allowTestEdits ? $this->pestConfiguration($workspace, $before) : []);
             } finally {
                 $report['model_identity'] = $this->modelIdentity->handle(intdiv(hrtime(true) - $generationStarted, 1_000_000));
                 $run->update(['report' => $report]);
@@ -366,6 +366,27 @@ class RunTask
             'errors' => $verification['errors'] ?? 0,
             'checked_at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * tests/Pest.php as read-only context for a test-authoring run, so the
+     * model sees which TestCase and traits apply to every test. The content
+     * is null when the file does not exist. The file is left out when the
+     * run may write it or Molly cannot read it.
+     *
+     * @param  array<string, ?string>  $before
+     * @return array<string, ?string>
+     */
+    private function pestConfiguration(Workspace $workspace, array $before): array
+    {
+        if (array_key_exists('tests/Pest.php', $before)) {
+            return [];
+        }
+        try {
+            return $workspace->readProtectedTest('tests/Pest.php');
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /** @param array<string, mixed> $measurement */

@@ -26,7 +26,7 @@ class RunReport
         $this->showChanges($report);
         $this->showSnapshots($report, $verbose);
         $this->showVerification($report, $verbose);
-        $this->showAuthoredTest($report);
+        $this->showAuthoredTest($run, $report);
         $this->showTarpit($report);
         $this->showMeasurements($report, $verbose);
         $this->showAdvice($report);
@@ -77,7 +77,7 @@ class RunReport
     }
 
     /** @param array<string, mixed> $report */
-    private function showAuthoredTest(array $report): void
+    private function showAuthoredTest(Run $run, array $report): void
     {
         $check = $report['authored_test'] ?? null;
         if (! is_array($check) || ! is_string($check['classification'] ?? null)) {
@@ -88,6 +88,26 @@ class RunReport
         foreach (Task::authoredTestProblems($check) as $problem) {
             warning($problem);
         }
+        $next = $this->next($run);
+        if ($next !== null) {
+            note('Next: '.$next['reason'].' Run '.$next['command'].'.');
+        }
+    }
+
+    /**
+     * The next step after a test-authoring run whose test Molly checked, or null.
+     *
+     * @return array{command: string, reason: string}|null
+     */
+    public function next(Run $run): ?array
+    {
+        $check = $run->report['authored_test'] ?? null;
+        $task = $run->task;
+        if (! is_array($check) || ! $task instanceof Task || ! $task->allow_test_edits) {
+            return null;
+        }
+
+        return $task->authoringNextStep($check);
     }
 
     /** @param array<string, mixed> $report */

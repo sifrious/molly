@@ -153,3 +153,72 @@ it('classifies an authored test that fails for unbuilt behavior as missing behav
     // RefreshDatabase is applied, so a missing table means a migration is still to be written.
     expect($start['report']['authored_test'])->toMatchArray(['classification' => 'missing_behavior', 'reason' => 'tests_failed', 'test_broken' => false, 'causes' => []]);
 });
+
+/** The unmigrated test repaired the way the guidance asks. */
+function migratedCounterTest(): string
+{
+    return str_replace("use Illuminate\\Support\\Facades\\DB;\n", "use Illuminate\\Foundation\\Testing\\RefreshDatabase;\nuse Illuminate\\Support\\Facades\\DB;\n\nuses(RefreshDatabase::class);\n", unmigratedCounterTest());
+}
+
+it('sends a broken authored test back to Molly with guidance instead of suggesting a lock', function () {
+    $task = authoringTask($this->workspace);
+    ChangeWriter::fake([
+        ['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => unmigratedCounterTest()]]],
+        ['summary' => 'Apply RefreshDatabase.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => migratedCounterTest()]]],
+    ])->preventStrayPrompts();
+    fakeAuthoringCollaborators(2);
+
+    [, $start] = mollyJson('molly:start', ['task' => $task->id]);
+    expect($start['next']['command'])->toBe('php artisan molly:retry '.$task->id);
+
+    [, $shown] = mollyJson('molly:task', ['task' => $task->id]);
+    expect($shown['next'])->toBe(['command' => 'php artisan molly:retry '.$task->id, 'reason' => 'Have Molly rewrite tests/Feature/CounterTest.php with guidance for this cause.']);
+
+    Artisan::call('molly:task', ['task' => $task->id]);
+    $text = preg_replace('/\s+/', ' ', Artisan::output());
+    expect($text)->toContain('Run php artisan molly:retry '.$task->id.'.')
+        ->and($text)->not->toContain('molly:lock-test');
+
+    [$exit, $retry] = mollyJson('molly:retry', ['task' => $task->id]);
+
+    ChangeWriter::assertPrompted(function ($prompt): bool {
+        $payload = json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR);
+
+        return ($payload['read_only_files']['tests/Pest.php'] ?? null) === File::get(test()->workspace.'/tests/Pest.php')
+            && ! isset($payload['previous_attempt']);
+    });
+    ChangeWriter::assertPrompted(function ($prompt): bool {
+        $payload = json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR);
+        $authored = $payload['previous_attempt']['authored_test'] ?? null;
+
+        return $authored !== null
+            && $authored['classification'] === 'bootstrap_error'
+            && $authored['causes'][0]['cause'] === 'database_not_migrated'
+            && str_contains($authored['causes'][0]['guidance'], 'uses(RefreshDatabase::class);')
+            && $authored['causes'][0]['tests'] === ['it counts signed in users'];
+    });
+    expect(File::get($this->workspace.'/tests/Feature/CounterTest.php'))->toBe(migratedCounterTest())
+        ->and($retry['report']['authored_test']['classification'])->toBe('missing_behavior')
+        ->and($retry['next']['command'])->toBe('php artisan molly:lock-test '.$task->id.' --approve');
+
+    [$lockExit, $lock] = mollyJson('molly:lock-test', ['task' => $task->id, '--approve' => true]);
+    expect($lockExit)->toBe(0)
+        ->and($lock['locked'])->toBeTrue()
+        ->and($lock['red_baseline']['classification'])->toBe('missing_behavior');
+});
+
+it('gives the model Laravel guidance for an unbound TestCase', function () {
+    $task = authoringTask($this->workspace, 'tests/Unit/CounterTest.php');
+    $test = "<?php\n\nit('shows the counter', function () {\n    \$this->get('/counter')->assertOk();\n});\n";
+    ChangeWriter::fake([
+        ['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Unit/CounterTest.php', 'content' => $test]]],
+        ['summary' => 'Bind the TestCase.', 'files' => [['path' => 'tests/Unit/CounterTest.php', 'content' => str_replace("<?php\n", "<?php\n\nuses(Tests\\TestCase::class);\n", $test)]]],
+    ])->preventStrayPrompts();
+    fakeAuthoringCollaborators(2);
+
+    mollyJson('molly:start', ['task' => $task->id]);
+    [, $retry] = mollyJson('molly:retry', ['task' => $task->id]);
+
+    ChangeWriter::assertPrompted(fn ($prompt): bool => str_contains(json_decode($prompt->prompt, true)['previous_attempt']['authored_test']['causes'][0]['guidance'] ?? '', 'uses(Tests\TestCase::class);'));
+    expect($retry['report']['authored_test']['classification'])->toBe('missing_behavior');
+});

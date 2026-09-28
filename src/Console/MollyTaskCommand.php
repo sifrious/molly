@@ -32,7 +32,7 @@ class MollyTaskCommand extends Command
                     'display_status' => $inspection['display_status'],
                     'linked_pr' => $inspection['linked_pr'],
                     'issue_url' => $inspection['issue_url'],
-                    ...($check === null ? [] : ['authored_test' => $check]),
+                    ...($check === null ? [] : ['authored_test' => $check, 'next' => $task->authoringNextStep($check)]),
                     'task' => $task->toArray(),
                 ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {

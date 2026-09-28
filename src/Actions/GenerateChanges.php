@@ -23,15 +23,17 @@ class GenerateChanges
     /**
      * @param  array<string, string|null>  $files
      * @param  array<string, mixed>|null  $previousAttempt
+     * @param  array<string, string|null>  $readOnlyFiles  context the model may read but not change, such as tests/Pest.php
      * @return array{summary: string, files: list<array{path: string, content: string}>}
      */
-    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null, bool $allowTestEdits = false, ?string $testDigest = null): array
+    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null, bool $allowTestEdits = false, ?string $testDigest = null, array $readOnlyFiles = []): array
     {
         $input = json_encode([
             'task' => $prompt,
             'allowed_files' => $files,
             'required_test' => $testPath,
             'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
+            ...($readOnlyFiles === [] ? [] : ['read_only_files' => $readOnlyFiles]),
             'laravel_knowledge' => $this->knowledge->handle($prompt, $files, $testPath),
             'nativephp_knowledge' => $this->nativephp->handle($prompt, $files, $testPath),
             'tarpit_knowledge' => $this->tarpit->handle($prompt, $files, $testPath),

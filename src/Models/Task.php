@@ -111,6 +111,34 @@ class Task extends Model
     }
 
     /**
+     * The next command for a test-authoring task once its authored test was
+     * checked. A test that cannot run goes back to Molly for a rewrite while
+     * attempts remain; otherwise a person reviews or repairs it and locks it.
+     *
+     * @param  array<string, mixed>  $check
+     * @return array{command: string, reason: string}
+     */
+    public function authoringNextStep(array $check): array
+    {
+        $lock = 'php artisan molly:lock-test '.$this->reference().' --approve';
+        if (($check['test_broken'] ?? false) !== true) {
+            return ['command' => $lock, 'reason' => 'Review '.$this->test_path.', then lock it.'];
+        }
+
+        $limit = config('molly.max_attempts', 3);
+        $budget = config('molly.repair.per_failure', 3);
+        $repeated = $this->repeatedFailure();
+        if ((is_int($limit) && $this->attemptsUsed() >= $limit) || (is_int($budget) && $repeated !== null && $repeated['failures'] >= $budget)) {
+            return ['command' => $lock, 'reason' => 'Molly has no attempts left for this test. Edit '.$this->test_path.' to fix the cause, then lock it.'];
+        }
+
+        return [
+            'command' => 'php artisan molly:'.($this->status === 'pending' ? 'start' : 'retry').' '.$this->reference(),
+            'reason' => 'Have Molly rewrite '.$this->test_path.' with guidance for this cause.',
+        ];
+    }
+
+    /**
      * One plain sentence per cause of an authored test check, naming the
      * cause code and up to five affected tests.
      *

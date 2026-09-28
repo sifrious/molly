@@ -225,12 +225,42 @@ class StartTask
         $output = is_string($report['verification']['output'] ?? null)
             ? $report['verification']['output']
             : null;
+        $authored = $this->authoredTestGuidance($report['authored_test'] ?? null);
+        if ($authored !== null) {
+            $evidence['authored_test'] = $authored;
+        }
         $hints = $this->boundedAssertionHints($output);
         if ($hints !== []) {
             $evidence['assertion_hints'] = $hints;
         }
 
         return $evidence;
+    }
+
+    /**
+     * Molly's guidance for rewriting an authored test that could not run: the
+     * classification and, per cause, the guidance and up to five affected tests.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function authoredTestGuidance(mixed $check): ?array
+    {
+        if (! is_array($check) || ($check['classification'] ?? null) !== 'bootstrap_error') {
+            return null;
+        }
+        $causes = [];
+        foreach (array_slice(array_filter($check['causes'] ?? [], is_array(...)), 0, 4) as $cause) {
+            if (! is_string($cause['guidance'] ?? null)) {
+                continue;
+            }
+            $causes[] = [
+                'cause' => $this->boundedText((string) ($cause['cause'] ?? ''), 64),
+                'guidance' => $this->boundedText($cause['guidance'], 512),
+                'tests' => array_map(fn (mixed $name): string => $this->boundedText((string) $name, 128), array_slice($cause['tests'] ?? [], 0, 5)),
+            ];
+        }
+
+        return $causes === [] ? null : ['classification' => 'bootstrap_error', 'causes' => $causes];
     }
 
     /** @param  array<string, mixed>  $verification

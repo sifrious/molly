@@ -73,7 +73,10 @@ class TaskReport
                     warning($problem);
                 }
             }
-            if ($task->allow_test_edits && $task->runs->isNotEmpty() && $task->status !== 'running') {
+            if ($check !== null) {
+                $next = $task->authoringNextStep($check);
+                note('Next: '.$next['reason'].' Run '.$next['command'].'.');
+            } elseif ($task->allow_test_edits && $task->runs->isNotEmpty() && $task->status !== 'running') {
                 note('Review '.$task->test_path.', then lock it with php artisan molly:lock-test '.$task->reference().' --approve.');
             }
             if ($task->runs->isEmpty()) {
