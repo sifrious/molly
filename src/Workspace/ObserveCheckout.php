@@ -76,6 +76,42 @@ final class ObserveCheckout
         return ['root' => $root, 'ignored_by' => null];
     }
 
+    /** The path relative to the top level of its work tree, such as backend or scratch/app, or . at the top level. */
+    public static function prefix(string $path): string
+    {
+        [$code, $prefix] = self::run($path, ['rev-parse', '--show-prefix']);
+        $prefix = rtrim($prefix, '/');
+
+        return $code === 0 && $prefix !== '' ? $prefix : '.';
+    }
+
+    /** Whether the HEAD commit contains at least one file under the path. */
+    public function headContainsFiles(string $path): bool
+    {
+        if (! is_dir($path) || GitBinary::find() === null) {
+            return false;
+        }
+        [$code, $out] = self::run($path, ['ls-tree', '--name-only', 'HEAD', '--', '.']);
+
+        return $code === 0 && $out !== '';
+    }
+
+    /**
+     * The commands that commit a path into the repository that already holds it. Molly prints
+     * them for the user to run and never runs them itself.
+     *
+     * @return list<string>
+     */
+    public static function commitCommands(string $root, string $path): array
+    {
+        $prefix = self::prefix($path);
+
+        return [
+            'git -C '.escapeshellarg($root).' add '.escapeshellarg($prefix),
+            'git -C '.escapeshellarg($root).' commit -m '.escapeshellarg($prefix === '.' ? 'Start' : 'Add '.$prefix),
+        ];
+    }
+
     /** Whether a Git work tree tracks the path, at its top level or in a subdirectory. */
     public static function isCheckout(string $path): bool
     {

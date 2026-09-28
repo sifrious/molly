@@ -80,11 +80,12 @@ it('refuses a non-laravel directory', function (): void {
 });
 
 it('creates a new project scaffold and marks source as new', function (): void {
-    // Inside a committed repository, so Molly can attach the new app right away.
+    // Replacing a directory the HEAD commit already tracks, so Molly can attach the new app right away.
     $parent = sys_get_temp_dir().'/molly-new-'.Str::uuid();
-    File::ensureDirectoryExists($parent);
-    commitGitWorkspace($parent);
     $target = $parent.'/app';
+    File::ensureDirectoryExists($target);
+    File::put($target.'/README.md', "# app\n");
+    commitGitWorkspace($parent);
 
     $result = (new CreateMollyProject(
         new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)),
@@ -92,6 +93,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
     ))->handle(
         path: $target,
         name: 'Fresh',
+        force: true,
         runComposer: false,
         runMigrations: false,
         bootstrapGraphs: false,
@@ -195,5 +197,93 @@ it('tells the user to commit when molly:project-new stops before attaching Molly
             ->assertSuccessful();
     } finally {
         File::deleteDirectory($target);
+    }
+});
+
+it('asks to commit a new app into the committed repository that holds it, without git init', function (): void {
+    $parent = sys_get_temp_dir().'/molly-new-mono-'.Str::uuid();
+    File::ensureDirectoryExists($parent);
+    File::put($parent.'/README.md', "# mono\n");
+    commitGitWorkspace($parent);
+    $target = $parent.'/backend';
+    $repository = realpath($parent);
+
+    try {
+        $exit = Artisan::call('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($payload['status'])->toBe('needs_commit')
+            ->and($payload['project'])->toBeNull()
+            ->and($payload['reason'])->toContain('is inside the Git repository at '.$repository)
+            ->and($payload['next'])->toBe([
+                'git -C '.escapeshellarg($repository).' add '.escapeshellarg('backend'),
+                'git -C '.escapeshellarg($repository).' commit -m '.escapeshellarg('Add backend'),
+                'php artisan molly:project-init '.escapeshellarg($target),
+            ])
+            ->and(implode("\n", $payload['next']))->not->toContain('git init')
+            ->and(File::exists($target.'/.git'))->toBeFalse()
+            ->and(File::exists($target.'/.molly'))->toBeFalse()
+            ->and(File::exists($this->mollyHome.'/projects.json'))->toBeFalse();
+
+        foreach (array_slice($payload['next'], 0, 2) as $command) {
+            (Process::fromShellCommandline($command, env: ['GIT_AUTHOR_NAME' => 'Molly Tests', 'GIT_AUTHOR_EMAIL' => 'tests@example.com', 'GIT_COMMITTER_NAME' => 'Molly Tests', 'GIT_COMMITTER_EMAIL' => 'tests@example.com']))->mustRun();
+        }
+        $exit = Artisan::call('molly:project-init', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+
+        expect($exit)->toBe(0)
+            ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['status'])->toBe('initialized');
+    } finally {
+        File::deleteDirectory($parent);
+    }
+});
+
+it('asks to commit a new app into a repository with no commit, without git init', function (): void {
+    $parent = sys_get_temp_dir().'/molly-new-nocommit-'.Str::uuid();
+    File::ensureDirectoryExists($parent);
+    (new Process(['git', 'init', '--quiet', $parent]))->mustRun();
+    $target = $parent.'/backend';
+    $repository = realpath($parent);
+
+    try {
+        $exit = Artisan::call('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($payload['status'])->toBe('needs_commit')
+            ->and($payload['next'][0])->toBe('git -C '.escapeshellarg($repository).' add '.escapeshellarg('backend'))
+            ->and(implode("\n", $payload['next']))->not->toContain('git init')
+            ->and(File::exists($target.'/.git'))->toBeFalse();
+    } finally {
+        File::deleteDirectory($parent);
+    }
+});
+
+it('tells the user to stop ignoring a new app in the repository that ignores it, without git init', function (): void {
+    $parent = sys_get_temp_dir().'/molly-new-ignored-'.Str::uuid();
+    File::ensureDirectoryExists($parent);
+    File::put($parent.'/.gitignore', "scratch/\n");
+    commitGitWorkspace($parent);
+    $target = $parent.'/scratch/app';
+    $repository = realpath($parent);
+
+    try {
+        $exit = Artisan::call('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($payload['status'])->toBe('needs_commit')
+            ->and($payload['reason'])->toContain('is ignored by the Git repository at '.$repository)
+            ->and($payload['reason'])->toContain('Stop ignoring it in '.$repository)
+            ->and($payload['next'][0])->toBe('git -C '.escapeshellarg($repository).' add '.escapeshellarg('scratch/app'))
+            ->and(implode("\n", $payload['next']))->not->toContain('git init')
+            ->and(File::exists($target.'/.git'))->toBeFalse();
+
+        $this->artisan('molly:project-new', ['path' => $parent.'/scratch/other', '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true])
+            ->expectsOutputToContain('Stop ignoring it in '.$repository)
+            ->doesntExpectOutputToContain('git init')
+            ->assertSuccessful();
+    } finally {
+        File::deleteDirectory($parent);
     }
 });

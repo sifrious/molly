@@ -91,15 +91,17 @@ it('does not register a project when molly:project-init fails during the graph b
 });
 
 it('runs molly:project-new with the container bootstrap', function (): void {
-    // Inside a committed repository, so Molly can attach the new app right away.
+    // Replacing a directory the HEAD commit already tracks, so Molly can attach the new app right away.
     $parent = sys_get_temp_dir().'/molly-new-'.Str::uuid();
-    File::ensureDirectoryExists($parent);
-    commitGitWorkspace($parent);
     $target = $parent.'/app';
+    File::ensureDirectoryExists($target);
+    File::put($target.'/README.md', "# app\n");
+    commitGitWorkspace($parent);
 
     try {
         $exit = Artisan::call('molly:project-new', [
             'path' => $target,
+            '--force' => true,
             '--no-composer' => true,
             '--no-migrate' => true,
             '--json' => true,
