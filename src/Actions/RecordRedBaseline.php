@@ -129,7 +129,8 @@ class RecordRedBaseline
         if (($verification['status'] ?? null) === 'passed') {
             return $this->result('already_passing', 'The locked test passed before implementation.');
         }
-        $fatal = preg_match('/PHP (Parse|Fatal) error/i', (string) ($verification['output'] ?? '')) === 1;
+        // PHP reports "PHP Parse error"; Pest's Collision printer shows the exception class on its own line.
+        $fatal = preg_match('/PHP (Parse|Fatal) error|^\s*(ParseError|CompileError)\s*$/im', (string) ($verification['output'] ?? '')) === 1;
         if ($reason !== 'tests_failed') {
             $cause = match (true) {
                 $fatal => 'parse_error',

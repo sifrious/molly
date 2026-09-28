@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Console;
 
 use Closure;
 use Laravel\Prompts\Prompt;
+use Sifrious\Molly\AuthoredTestBroken;
 use Sifrious\Molly\ChoiceRequired;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Input\InputInterface;
@@ -122,12 +123,16 @@ trait ReportsFailures
 
     /**
      * The failure message and, for an error that asks for a choice, the
-     * choices and the command to run again.
+     * choices and the command to run again. For an authored test that cannot
+     * run, the check and the next step.
      *
-     * @return array{0: string, 1: array{choices?: list<array{value: string, label: string}>, rerun?: string}}
+     * @return array{0: string, 1: array{choices?: list<array{value: string, label: string}>, rerun?: string, authored_test?: array<string, mixed>, next?: array{command: string, reason: string}}}
      */
     protected function failureDetails(Throwable $exception): array
     {
+        if ($exception instanceof AuthoredTestBroken) {
+            return [$exception->getMessage(), ['authored_test' => $exception->check, 'next' => $exception->next]];
+        }
         if (! $exception instanceof ChoiceRequired) {
             return [$exception->getMessage(), []];
         }

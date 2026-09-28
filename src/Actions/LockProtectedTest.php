@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Actions;
 
 use RuntimeException;
+use Sifrious\Molly\AuthoredTestBroken;
 use Sifrious\Molly\ChoiceRequired;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Task;
@@ -44,6 +45,11 @@ class LockProtectedTest
         if ($after === null) {
             throw new RuntimeException('PROTECTED_TEST_MISSING: Create the required Pest test before locking it.');
         }
+        // Run the test as it is now. A test that cannot run is not locked; it goes back for a rewrite.
+        $check = $this->redBaseline->check($task);
+        if (($check['test_broken'] ?? false) === true) {
+            throw new AuthoredTestBroken($task, $check, $task->authoringNextStep($check));
+        }
 
         $before = is_string($task->test_digest) && $task->test_digest !== '' ? $task->test_digest : null;
         [$paths, $scopeSource] = $this->scope($task, $implementationPaths);
@@ -76,7 +82,7 @@ class LockProtectedTest
             'source' => $source,
         ]);
         $this->lifecycle->handle($task->workspace, LifecycleEventType::TestLocked, $task->id, $task->runs->last()?->id, $source['test_lock']);
-        $baseline = $this->redBaseline->handle($task->fresh());
+        $baseline = $this->redBaseline->record($task->fresh(), $check);
         $this->journal->handle($task->fresh());
 
         return $this->result($task->id, $task->test_path, $before, $after, true, $baseline, $paths, $scopeSource);

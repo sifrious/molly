@@ -12,6 +12,7 @@ use Sifrious\Molly\Actions\RecordRedBaseline;
 use Sifrious\Molly\Actions\RecordVerificationReceipts;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Actions\StartTask;
+use Sifrious\Molly\AuthoredTestBroken;
 use Sifrious\Molly\Models\Task;
 
 function redBaselineWorkspace(bool $realPest = true): string
@@ -69,19 +70,51 @@ it('records a missing behavior RED baseline when the locked test fails on an unb
     expect($json['task']['source']['test_lock']['red_baseline']['classification'])->toBe('missing_behavior');
 });
 
-it('refuses implementation after a bootstrap error and accepts a repaired, relocked test', function () {
+it('refuses to lock an authored test that cannot run and locks it once repaired', function () {
+    $this->workspace = redBaselineWorkspace();
+    $task = app(CreateTask::class)->handle('Author the greeting test.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true);
+    File::put($this->workspace.'/tests/GreetingTest.php', '<?php it("greets", function () { expect(');
+
+    try {
+        app(LockProtectedTest::class)->handle($task->id, true, ['app/Greeting.php']);
+        $this->fail('The lock accepted a test that cannot run.');
+    } catch (AuthoredTestBroken $refusal) {
+        expect($refusal->getMessage())->toStartWith('AUTHORED_TEST_BROKEN: Molly did not lock tests/GreetingTest.php because it cannot run.')
+            ->and($refusal->getMessage())->toContain('(parse_error)')
+            ->and($refusal->check['classification'])->toBe('bootstrap_error')
+            ->and($refusal->next['command'])->toBe('php artisan molly:start '.$task->id);
+    }
+    $task->refresh();
+    expect($task->allow_test_edits)->toBeTrue()
+        ->and($task->source['test_lock'] ?? null)->toBeNull()
+        ->and($task->test_digest)->toBeNull();
+
+    File::put($this->workspace.'/tests/GreetingTest.php', '<?php it("greets", function () { expect(App\\Greeting::hello())->toBe("Hello"); });');
+    $result = app(LockProtectedTest::class)->handle($task->id, true, ['app/Greeting.php']);
+
+    expect($result['locked'])->toBeTrue()
+        ->and($result['red_baseline']['classification'])->toBe('missing_behavior')
+        ->and($task->fresh()->redBaselineError())->toBeNull();
+});
+
+it('refuses implementation after a bootstrap error baseline and accepts a repaired, relocked test', function () {
     $this->workspace = redBaselineWorkspace();
 
-    [$task, $result] = authoredAndLocked($this->workspace, '<?php it("greets", function () { expect(');
+    // The lock refuses a test that cannot run, so the bootstrap baseline is written as an older lock left it.
+    [$task] = authoredAndLocked($this->workspace, '<?php it("greets", function () { expect(App\\Greeting::hello())->toBe("Hello"); });');
+    File::put($this->workspace.'/tests/GreetingTest.php', '<?php it("greets", function () { expect(');
+    $broken = hash_file('sha256', $this->workspace.'/tests/GreetingTest.php');
+    $source = $task->source;
+    $source['test_lock']['red_baseline'] = ['classification' => 'bootstrap_error', 'reason' => 'parse_error', 'test_digest' => $broken];
+    $task->update(['test_digest' => $broken, 'source' => $source]);
+    $task->refresh();
 
-    expect($result['red_baseline']['classification'])->toBe('bootstrap_error')
-        ->and($task->redBaselineError())->toStartWith('RED_BASELINE_INVALID');
+    expect($task->redBaselineError())->toStartWith('RED_BASELINE_INVALID');
 
     $this->mock(GenerateChanges::class)->shouldNotReceive('handle');
     expect(fn () => app(StartTask::class)->handle($task->id))->toThrow(RuntimeException::class, 'RED_BASELINE_INVALID');
     expect($task->fresh()->status)->toBe('pending')->and($task->runs()->count())->toBe(0);
 
-    $broken = $task->test_digest;
     File::put($this->workspace.'/tests/GreetingTest.php', '<?php it("greets", function () { expect(App\\Greeting::hello())->toBe("Hello"); });');
     $relock = app(LockProtectedTest::class)->handle($task->id, true, reason: 'Repair the parse error in the authored test.');
     $task->refresh();

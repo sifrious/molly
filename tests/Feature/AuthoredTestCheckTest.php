@@ -222,3 +222,32 @@ it('gives the model Laravel guidance for an unbound TestCase', function () {
     ChangeWriter::assertPrompted(fn ($prompt): bool => str_contains(json_decode($prompt->prompt, true)['previous_attempt']['authored_test']['causes'][0]['guidance'] ?? '', 'uses(Tests\TestCase::class);'));
     expect($retry['report']['authored_test']['classification'])->toBe('missing_behavior');
 });
+
+it('refuses to lock a broken authored test and names the cause and the retry', function () {
+    $task = authoringTask($this->workspace);
+    ChangeWriter::fake([['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => unmigratedCounterTest()]]]])->preventStrayPrompts();
+    fakeAuthoringCollaborators(1);
+    mollyJson('molly:start', ['task' => $task->id]);
+    $before = $task->fresh()->only(['allow_test_edits', 'test_digest', 'paths', 'status', 'source']);
+
+    [$exit, $refusal] = mollyJson('molly:lock-test', ['task' => $task->id, '--approve' => true]);
+
+    expect($exit)->toBe(1)
+        ->and($refusal['status'])->toBe('error')
+        ->and($refusal['error'])->toStartWith('AUTHORED_TEST_BROKEN: Molly did not lock tests/Feature/CounterTest.php because it cannot run.')
+        ->and($refusal['error'])->toContain('(database_not_migrated) Affected tests: it counts signed in users.')
+        ->and($refusal['error'])->toContain('Run php artisan molly:retry '.$task->id.'.')
+        ->and($refusal['authored_test']['classification'])->toBe('bootstrap_error')
+        ->and($refusal['authored_test']['causes'][0]['cause'])->toBe('database_not_migrated')
+        ->and($refusal['next']['command'])->toBe('php artisan molly:retry '.$task->id)
+        ->and($task->fresh()->only(['allow_test_edits', 'test_digest', 'paths', 'status', 'source']))->toBe($before);
+
+    // A person may repair the test instead; the next lock checks it again.
+    File::put($this->workspace.'/tests/Feature/CounterTest.php', migratedCounterTest());
+    [$lockExit, $lock] = mollyJson('molly:lock-test', ['task' => $task->id, '--approve' => true]);
+
+    expect($lockExit)->toBe(0)
+        ->and($lock['locked'])->toBeTrue()
+        ->and($lock['red_baseline']['classification'])->toBe('missing_behavior')
+        ->and($task->fresh()->redBaselineError())->toBeNull();
+});
