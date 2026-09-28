@@ -138,7 +138,7 @@ class CheckEnvironment
 
         $head = $this->observe->head($workspace);
         if ($head !== null && ! $this->observe->headContainsFiles($workspace)) {
-            $add('Git repository', false, 'workspace_revision_missing', ObserveCheckout::untrackedMessage($location['root'], $workspace).' Commit it there before creating a task.');
+            $add('Git repository', false, 'workspace_revision_missing', ObserveCheckout::untrackedMessage($location['root'], $workspace).' Then create the task.');
 
             return;
         }

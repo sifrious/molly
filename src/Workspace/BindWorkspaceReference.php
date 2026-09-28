@@ -29,7 +29,7 @@ final class BindWorkspaceReference
         }
         // A HEAD that holds none of the app's files is not a revision of this workspace.
         if (! $this->observe->headContainsFiles($obs['path'])) {
-            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.ObserveCheckout::untrackedMessage($obs['repository_root'], $obs['path']).' Commit it there, then try again.');
+            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.ObserveCheckout::untrackedMessage($obs['repository_root'], $obs['path']).' Then try again.');
         }
 
         // The app may sit in a subdirectory; the checkout kind comes from the repository root.

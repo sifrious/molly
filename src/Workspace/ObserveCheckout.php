@@ -147,7 +147,7 @@ final class ObserveCheckout
             throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.$path.' has no commit yet. Commit your work, then try again.');
         }
         if (! $this->headContainsFiles($path)) {
-            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.self::untrackedMessage($root, $path).' Commit it there, then try again.');
+            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.self::untrackedMessage($root, $path).' Then try again.');
         }
 
         return $head;
