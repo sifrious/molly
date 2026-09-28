@@ -7,12 +7,13 @@ use Sifrious\Molly\Actions\LockProtectedTest;
 use Throwable;
 
 use function Laravel\Prompts\note;
+use function Laravel\Prompts\table;
 
 class MollyLockTestCommand extends Command
 {
     use ReportsFailures;
 
-    protected $signature = 'molly:lock-test {task : Saved task name or ID} {--approve : Confirm the Pest file is the locked acceptance test} {--reason= : Why this digest is locked} {--file=* : Implementation files the next run may change} {--json : Print JSON only}';
+    protected $signature = 'molly:lock-test {task : Saved task name or ID} {--approve : Confirm the Pest file is the locked acceptance test} {--reason= : Why this digest is locked} {--file=* : Implementation file the next run may change, instead of the files derived from the story} {--json : Print JSON only}';
 
     protected $description = 'Lock the required Pest test after a test-authoring task and drop it from the writer scope';
 
@@ -29,6 +30,7 @@ class MollyLockTestCommand extends Command
                 $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             } else {
                 note('Locked '.$result['test_path'].' at '.$result['after_digest'].'. The next run cannot edit that file.');
+                table(['File the implementation may change'], array_map(fn (string $path): array => [$path], $result['paths']));
             }
 
             return self::SUCCESS;

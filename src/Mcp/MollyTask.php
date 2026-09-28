@@ -185,7 +185,7 @@ class MollyTask extends Tool
             'plan_id' => $schema->string()->description('Completed or explicitly skipped plan ID, required for from_plan.'),
             'prompt' => $schema->string()->description('Task description; required for create/from_plan. Maximum 8192 bytes, or 1000 for from_plan.'),
             'workspace' => $schema->string()->description('Existing local workspace directory; required when saving a task.'),
-            'paths' => $schema->array()->items($schema->string())->description('Relative implementation files Molly may change. The required Pest test is protected unless allow_test_edits is true.'),
+            'paths' => $schema->array()->items($schema->string())->description('Relative implementation files Molly may change. The required Pest test is protected unless allow_test_edits is true. For lock_test, omit paths to use the files derived from the story.'),
             'test_path' => $schema->string()->description('Required PHP test file under tests/. It is read-only unless allow_test_edits is true.'),
             'allow_test_edits' => $schema->boolean()->description('Explicit weaker trust model that lets the same writer change the required Pest test. Default false.'),
             'issue_url' => $schema->string()->description('HTTPS github.com issue URL; required for import_github.'),

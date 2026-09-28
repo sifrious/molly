@@ -17,16 +17,20 @@ class LockProtectedTest
 
     /**
      * @param  list<string>  $implementationPaths
-     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null}
+     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null, paths: list<string>, scope_source: string}
      */
     public function handle(string $reference, bool $approved, array $implementationPaths = [], string $reason = 'Human approved the Pest test as the locked acceptance test.'): array
     {
+        $task = app(ShowTask::class)->handle($reference);
         if (! $approved) {
-            throw new RuntimeException('TEST_LOCK_UNCONFIRMED: Molly locks the required Pest test only after --approve.');
+            // Show the scope the approval would cover; nothing is saved.
+            [$paths] = $task !== null && $task->allow_test_edits ? $this->scope($task, $implementationPaths) : [[]];
+
+            throw new RuntimeException('TEST_LOCK_UNCONFIRMED: Molly locks the required Pest test only after --approve.'
+                .($paths === [] ? '' : ' The implementation may then change: '.implode(', ', $paths).'.'));
         }
 
-        $task = app(ShowTask::class)->handle($reference)
-            ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
+        $task ??= throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
         if (! $task->allow_test_edits) {
             return $this->confirmLocked($task, $reason);
         }
@@ -41,9 +45,13 @@ class LockProtectedTest
         }
 
         $before = is_string($task->test_digest) && $task->test_digest !== '' ? $task->test_digest : null;
-        $paths = $implementationPaths === []
-            ? array_values(array_filter($task->paths, fn (string $path): bool => $path !== $task->test_path))
-            : $implementationPaths;
+        [$paths, $scopeSource] = $this->scope($task, $implementationPaths);
+        if ($paths === []) {
+            $suggested = array_slice($workspace->sourceFiles(), 0, 3);
+
+            throw new RuntimeException('SCOPE_REQUIRED: Task '.$task->reference().' has no implementation files. Name the files the implementation may change, for example: php artisan molly:lock-test '.$task->reference().' --approve'
+                .($suggested === [] ? ' --file=app/Example.php' : implode('', array_map(fn (string $path): string => ' --file='.$path, $suggested))));
+        }
         $paths = $workspace->taskPaths($paths, $task->test_path, false);
 
         $source = $task->source ?? [];
@@ -67,7 +75,26 @@ class LockProtectedTest
         $baseline = $this->redBaseline->handle($task->fresh());
         $this->journal->handle($task->fresh());
 
-        return $this->result($task->id, $task->test_path, $before, $after, true, $baseline);
+        return $this->result($task->id, $task->test_path, $before, $after, true, $baseline, $paths, $scopeSource);
+    }
+
+    /**
+     * The implementation files a lock allows: the --file paths when given,
+     * otherwise the task's own non-test files plus the files derived from its story.
+     *
+     * @param  list<string>  $implementationPaths
+     * @return array{0: list<string>, 1: string}
+     */
+    private function scope(Task $task, array $implementationPaths): array
+    {
+        if ($implementationPaths !== []) {
+            return [$implementationPaths, 'option'];
+        }
+
+        $own = array_values(array_filter($task->paths, fn (string $path): bool => $path !== $task->test_path));
+        $derived = is_array($task->source['scope']['files'] ?? null) ? array_values(array_filter($task->source['scope']['files'], is_string(...))) : [];
+
+        return [array_values(array_unique([...$own, ...$derived])), $derived === [] ? 'task' : 'derived'];
     }
 
     /**
@@ -75,7 +102,7 @@ class LockProtectedTest
      * unusable, an approved lock records a new baseline, and re-locks the
      * test at its current digest if a human repaired the file.
      *
-     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null}
+     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null, paths: list<string>, scope_source: string}
      */
     private function confirmLocked(Task $task, string $reason): array
     {
@@ -86,7 +113,7 @@ class LockProtectedTest
         $lock = $task->source['test_lock'] ?? null;
         $baseline = is_array($lock) ? ($lock['red_baseline'] ?? null) : null;
         if (! is_array($lock) || ($baseline['classification'] ?? null) === 'missing_behavior') {
-            return $this->result($task->id, $task->test_path, $digest, $digest, false, $baseline);
+            return $this->result($task->id, $task->test_path, $digest, $digest, false, $baseline, $task->paths, 'locked');
         }
         if ($task->status === 'running') {
             throw new RuntimeException('TEST_LOCK_RUNNING: Stop or finish the current run before recording a RED baseline.');
@@ -114,14 +141,15 @@ class LockProtectedTest
         $baseline = $this->redBaseline->handle($task->fresh());
         $this->journal->handle($task->fresh());
 
-        return $this->result($task->id, $task->test_path, $digest, $current, $current !== $digest, $baseline);
+        return $this->result($task->id, $task->test_path, $digest, $current, $current !== $digest, $baseline, $task->paths, 'locked');
     }
 
     /**
      * @param  array<string, mixed>|null  $baseline
-     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null}
+     * @param  list<string>  $paths
+     * @return array{task_id: string, test_path: string, before_digest: string|null, after_digest: string, locked: bool, allow_test_edits: false, red_baseline: array<string, mixed>|null, paths: list<string>, scope_source: string}
      */
-    private function result(string $taskId, string $testPath, ?string $before, string $after, bool $locked, ?array $baseline = null): array
+    private function result(string $taskId, string $testPath, ?string $before, string $after, bool $locked, ?array $baseline, array $paths, string $scopeSource): array
     {
         return [
             'task_id' => $taskId,
@@ -131,6 +159,8 @@ class LockProtectedTest
             'locked' => $locked,
             'allow_test_edits' => false,
             'red_baseline' => $baseline,
+            'paths' => $paths,
+            'scope_source' => $scopeSource,
         ];
     }
 

@@ -120,3 +120,52 @@ it('starts the implementation scope with fresh attempts after authoring attempts
         ->and($task->runs()->count())->toBe(2)
         ->and($bus->claim($task->id, 'worker-b')->status)->toBe('running');
 });
+
+function storyScopedAuthoringTask(string $workspace, array $files): Task
+{
+    return app(CreateTask::class)->handle('Author the greeting test.', $workspace, [], 'tests/GreetingTest.php', [
+        'provider' => 'molly-story',
+        'scope' => ['files' => $files, 'rejected' => []],
+    ], allowTestEdits: true);
+}
+
+it('locks with the files derived from the story when no --file is given', function () {
+    $task = storyScopedAuthoringTask($this->workspace, ['app/Greeting.php', 'resources/views/greeting.blade.php']);
+    writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+
+    expect(fn () => app(LockProtectedTest::class)->handle($task->id, false))
+        ->toThrow(RuntimeException::class, 'TEST_LOCK_UNCONFIRMED: Molly locks the required Pest test only after --approve. The implementation may then change: app/Greeting.php, resources/views/greeting.blade.php.');
+    expect($task->fresh()->allow_test_edits)->toBeTrue();
+
+    expect(Artisan::call('molly:lock-test', ['task' => $task->id, '--approve' => true]))->toBe(0)
+        ->and(Artisan::output())->toContain('File the implementation may change', 'app/Greeting.php', 'resources/views/greeting.blade.php');
+
+    expect($task->fresh()->paths)->toBe(['app/Greeting.php', 'resources/views/greeting.blade.php'])
+        ->and($task->fresh()->allow_test_edits)->toBeFalse();
+
+    Artisan::call('molly:lock-test', ['task' => $task->id, '--approve' => true, '--json' => true]);
+    expect(json_decode(Artisan::output(), true))->toMatchArray(['paths' => ['app/Greeting.php', 'resources/views/greeting.blade.php'], 'scope_source' => 'locked']);
+});
+
+it('reports the derived files in the lock JSON and lets --file override them', function () {
+    $task = storyScopedAuthoringTask($this->workspace, ['app/Greeting.php', 'resources/views/greeting.blade.php']);
+    writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+
+    Artisan::call('molly:lock-test', ['task' => $task->id, '--approve' => true, '--file' => ['app/Other.php'], '--json' => true]);
+
+    expect(json_decode(Artisan::output(), true))->toMatchArray(['locked' => true, 'paths' => ['app/Other.php'], 'scope_source' => 'option'])
+        ->and($task->fresh()->paths)->toBe(['app/Other.php']);
+});
+
+it('refuses a lock with no derived files and no --file with SCOPE_REQUIRED and a runnable command', function () {
+    $task = app(CreateTask::class)->handle('Author the greeting test.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true);
+    writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+
+    expect(Artisan::call('molly:lock-test', ['task' => $task->id, '--approve' => true, '--json' => true]))->toBe(1);
+    $json = json_decode(Artisan::output(), true);
+
+    expect($json['error'])->toStartWith('SCOPE_REQUIRED: ')
+        ->and($json['error'])->toContain('php artisan molly:lock-test '.$task->id.' --approve --file=app/Greeting.php')
+        ->and($task->fresh()->allow_test_edits)->toBeTrue()
+        ->and($task->fresh()->test_digest)->toBe($this->before);
+});
