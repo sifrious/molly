@@ -197,3 +197,48 @@ it('shows the derived files and the lock command in molly:task after the authori
     Artisan::call('molly:task', ['task' => 'counter-story']);
     expect(Artisan::output())->toContain('lock it with php artisan molly:lock-test counter-story --approve.');
 });
+
+it('checks the packages the story needs against composer.json and composer.lock', function () {
+    File::put($this->workspace.'/composer.json', json_encode([
+        'require' => ['php' => '^8.3', 'laravel/framework' => '^13.0'],
+        'require-dev' => ['pestphp/pest' => '^4.0'],
+    ]));
+    File::put($this->workspace.'/composer.lock', json_encode([
+        'packages' => [['name' => 'laravel/framework'], ['name' => 'symfony/console']],
+        'packages-dev' => [['name' => 'pestphp/pest'], ['name' => 'livewire/livewire']],
+    ]));
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files, 'required_packages' => [
+        'laravel/framework', 'Livewire/Livewire', 'symfony/console', 'spatie/laravel-counter', 'pestphp/pest', 'not a package', 'livewire/livewire',
+    ]]])->preventStrayPrompts();
+
+    Artisan::call('molly:story', ['story' => $this->story, '--workspace' => $this->workspace, '--test' => 'tests/Feature/StoryTest.php', '--json' => true]);
+    $json = json_decode(Artisan::output(), true);
+    $task = Task::findOrFail($json['id']);
+
+    expect($task->source['scope']['required_packages'])->toBe([
+        ['name' => 'laravel/framework', 'status' => 'required', 'command' => null],
+        ['name' => 'livewire/livewire', 'status' => 'dev_only', 'command' => 'composer require livewire/livewire'],
+        ['name' => 'symfony/console', 'status' => 'transitive', 'command' => 'composer require symfony/console'],
+        ['name' => 'spatie/laravel-counter', 'status' => 'missing', 'command' => 'composer require spatie/laravel-counter'],
+        ['name' => 'pestphp/pest', 'status' => 'dev_only', 'command' => 'composer require pestphp/pest'],
+    ])->and($task->source['scope']['rejected_packages'])->toBe([
+        ['name' => 'not a package', 'reason' => 'PACKAGE_INVALID: Not a Composer package name in vendor/package form.'],
+    ])->and($json['package_commands'])->toBe([
+        'composer require livewire/livewire',
+        'composer require symfony/console',
+        'composer require spatie/laravel-counter',
+        'composer require pestphp/pest',
+    ])->and(File::get($this->workspace.'/composer.json'))->not->toContain('livewire');
+});
+
+it('tells the user to install a missing package before the implementation run', function () {
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => $this->files, 'required_packages' => ['livewire/livewire']]])->preventStrayPrompts();
+
+    $this->artisan('molly:story', [
+        'story' => $this->story,
+        '--workspace' => $this->workspace,
+        '--test' => 'tests/Feature/StoryTest.php',
+    ])->expectsOutputToContain('The implementation run cannot add Composer packages.')
+        ->expectsOutputToContain('composer require livewire/livewire (livewire/livewire is not installed)')
+        ->assertSuccessful();
+});

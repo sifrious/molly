@@ -43,6 +43,7 @@ class MollyStoryCommand extends Command
 
             $task = $action->handle($story, (string) ($this->option('workspace') ?: base_path()), $paths, $test, $this->option('name'));
             $reference = $task->reference();
+            $packages = array_values(array_filter($task->source['scope']['required_packages'], fn (array $package): bool => $package['command'] !== null));
             // The lock uses the task's files and the derived scope, so the printed command needs no --file.
             $next = ['php artisan molly:start '.$reference, 'php artisan molly:lock-test '.$reference.' --approve', 'php artisan molly:start '.$reference];
 
@@ -52,6 +53,7 @@ class MollyStoryCommand extends Command
                     'status' => $task->status,
                     'acceptance' => $task->source['acceptance'],
                     'scope' => $task->source['scope'],
+                    'package_commands' => array_column($packages, 'command'),
                     'next' => $next,
                     'task' => $task->toArray(),
                 ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
@@ -66,6 +68,19 @@ class MollyStoryCommand extends Command
             $this->line(implode("\n", [...$paths, ...$scope['files']]));
             foreach ($scope['rejected'] as $rejected) {
                 warning('Molly left out '.$rejected['path'].'. '.$rejected['reason']);
+            }
+            foreach ($scope['rejected_packages'] as $rejected) {
+                warning('Molly left out the package '.$rejected['name'].'. '.$rejected['reason']);
+            }
+            if ($packages !== []) {
+                warning('The implementation run cannot add Composer packages. Run these in '.$task->workspace.' before step 3.');
+                foreach ($packages as $package) {
+                    $this->line($package['command'].' ('.$package['name'].' '.match ($package['status']) {
+                        'dev_only' => 'is installed for development only',
+                        'transitive' => 'is installed only as a dependency of another package',
+                        default => 'is not installed',
+                    }.')');
+                }
             }
             note('Saved test-authoring task '.$reference.'. Review the criteria, then run these commands in order.');
             $this->line('1. '.$next[0].' writes the Pest test.');

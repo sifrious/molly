@@ -64,7 +64,7 @@ class CreateTaskFromStory
                 'text' => $numbered,
                 'provenance' => $provenance,
             ],
-            'scope' => [...$scope, 'provenance' => $provenance],
+            'scope' => [...$scope, ...$this->packages($result, $files->path), 'provenance' => $provenance],
         ], nickname: $nickname, allowTestEdits: true);
     }
 
@@ -143,5 +143,57 @@ class CreateTaskFromStory
         }
 
         return ['files' => $files, 'rejected' => $rejected];
+    }
+
+    /**
+     * Compare the packages the model says the behavior needs with the
+     * application's composer.json require list and composer.lock. Molly
+     * reports what to install; it never runs Composer, and the
+     * implementation run cannot add packages.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array{required_packages: list<array{name: string, status: string, command: string|null}>, rejected_packages: list<array{name: string, reason: string}>}
+     */
+    private function packages(array $result, string $workspace): array
+    {
+        $composer = $this->json($workspace.'/composer.json');
+        $lock = $this->json($workspace.'/composer.lock');
+        $lockNames = fn (string $key): array => array_column(is_array($lock[$key] ?? null) ? array_filter($lock[$key], is_array(...)) : [], 'name');
+        $installed = array_map(strtolower(...), $lockNames('packages'));
+        $installedDev = array_map(strtolower(...), $lockNames('packages-dev'));
+        $require = array_map(strtolower(...), array_keys(is_array($composer['require'] ?? null) ? $composer['require'] : []));
+        $requireDev = array_map(strtolower(...), array_keys(is_array($composer['require-dev'] ?? null) ? $composer['require-dev'] : []));
+
+        $packages = [];
+        $rejected = [];
+        $proposed = is_array($result['required_packages'] ?? null) && array_is_list($result['required_packages']) ? $result['required_packages'] : [];
+        foreach ($proposed as $name) {
+            $name = is_string($name) ? strtolower(trim($name)) : '';
+            if (preg_match('~\A[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*\z~', $name) !== 1) {
+                $rejected[] = ['name' => substr(is_string($name) ? $name : '', 0, 255), 'reason' => 'PACKAGE_INVALID: Not a Composer package name in vendor/package form.'];
+
+                continue;
+            }
+            if (in_array($name, array_column($packages, 'name'), true)) {
+                continue;
+            }
+            $status = match (true) {
+                in_array($name, $require, true) => 'required',
+                in_array($name, $requireDev, true) || in_array($name, $installedDev, true) => 'dev_only',
+                in_array($name, $installed, true) => 'transitive',
+                default => 'missing',
+            };
+            $packages[] = ['name' => $name, 'status' => $status, 'command' => $status === 'required' ? null : 'composer require '.$name];
+        }
+
+        return ['required_packages' => $packages, 'rejected_packages' => $rejected];
+    }
+
+    /** @return array<string, mixed> */
+    private function json(string $path): array
+    {
+        $decoded = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+
+        return is_array($decoded) ? $decoded : [];
     }
 }
