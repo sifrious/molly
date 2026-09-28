@@ -16,11 +16,11 @@ afterEach(function () {
 it('keeps the getting started ReadyTest identical to the tested fixture', function () {
     $documented = File::get(dirname(__DIR__, 2).'/docs/getting-started.md');
 
-    expect($documented)->toContain(trim(File::get(dirname(__DIR__).'/Fixtures/docs/ReadyTest.php')));
+    expect($documented)->toContain(trim(File::get(dirname(__DIR__).'/Fixtures/docs/ReadyTest.example.php')));
 });
 
 it('runs the getting started ReadyTest red for missing behavior, then saves the documented task', function () {
-    File::copy(dirname(__DIR__).'/Fixtures/docs/ReadyTest.php', $this->workspace.'/tests/Feature/ReadyTest.php');
+    File::copy(dirname(__DIR__).'/Fixtures/docs/ReadyTest.example.php', $this->workspace.'/tests/Feature/ReadyTest.php');
 
     $verification = app(VerifyChanges::class)->handle($this->workspace, 'tests/Feature/ReadyTest.php', $this->workspace.'/evidence');
     $classification = app(RecordRedBaseline::class)->classify($verification, $this->workspace, 'tests/Feature/ReadyTest.php');
