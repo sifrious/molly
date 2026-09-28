@@ -76,22 +76,28 @@ class Task extends Model
      * The fingerprint of the latest failed run in the implementation scope
      * and how many runs in that scope failed with the same fingerprint.
      *
-     * @return array{digest: string, failures: int}|null
+     * An authoring run whose test cannot run adds the causes of that check.
+     *
+     * @return array{digest: string, failures: int, authored_test_causes?: list<string>}|null
      */
     public function repeatedFailure(): ?array
     {
         $before = $this->source['test_lock']['runs_before'] ?? 0;
-        $digests = $this->runs()->get()
+        $fingerprints = $this->runs()->get()
             ->slice(is_int($before) ? $before : 0)
             ->filter(fn (Run $run): bool => $run->status === 'failed')
-            ->map(fn (Run $run): mixed => $run->report['failure_fingerprint']['digest'] ?? null)
-            ->filter(fn (mixed $digest): bool => is_string($digest))
+            ->map(fn (Run $run): mixed => $run->report['failure_fingerprint'] ?? null)
+            ->filter(fn (mixed $fingerprint): bool => is_string($fingerprint['digest'] ?? null))
             ->values();
-        if ($digests->isEmpty()) {
+        if ($fingerprints->isEmpty()) {
             return null;
         }
 
-        return ['digest' => $digests->last(), 'failures' => $digests->filter(fn (string $digest): bool => $digest === $digests->last())->count()];
+        $latest = $fingerprints->last();
+        $repeated = ['digest' => $latest['digest'], 'failures' => $fingerprints->filter(fn (array $fingerprint): bool => $fingerprint['digest'] === $latest['digest'])->count()];
+        $causes = $latest['inputs']['authored_test'] ?? null;
+
+        return is_array($causes) ? [...$repeated, 'authored_test_causes' => array_values(array_filter($causes, is_string(...)))] : $repeated;
     }
 
     /**

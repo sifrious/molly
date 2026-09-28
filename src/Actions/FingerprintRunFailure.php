@@ -7,7 +7,8 @@ namespace Sifrious\Molly\Actions;
  * The digest covers failing verifiers, the error code, the Pest reason and
  * failing test identities, and blocking Tarpit check codes with their paths.
  * Message text, line numbers, and timings are left out, so a reworded
- * failure keeps its fingerprint.
+ * failure keeps its fingerprint. A test-authoring run whose test cannot
+ * run is identified only by the causes of its authored test check.
  */
 class FingerprintRunFailure
 {
@@ -17,6 +18,18 @@ class FingerprintRunFailure
      */
     public function handle(array $report): array
     {
+        // A test-authoring run whose test cannot run is identified by its causes alone,
+        // so a rewrite that renames tests or draws other Tarpit findings keeps the fingerprint.
+        $authored = $report['authored_test'] ?? null;
+        if (is_array($authored) && ($authored['test_broken'] ?? false) === true) {
+            $inputs = ['authored_test' => $this->sorted(array_map(
+                fn (array $cause): string => (string) ($cause['cause'] ?? ''),
+                array_filter($authored['causes'] ?? [], is_array(...)),
+            ))];
+
+            return ['digest' => hash('sha256', json_encode($inputs, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), 'inputs' => $inputs];
+        }
+
         $failing = array_filter($report['verification_outcomes'] ?? [], fn (mixed $outcome): bool => is_array($outcome) && ($outcome['state'] ?? null) !== 'PASS');
         $inputs = [
             'verifiers' => $this->sorted(array_map(

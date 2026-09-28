@@ -251,3 +251,29 @@ it('refuses to lock a broken authored test and names the cause and the retry', f
         ->and($lock['red_baseline']['classification'])->toBe('missing_behavior')
         ->and($task->fresh()->redBaselineError())->toBeNull();
 });
+
+it('stops rewriting a test that keeps failing for the same cause at the repair budget', function () {
+    config(['molly.max_attempts' => 5, 'molly.repair.per_failure' => 2]);
+    $task = authoringTask($this->workspace);
+    $renamed = str_replace('counts signed in users', 'counts every signed in user', unmigratedCounterTest());
+    ChangeWriter::fake([
+        ['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => unmigratedCounterTest()]]],
+        ['summary' => 'Rename the user test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => $renamed]]],
+    ])->preventStrayPrompts();
+    fakeAuthoringCollaborators(2);
+
+    mollyJson('molly:start', ['task' => $task->id]);
+    [, $retry] = mollyJson('molly:retry', ['task' => $task->id]);
+
+    expect($retry['report']['authored_test']['causes'][0]['tests'])->toBe(['it counts every signed in user'])
+        ->and($retry['report']['failure_fingerprint']['inputs'])->toBe(['authored_test' => ['database_not_migrated']])
+        ->and($retry['next']['command'])->toBe('php artisan molly:lock-test '.$task->id.' --approve')
+        ->and($retry['next']['reason'])->toBe('Molly has no attempts left for this test. Edit tests/Feature/CounterTest.php to fix the cause, then lock it.');
+
+    [$exit, $refused] = mollyJson('molly:retry', ['task' => $task->id]);
+
+    expect($exit)->toBe(1)
+        ->and($refused['report']['error'])->toStartWith('REPAIR_BUDGET_EXHAUSTED: Molly wrote tests/Feature/CounterTest.php 2 times and each time it could not run for the same cause (database_not_migrated, fingerprint ')
+        ->and($refused['report']['error'])->toContain('then lock it with php artisan molly:lock-test '.$task->id.' --approve.')
+        ->and($task->runs()->count())->toBe(2);
+});

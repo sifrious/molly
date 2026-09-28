@@ -202,6 +202,10 @@ final class LocalAgentBus
         }
 
         $repeated = $task->repeatedFailure();
+        if ($repeated !== null && $repeated['failures'] >= $budget && isset($repeated['authored_test_causes'])) {
+            throw new RuntimeException('REPAIR_BUDGET_EXHAUSTED: Molly wrote '.$task->test_path.' '.$repeated['failures'].' times and each time it could not run for the same cause ('
+                .implode(', ', $repeated['authored_test_causes']).', fingerprint '.$repeated['digest'].'). Edit the test to fix the cause, then lock it with php artisan molly:lock-test '.$task->reference().' --approve. Run php artisan molly:task '.$task->reference().' to read the cause.');
+        }
         if ($repeated !== null && $repeated['failures'] >= $budget) {
             throw new RuntimeException('REPAIR_BUDGET_EXHAUSTED: The same failure has happened '.$repeated['failures'].' times (fingerprint '.$repeated['digest'].'). Change the task scope, test, or model before another attempt.');
         }
