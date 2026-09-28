@@ -38,6 +38,7 @@ class RunTask
         private FingerprintRunFailure $fingerprint,
         private RecordModelIdentity $modelIdentity,
         private ObserveCheckout $observe,
+        private RecordRedBaseline $redBaseline,
     ) {}
 
     /**
@@ -193,6 +194,9 @@ class RunTask
                 $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Reviewing complexity with the seven Tarpit checks');
                 $report['review'] = $this->review->handle($run->prompt, $before, $after);
             }
+            if ($allowTestEdits) {
+                $report['authored_test'] = $this->checkAuthoredTest(is_array($report['verification'] ?? null) ? $report['verification'] : [], $workspace->path, $testPath);
+            }
             $run->update(['report' => $report]);
 
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Measuring complexity after changes');
@@ -343,6 +347,25 @@ class RunTask
         if ($shouldStop?->__invoke()) {
             throw new RunStopped('RUN_STOPPED: Molly stopped at an execution boundary. Applied edits remain available for review.');
         }
+    }
+
+    /**
+     * Classify the test an authoring run wrote with the RED baseline
+     * classifier, so a test that cannot run is caught before a lock.
+     *
+     * @param  array<string, mixed>  $verification
+     * @return array<string, mixed>
+     */
+    private function checkAuthoredTest(array $verification, string $workspace, string $testPath): array
+    {
+        return [
+            ...$this->redBaseline->classify($verification, $workspace, $testPath),
+            'test_path' => $testPath,
+            'tests' => $verification['tests'] ?? 0,
+            'failures' => $verification['failures'] ?? 0,
+            'errors' => $verification['errors'] ?? 0,
+            'checked_at' => now()->toIso8601String(),
+        ];
     }
 
     /** @param array<string, mixed> $measurement */

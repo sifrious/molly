@@ -66,6 +66,13 @@ class TaskReport
             table(['File derived for the implementation'], array_map(fn (string $path): array => [$path], $scope));
         }
         if ($task->relationLoaded('runs')) {
+            $check = $task->status === 'running' ? null : $task->latestAuthoredTest();
+            if ($check !== null) {
+                note('Authored test check: '.$check['classification'].' ('.($check['reason'] ?? 'no reason recorded').')');
+                foreach (Task::authoredTestProblems($check) as $problem) {
+                    warning($problem);
+                }
+            }
             if ($task->allow_test_edits && $task->runs->isNotEmpty() && $task->status !== 'running') {
                 note('Review '.$task->test_path.', then lock it with php artisan molly:lock-test '.$task->reference().' --approve.');
             }

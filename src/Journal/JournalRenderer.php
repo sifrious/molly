@@ -70,6 +70,7 @@ final class JournalRenderer
 
         return [...$lines,
             ...$this->verification(is_array($report['verification'] ?? null) ? $report['verification'] : []),
+            ...$this->authoredTest(is_array($report['authored_test'] ?? null) ? $report['authored_test'] : []),
             ...$this->receipts(is_array($report['verification_receipts'] ?? null) ? $report['verification_receipts'] : []),
             ...$this->review(is_array($report['review'] ?? null) ? $report['review'] : []),
             ...$this->measurements($report),
@@ -89,6 +90,36 @@ final class JournalRenderer
         foreach (['reason', 'error'] as $key) {
             if (is_string($verification[$key] ?? null)) {
                 $lines = [...$lines, '', $this->quote($verification[$key])];
+            }
+        }
+
+        return [...$lines, ''];
+    }
+
+    /**
+     * The check of a test an authoring run wrote: its classification and each
+     * cause with the tests it affects.
+     *
+     * @param  array<string, mixed>  $check
+     * @return list<string>
+     */
+    public function authoredTest(array $check): array
+    {
+        if ($check === []) {
+            return [];
+        }
+
+        $lines = ['#### Authored test check', '',
+            '- Classification: '.$this->escape($check['classification'] ?? null),
+            '- Reason: '.$this->escape($check['reason'] ?? null),
+        ];
+        foreach ($check['causes'] ?? [] as $cause) {
+            if (! is_array($cause)) {
+                continue;
+            }
+            $lines[] = '- Cause '.$this->escape($cause['cause'] ?? null).': '.$this->escape($cause['explanation'] ?? null);
+            foreach ($cause['tests'] ?? [] as $test) {
+                $lines[] = '  - '.$this->escape($test);
             }
         }
 

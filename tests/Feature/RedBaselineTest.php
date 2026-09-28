@@ -142,6 +142,9 @@ it('classifies JUnit failures as missing behavior or bootstrap errors', function
     'missing application class' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="Error">Class "App\\Livewire\\Counter" not found</error></testcase></testsuite>', 'missing_behavior'],
     'missing test base class' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="Error">Class "Tests\\TestCase" not found</error></testcase></testsuite>', 'bootstrap_error'],
     'parse error' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="ParseError">unexpected end of file</error></testcase></testsuite>', 'bootstrap_error'],
+    'unmigrated database' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="Illuminate\\Database\\QueryException">SQLSTATE[HY000]: General error: 1 no such table: users</error></testcase></testsuite>', 'bootstrap_error'],
+    'unbound test case' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="ReflectionException">Call to undefined method PHPUnit\\Framework\\TestCase::get()</error></testcase></testsuite>', 'bootstrap_error'],
+    'missing application method' => ['<testsuite tests="1" file="tests/GreetingTest.php"><testcase name="greets" file="tests/GreetingTest.php::greets" assertions="0"><error type="BadMethodCallException">Call to undefined method App\\Models\\User::counter()</error></testcase></testsuite>', 'missing_behavior'],
     'zero tests' => ['<testsuite tests="0"/>', 'bootstrap_error'],
     'missing report' => ['', 'bootstrap_error'],
 ]);

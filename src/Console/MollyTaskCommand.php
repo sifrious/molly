@@ -25,12 +25,14 @@ class MollyTaskCommand extends Command
             }
             $inspection = $inspect->handle($task);
             if ($this->option('json')) {
+                $check = $task->latestAuthoredTest();
                 $this->line(json_encode([
                     'id' => $task->id,
                     'status' => $task->status,
                     'display_status' => $inspection['display_status'],
                     'linked_pr' => $inspection['linked_pr'],
                     'issue_url' => $inspection['issue_url'],
+                    ...($check === null ? [] : ['authored_test' => $check]),
                     'task' => $task->toArray(),
                 ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {

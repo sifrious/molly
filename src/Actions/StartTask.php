@@ -109,8 +109,9 @@ class StartTask
             }
 
             $finished = $run->fresh();
+            $authored = $this->authoredTestSummary($finished->report ?? []);
             if ($finished->status === 'completed') {
-                $this->lifecycle->handle($task->workspace, LifecycleEventType::VerificationFinished, $task->id, $finished->id);
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::VerificationFinished, $task->id, $finished->id, $authored);
                 $this->lifecycle->handle($task->workspace, LifecycleEventType::ApprovalRequested, $task->id, $finished->id, [
                     'before_pull_request' => true,
                     'before_merge' => true,
@@ -121,6 +122,7 @@ class StartTask
                     $finished->status === 'stopped' ? LifecycleEventType::Stopped : LifecycleEventType::Failed,
                     $task->id,
                     $finished->id,
+                    $authored,
                 );
             }
 
@@ -165,6 +167,31 @@ class StartTask
             'message' => $this->boundedText($message, 512),
             'retry' => $retry,
         ]);
+    }
+
+    /**
+     * The authored test check of a test-authoring run for its lifecycle event:
+     * the classification, reason, and each cause with its affected tests.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    private function authoredTestSummary(array $report): array
+    {
+        $check = $report['authored_test'] ?? null;
+        if (! is_array($check) || ! is_string($check['classification'] ?? null)) {
+            return [];
+        }
+
+        return ['authored_test' => [
+            'classification' => $check['classification'],
+            'reason' => is_string($check['reason'] ?? null) ? $this->boundedText($check['reason'], 128) : null,
+            'test_broken' => ($check['test_broken'] ?? false) === true,
+            'causes' => array_values(array_map(fn (array $cause): array => [
+                'cause' => (string) ($cause['cause'] ?? ''),
+                'tests' => array_values(array_map(fn (mixed $name): string => $this->boundedText((string) $name, 128), array_slice($cause['tests'] ?? [], 0, 20))),
+            ], array_filter($check['causes'] ?? [], is_array(...)))),
+        ]];
     }
 
     private function workerId(): string

@@ -95,6 +95,45 @@ class Task extends Model
     }
 
     /**
+     * The check of the test the latest authoring run wrote, while the test is
+     * still writable, or null when there is none.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function latestAuthoredTest(): ?array
+    {
+        if (! $this->allow_test_edits) {
+            return null;
+        }
+        $check = $this->runs()->get()->last()?->report['authored_test'] ?? null;
+
+        return is_array($check) && is_string($check['classification'] ?? null) ? $check : null;
+    }
+
+    /**
+     * One plain sentence per cause of an authored test check, naming the
+     * cause code and up to five affected tests.
+     *
+     * @param  array<string, mixed>  $check
+     * @return list<string>
+     */
+    public static function authoredTestProblems(array $check): array
+    {
+        $lines = [];
+        foreach ($check['causes'] ?? [] as $cause) {
+            if (! is_array($cause) || ! is_string($cause['cause'] ?? null)) {
+                continue;
+            }
+            $tests = array_values(array_filter($cause['tests'] ?? [], is_string(...)));
+            $listed = array_slice($tests, 0, 5);
+            $lines[] = ($cause['explanation'] ?? 'The test cannot run.').' ('.$cause['cause'].')'
+                .($listed === [] ? '' : ' Affected tests: '.implode('; ', $listed).(count($tests) > 5 ? '; and '.(count($tests) - 5).' more' : '').'.');
+        }
+
+        return $lines;
+    }
+
+    /**
      * Why an implementation run may not start yet, or null when it may.
      * A task whose Pest test was authored and locked needs a RED baseline
      * that failed for missing behavior, unless it opted out at creation.

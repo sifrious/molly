@@ -3,11 +3,13 @@
 namespace Sifrious\Molly\Console;
 
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Models\Task;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\outro;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 class RunReport
 {
@@ -24,6 +26,7 @@ class RunReport
         $this->showChanges($report);
         $this->showSnapshots($report, $verbose);
         $this->showVerification($report, $verbose);
+        $this->showAuthoredTest($report);
         $this->showTarpit($report);
         $this->showMeasurements($report, $verbose);
         $this->showAdvice($report);
@@ -70,6 +73,20 @@ class RunReport
         }
         if (! empty($verification['output']) && (($verification['status'] ?? null) !== 'passed' || $verbose)) {
             note($verification['output']);
+        }
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showAuthoredTest(array $report): void
+    {
+        $check = $report['authored_test'] ?? null;
+        if (! is_array($check) || ! is_string($check['classification'] ?? null)) {
+            return;
+        }
+
+        note('Authored test check: '.$check['classification'].' ('.($check['reason'] ?? 'no reason recorded').')');
+        foreach (Task::authoredTestProblems($check) as $problem) {
+            warning($problem);
         }
     }
 
