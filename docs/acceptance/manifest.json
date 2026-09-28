@@ -1211,7 +1211,8 @@
           "timeout_s": 300,
           "owner": "E",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.3",
@@ -1254,7 +1255,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.6",
@@ -1297,7 +1299,8 @@
           "timeout_s": 300,
           "owner": "C",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.9",
@@ -1340,7 +1343,8 @@
           "timeout_s": 300,
           "owner": "B",
           "outcome": "UNVERIFIED",
-          "mandatory": true
+          "mandatory": true,
+          "expected_exit_code": 1
         },
         {
           "id": "M07.12",
@@ -2403,6 +2407,18 @@
       "change": "The expected test count is now a rule rather than a single frozen number. The two declared fallback tests are listed by their current names.",
       "reason": "The manifest froze only the 048ad82 baseline (1111 tests). Every candidate since then adds tests, so the expected count must follow the candidate. Otherwise a count check can never pass, or it passes against a stale number.",
       "invalidates": "RC9 M10.3 record (BLOCKED for a missing expectation) must be rerun on the next candidate"
+    },
+    {
+      "date": "2026-09-28",
+      "subcases": [
+        "M07.11",
+        "M07.2",
+        "M07.5",
+        "M07.8"
+      ],
+      "change": "expected_exit_code set to 1",
+      "reason": "Each of these subcases checks a command that must fail: no provider, a provider outage, a malformed reply, or a memory refusal. The RC9 M07 run showed that the correct behavior exits 1. The expected-result text is unchanged.",
+      "invalidates": "none; no PASS was granted under the old value"
     }
   ]
 }
