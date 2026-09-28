@@ -34,6 +34,12 @@
         "DetectLaravelAiClassificationTest: does not treat structured-agent support as decide support",
         "ClassificationAdapterTest: uses fallback capability detection when Laravel AI lacks the decide capability"
       ]
+    },
+    "no-application-source-index": {
+      "reason": "The frozen launch contract does not include indexing application source. docs/project-graph.md states that application source is not indexed, so there are no application call edges to mark unresolved. Mary's MVP completion prompt of 2026-09-28 says not to build a new PHP application-source index only to satisfy an imported requirement.",
+      "applies_to": [
+        "M08.7"
+      ]
     }
   },
   "budgets": {
@@ -2379,6 +2385,15 @@
       "change": "Prelaunch acceptance runs the documented 'Install a prelaunch candidate' commands. The public registry install line is checked after publication under MME-5341.",
       "reason": "The public line (^0.2 from the GitHub VCS repository) cannot resolve until a 0.2 release is tagged, and tagging is not authorized before human prelaunch review. The MME-5885 handoff keeps public-registry installation as a postpublication check and forbids a circular dependency on publication.",
       "invalidates": "RC3 records for M01.2 and M01.7 must be rerun under the amended action"
+    },
+    {
+      "date": "2026-09-28",
+      "subcases": [
+        "M08.7"
+      ],
+      "change": "M08.7 may be recorded as not applicable with key no-application-source-index.",
+      "reason": "Scope decision in Mary's MVP completion prompt (2026-09-28), recorded on Todoist task 6hfCHHR7PmXGRrwH. No source-indexing capability is part of the launch contract.",
+      "invalidates": "none; M08.7 was never PASS"
     }
   ]
 }
