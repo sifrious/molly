@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Execution\Sandbox;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Symfony\Component\Process\Process;
@@ -210,4 +211,93 @@ it('refuses an app the enclosing repository ignores without advising git init', 
     } finally {
         File::deleteDirectory($root);
     }
+});
+
+/** A pending task whose workspace has since lost its repository and .molly/ directory. */
+function pendingTaskWithoutRepository(string $workspace, bool $initialize = false): Task
+{
+    commitGitWorkspace($workspace);
+    $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Hello.php'], 'tests/HelloTest.php');
+    File::deleteDirectory($workspace.'/.git');
+    File::deleteDirectory($workspace.'/.molly');
+    if ($initialize) {
+        (new Process(['git', 'init', '--quiet', $workspace]))->mustRun();
+    }
+
+    return $task;
+}
+
+function refuseSandbox(): void
+{
+    $sandbox = new Sandbox;
+    (fn () => $this->available = false)->call($sandbox);
+    app()->instance(Sandbox::class, $sandbox);
+    config(['molly.sandbox.allow_unsafe' => false]);
+}
+
+it('refuses molly:start and molly:retry outside a repository before the sandbox check and writes nothing', function (string $command, string $status) {
+    $task = pendingTaskWithoutRepository($this->workspace);
+    $task->update(['status' => $status]);
+    $before = File::allFiles($this->workspace, true);
+    refuseSandbox();
+
+    $exit = Artisan::call($command, ['task' => $task->id, '--json' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['report']['error'])->toStartWith('WORKSPACE_NOT_GIT: ')
+        ->and(file_exists($this->workspace.'/.molly'))->toBeFalse()
+        ->and(file_exists($this->workspace.'/.git'))->toBeFalse()
+        ->and(File::allFiles($this->workspace, true))->toEqual($before)
+        ->and($task->fresh()->status)->toBe($status)
+        ->and($task->fresh()->attempt_number)->toBe(0);
+})->with([
+    'start' => ['molly:start', 'pending'],
+    'retry' => ['molly:retry', 'failed'],
+]);
+
+it('refuses molly:start in a repository with no commit before the sandbox check and writes nothing', function () {
+    $task = pendingTaskWithoutRepository($this->workspace, initialize: true);
+    $before = File::allFiles($this->workspace, true);
+    refuseSandbox();
+
+    $exit = Artisan::call('molly:start', ['task' => $task->id, '--json' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['report']['error'])->toStartWith('WORKSPACE_REVISION_MISSING: ')
+        ->and(file_exists($this->workspace.'/.molly'))->toBeFalse()
+        ->and(File::allFiles($this->workspace, true))->toEqual($before)
+        ->and($task->fresh()->status)->toBe('pending');
+});
+
+it('reports GIT_MISSING before WORKSPACE_NOT_GIT from molly:start', function () {
+    $task = pendingTaskWithoutRepository($this->workspace);
+    $path = getenv('PATH');
+    putenv('PATH='.sys_get_temp_dir().'/molly-no-git-'.Str::uuid());
+
+    try {
+        $exit = Artisan::call('molly:start', ['task' => $task->id, '--json' => true]);
+    } finally {
+        putenv('PATH='.$path);
+    }
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['report']['error'])->toStartWith('GIT_MISSING: ')
+        ->and(file_exists($this->workspace.'/.molly'))->toBeFalse();
+});
+
+it('reports a running task as not pending, not as a sandbox refusal', function () {
+    commitGitWorkspace($this->workspace);
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Hello.php'], 'tests/HelloTest.php');
+    $task->update(['status' => 'running', 'worker_id' => 'live-worker', 'lease_expires_at' => now()->addMinutes(10)]);
+    refuseSandbox();
+
+    $exit = Artisan::call('molly:start', ['task' => $task->id, '--json' => true]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['report']['error'])->toStartWith('TASK_NOT_PENDING: ')
+        ->and($task->fresh()->only(['status', 'worker_id']))->toBe(['status' => 'running', 'worker_id' => 'live-worker']);
 });

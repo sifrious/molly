@@ -69,7 +69,7 @@ Commands that create or run a task refuse a workspace that is not a Git reposito
 WORKSPACE_NOT_GIT: /path/to/app is not a Git repository. Run git init and commit your work, then try again.
 ```
 
-Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
+Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `molly:start` and `molly:retry` check, in order, the task's state and inputs, `GIT_MISSING`, `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING`, and then `SANDBOX_UNAVAILABLE`, all before they take the task lock. When the workspace already has `.molly/lifecycle.jsonl`, the refusal is appended to it as a `start_refused` event; otherwise the command only prints the error. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
 
 ```bash
 git init
@@ -79,7 +79,7 @@ git commit -m "Start"
 
 The application does not have to be the repository root. A Laravel app in `backend/` of a repository rooted one level up is accepted, and so is a linked worktree or a submodule, where `.git` is a file. Molly asks Git for the top level with `git rev-parse --show-toplevel`. The workspace stays the app directory: tasks, `.molly/`, and the protected test paths belong to the app, while the revision, branch, and checkout kind come from the repository that contains it. Do not run `git init` inside an app that already sits in a repository. A directory the enclosing repository ignores, such as a scratch copy under an ignored path, is refused with `WORKSPACE_NOT_GIT` and a message naming the repository that ignores it, because its files are in no commit.
 
-A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
+A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists, and the same commands write nothing. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
 
 ## .molly is a link
 

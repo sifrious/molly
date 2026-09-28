@@ -99,7 +99,7 @@ it('refreshes after a nickname change and replays without changing lifecycle tim
 
 it('refreshes the running claim and final attempt outcome', function (string $status): void {
     $task = lifecycleTask();
-    $this->mock(RunTask::class)->shouldReceive('handle')->once()->andReturnUsing(function () use ($task, $status): Run {
+    $this->mock(RunTask::class, fn ($mock) => $mock->shouldReceive('refuseUnready')->andReturn([[], null]))->shouldReceive('handle')->once()->andReturnUsing(function () use ($task, $status): Run {
         expect($task->fresh()->status)->toBe('running')
             ->and(Str::markdown(File::get($this->journalWorkspace.'/.molly/JOURNAL.md')))->toContain('Status: running');
 
@@ -118,7 +118,7 @@ it('refreshes the running claim and final attempt outcome', function (string $st
 
 it('releases the claim and refreshes the journal when execution is refused before creating an attempt', function (): void {
     $task = lifecycleTask();
-    $this->mock(RunTask::class)->shouldReceive('handle')->once()->andThrow(new RuntimeException('WORKSPACE_BUSY: Another run owns the workspace.'));
+    $this->mock(RunTask::class, fn ($mock) => $mock->shouldReceive('refuseUnready')->andReturn([[], null]))->shouldReceive('handle')->once()->andThrow(new RuntimeException('WORKSPACE_BUSY: Another run owns the workspace.'));
 
     expect(fn () => app(StartTask::class)->handle($task->id))->toThrow(RuntimeException::class, 'WORKSPACE_BUSY');
 
@@ -191,7 +191,7 @@ it('keeps a newly saved task when a linked project journal cannot be written', f
 
 it('preserves a completed task when its journal directory becomes read only', function (): void {
     $task = lifecycleTask();
-    $this->mock(RunTask::class)->shouldReceive('handle')->once()->andReturnUsing(function () use ($task): Run {
+    $this->mock(RunTask::class, fn ($mock) => $mock->shouldReceive('refuseUnready')->andReturn([[], null]))->shouldReceive('handle')->once()->andReturnUsing(function () use ($task): Run {
         chmod($this->journalWorkspace.'/.molly', 0500);
 
         return $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'completed', 'report' => ['summary' => 'The task completed.']]);

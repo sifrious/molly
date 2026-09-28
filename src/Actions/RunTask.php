@@ -15,6 +15,7 @@ use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
 class RunTask
@@ -36,6 +37,7 @@ class RunTask
         private BindWorkspaceReference $bindWorkspaceReference,
         private FingerprintRunFailure $fingerprint,
         private RecordModelIdentity $modelIdentity,
+        private ObserveCheckout $observe,
     ) {}
 
     /**
@@ -45,28 +47,10 @@ class RunTask
      */
     public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null, ?Closure $prepared = null): Run
     {
-        if (trim($prompt) === '' || strlen($prompt) > 8192) {
-            throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
-        }
-
         $files = new Workspace($workspace);
         $task = $taskId === null ? null : Task::find($taskId);
-        if (($blocked = $task?->redBaselineError()) !== null) {
-            throw new RuntimeException($blocked);
-        }
+        [$paths, $testDigest] = $this->refuseUnready($prompt, $files, $paths, $testPath, $task);
         $allowTestEdits = (bool) ($task?->allow_test_edits);
-        $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
-        $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
-        if (! $allowTestEdits) {
-            if ($testDigest === null) {
-                throw $files->missingProtectedTest($testPath);
-            }
-            $files->assertProtectedTestUnchanged($testPath, $testDigest);
-        }
-        // Refuse an unsafe host only after the task's own inputs are valid, so a mistyped
-        // test path is reported as such and not hidden behind SANDBOX_UNAVAILABLE.
-        GitBinary::require();
-        $this->sandbox->refuseSafeWorkflow();
 
         return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat, $prepared): Run {
             $before = $files->read($paths);
@@ -101,6 +85,38 @@ class RunTask
 
             return $this->execute($run, $files, $before, $testPath, $progress, $shouldStop, $workspaceLease, $previousAttempt, $allowTestEdits, $testDigest, $taskId, $heartbeat);
         });
+    }
+
+    /**
+     * Check a run's preconditions without writing anything, in this order: the task's own
+     * inputs, the git executable, a committed checkout, then the sandbox. A mistyped test path
+     * is reported as such and not hidden behind SANDBOX_UNAVAILABLE.
+     *
+     * @param  list<string>  $paths
+     * @return array{0: list<string>, 1: ?string} the normalized write paths and the protected test digest
+     */
+    public function refuseUnready(string $prompt, Workspace $files, array $paths, string $testPath, ?Task $task): array
+    {
+        if (trim($prompt) === '' || strlen($prompt) > 8192) {
+            throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
+        }
+        if (($blocked = $task?->redBaselineError()) !== null) {
+            throw new RuntimeException($blocked);
+        }
+        $allowTestEdits = (bool) ($task?->allow_test_edits);
+        $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
+        $testDigest = is_string($task?->test_digest) ? $task->test_digest : $files->testDigest($testPath);
+        if (! $allowTestEdits) {
+            if ($testDigest === null) {
+                throw $files->missingProtectedTest($testPath);
+            }
+            $files->assertProtectedTestUnchanged($testPath, $testDigest);
+        }
+        GitBinary::require();
+        $this->observe->requireCommit($files->path);
+        $this->sandbox->refuseSafeWorkflow();
+
+        return [$paths, $testDigest];
     }
 
     /** @param array<string, ?string> $before */

@@ -49,27 +49,8 @@ final class LocalAgentBus
             $task = Task::query()->whereKey($taskId)->lockForUpdate()->first()
                 ?? throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
 
-            $this->refuseDuplicateSuccess($task, $idempotencyKey);
-
             $this->recoverIfAbandoned($task);
-
-            $allowed = $retry ? ['failed', 'stopped'] : ['pending'];
-            $stateError = $retry
-                ? 'TASK_NOT_RETRYABLE: Only failed or stopped tasks can be retried.'
-                : 'TASK_NOT_PENDING: Start a pending task or retry a failed or stopped task.';
-
-            if (! in_array($task->status, $allowed, true)) {
-                throw new RuntimeException($stateError);
-            }
-
-            $limit = config('molly.max_attempts', 3);
-            if (! is_int($limit) || $limit < 1 || $limit > 10) {
-                throw new RuntimeException('ATTEMPT_LIMIT_INVALID: Set molly.max_attempts to an integer from 1 to 10.');
-            }
-            if ($task->attemptsUsed() >= $limit) {
-                throw new RuntimeException('ATTEMPT_LIMIT_REACHED: This task has used its allowed attempts.');
-            }
-            $this->refuseExhaustedRepair($task);
+            $this->refuseUnclaimable($task, $retry, $idempotencyKey);
 
             $now = now();
             $expires = $now->copy()->addSeconds($this->leaseSeconds());
@@ -96,6 +77,31 @@ final class LocalAgentBus
 
             return $task->refresh();
         });
+    }
+
+    /**
+     * Refuse a claim the task's state does not allow, without changing anything. StartTask
+     * calls this before its workspace checks, so a running task reports TASK_NOT_PENDING.
+     */
+    public function refuseUnclaimable(Task $task, bool $retry = false, ?string $idempotencyKey = null): void
+    {
+        $this->refuseDuplicateSuccess($task, $idempotencyKey);
+
+        $allowed = $retry ? ['failed', 'stopped'] : ['pending'];
+        if (! in_array($task->status, $allowed, true)) {
+            throw new RuntimeException($retry
+                ? 'TASK_NOT_RETRYABLE: Only failed or stopped tasks can be retried.'
+                : 'TASK_NOT_PENDING: Start a pending task or retry a failed or stopped task.');
+        }
+
+        $limit = config('molly.max_attempts', 3);
+        if (! is_int($limit) || $limit < 1 || $limit > 10) {
+            throw new RuntimeException('ATTEMPT_LIMIT_INVALID: Set molly.max_attempts to an integer from 1 to 10.');
+        }
+        if ($task->attemptsUsed() >= $limit) {
+            throw new RuntimeException('ATTEMPT_LIMIT_REACHED: This task has used its allowed attempts.');
+        }
+        $this->refuseExhaustedRepair($task);
     }
 
     public function heartbeat(string $taskId, string $workerId, ?int $seconds = null): Task

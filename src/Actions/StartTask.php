@@ -33,15 +33,31 @@ class StartTask
             throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
         }
         $id = $task->id;
+        $workspace = new Workspace($task->workspace);
+        $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
 
-        return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
+        // Before taking the task lock, which creates .molly/, check what needs no write: the task's
+        // state, its inputs, Git, a committed checkout, and the sandbox, in that order. A task that
+        // is still running goes straight to the lock, which reports WORKSPACE_BUSY while its run
+        // holds it and TASK_NOT_PENDING otherwise.
+        $task = $this->bus->recoverIfAbandoned($task);
+        if ($task->status !== 'running') {
+            $this->bus->refuseUnclaimable($task, $retry, $idempotencyKey);
+            try {
+                $this->runTask->refuseUnready($task->prompt, $workspace, $task->paths, $task->test_path, $task);
+            } catch (RuntimeException $exception) {
+                $this->recordRefusal($task, $exception->getMessage(), $retry);
+                throw $exception;
+            }
+        }
+
+        return $workspace->exclusivelyForTask($id, function () use ($id, $progress, $retry, $idempotencyKey): Run {
             $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id));
             if (($blocked = $task->redBaselineError()) !== null) {
                 $this->recordRefusal($task, $blocked, $retry);
                 throw new RuntimeException($blocked);
             }
             $workerId = $this->workerId();
-            $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
             // Snapshot after recovering an abandoned claim, so a refusal restores the recovered state.
             $unclaimed = $task->only(self::CLAIM_COLUMNS);
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
@@ -135,8 +151,15 @@ class StartTask
         }
     }
 
+    /**
+     * Append start_refused to an existing .molly/lifecycle.jsonl. A refusal never creates
+     * .molly/, so a workspace without a lifecycle log only gets the error.
+     */
     private function recordRefusal(Task $task, string $message, bool $retry): void
     {
+        if (! is_file(rtrim($task->workspace, '/').'/.molly/lifecycle.jsonl')) {
+            return;
+        }
         $this->lifecycle->handle($task->workspace, LifecycleEventType::StartRefused, $task->id, payload: [
             'code' => preg_match('/\A([A-Z][A-Z0-9_]+):/', $message, $match) === 1 ? $match[1] : 'COMMAND_FAILED',
             'message' => $this->boundedText($message, 512),
