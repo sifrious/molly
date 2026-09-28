@@ -8,6 +8,7 @@ use Sifrious\Molly\Actions\CreateMollyProject;
 use Sifrious\Molly\Actions\InitializeMollyInExistingProject;
 use Sifrious\Molly\Actions\ListMollyProjects;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Symfony\Component\Process\Process;
 
 beforeEach(function (): void {
     $this->mollyHome = sys_get_temp_dir().'/molly-home-'.Str::uuid();
@@ -28,6 +29,7 @@ beforeEach(function (): void {
     File::put($this->laravelRoot.'/.env', "APP_NAME=Example\nAPP_KEY=base64:dGVzdA==\nMOLLY_AGENT=keep-me\n");
     File::ensureDirectoryExists($this->laravelRoot.'/config');
     File::ensureDirectoryExists($this->laravelRoot.'/vendor/sifrious/molly');
+    commitGitWorkspace($this->laravelRoot);
 });
 
 afterEach(function (): void {
@@ -78,7 +80,11 @@ it('refuses a non-laravel directory', function (): void {
 });
 
 it('creates a new project scaffold and marks source as new', function (): void {
-    $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+    // Inside a committed repository, so Molly can attach the new app right away.
+    $parent = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+    File::ensureDirectoryExists($parent);
+    commitGitWorkspace($parent);
+    $target = $parent.'/app';
 
     $result = (new CreateMollyProject(
         new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)),
@@ -96,7 +102,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
         ->and(File::exists($target.'/.molly/project.json'))->toBeTrue()
         ->and(json_decode(File::get($this->mollyHome.'/projects.json'), true))->toContain(str_replace('\\', '/', realpath($target)));
 
-    File::deleteDirectory($target);
+    File::deleteDirectory($parent);
 });
 
 it('exposes init and list over artisan with shared registry state', function (): void {
@@ -118,4 +124,76 @@ it('exposes init and list over artisan with shared registry state', function ():
     expect($exit)->toBe(0)
         ->and($list['projects'])->toHaveCount(1)
         ->and($list['projects'][0]['name'])->toBe('Via CLI');
+});
+
+it('refuses molly:project-init outside a committed repository before writing anything', function (bool $initialize, string $code): void {
+    $root = sys_get_temp_dir().'/molly-laravel-nogit-'.Str::uuid();
+    File::ensureDirectoryExists($root);
+    File::put($root.'/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($root.'/composer.json', json_encode(['name' => 'example/app', 'require' => ['laravel/framework' => '^12.0']]));
+    if ($initialize) {
+        (new Process(['git', 'init', '--quiet', $root]))->mustRun();
+    }
+    $before = File::allFiles($root, true);
+
+    try {
+        $exit = Artisan::call('molly:project-init', ['path' => $root, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(1)
+            ->and($payload['error'])->toStartWith($code.': ')
+            ->and(File::exists($root.'/.molly'))->toBeFalse()
+            ->and(File::exists($root.'/.gitignore'))->toBeFalse()
+            ->and(File::allFiles($root, true))->toEqual($before)
+            ->and(File::exists($this->mollyHome.'/projects.json'))->toBeFalse();
+    } finally {
+        File::deleteDirectory($root);
+    }
+})->with([
+    'no repository' => [false, 'WORKSPACE_NOT_GIT'],
+    'no commit' => [true, 'WORKSPACE_REVISION_MISSING'],
+]);
+
+it('creates the app with molly:project-new outside a repository and asks for a commit before attaching Molly', function (): void {
+    $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+
+    try {
+        $exit = Artisan::call('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($payload['status'])->toBe('needs_commit')
+            ->and($payload['project'])->toBeNull()
+            ->and($payload['next'])->toBe([
+                'git -C '.escapeshellarg($target).' init',
+                'git -C '.escapeshellarg($target).' add -A',
+                'git -C '.escapeshellarg($target).' commit -m "Start"',
+                'php artisan molly:project-init '.escapeshellarg($target),
+            ])
+            ->and(File::exists($target.'/artisan'))->toBeTrue()
+            ->and(File::exists($target.'/.git'))->toBeFalse()
+            ->and(File::exists($target.'/.molly'))->toBeFalse()
+            ->and(File::exists($this->mollyHome.'/projects.json'))->toBeFalse();
+
+        commitGitWorkspace($target);
+        $exit = Artisan::call('molly:project-init', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
+
+        expect($exit)->toBe(0)
+            ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['status'])->toBe('initialized');
+    } finally {
+        File::deleteDirectory($target);
+    }
+});
+
+it('tells the user to commit when molly:project-new stops before attaching Molly', function (): void {
+    $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+
+    try {
+        $this->artisan('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true])
+            ->expectsOutputToContain('Molly has not attached it yet')
+            ->expectsOutputToContain('git -C '.escapeshellarg($target).' commit -m "Start"')
+            ->assertSuccessful();
+    } finally {
+        File::deleteDirectory($target);
+    }
 });

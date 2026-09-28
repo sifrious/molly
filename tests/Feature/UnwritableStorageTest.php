@@ -131,6 +131,7 @@ function laravelRoot(string $root): string
     File::put($root.'/artisan', "#!/usr/bin/env php\n<?php\n");
     File::put($root.'/composer.json', '{"name":"example/app","require":{"laravel/framework":"^13.0"}}');
     File::put($root.'/.gitignore', ".molly/\n");
+    commitGitWorkspace($root);
 
     return $root;
 }

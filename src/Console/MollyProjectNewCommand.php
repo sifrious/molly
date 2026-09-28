@@ -44,14 +44,22 @@ class MollyProjectNewCommand extends Command
             );
 
             $payload = [
-                'status' => 'created',
-                'project' => $result['project']->toArray(),
+                'status' => $result['status'],
+                'path' => $result['path'],
+                'project' => $result['project']?->toArray(),
                 'created' => $result['created'],
                 'steps' => $result['steps'],
+                'next' => $result['next'],
             ];
 
             if ($this->option('json')) {
                 $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+            } elseif ($result['project'] === null) {
+                note('Laravel application created at '.$result['path'].'.');
+                note('Molly has not attached it yet. Molly records the commit each task starts from and never creates a repository or a commit for you. Commit the application with your own Git identity, then attach Molly:');
+                foreach ($result['next'] as $command) {
+                    $this->line('  '.$command);
+                }
             } else {
                 note('Molly project ready: '.$result['project']->path);
                 note('List projects: php artisan molly:projects');

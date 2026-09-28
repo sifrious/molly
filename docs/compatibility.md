@@ -10,7 +10,7 @@ What Molly needs from the application, and which combinations the release tests 
 | Laravel | 12, 13 |
 | PHP extensions | DOM, PDO, PDO SQLite |
 | Database | Any working Laravel connection |
-| Git | Required. Molly records the revision each run started from. |
+| Git | Required. The application must be in a Git repository with at least one commit, either at the repository root or in a subdirectory. Molly records the revision each run started from and never runs `git init` or commits for you. |
 | Pest | Pest 4 with `pest-plugin-laravel` 4 is tested. Pest 5 is accepted by doctor but not yet part of release testing. |
 
 ## What the release tests cover

@@ -47,12 +47,12 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:setup --agent=amp [--no-login]` | Saves Amp as the agent and connects its MCP client. |
 | `molly:settings` | Shows global settings from `~/.molly/settings.json`. |
 | `molly:settings-set --patch=JSON` | Merges a JSON patch into global settings. |
-| `molly:project-init [PATH]` | Adds Molly to an existing Laravel project: Composer, config, migrations, graphs. |
-| `molly:project-new [PATH]` | Creates a new Laravel project with Molly installed. |
+| `molly:project-init [PATH]` | Adds Molly to an existing Laravel project: Composer, config, migrations, graphs. The project must be in a Git repository with at least one commit; otherwise it fails with `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING` before writing anything. |
+| `molly:project-new [PATH]` | Creates a new Laravel project. Molly attaches it only when the new project is inside a committed repository. |
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
 | `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |
 
-`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed. `project-new` does not create a Git repository; commit the new project yourself before creating a task, or task commands stop with `WORKSPACE_NOT_GIT`.
+`project-init` and `project-new` take `--no-composer`, `--no-migrate`, and `--no-graphs` to skip steps. Molly writes `.molly/project.json` and adds the project to the registry only after every step succeeds. If the Laravel graph cannot be built, the command exits 1 and the project is not listed. `project-new` never creates a Git repository or a commit. A fresh `composer create-project` app is not a repository, so `project-new` stops after creating the app, exits 0 with `"status": "needs_commit"` and `"project": null`, and lists the commands to run in `next`: `git init`, `git add -A`, and `git commit` in the new project, then `molly:project-init` for it. Nothing is written to `.molly/` or the registry until you run `molly:project-init`. When the target is inside a repository that already has a commit, such as `backend/` in a monorepo, `project-new` attaches Molly right away and reports `"status": "created"`.
 
 ## Queue worker
 

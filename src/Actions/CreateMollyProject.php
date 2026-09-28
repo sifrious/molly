@@ -9,6 +9,7 @@ use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
 use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 
 /**
  * Create a new Laravel application and initialize Molly inside it.
@@ -20,11 +21,17 @@ final class CreateMollyProject
     public function __construct(
         private InitializeMollyInExistingProject $initialize,
         private ProjectRegistry $registry,
+        private ObserveCheckout $observe = new ObserveCheckout,
     ) {}
 
     /**
+     * A new application is not a Git repository, and Molly never creates one or commits for the
+     * user. When the app is not in a committed checkout, stop after creating it and return
+     * status needs_commit with the commands to run; the project is attached by molly:project-init
+     * after the user's first commit. Inside a committed repository, Molly attaches it right away.
+     *
      * @param  (callable(string, string): void)|null  $progress
-     * @return array{project: MollyProject, created: array<string, bool>, steps: list<string>}
+     * @return array{status: 'created'|'needs_commit', path: string, project: ?MollyProject, created: array<string, bool>, steps: list<string>, next: list<string>}
      */
     public function handle(
         string $path,
@@ -94,6 +101,25 @@ final class CreateMollyProject
             }
         }
 
+        $inRepository = ObserveCheckout::isCheckout($path);
+        if (! $inRepository || $this->observe->head($path) === null) {
+            $note('git', 'Laravel application created. Molly did not attach it because it is not in a Git repository with a commit.');
+
+            return [
+                'status' => 'needs_commit',
+                'path' => $path,
+                'project' => null,
+                'created' => ['application' => true, 'metadata' => false],
+                'steps' => $steps,
+                'next' => [
+                    ...($inRepository ? [] : ['git -C '.escapeshellarg($path).' init']),
+                    'git -C '.escapeshellarg($path).' add -A',
+                    'git -C '.escapeshellarg($path).' commit -m "Start"',
+                    'php artisan molly:project-init '.escapeshellarg($path).($name !== basename($path) ? ' --name='.escapeshellarg($name) : ''),
+                ],
+            ];
+        }
+
         $result = $this->initialize->handle(
             path: $path,
             name: $name,
@@ -116,9 +142,12 @@ final class CreateMollyProject
         $note('source', 'Recorded project source as new');
 
         return [
+            'status' => 'created',
+            'path' => $project->path,
             'project' => $project,
             'created' => $result['created'],
             'steps' => $steps,
+            'next' => [],
         ];
     }
 

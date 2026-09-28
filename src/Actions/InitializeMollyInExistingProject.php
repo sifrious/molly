@@ -10,12 +10,14 @@ use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
 use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
  *
  * Safe behaviour:
+ * - Refuses a workspace that is not a Git repository with at least one commit, before any write
  * - Creates `.molly/` and project metadata when missing
  * - Appends `.molly/` to `.gitignore` only when absent
  * - Publishes `config/molly.php` only when the destination file does not exist
@@ -35,6 +37,7 @@ final class InitializeMollyInExistingProject
     public function __construct(
         private ProjectRegistry $registry,
         private BootstrapProjectKnowledgeGraphs $bootstrapGraphs,
+        private ObserveCheckout $observe = new ObserveCheckout,
     ) {}
 
     /**
@@ -58,6 +61,8 @@ final class InitializeMollyInExistingProject
 
         $root = $this->assertLaravelRoot($path);
         GitBinary::require();
+        // The project identity is bound to a commit, so refuse before writing anything, like molly:create.
+        $this->observe->requireCommit($root);
         $note('validate', 'Laravel application root accepted at '.$root);
 
         if ($runComposerRequire && ! $this->packageInstalled($root)) {

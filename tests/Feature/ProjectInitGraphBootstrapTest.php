@@ -25,6 +25,7 @@ beforeEach(function (): void {
         'name' => 'example/app',
         'require' => ['laravel/framework' => '^12.0'],
     ], JSON_PRETTY_PRINT));
+    commitGitWorkspace($this->laravelRoot);
 });
 
 afterEach(function (): void {
@@ -90,7 +91,11 @@ it('does not register a project when molly:project-init fails during the graph b
 });
 
 it('runs molly:project-new with the container bootstrap', function (): void {
-    $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+    // Inside a committed repository, so Molly can attach the new app right away.
+    $parent = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+    File::ensureDirectoryExists($parent);
+    commitGitWorkspace($parent);
+    $target = $parent.'/app';
 
     try {
         $exit = Artisan::call('molly:project-new', [
@@ -107,6 +112,6 @@ it('runs molly:project-new with the container bootstrap', function (): void {
             ->and(File::exists($target.'/.molly/graphs/manifest.json'))->toBeTrue()
             ->and(registeredPaths($this->mollyHome))->toContain(str_replace('\\', '/', realpath($target)));
     } finally {
-        File::deleteDirectory($target);
+        File::deleteDirectory($parent);
     }
 });

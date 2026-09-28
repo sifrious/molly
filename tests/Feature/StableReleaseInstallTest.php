@@ -17,6 +17,7 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->laravelRoot.'/config');
     File::put($this->laravelRoot.'/artisan', "#!/usr/bin/env php\n<?php\n");
     File::put($this->laravelRoot.'/.gitignore', "/vendor\n");
+    commitGitWorkspace($this->laravelRoot);
 });
 
 afterEach(function (): void {
