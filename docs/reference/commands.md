@@ -47,7 +47,7 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 | `molly:setup --agent=amp [--no-login]` | Saves Amp as the agent and connects its MCP client. |
 | `molly:settings` | Shows global settings from `~/.molly/settings.json`. |
 | `molly:settings-set --patch=JSON` | Merges a JSON patch into global settings. |
-| `molly:project-init [PATH]` | Adds Molly to an existing Laravel project: Composer, config, migrations, graphs. The project must be in a Git repository with at least one commit; otherwise it fails with `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING` before writing anything. |
+| `molly:project-init [PATH]` | Adds Molly to an existing Laravel project: Composer, config, migrations, graphs. The project must be in a Git repository whose HEAD commit contains its files; otherwise it fails with `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING` before writing anything. |
 | `molly:project-new [PATH]` | Creates a new Laravel project. Molly attaches it only when the HEAD commit already contains files under the target. |
 | `molly:projects` | Lists projects in the shared registry Bloom also reads. |
 | `molly:status [--workspace=PATH]` | Shows readiness, running and pending tasks with lease expiry, the Molly worker, and effective settings. Reads only. |

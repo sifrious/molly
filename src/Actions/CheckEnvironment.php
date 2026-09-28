@@ -137,6 +137,11 @@ class CheckEnvironment
         }
 
         $head = $this->observe->head($workspace);
+        if ($head !== null && ! $this->observe->headContainsFiles($workspace)) {
+            $add('Git repository', false, 'workspace_revision_missing', ObserveCheckout::untrackedMessage($location['root'], $workspace).' Commit it there before creating a task.');
+
+            return;
+        }
         $add('Git repository', $head !== null, $head !== null ? 'git_repository' : 'workspace_revision_missing', $head !== null
             ? 'The workspace is a Git checkout at commit '.$head.($location['root'] !== $workspace ? ' in the repository at '.$location['root'] : '').'.'
             : $workspace.' is a Git repository with no commit yet. Commit your work before creating a task.');

@@ -27,6 +27,10 @@ final class BindWorkspaceReference
         if ($obs['head'] === null || ! preg_match('/\A[0-9a-f]{40}\z/', $obs['head'])) {
             throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.$obs['path'].' has no commit yet. Commit your work, then try again.');
         }
+        // A HEAD that holds none of the app's files is not a revision of this workspace.
+        if (! $this->observe->headContainsFiles($obs['path'])) {
+            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.ObserveCheckout::untrackedMessage($obs['repository_root'], $obs['path']).' Commit it there, then try again.');
+        }
 
         // The app may sit in a subdirectory; the checkout kind comes from the repository root.
         $gitMeta = $obs['repository_root'].'/.git';

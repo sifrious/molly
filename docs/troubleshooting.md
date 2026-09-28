@@ -27,7 +27,7 @@ Restart queue workers after configuration changes too.
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
 | `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. |
 | `workspace_not_git` | The workspace is not a Git repository. Molly records the commit each task starts from and never creates a repository or a commit for you. See [Not a Git repository](#not-a-git-repository). |
-| `workspace_revision_missing` | The workspace is a Git repository with no commit yet. Commit your work, then run doctor again. |
+| `workspace_revision_missing` | The workspace is a Git repository with no commit yet, or the HEAD commit holds none of its files, such as an untracked `backend/` in a committed monorepo. Commit the app in the repository that holds it, then run doctor again. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
 | `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |
 | `parallel_process_groups_unavailable` | Install POSIX support, or set `parallel_checks` to `false`. |
@@ -79,7 +79,7 @@ git commit -m "Start"
 
 The application does not have to be the repository root. A Laravel app in `backend/` of a repository rooted one level up is accepted, and so is a linked worktree or a submodule, where `.git` is a file. Molly asks Git for the top level with `git rev-parse --show-toplevel`. The workspace stays the app directory: tasks, `.molly/`, and the protected test paths belong to the app, while the revision, branch, and checkout kind come from the repository that contains it. Do not run `git init` inside an app that already sits in a repository. A directory the enclosing repository ignores, such as a scratch copy under an ignored path, is refused with `WORKSPACE_NOT_GIT` and a message naming the repository that ignores it, because its files are in no commit.
 
-A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists, and the same commands write nothing. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
+A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists, and the same commands write nothing. So does an app whose files are in no commit of the repository that holds it, such as an untracked, not ignored `backend/`: Molly checks `git ls-tree HEAD` under the app and prints the `git -C <repository> add <path>` and `git -C <repository> commit` commands to run. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
 
 ## .molly is a link
 

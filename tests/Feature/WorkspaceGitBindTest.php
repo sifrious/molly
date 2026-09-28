@@ -301,3 +301,94 @@ it('reports a running task as not pending, not as a sandbox refusal', function (
         ->and($payload['report']['error'])->toStartWith('TASK_NOT_PENDING: ')
         ->and($task->fresh()->only(['status', 'worker_id']))->toBe(['status' => 'running', 'worker_id' => 'live-worker']);
 });
+
+/** A Laravel app in backend/ that is neither tracked nor ignored by a committed repository. */
+function monorepoWithUntrackedApp(): array
+{
+    $root = sys_get_temp_dir().'/molly-mono-untracked-'.Str::uuid();
+    File::ensureDirectoryExists($root);
+    File::put($root.'/README.md', "# mono\n");
+    commitGitWorkspace($root);
+    File::ensureDirectoryExists($root.'/backend/app');
+    File::ensureDirectoryExists($root.'/backend/tests');
+    File::put($root.'/backend/app/Hello.php', '<?php');
+    File::put($root.'/backend/tests/HelloTest.php', "<?php\nit('works', fn () => expect(true)->toBeTrue());\n");
+    File::put($root.'/backend/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($root.'/backend/composer.json', json_encode(['name' => 'example/app', 'require' => ['laravel/framework' => '^12.0']]));
+
+    return [$root, $root.'/backend'];
+}
+
+it('refuses an untracked app in a committed repository in create, project-init, and demo without writing', function () {
+    [$root, $app] = monorepoWithUntrackedApp();
+    $advice = 'git -C '.escapeshellarg(realpath($root)).' add '.escapeshellarg('backend');
+    $before = File::allFiles($app, true);
+
+    try {
+        expect(fn () => app(CreateTask::class)->handle('Return Hello.', $app, ['app/Hello.php'], 'tests/HelloTest.php'))
+            ->toThrow(RuntimeException::class, 'WORKSPACE_REVISION_MISSING: '.$app.' has no files in the HEAD commit of the Git repository at '.realpath($root));
+
+        foreach ([
+            ['molly:create', ['prompt' => 'Return Hello.', '--workspace' => $app, '--file' => ['app/Hello.php'], '--test' => 'tests/HelloTest.php', '--json' => true]],
+            ['molly:project-init', ['path' => $app, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]],
+            ['molly:demo', ['--workspace' => $app, '--json' => true, '--no-interaction' => true]],
+        ] as [$command, $arguments]) {
+            $exit = Artisan::call($command, $arguments);
+            $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+            expect($exit)->toBe(1)
+                ->and($payload['error'])->toStartWith('WORKSPACE_REVISION_MISSING: ')
+                ->and($payload['error'])->toContain($advice)
+                ->and($payload['error'])->not->toContain('git init');
+        }
+
+        expect(File::allFiles($app, true))->toEqual($before)
+            ->and(file_exists($app.'/.molly'))->toBeFalse()
+            ->and(file_exists($app.'/.gitignore'))->toBeFalse()
+            ->and(file_exists($app.'/.git'))->toBeFalse()
+            ->and(Task::count())->toBe(0);
+    } finally {
+        File::deleteDirectory($root);
+    }
+});
+
+it('reports an untracked app in molly:doctor and molly:status', function () {
+    [$root, $app] = monorepoWithUntrackedApp();
+
+    try {
+        Artisan::call('molly:doctor', ['--workspace' => $app, '--json' => true]);
+        $doctor = collect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['checks'])->keyBy('name');
+        $exit = Artisan::call('molly:status', ['--workspace' => $app, '--json' => true]);
+        $status = collect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['readiness']['checks'])->keyBy('name');
+
+        expect($doctor['Git repository']['status'])->toBe('failed')
+            ->and($doctor['Git repository']['code'])->toBe('workspace_revision_missing')
+            ->and($doctor['Git repository']['message'])->toContain('has no files in the HEAD commit')
+            ->and($doctor['Git repository']['message'])->not->toContain('git init')
+            ->and($exit)->toBe(0)
+            ->and($status['Git repository']['code'])->toBe('workspace_revision_missing')
+            ->and(file_exists($app.'/.molly'))->toBeFalse();
+    } finally {
+        File::deleteDirectory($root);
+    }
+});
+
+it('refuses molly:start when the app has left the HEAD commit, before the sandbox check', function () {
+    [$root, $app] = monorepoWithApp();
+    $task = app(CreateTask::class)->handle('Return Hello.', $app, ['app/Hello.php'], 'tests/HelloTest.php');
+    (new Process(['git', '-C', $root, 'rm', '-r', '--cached', '--quiet', 'backend']))->mustRun();
+    (new Process(['git', '-c', 'user.name=Molly Tests', '-c', 'user.email=tests@example.com', '-c', 'commit.gpgsign=false', '-C', $root, 'commit', '--quiet', '-m', 'Stop tracking backend']))->mustRun();
+    refuseSandbox();
+
+    try {
+        $exit = Artisan::call('molly:start', ['task' => $task->id, '--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(1)
+            ->and($payload['report']['error'])->toStartWith('WORKSPACE_REVISION_MISSING: ')
+            ->and($payload['report']['error'])->toContain('has no files in the HEAD commit')
+            ->and($task->fresh()->only(['status', 'attempt_number']))->toBe(['status' => 'pending', 'attempt_number' => 0]);
+    } finally {
+        File::deleteDirectory($root);
+    }
+});

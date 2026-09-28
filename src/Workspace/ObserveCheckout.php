@@ -135,16 +135,28 @@ final class ObserveCheckout
         return $location['root'];
     }
 
-    /** Refuse a path that is not a Git checkout or has no commit yet, before anything is written. */
+    /**
+     * Refuse a path that is not a Git checkout, has no commit yet, or whose files are not in the
+     * HEAD commit, such as an untracked backend/ in a committed monorepo, before anything is written.
+     */
     public function requireCommit(string $path): string
     {
-        self::requireCheckout($path);
+        $root = self::requireCheckout($path);
         $head = $this->head($path);
         if ($head === null) {
             throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.$path.' has no commit yet. Commit your work, then try again.');
         }
+        if (! $this->headContainsFiles($path)) {
+            throw new RuntimeException('WORKSPACE_REVISION_MISSING: '.self::untrackedMessage($root, $path).' Commit it there, then try again.');
+        }
 
         return $head;
+    }
+
+    /** Explain that the HEAD commit holds none of the path's files, with the commands that commit them. */
+    public static function untrackedMessage(string $root, string $path): string
+    {
+        return $path.' has no files in the HEAD commit of the Git repository at '.$root.'. Run '.implode(' && ', self::commitCommands($root, $path)).'.';
     }
 
     /**
