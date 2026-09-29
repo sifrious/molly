@@ -155,10 +155,11 @@ it('restarts the worker with a new process', function (): void {
 });
 
 it('treats a pid file for a process that has exited as stale and starts a new worker', function (): void {
-    $gone = new Process(['true']);
+    // getPid() is null once a process has exited, so read it before stopping a process that waits.
+    $gone = new Process(['sleep', '30']);
     $gone->start();
     $pid = $gone->getPid();
-    $gone->wait();
+    $gone->stop(0);
     File::ensureDirectoryExists($this->workspace.'/.molly/worker');
     File::put($this->workspace.'/.molly/worker/worker.json', json_encode([
         'pid' => $pid, 'pgid' => $pid, 'command' => ['php', base_path('artisan'), 'queue:work', 'sync', '--queue=default'],
