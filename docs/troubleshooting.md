@@ -25,7 +25,7 @@ Restart queue workers after configuration changes too.
 | `database_unavailable` | Fix the application's database connection. |
 | `database_unwritable` | Doctor inserted a row inside a transaction, and the database refused it. Free disk space, or make the database file and its directory writable. Doctor rolls the row back. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
-| `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. |
+| `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. Doctor's `Git repository` check then has the status `unknown` and the code `git_missing`, because Molly cannot read a repository without Git. |
 | `workspace_not_git` | The workspace is not a Git repository. Molly records the commit each task starts from and never creates a repository or a commit for you. See [Not a Git repository](#not-a-git-repository). |
 | `workspace_revision_missing` | The workspace is a Git repository with no commit yet, or the HEAD commit holds none of its files, such as an untracked `backend/` in a committed monorepo. Commit the app in the repository that holds it, then run doctor again. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
@@ -55,6 +55,7 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `WORKER_START_FAILED` | `.molly/worker`. |
 | `GITIGNORE_UNWRITABLE` | `.gitignore`, from `molly:project-init`. |
 | `CONFIG_UNWRITABLE` | `config/molly.php`, from `molly:project-init`. |
+| `DEMO_FILE_UNWRITABLE` | `app/Greeting.php` or `tests/Feature/GreetingTest.php`, from `molly:demo`. When `molly:demo` cannot update `.gitignore`, it fails with `GITIGNORE_UNWRITABLE`. |
 | `WORKSPACE_IDENTITY_UNWRITABLE` | `.molly/identity.json`. |
 | `PROJECT_RECORD_UNWRITABLE` | `.molly/project.json`. |
 | `PROJECT_INDEX_UNWRITABLE` | `projects.json` in `MOLLY_HOME`. |
@@ -74,7 +75,7 @@ Commands that create or run a task refuse a workspace that is not a Git reposito
 WORKSPACE_NOT_GIT: /path/to/app is not a Git repository. Run git init and commit your work, then try again.
 ```
 
-Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `molly:start` and `molly:retry` check, in order, the task's state and inputs, `GIT_MISSING`, `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING`, and then `SANDBOX_UNAVAILABLE`, all before they take the task lock. When the workspace already has `.molly/lifecycle.jsonl`, the refusal is appended to it as a `start_refused` event; otherwise the command only prints the error. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
+Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `molly:start` and `molly:retry` check, in order, the task's state and inputs, including an Orb named with `--orb` (`ORB_NOT_FOUND`), `GIT_MISSING`, `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING`, and then `SANDBOX_UNAVAILABLE`, all before they take the task lock. When the workspace already has `.molly/lifecycle.jsonl`, the refusal is appended to it as a `start_refused` event; otherwise the command only prints the error. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
 
 ```bash
 git init
@@ -137,7 +138,7 @@ Molly writes `project.json`, `projects.json`, and `config/molly.php` to a tempor
 
 `molly:project-new` refuses a directory that an interrupted run left behind with `PROJECT_PATH_NOT_EMPTY`. Run it again with `--force` to delete that directory and create the application again. The demo installer also refuses a non-empty directory; run `bash molly-demo DIR --force` to start over.
 
-If you installed with Composer yourself, run the same `composer require` again, then `php artisan vendor:publish --tag=molly-config` and `php artisan migrate`. Each one skips what is already done.
+If you installed with Composer yourself, run the same `composer require` again, then `php artisan vendor:publish --tag=molly-config` and `php artisan migrate`. Each one skips what is already done. SQLite and MySQL do not run schema changes in a transaction, and Laravel records a migration only after it finishes, so a `migrate` stopped partway, even with `kill -9`, can leave a Molly table, column, or index without its migration recorded. Each Molly migration checks for every table, column, index, and foreign key before it adds one, so the next `migrate` adds only what is missing. On SQLite this includes the copy of `molly_runs` that Laravel makes to add a foreign key: Molly discards the copy, or renames it into place when `molly_runs` was already dropped. Laravel's own migrations in a new application, such as `create_users_table` and `create_jobs_table`, have no such checks, so a kill inside one of them still fails the next `migrate` with `table ... already exists`.
 
 ## A model install stops
 

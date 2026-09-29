@@ -161,6 +161,28 @@ it('keeps a refused start pending and records one start_refused event', function
     }],
 ]);
 
+it('names an unknown Orb before it checks the sandbox', function (): void {
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', nickname: 'orb-check');
+    $sandbox = new Sandbox;
+    (fn () => $this->available = false)->call($sandbox);
+    app()->instance(Sandbox::class, $sandbox);
+    config(['molly.sandbox.allow_unsafe' => false]);
+
+    $exit = Artisan::call('molly:start', ['task' => 'orb-check', '--orb' => 'no-such-orb', '--json' => true]);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    $refused = app(RecordLifecycleEvent::class)->load($this->workspace)->latestOf($task->id, LifecycleEventType::StartRefused);
+
+    expect($exit)->toBe(1)
+        ->and($result['report']['error'])->toStartWith('ORB_NOT_FOUND: No registered Orb has the name or ID no-such-orb.')
+        ->and($refused->payload['code'])->toBe('ORB_NOT_FOUND')
+        ->and($task->fresh()->only(['status', 'attempt_number', 'worker_id']))->toBe(['status' => 'pending', 'attempt_number' => 0, 'worker_id' => null])
+        ->and($task->runs()->count())->toBe(0);
+
+    // The sandbox check itself is unchanged: without an Orb the same start is refused by it.
+    expect(Artisan::call('molly:start', ['task' => 'orb-check', '--json' => true]))->toBe(1)
+        ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['report']['error'])->toStartWith('SANDBOX_UNAVAILABLE:');
+});
+
 it('keeps a start refused by a busy workspace pending', function (): void {
     $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 

@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Task;
@@ -107,7 +108,7 @@ class MollyDemoCommand extends Command
         $gitignore = $root.'/.gitignore';
         $needle = '.molly/';
         if (! is_file($gitignore)) {
-            File::put($gitignore, $needle.PHP_EOL);
+            $this->write('GITIGNORE_UNWRITABLE', $gitignore, $needle.PHP_EOL);
 
             return;
         }
@@ -117,7 +118,7 @@ class MollyDemoCommand extends Command
             return;
         }
 
-        File::append($gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n");
+        $this->write('GITIGNORE_UNWRITABLE', $gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n", FILE_APPEND);
     }
 
     private function ensureGreetingStub(string $root): bool
@@ -128,7 +129,7 @@ class MollyDemoCommand extends Command
         }
 
         Directory::ensure(dirname($path));
-        File::put($path, <<<'PHP'
+        $this->write('DEMO_FILE_UNWRITABLE', $path, <<<'PHP'
 <?php
 
 namespace App;
@@ -155,7 +156,7 @@ PHP);
         }
 
         Directory::ensure(dirname($path));
-        File::put($path, <<<'PHP'
+        $this->write('DEMO_FILE_UNWRITABLE', $path, <<<'PHP'
 <?php
 
 use App\Greeting;
@@ -167,5 +168,14 @@ it('returns Hello from the greeting helper', function () {
 PHP);
 
         return true;
+    }
+
+    /** Write a demo file, or fail with $code, the path, and the reason the system gave. */
+    private function write(string $code, string $path, string $contents, int $flags = 0): void
+    {
+        [$written, $reason] = Directory::attempt(fn (): int|false => file_put_contents($path, $contents, $flags));
+        if ($written === false) {
+            throw new RuntimeException($code.': Molly could not write '.$path.' ('.($reason !== '' ? $reason : 'the file is not writable').'). Check free disk space and that '.dirname($path).' is writable, then run molly:demo again.');
+        }
     }
 }

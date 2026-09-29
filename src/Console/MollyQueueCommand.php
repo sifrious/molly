@@ -28,7 +28,7 @@ class MollyQueueCommand extends Command
     {
         try {
             $target = ExecutionTargetRequest::orb($this->option('orb'), $this->option('orb-runtime'), $this->option('orb-model'));
-            $task = $queue->handle((string) $this->argument('task'), (bool) $this->option('retry'), $target);
+            ['task' => $task, 'queued' => $queued] = $queue->request((string) $this->argument('task'), (bool) $this->option('retry'), $target);
             $orb = $target === null ? null : $orbs->placementOf($task->id);
         } catch (Throwable $exception) {
             return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'task' => (string) $this->argument('task'), 'error' => $exception->getMessage()]);
@@ -38,7 +38,7 @@ class MollyQueueCommand extends Command
         $queueName = $orb?->queue() ?? (string) (config('queue.connections.'.$connection.'.queue') ?? 'default');
         if ($this->option('json')) {
             $this->writeJson([
-                'status' => 'queued',
+                'status' => $queued ? 'queued' : 'already_queued',
                 'task_id' => $task->id,
                 'task' => $task->reference(),
                 'retry' => (bool) $this->option('retry'),
@@ -50,6 +50,12 @@ class MollyQueueCommand extends Command
             return self::SUCCESS;
         }
 
+        if (! $queued) {
+            note('Task '.$task->reference().' already has a '.($this->option('retry') ? 'retry' : 'start').' queued or running on '.($orb === null ? $connection.' / '.$queueName : 'Orb '.$orb->name).'. Molly added no second job.');
+            note('Read the result with php artisan molly:task '.$task->reference().'.');
+
+            return self::SUCCESS;
+        }
         note($orb === null
             ? 'Queued task '.$task->reference().' on '.$connection.' / '.$queueName.'. php artisan molly:worker start runs it.'
             : 'Queued task '.$task->reference().' on Orb '.$orb->name.' ('.$orb->runtime.($orb->model === null ? '' : ' / '.$orb->model).'). php artisan molly:worker start --orb='.$orb->name.' runs it.');

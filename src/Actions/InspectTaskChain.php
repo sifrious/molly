@@ -66,7 +66,7 @@ final class InspectTaskChain
                 'reference' => $task->reference(),
                 'status' => $task->status,
                 'display_status' => $inspection['display_status'],
-                'prompt' => $task->prompt,
+                'prompt' => $task->redactedPrompt(),
                 'workspace' => $task->workspace,
                 'paths' => $task->paths,
                 'test_path' => $task->test_path,

@@ -135,6 +135,12 @@ class CheckEnvironment
      */
     private function checkGitRepository(string|false $workspace, callable $add): void
     {
+        if (GitBinary::find() === null) {
+            // Without git, HEAD cannot be read, which is not the same as a repository with no commit.
+            $add('Git repository', null, 'git_missing', 'Molly cannot read the repository without the git executable (GIT_MISSING). Install Git or add it to PATH, then run doctor again.');
+
+            return;
+        }
         $location = $workspace === false ? ['root' => null, 'ignored_by' => null] : ObserveCheckout::locate($workspace);
         if ($location['ignored_by'] !== null) {
             $add('Git repository', false, 'workspace_not_git', $workspace.' is ignored by the Git repository at '.$location['ignored_by'].', so its files are not in any commit. Stop ignoring it and commit it before creating a task.');

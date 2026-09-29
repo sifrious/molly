@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('molly_tasks', 'context_snapshot')) {
+            return;
+        }
+
         Schema::table('molly_tasks', function (Blueprint $table): void {
             $table->json('context_snapshot')->nullable();
         });

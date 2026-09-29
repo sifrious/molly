@@ -8,6 +8,26 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('molly_orbs')) {
+            $this->create();
+        }
+
+        // Create table and each index are separate statements, so an interrupted migrate can
+        // leave the table without its indexes. Running it again adds only what is missing.
+        if (! Schema::hasIndex('molly_orbs', ['name'], 'unique')) {
+            Schema::table('molly_orbs', function (Blueprint $table) {
+                $table->unique('name');
+            });
+        }
+        if (! Schema::hasIndex('molly_orbs', ['current_task_id'])) {
+            Schema::table('molly_orbs', function (Blueprint $table) {
+                $table->index('current_task_id');
+            });
+        }
+    }
+
+    private function create(): void
+    {
         Schema::create('molly_orbs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name')->unique();

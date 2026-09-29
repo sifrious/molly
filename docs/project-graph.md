@@ -88,7 +88,7 @@ Every node and relationship carries one source record for the workspace. Depth r
 
 ### What it does not cover
 
-The project graph has no nodes for your classes, methods, routes, or container bindings, and no relationships between them. A file appears only because a task or run named it. Calls in your code, including dynamic ones such as `app($name)` or `$class::make()`, produce no node and no relationship, resolved or unresolved. The [Laravel knowledge graph](knowledge-graph.md) covers framework symbols, not your application code. Whether Molly should index application source is an open product decision.
+The project graph has no nodes for your classes, methods, routes, or container bindings, and no relationships between them. A file appears only because a task or run named it. Calls in your code, including dynamic ones such as `app($name)` or `$class::make()`, produce no node and no relationship, resolved or unresolved. The [Laravel knowledge graph](knowledge-graph.md) covers framework symbols, not your application code. Indexing application source is not part of Molly 0.2. That scope was decided on 2026-09-28, and the [acceptance manifest](acceptance/manifest.json) records the check for unresolved dynamic calls, M08.7, as not applicable.
 
 ### Moved or deleted files
 

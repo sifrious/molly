@@ -27,7 +27,7 @@ php artisan molly:journal --project --workspace=/path/to/app
 php artisan molly:journal ready-check --project
 ```
 
-Without a task, `--project` refreshes the workspace of the current app, or the one named by `--workspace`. With a task, it refreshes that task's workspace and records the result on the task.
+Without a task, `--project` refreshes the workspace of the current app, or the one named by `--workspace`. With a task, it also writes that task's journal, `.molly/journal/TASK_UUID.md`, then refreshes the task's workspace and records the result on the task. Its `--json` document then carries the `path` and `attempt_count` that `molly:journal TASK` prints, with the project journal keys.
 
 `php artisan molly:glossary --json` lists the Molly terms with their links. The source link resolves from the workspace: `vendor/sifrious/molly/src/Journal/JournalRenderer.php` when Molly is installed with Composer, or `src/Journal/JournalRenderer.php` in a Molly checkout. When Molly's source is not under the workspace, the link has kind `package_source` and a `package:sifrious/molly/` prefix instead of a path. Each term's `provenance.source` uses the same path.
 

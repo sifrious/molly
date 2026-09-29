@@ -165,3 +165,50 @@ it('redacts reports that were saved before redaction existed when they are read'
     expectNoPlantedSecrets(Artisan::output());
     expect(Run::findOrFail($id)->report['verification']['reason'])->toBe('app key [redacted:APP_KEY], TypeSafe [redacted:TYPESAFE_API_KEY], token [redacted:github_token]');
 });
+
+it('redacts secrets typed into a prompt from the journals and every displayed prompt, and stores the prompt as typed', function () {
+    config(['app.key' => 'base64:'.base64_encode(str_repeat('a', 32)), 'session.driver' => 'array', 'molly.ui.enabled' => true]);
+    $prompt = 'Return Hello. Use '.plantedSecrets();
+    $task = app(CreateTask::class)->handle($prompt, $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', nickname: 'secret-task');
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::Failed, $task->id, null, ['url' => 'https://example.com/?token='.PLANTED_GITHUB_TOKEN]);
+    Run::create(['task_id' => $task->id, 'prompt' => $prompt, 'workspace' => $this->workspace, 'status' => 'failed', 'report' => []]);
+    $redacted = 'Return Hello. Use app key [redacted:APP_KEY], TypeSafe [redacted:TYPESAFE_API_KEY], token [redacted:github_token]';
+
+    // Markdown escaping turns a secret into sk\-... or ghp\_..., so search the journals with the backslashes removed.
+    $taskJournal = str_replace('\\', '', File::get(app(ExportTaskJournal::class)->handle($task->id)['path']));
+    $projectJournal = str_replace('\\', '', File::get(app(ExportTaskJournal::class)->forWorkspace($this->workspace)['journal_path']));
+    foreach ([$taskJournal, $projectJournal] as $markdown) {
+        expectNoPlantedSecrets($markdown);
+        expect($markdown)->toContain('> '.htmlspecialchars($redacted, ENT_QUOTES));
+    }
+    expect($taskJournal)->toContain('Lifecycle: failed https://example.com/?token=[redacted:github_token]');
+
+    $outputs = [];
+    foreach ([
+        ['molly:task', ['task' => 'secret-task', '--json' => true]],
+        ['molly:task', ['task' => 'secret-task']],
+        ['molly:tasks', ['--json' => true]],
+        ['molly:tasks', []],
+        ['molly:inspect', ['target' => 'secret-task', '--json' => true]],
+        ['molly:inspect', ['target' => 'run:'.$task->runs()->value('id'), '--json' => true]],
+        ['molly:create', ['prompt' => 'Also '.PLANTED_GITHUB_TOKEN, '--workspace' => $this->workspace, '--file' => ['app/Greeting.php'], '--test' => 'tests/GreetingTest.php', '--json' => true]],
+    ] as [$command, $arguments]) {
+        expect(Artisan::call($command, [...$arguments, '--no-interaction' => true]))->toBe(0);
+        $outputs[] = $output = Artisan::output();
+        expectNoPlantedSecrets($output);
+    }
+    expect(json_decode($outputs[0], true)['task']['prompt'])->toBe($redacted)
+        ->and($outputs[1])->toContain('[redacted:APP_KEY]')
+        ->and(json_decode($outputs[4], true)['inspection']['task']['prompt'])->toBe($redacted)
+        ->and(json_decode($outputs[5], true)['inspection']['run']['prompt'])->toBe($redacted)
+        ->and(json_decode($outputs[6], true)['task']['prompt'])->toBe('Also [redacted:github_token]');
+
+    foreach (['/molly', '/molly/tasks/'.$task->id] as $page) {
+        $html = $this->get($page)->assertOk()->assertSee('[redacted:APP_KEY]')->getContent();
+        expectNoPlantedSecrets(html_entity_decode((string) $html));
+    }
+
+    expect(DB::table('molly_tasks')->where('id', $task->id)->value('prompt'))->toBe($prompt)
+        ->and($task->fresh()->prompt)->toBe($prompt)
+        ->and(DB::table('molly_tasks')->where('nickname', null)->value('prompt'))->toBe('Also '.PLANTED_GITHUB_TOKEN);
+});

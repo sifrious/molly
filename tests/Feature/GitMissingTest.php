@@ -43,6 +43,22 @@ it('names missing git in molly:doctor with git_missing', function (): void {
     expect($checks['Git']['code'])->toBe('git_ready');
 });
 
+it('names GIT_MISSING in the Git repository check instead of reporting a repository with no commit', function (): void {
+    putenv('PATH='.$this->path);
+    commitGitWorkspace($this->workspace);
+    putenv('PATH='.$this->workspace.'/empty-bin');
+
+    $checks = array_column(app(CheckEnvironment::class)->handle($this->workspace)['checks'], null, 'name');
+
+    expect($checks['Git repository']['code'])->toBe('git_missing')
+        ->and($checks['Git repository']['status'])->toBe('unknown')
+        ->and($checks['Git repository']['message'])->toContain('GIT_MISSING')->not->toContain('no commit yet');
+
+    putenv('PATH='.$this->path);
+    $checks = array_column(app(CheckEnvironment::class)->handle($this->workspace)['checks'], null, 'name');
+    expect($checks['Git repository']['code'])->toBe('git_repository');
+});
+
 it('fails molly:create with GIT_MISSING before saving a task', function (): void {
     $result = jsonCommand('molly:create', ['prompt' => 'Return Hello', '--workspace' => $this->workspace, '--file' => ['app/Greeting.php'], '--test' => 'tests/Feature/GreetingTest.php']);
 
