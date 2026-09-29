@@ -35,4 +35,4 @@ The task page has a "Find linked Amp threads" link. Through MCP, `molly_connecti
 ## Next
 
 - [Agents and MCP](agents.md)
-- [Execution targets](execution-targets.md), where runs execute and why Orb requests are refused
+- [Execution targets](execution-targets.md), where runs execute and how local Orbs run tasks

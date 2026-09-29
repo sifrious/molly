@@ -109,7 +109,7 @@ This reads a bounded PHP diff, runs Git's whitespace check, and, when Jev is ena
 
 ## Limits
 
-An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is not shipped; [Execution targets](execution-targets.md) explains the `ORB_UNVERIFIED` refusal.
+An Amp thread link is a note you save; Molly does not verify that the thread exists, and a thread is not an Orb. MCP `molly_task` can queue a start or retry on a registered local Orb with `orb`, `orb_runtime`, or `orb_model`; choosing where a task runs is not a human decision. Registering and revoking Orbs are Artisan commands. [Execution targets](execution-targets.md) covers Orbs.
 
 Molly treats the terminal as the person's. It refuses human decisions from MCP clients, but it cannot tell whether a person or an agent with shell access typed an Artisan command. Do not give an agent a shell where it can run `--approve` commands for you.
 

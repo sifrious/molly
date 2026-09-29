@@ -37,7 +37,8 @@ it('keeps create start retry stop show lifecycle handoff name thread and advice 
     $source = file_get_contents(dirname(__DIR__, 3).'/src/Mcp/MollyTask.php');
 
     expect($source)->toContain('#[IsDestructive]')
-        ->and($source)->toContain("app(QueueTask::class)->handle(\$data['id'], \$data['operation'] === 'retry')")
+        ->and($source)->toContain("app(QueueTask::class)->handle(\$data['id'], \$data['operation'] === 'retry', \$target)")
+        ->and($source)->toContain("ExecutionTargetRequest::orb(\$data['orb'] ?? null, \$data['orb_runtime'] ?? null, \$data['orb_model'] ?? null)")
         ->and($source)->toContain("'queued' => true")
         ->and($source)->toContain('private function dispatchQueue(array $data): array')
         ->and($source)->not->toContain('OpenPullRequest')

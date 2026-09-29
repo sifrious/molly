@@ -18,6 +18,7 @@ class RunReport
         $report = $run->report ?? [];
         note('Run '.$run->id.' / '.$run->status);
         note('Workspace: '.$run->workspace);
+        $this->showExecutionTarget($report);
         if (! empty($report['summary'])) {
             note($report['summary']);
         }
@@ -32,6 +33,24 @@ class RunReport
         $this->showAdvice($report);
         $this->showErrors($report);
         $this->showOutcome($run->status);
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showExecutionTarget(array $report): void
+    {
+        $target = $report['execution_target'] ?? null;
+        if (! is_array($target) || ($target['kind'] ?? null) !== 'orb') {
+            return;
+        }
+        $orb = $target['orb'] ?? [];
+        note('Execution target: Orb '.($orb['name'] ?? 'unknown').' ('.($target['target_id'] ?? 'no ID').'), '
+            .($orb['runtime'] ?? 'unknown runtime').' / '.($orb['model'] ?? 'chosen by Amp').', worktree '.($target['worktree'] ?? 'not recorded')
+            .', starting revision '.($target['starting_revision'] ?? 'not recorded').'.');
+        if (($target['diff']['status'] ?? null) === 'captured') {
+            note('Worktree diff: '.$target['diff']['path'].' ('.$target['diff']['bytes'].' bytes, sha256 '.$target['diff']['sha256'].').');
+        } elseif (isset($target['diff']['reason'])) {
+            note('Worktree diff: '.$target['diff']['reason']);
+        }
     }
 
     /** @param array<string, mixed> $report */
@@ -217,7 +236,11 @@ class RunReport
             if ($kind === 'verification' && empty($branch['provider']) && empty($branch['model'])) {
                 $model = 'Pest';
             }
-            $row = [$kind, $branch['status'] ?? 'Not reported', $branch['execution_target'] ?? 'Not recorded', $model];
+            $target = $branch['execution_target'] ?? 'Not recorded';
+            if ($target === ($report['execution_target']['target_id'] ?? null) && isset($report['execution_target']['orb']['name'])) {
+                $target = 'orb '.$report['execution_target']['orb']['name'];
+            }
+            $row = [$kind, $branch['status'] ?? 'Not reported', $target, $model];
             if ($verbose) {
                 $row[] = $branch['started_at'] ?? 'Not recorded';
                 $row[] = $branch['finished_at'] ?? 'Not recorded';

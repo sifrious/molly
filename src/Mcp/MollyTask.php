@@ -25,9 +25,11 @@ use Sifrious\Molly\Actions\RecommendTaskNextStep;
 use Sifrious\Molly\Actions\ShowRun;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Actions\StopTask;
+use Sifrious\Molly\Contracts\ExecutionTargetRequest;
+use Sifrious\Molly\Execution\LocalOrbProvider;
 
 #[Name('molly_task')]
-#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. import_github reads GitHub using the host gh login. approve, lock_test, pr_opened, merged, comment, and handoff record a human decision, so molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the php artisan command a person runs instead. pr_body prints a pull request description; it does not open or merge a pull request or create a worktree.')]
+#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. start/retry accept orb, orb_runtime, or orb_model to queue the task on a registered local Orb, which runs it in the task\'s own Git worktree with that Orb\'s model. import_github reads GitHub using the host gh login. approve, lock_test, pr_opened, merged, comment, and handoff record a human decision, so molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the php artisan command a person runs instead. pr_body prints a pull request description; it does not open or merge a pull request or create a worktree.')]
 #[IsDestructive]
 class MollyTask extends Tool
 {
@@ -76,6 +78,9 @@ class MollyTask extends Tool
             'next_action' => ['sometimes', 'string', 'max:64'],
             'context' => ['sometimes', 'string', 'max:8192'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'orb' => ['sometimes', 'string', 'max:100'],
+            'orb_runtime' => ['sometimes', 'string', 'in:ollama,amp'],
+            'orb_model' => ['sometimes', 'string', 'max:200'],
         ]);
         try {
             $result = match ($data['operation']) {
@@ -186,7 +191,11 @@ class MollyTask extends Tool
      */
     private function dispatchQueue(array $data): array
     {
-        return ['task' => app(QueueTask::class)->handle($data['id'], $data['operation'] === 'retry')->toArray(), 'queued' => true];
+        $target = ExecutionTargetRequest::orb($data['orb'] ?? null, $data['orb_runtime'] ?? null, $data['orb_model'] ?? null);
+        $result = ['task' => app(QueueTask::class)->handle($data['id'], $data['operation'] === 'retry', $target)->toArray(), 'queued' => true];
+        $orb = $target === null ? null : app(LocalOrbProvider::class)->placementOf($result['task']['id']);
+
+        return [...$result, 'orb' => $orb === null ? null : ['id' => $orb->id, 'name' => $orb->name, 'runtime' => $orb->runtime, 'model' => $orb->model, 'queue' => $orb->queue()]];
     }
 
     /** @return array{task: array<string, mixed>, display_status: string, linked_pr: array{url: string, number: int|null, merge_sha: string|null}|null, issue_url: string|null} */
@@ -228,6 +237,9 @@ class MollyTask extends Tool
             'next_action' => $schema->string()->description('Requested next action. For handoff it becomes --action in the command a person runs. Cannot be merge or open_pull_request.'),
             'context' => $schema->string()->description('Bounded context for the recipient agent. For handoff it becomes --context in the command a person runs. Maximum 8192 bytes.'),
             'limit' => $schema->integer()->min(1)->max(100)->description('Task list limit; defaults to 20.'),
+            'orb' => $schema->string()->description('For start or retry, the name or ID of a registered Orb to queue the task on. The Orb must be idle and healthy, and the task must live in a linked Git worktree of the Orb\'s repository under its approved worktree root.'),
+            'orb_runtime' => $schema->string()->enum(['ollama', 'amp'])->description('For start or retry without orb, queue the task on the first idle, healthy Orb by name with this runtime.'),
+            'orb_model' => $schema->string()->description('For start or retry without orb, queue the task on the first idle, healthy Orb by name with this model, such as gpt-oss:20b.'),
         ];
     }
 }

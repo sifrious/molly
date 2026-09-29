@@ -36,8 +36,11 @@ class MollyReceiptCommand extends Command
                 if ($file->getExtension() !== 'json') {
                     continue;
                 }
-                $outcome = VerificationOutcome::fromJson(trim(File::get($file->getPathname())));
-                $receipts[] = [...$outcome->toArray(), 'path' => $file->getPathname()];
+                $json = trim(File::get($file->getPathname()));
+                $outcome = VerificationOutcome::fromJson($json);
+                // The run facts the evidence digest covers, such as the model and the Orb, when the receipt saved them.
+                $context = json_decode($json, true)['context'] ?? null;
+                $receipts[] = [...$outcome->toArray(), ...(is_array($context) ? ['context' => $context] : []), 'path' => $file->getPathname()];
             }
 
             usort($receipts, fn (array $a, array $b): int => strcmp((string) $a['verifier'], (string) $b['verifier']));
@@ -65,6 +68,10 @@ class MollyReceiptCommand extends Command
                     $this->line('  another_attempt_permitted: '.($receipt['another_attempt_permitted'] ? 'yes' : 'no'));
                     if ($receipt['diagnostics_ref'] !== null) {
                         $this->line('  diagnostics_ref: '.$receipt['diagnostics_ref']);
+                    }
+                    $target = $receipt['context']['execution_target'] ?? null;
+                    if (is_array($target) && ($target['kind'] ?? null) === 'orb') {
+                        $this->line('  execution_target: Orb '.($target['orb']['name'] ?? 'unknown').' ('.($target['target_id'] ?? 'no ID').') in '.($target['worktree'] ?? 'an unrecorded worktree'));
                     }
                     $this->line('  path: '.$receipt['path']);
                 }

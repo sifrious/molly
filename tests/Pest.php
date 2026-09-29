@@ -368,3 +368,133 @@ function hardwareFact(array $snapshot, string $path): array
 {
     return Arr::get($snapshot['facts'], $path) ?? throw new RuntimeException("Missing fact {$path}");
 }
+
+/**
+ * A Laravel application in a temporary directory whose artisan boots tests/Fixtures/orb-runtime.php,
+ * and Git worktrees of it under a sibling orbs/ directory, one per task. The application is also
+ * the repository the Orbs may change, as in the tutorial. Setup registers each Orb in $orbs
+ * (name => Ollama model) with orbs/ as its approved worktree root, and saves each task in $tasks
+ * in orbs/NAME. A fake Ollama lists $models. Each task changes app/Flag.php, and
+ * tests/QueuedFlagTest.php checks it. Returns the application root; orbs/ is beside it.
+ *
+ * $barrier is how many writers must be inside a model call at once before any answers. Create
+ * hold in the root to make every writer wait, and remove it to let them answer. The Pest test
+ * sleeps $testSleep seconds, and molly.test_timeout is $testTimeout.
+ *
+ * @param  array<string, string>  $orbs
+ * @param  list<string>  $tasks
+ * @param  list<string>|null  $models
+ */
+function orbExecutionFixture(array $orbs = ['big' => 'gpt-oss:120b-code', 'small' => 'gpt-oss:20b'], array $tasks = ['one', 'two', 'spare'], ?array $models = null, int $barrier = 1, bool $duplicate = false, int $testSleep = 0, int $testTimeout = 10): string
+{
+    $base = realpath(sys_get_temp_dir()).'/molly-orb-'.bin2hex(random_bytes(8));
+    $root = $base.'/app';
+    foreach (['app', 'tests', 'storage/logs', 'storage/framework/views', 'bootstrap/cache'] as $path) {
+        mkdir($root.'/'.$path, 0700, true);
+    }
+    mkdir($base.'/orbs', 0700);
+    symlink(dirname(__DIR__).'/vendor', $root.'/vendor');
+    file_put_contents($root.'/.gitignore', "/storage/\n/database.sqlite\n/.molly/\n");
+    touch($root.'/database.sqlite');
+    file_put_contents($root.'/runtime.json', json_encode([
+        'models' => $models ?? array_values($orbs),
+        'orbs' => $orbs,
+        'tasks' => array_combine($tasks, array_map(fn (string $task): string => $base.'/orbs/'.$task, $tasks)),
+        'barrier' => $barrier,
+        'duplicate' => $duplicate,
+        'test_timeout' => $testTimeout,
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($root.'/artisan', '<?php define("MOLLY_ORB_TEST_ROOT", __DIR__); require '.var_export(__DIR__.'/Fixtures/orb-runtime.php', true).';');
+    file_put_contents($root.'/app/Flag.php', "<?php\nreturn false;\n");
+    file_put_contents($root.'/phpunit.xml', '<phpunit bootstrap="vendor/autoload.php" cacheDirectory="storage/phpunit"><testsuites><testsuite name="Flag"><directory>tests</directory></testsuite></testsuites></phpunit>');
+    file_put_contents($root.'/tests/QueuedFlagTest.php', str_replace('SLOW', $testSleep > 0 ? 'sleep('.$testSleep.');' : '', <<<'PHPTEST'
+<?php
+final class QueuedFlagTest extends PHPUnit\Framework\TestCase
+{
+    public function test_flag_value(): void
+    {
+        SLOW
+        $this->assertTrue(require dirname(__DIR__).'/app/Flag.php');
+    }
+}
+PHPTEST));
+    commitGitWorkspace($root);
+    try {
+        foreach ($tasks as $task) {
+            (new Process(['git', '-C', $root, 'worktree', 'add', '--quiet', '-b', 'orb-'.$task, $base.'/orbs/'.$task]))->mustRun();
+        }
+        $setup = new Process([PHP_BINARY, $root.'/artisan', 'fixture:setup', '--no-interaction'], $root, timeout: 30);
+        $setup->run();
+        expect($setup->isSuccessful())->toBeTrue($setup->getOutput().$setup->getErrorOutput());
+    } catch (Throwable $exception) {
+        File::deleteDirectory($base);
+        throw $exception;
+    }
+
+    return $root;
+}
+
+/**
+ * Run an Artisan command in an orbExecutionFixture() application with --json and return the
+ * exit code and the decoded document.
+ *
+ * @param  list<string>  $arguments
+ * @return array{0: int, 1: array<string, mixed>|null, 2: Process}
+ */
+function orbArtisan(string $root, array $arguments, float $timeout = 60): array
+{
+    $process = new Process([PHP_BINARY, $root.'/artisan', ...$arguments, '--json', '--no-interaction'], $root, timeout: $timeout);
+    $process->run();
+
+    return [$process->getExitCode(), json_decode($process->getOutput(), true), $process];
+}
+
+/** Start one queue:work --once process for an Orb's queue in an orbExecutionFixture() application. */
+function orbQueueWorker(string $root, string $orbId): Process
+{
+    $worker = new Process([PHP_BINARY, $root.'/artisan', 'queue:work', 'database', '--once', '--tries=1', '--sleep=0', '--queue=molly-orb-'.$orbId, '--no-interaction'], $root, timeout: 90);
+    $worker->start();
+
+    return $worker;
+}
+
+/**
+ * The fixture's records: tasks and Orbs by name, each task's runs oldest first with decoded
+ * reports, the jobs left in the queue, and the failed jobs.
+ *
+ * @return array{tasks: array<string, array>, runs: array<string, list<array>>, orbs: array<string, array>, jobs: int, failed: list<array>}
+ */
+function orbExecutionState(string $root): array
+{
+    $database = new PDO('sqlite:'.$root.'/database.sqlite');
+    $tasks = [];
+    foreach ($database->query('select * from molly_tasks')->fetchAll(PDO::FETCH_ASSOC) as $task) {
+        $tasks[$task['nickname']] = $task;
+    }
+    $names = array_column($tasks, 'nickname', 'id');
+    $runs = array_fill_keys(array_keys($tasks), []);
+    foreach ($database->query('select * from molly_runs order by created_at, rowid')->fetchAll(PDO::FETCH_ASSOC) as $run) {
+        $run['report'] = json_decode($run['report'], true, flags: JSON_THROW_ON_ERROR);
+        $runs[$names[$run['task_id']]][] = $run;
+    }
+    $orbs = [];
+    foreach ($database->query('select * from molly_orbs')->fetchAll(PDO::FETCH_ASSOC) as $orb) {
+        $orbs[$orb['name']] = $orb;
+    }
+
+    return [
+        'tasks' => $tasks,
+        'runs' => $runs,
+        'orbs' => $orbs,
+        'jobs' => (int) $database->query('select count(*) from jobs')->fetchColumn(),
+        'failed' => $database->query('select * from failed_jobs')->fetchAll(PDO::FETCH_ASSOC),
+    ];
+}
+
+/** @return list<array{pid: int, model: string, agent: string, at: float}> each writer call the fixture recorded */
+function orbGenerationCalls(string $root): array
+{
+    return is_file($root.'/generation-calls')
+        ? array_map(fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($root.'/generation-calls', FILE_IGNORE_NEW_LINES))
+        : [];
+}

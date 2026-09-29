@@ -10,13 +10,14 @@ For a first run, read [Getting started](../getting-started.md) instead of this p
 | --- | --- |
 | `molly:create [PROMPT]` | Saves a pending task. Does not call the model. |
 | `molly:story [STORY] --test=… [--file=…]` | Asks the configured model for numbered acceptance criteria and the files the implementation will change, saves them on a new test-authoring task, and prints the next three commands. Run them as printed. |
-| `molly:start TASK` | Runs a pending task in the terminal. Exits `0` only when the run completes. Ctrl-C or `SIGTERM` stops the run at its next step, saves it as `stopped`, and exits `130` or `143`. |
-| `molly:retry TASK` | Starts another attempt for a failed or stopped task, and recovers a task a killed process left `running`. Handles Ctrl-C and `SIGTERM` like `molly:start`. |
+| `molly:start TASK [--orb=ORB]` | Runs a pending task in the terminal. Exits `0` only when the run completes. Ctrl-C or `SIGTERM` stops the run at its next step, saves it as `stopped`, and exits `130` or `143`. With an [Orb option](#orbs), the run executes on that Orb. |
+| `molly:retry TASK [--orb=ORB]` | Starts another attempt for a failed or stopped task, and recovers a task a killed process left `running`. Handles Ctrl-C and `SIGTERM` like `molly:start`, and takes the same Orb options. |
+| `molly:queue TASK [--retry] [--orb=ORB]` | Queues a start, or a retry with `--retry`, for a queue worker and returns. With an Orb option, the job goes to that Orb's queue. The queue needs the settings in [Queue requirements](../web-interface.md#queue-requirements). `queued` means requested, not running or passed. |
 | `molly:stop TASK` | Stops a pending task, or asks a running one to stop at its next step. |
 | `molly:tasks [--limit=20]` | Lists saved tasks, newest first. |
 | `molly:task TASK` | Shows one task, its display status, recorded pull request, and attempts. |
 | `molly:show RUN_ID [--verbose]` | Shows a saved run's evidence. |
-| `molly:receipt RUN_ID` | Shows the run's verification receipts from `.molly/receipts/`. |
+| `molly:receipt RUN_ID` | Shows the run's verification receipts from `.molly/receipts/`, with the run facts each receipt's digest covers, such as the model identity and the Orb. |
 | `molly:inspect [TARGET]` | Follows links between a task, its runs, and conversations. |
 | `molly:name TASK NAME` | Gives a task a nickname. |
 | `molly:advice TASK` | Says which action is allowed next. Never performs it. |
@@ -69,11 +70,33 @@ Queued starts from the web interface and MCP need a queue worker. `molly:worker`
 | `molly:worker stop [--workspace=PATH] [--timeout=30]` | Sends `SIGTERM` to the worker's process group, then `SIGKILL` after the timeout. |
 | `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, settles tasks it left running, then starts a new one. |
 
+Each action takes `--orb=ORB` to manage that Orb's worker instead. An Orb's worker runs `queue:work` on the Orb's own queue, `molly-orb-ORB_ID`, so it runs only tasks queued on that Orb, one at a time. Its record and log are `.molly/worker/orb-ORB_ID.json` and `.molly/worker/orb-ORB_ID.log`. `start` and `restart` refuse a revoked Orb with `ORB_REVOKED`.
+
 Molly starts the worker with `setsid` where it exists, as on Linux. Without `setsid`, as on macOS, `/bin/sh` job control puts the worker in its own process group. When neither is available, `start` fails with `WORKER_START_FAILED` and starts nothing, because `stop` could not reach the worker's children. The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. Only your user can read them: the directory has mode `0700` and both files `0600`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly reads the process's command from `/proc` on Linux and from `ps` with the `en_US.UTF-8` locale elsewhere, so a worker whose command has spaces or non-ASCII characters is still recognized when Molly runs without a locale, as it does under Bloom. Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. Only one `molly:worker` command runs at a time per workspace. Another one waits up to `--timeout` seconds for `.molly/worker/worker.lock` (10 for `start`, 30 for `stop` and `restart`) and then fails with `WORKER_BUSY`. If Molly cannot write `worker.json` or `worker.log`, `start` fails with `WORKER_START_FAILED` and leaves no worker running. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
 
 Before `start` and `restart` launch the queue worker, they run a recovery check over every task marked `running` in the database. This is how the records become consistent after a worker was killed or the host restarted. The check recovers a task whose lease expired, and a task claimed by a process on this host whose task lock it can take at once, because a live run holds that lock. It never waits for a lock and leaves every other running task alone. Each recovered task becomes `failed`, or `stopped` when a stop was requested, and so does each run it left `running`; [Recovery after a crash](../tasks.md#recovery-after-a-crash) describes the records. One check looks at no more than 50 tasks per pass, oldest first. With `--json`, `start` and `restart` report `recovery` with `status` (`checked` or `failed`), `recovered` (each task's `task_id`, `reference`, `status`, and `reason`), and `limit_reached`. When the check cannot read the database, `status` is `failed`, `error` starts with `WORKER_RECOVERY_FAILED`, and the worker starts anyway, because it also runs your application's own jobs. The check does not run when you start `queue:work` yourself. A crashed task is then recovered when you run `molly:retry TASK`.
 
 With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), `graphs` (the [graph freshness](../knowledge-graph.md#stale-graphs) report for the workspace), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
+
+## Orbs
+
+A local Orb is a registered worker on this machine with its own ID, runtime, model, repository, and approved worktree root. [Execution targets](../execution-targets.md#local-orbs) explains placement, the checks, and the evidence, and [Run tasks on two local Orbs](../execution-targets.md#run-tasks-on-two-local-orbs) walks through two at once.
+
+| Command | What it does |
+| --- | --- |
+| `molly:orb-register NAME --model=MODEL --worktree-root=PATH [--runtime=ollama] [--repository=PATH]` | Registers an Orb with a new UUID and checks its runtime. `--runtime` is `ollama` or `amp`; an Amp Orb takes no `--model`. `--repository` defaults to the application. Refuses with `ORB_NAME_INVALID`, `ORB_NAME_TAKEN`, `ORB_RUNTIME_INVALID`, `ORB_MODEL_INVALID`, `ORB_REPOSITORY_INVALID`, `ORB_WORKTREE_ROOT_REQUIRED`, or `ORB_WORKTREE_ROOT_INVALID` and saves nothing. |
+| `molly:orbs [--check]` | Lists every Orb with its ID, availability (`available`, `busy`, `unhealthy`, or `revoked`), health, runtime and model, capabilities, repository, worktree root, current task, and queue worker. `--check` asks each active Orb's runtime for its health first and records a heartbeat. |
+| `molly:orb-revoke ORB [--reason=TEXT]` | Revokes an Orb. It keeps its ID and history and takes no new task. A task queued on it stays pending and loses its place; a running task stops at its next step. |
+
+`molly:start`, `molly:retry`, and `molly:queue` take the same Orb options:
+
+| Option | Meaning |
+| --- | --- |
+| `--orb=ORB` | Run on this Orb, by name or ID. |
+| `--orb-runtime=RUNTIME` | Run on the first idle, healthy Orb by name with this runtime, `ollama` or `amp`. |
+| `--orb-model=MODEL` | Run on the first idle, healthy Orb by name with this model. |
+
+The task must live in a linked Git worktree of the Orb's repository under its worktree root. A refused placement exits `1` with an `ORB_` code and changes nothing; [What Molly checks](../execution-targets.md#what-molly-checks) lists the codes.
 
 ## Agents and MCP
 
