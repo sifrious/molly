@@ -104,3 +104,25 @@ it('keeps untrusted markdown and html inert through escape and quote', function 
         expect($line)->toStartWith('> ');
     }
 });
+
+it('writes Clever warnings, limitations, and scan failure details to the journal', function () {
+    $renderer = new JournalRenderer;
+    $probe = [
+        'key' => 'c3', 'name' => 'The lonely files', 'status' => 'ok', 'metrics' => ['lonely_total' => 2],
+        'warnings' => ['The shallow clone contains partial history'],
+        'caveats' => ['Git history must be available in the measured workspace'],
+    ];
+
+    $markdown = implode("\n", $renderer->measurements([
+        'complexity_before' => ['status' => 'error', 'probes' => [], 'reason' => 'clever_scan_failed', 'detail' => 'The report directory is not writable'],
+        'complexity_after' => ['status' => 'ok', 'probes' => [$probe, [...$probe, 'status' => 'error', 'skip_reason' => 'Git log failed']]],
+    ]));
+
+    expect($markdown)->toContain('- Before changes: error')
+        ->and($markdown)->toContain('> '.$renderer->escape('clever_scan_failed'))
+        ->and($markdown)->toContain('> The report directory is not writable')
+        ->and($markdown)->toContain('  - Warning: The shallow clone contains partial history')
+        ->and($markdown)->toContain('> Git log failed')
+        ->and($markdown)->toContain("Limitations of these measurements:\n\n- The lonely files: Git history must be available in the measured workspace")
+        ->and(substr_count($markdown, 'Git history must be available in the measured workspace'))->toBe(1);
+});

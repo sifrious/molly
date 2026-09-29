@@ -128,6 +128,8 @@ php artisan clever:hotspots
 
 `owned-diff` counts lines and files in your application paths. `welds` finds literal constructor and static calls. `lonely-files` lists files with one Git author. `hotspots` combines size with recent commit activity. Each probe prints its scope, warnings, and the shell command you could use to check it by hand.
 
+In `molly:show`, the Clever rows are marked advisory. A probe that failed is shown as `error` with its message, not as skipped, and a failed scan shows the reason `clever_scan_failed` with the error detail. Probe warnings, such as a shallow clone with partial history, appear in the short form. Caveats appear with `--verbose`, on the run page, and in the task journal. Hand-verify commands appear with `--verbose` and on the run page.
+
 `lonely-files` and `hotspots` read the Git history of the measured directory only, with `git log --relative`, and report paths relative to that directory. An application in a subdirectory of its repository, such as `backend/` in a monorepo, gets the same results as one at the repository root. Commits to files outside that directory are not counted.
 
 ## False-green detection

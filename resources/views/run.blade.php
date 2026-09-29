@@ -45,6 +45,7 @@
 @endphp
 @foreach(['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label)
     @if(isset($report[$key]['reason']))<p>{{ $label }}: {{ $report[$key]['reason'] }}</p>@endif
+    @if(isset($report[$key]['detail']))<p>{{ $label }} detail: {{ is_string($report[$key]['detail']) ? $report[$key]['detail'] : json_encode($report[$key]['detail']) }}</p>@endif
 @endforeach
 @if($probeKeys->isEmpty())<p>No Clever measurements recorded.</p>@endif
 @foreach($probeKeys as $key)

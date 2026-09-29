@@ -25,7 +25,7 @@
     </table>
     @if($scalarNames->isEmpty())<p>No numeric or text measurements recorded.</p>@endif
     @foreach(['Before' => $before, 'After' => $after] as $label => $side)
-        @if(!empty($side['skip_reason']))<p>{{ $label }} skipped: {{ $side['skip_reason'] }}</p>@endif
+        @if(!empty($side['skip_reason']))<p>{{ $label }} {{ ($side['status'] ?? null) === 'error' ? 'error' : 'skipped' }}: {{ $side['skip_reason'] }}</p>@endif
         @foreach($side['warnings'] ?? [] as $warning)<p>{{ $label }} warning: {{ $warning }}</p>@endforeach
     @endforeach
     @php($caveats = collect($before['caveats'] ?? [])->merge($after['caveats'] ?? [])->unique())

@@ -8,7 +8,7 @@ Molly can write what it knows about a task to Markdown files you can read withou
 php artisan molly:journal ready-check
 ```
 
-Molly writes `.molly/journal/TASK_UUID.md` with the request, the file scope, the protected test, each attempt's state, Pest counts, Tarpit checks and findings, Clever measurements, the recorded pull request or merge if there is one, and the lifecycle events from `.molly/lifecycle.jsonl`. Run it again after another attempt to refresh the file. Missing evidence is written as missing.
+Molly writes `.molly/journal/TASK_UUID.md` with the request, the file scope, the protected test, each attempt's state, Pest counts, Tarpit checks and findings, Clever measurements with their warnings and limitations, the recorded pull request or merge if there is one, and the lifecycle events from `.molly/lifecycle.jsonl`. Run it again after another attempt to refresh the file. Missing evidence is written as missing.
 
 ## The project journal and glossary
 

@@ -191,26 +191,39 @@ final class JournalRenderer
     public function measurements(array $report): array
     {
         $lines = ['#### Clever measurements', '', 'Measurements are separate from Tarpit findings. Lower counts alone do not prove a simpler design.', ''];
+        $limitations = [];
         foreach (['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label) {
             $measurement = is_array($report[$key] ?? null) ? $report[$key] : [];
             $lines[] = '- '.$label.': '.$this->escape($measurement['status'] ?? null);
-            if (is_string($measurement['reason'] ?? null)) {
-                $lines = [...$lines, '', $this->quote($measurement['reason']), ''];
+            foreach (['reason', 'detail'] as $field) {
+                if (is_string($measurement[$field] ?? null)) {
+                    $lines = [...$lines, '', $this->quote($measurement[$field]), ''];
+                }
             }
             foreach ($measurement['probes'] ?? [] as $probe) {
                 if (! is_array($probe)) {
                     continue;
                 }
-                $lines[] = '- '.$this->escape($probe['name'] ?? $probe['key'] ?? null).': '.$this->escape($probe['status'] ?? null);
-                foreach ($probe['metrics'] ?? [] as $name => $value) {
+                $name = $this->escape($probe['name'] ?? $probe['key'] ?? null);
+                $lines[] = '- '.$name.': '.$this->escape($probe['status'] ?? null);
+                foreach ($probe['metrics'] ?? [] as $metric => $value) {
                     if (is_numeric($value) || is_bool($value)) {
-                        $lines[] = '  - '.$this->escape(str_replace('_', ' ', (string) $name)).': '.$this->escape($value);
+                        $lines[] = '  - '.$this->escape(str_replace('_', ' ', (string) $metric)).': '.$this->escape($value);
                     }
+                }
+                foreach (is_array($probe['warnings'] ?? null) ? $probe['warnings'] : [] as $warning) {
+                    $lines[] = '  - Warning: '.$this->escape($warning);
                 }
                 if (is_string($probe['skip_reason'] ?? null)) {
                     $lines = [...$lines, '', $this->quote($probe['skip_reason']), ''];
                 }
+                foreach (is_array($probe['caveats'] ?? null) ? $probe['caveats'] : [] as $caveat) {
+                    $limitations[$name.': '.$this->escape($caveat)] = true;
+                }
             }
+        }
+        if ($limitations !== []) {
+            $lines = [...$lines, '', 'Limitations of these measurements:', '', ...array_map(fn (string $limitation): string => '- '.$limitation, array_keys($limitations))];
         }
 
         return [...$lines, ''];
