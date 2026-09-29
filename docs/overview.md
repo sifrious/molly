@@ -52,4 +52,4 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 
 A model saying its work is correct is never evidence. A passing review never rescues a failing test.
 
-These pages describe the current `main` branch. The install lines use the latest tag, and a few things on these pages shipped after v0.1.3 and arrive with the next tag: doctor's Jev check, the fresh attempt budget after `molly:lock-test`, the approval requirement on `molly:pr-body` and `molly:handoff`, the MCP refusal of human decisions, and the `<?php` check on written tests. Everything on these pages works without Bloom.
+These pages describe the current `main` branch. The install lines use the latest tag, and a few things on these pages shipped after v0.1.3 and arrive with the next tag: doctor's Jev check, the fresh attempt budget after `molly:lock-test`, the approval requirement on `molly:pr-body` and `molly:handoff`, the saved handoff envelope, the MCP refusal of human decisions, and the `<?php` check on written tests. Everything on these pages works without Bloom.

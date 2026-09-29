@@ -136,8 +136,10 @@ it('redacts planted secrets from model and Pest output in every record Molly wri
     expectNoPlantedSecrets($markdown);
     expect($markdown)->toContain('[redacted:');
 
-    $handoff = app(HandOffTask::class)->handle($task->id, true, (string) Str::uuid(), (string) Str::uuid(), 'implement', 'Implement the locked greeting test.');
+    ['envelope' => $handoff, 'path' => $handoffPath] = app(HandOffTask::class)->handle($task->id, true, (string) Str::uuid(), (string) Str::uuid(), 'implement', 'Implement the locked greeting test with '.plantedSecrets());
     expectNoPlantedSecrets(json_encode($handoff->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    expectNoPlantedSecrets(File::get($handoffPath));
+    expect($handoff->boundedContext)->toBe('Implement the locked greeting test with app key [redacted:APP_KEY], TypeSafe [redacted:TYPESAFE_API_KEY], token [redacted:github_token]');
     expect(implode("\n", $handoff->priorDiagnostics))->toContain('pest_reason:Failed asserting that null is "Hello". app key [redacted:APP_KEY]');
 
     Artisan::call('molly:show', ['run' => $run->id, '--json' => true]);

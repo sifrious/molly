@@ -59,7 +59,7 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | --- | --- |
 | Bloom | An optional macOS workspace and review tool. It owns the checkout and pull request screens; Molly owns the task and its evidence. |
 | Bloom contract | `.molly/bloom-contract.json`, the versioned task description Bloom binds to a workspace. |
-| Handoff | An envelope that passes a task to a child Bloom workspace with the same scope, after a person confirms it with `molly:handoff --approve`. |
+| Handoff | An envelope that passes a task to a child Bloom workspace with the same scope, after a person confirms it with `molly:handoff --approve`. Saved in `.molly/handoffs/`. |
 | Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
 | Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
 | Orb | A planned remote execution environment. Not shipped; see [Execution targets](../execution-targets.md). |

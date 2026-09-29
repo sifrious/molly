@@ -98,7 +98,7 @@ php artisan molly:merged demo-greeting --sha MERGE_SHA --approve
 
 ## Hand a task to another workspace
 
-`molly:handoff TASK --from UUID --to UUID --approve` prints an envelope a child Bloom workspace can pick up. Without `--approve` it refuses with `HANDOFF_UNCONFIRMED` and records nothing. The recipient gets the same file scope and the same protected test; it cannot widen either or merge.
+`molly:handoff TASK --from UUID --to UUID --approve` saves an envelope for a child Bloom workspace to `.molly/handoffs/HANDOFF_ID.json` in the task's workspace, then prints the envelope and the path. With `--json` it prints only the envelope. Without `--approve` it refuses with `HANDOFF_UNCONFIRMED` and records nothing. The recipient gets the same file scope and the same protected test; it cannot widen either or merge.
 
 ## Install the Bloom plugin
 

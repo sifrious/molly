@@ -88,7 +88,7 @@ With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (th
 | `molly:comment TASK --approve [--close]` | Posts or updates one GitHub issue comment. |
 | `molly:pr-opened TASK --url URL --approve` | Records a pull request a person opened. |
 | `molly:merged TASK --sha SHA --approve` | Records a merge a person made. |
-| `molly:handoff TASK --from UUID --to UUID --approve` | Prints a handoff envelope for a child Bloom workspace. |
+| `molly:handoff TASK --from UUID --to UUID --approve` | Saves a handoff envelope for a child Bloom workspace to `.molly/handoffs/HANDOFF_ID.json` and prints it with that path. With `--json`, prints only the envelope. |
 | `molly:bloom-contract TASK --workspace-id=… --branch=… --base-sha=…` | Exports the task contract for a Bloom workspace. |
 | `molly:review-commit [REF] [--staged]` | Checks a PHP diff for whitespace problems and, with Jev on, asks for a review. |
 
