@@ -28,7 +28,7 @@ afterEach(function (): void {
 });
 
 /** @return list<string> Every file and directory under $directory, relative to it. */
-function filesUnder(string $directory): array
+function permissionTestEntries(string $directory): array
 {
     $found = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $file) {
@@ -54,7 +54,7 @@ it('names a read-only selected file and the reason before writing anything', fun
 
     expect($workspace->read(array_keys($before)))->toBe($before)
         ->and(fileperms($this->workspace.'/app/Locked.php') & 0777)->toBe(0444)
-        ->and(filesUnder($this->workspace))->toBe(['app', 'app/Existing.php', 'app/Locked.php']);
+        ->and(permissionTestEntries($this->workspace))->toBe(['app', 'app/Existing.php', 'app/Locked.php']);
 });
 
 it('names a read-only directory that would hold a selected file', function (string $path, string $directory): void {
@@ -67,7 +67,7 @@ it('names a read-only directory that would hold a selected file', function (stri
         ->toThrow(RuntimeException::class, 'WORKSPACE_WRITE_FAILED: Molly cannot write '.$path.' because it cannot write the directory '.$directory.' (Permission denied). No files were changed. Make '.$directory.' writable by this user');
 
     chmod($this->workspace.'/'.$directory, 0755);
-    expect(filesUnder($this->workspace))->toBe(['app', 'app/Models']);
+    expect(permissionTestEntries($this->workspace))->toBe(['app', 'app/Models']);
 })->with([
     'new file' => ['app/Models/User.php', 'app/Models'],
     'new directory' => ['app/Models/Concerns/HasName.php', 'app/Models'],
