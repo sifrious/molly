@@ -185,26 +185,27 @@ function gateDeclaredCases(string $key, bool $skipped): array
 const GATE_REMOTE_CLIENT_CASE = ['tests/Feature/WebTasksTest.php', 'it rejects remote clients and non-loopback hosts with data set "dataset "remote client""', false];
 
 /**
- * Give a record the two junit files the RC10 M10.3 runs produced, with every skip
+ * Give a record the junit files the RC10 M10.3 runs produced, with every skip
  * declared: macOS skips the Landlock and fallback tests, and Linux on PHP 8.3 skips
- * the two-worker and fallback tests.
+ * the two-worker and fallback tests. Without macOS, the record holds only the Linux
+ * run, as a tests.yml lane does.
  */
-function gateDeclaredSkips(array $fixture, string $subcase = 'M10.3'): void
+function gateDeclaredSkips(array $fixture, string $subcase = 'M10.3', bool $macos = true): void
 {
-    $runs = [
-        $subcase.'/junit-macos.xml' => ['Darwin', '8.4.23', [
+    $runs = array_filter([
+        $subcase.'/junit-macos.xml' => $macos ? ['Darwin', '8.4.23', [
             GATE_REMOTE_CLIENT_CASE,
             ...gateDeclaredCases('landlock-linux-only', true),
             ...gateDeclaredCases('laravel-ai-pre-v1-fallback', true),
             ...gateDeclaredCases('sqlite-competing-workers-php84', false),
-        ]],
+        ]] : null,
         $subcase.'/linux-8.3/junit.xml' => ['Linux', '8.3.35', [
             GATE_REMOTE_CLIENT_CASE,
             ...gateDeclaredCases('landlock-linux-only', false),
             ...gateDeclaredCases('laravel-ai-pre-v1-fallback', true),
             ...gateDeclaredCases('sqlite-competing-workers-php84', true),
         ]],
-    ];
+    ]);
     $counts = ['discovered' => 0, 'passed' => 0, 'failed' => 0, 'skipped' => 0];
     foreach ($runs as $path => [, , $cases]) {
         is_dir(dirname($fixture['evidence'].'/'.$path)) || mkdir(dirname($fixture['evidence'].'/'.$path), 0755, true);
@@ -214,13 +215,13 @@ function gateDeclaredSkips(array $fixture, string $subcase = 'M10.3'): void
         $counts['skipped'] += $skipped;
         $counts['passed'] += count($cases) - $skipped;
     }
-    gateEditRecord($fixture, $subcase, function (array $r) use ($runs, $counts) {
+    gateEditRecord($fixture, $subcase, function (array $r) use ($runs, $counts, $macos) {
         foreach ($runs as $path => [$os, $php]) {
             $r['files'][] = ['path' => $path, 'sha256' => ''];
             $r['test_runs'][] = ['junit' => $path, 'os_family' => $os, 'php' => $php];
         }
         $r['counts'] = $counts;
-        $r['skip_reasons'] = ['landlock-linux-only', 'laravel-ai-pre-v1-fallback', 'sqlite-competing-workers-php84'];
+        $r['skip_reasons'] = [...($macos ? ['landlock-linux-only'] : []), 'laravel-ai-pre-v1-fallback', 'sqlite-competing-workers-php84'];
 
         return $r;
     });
@@ -505,6 +506,30 @@ test('M11.7 rejects declared skips when the record lists only one of their keys'
 
         return $r;
     }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('accepts the suite skips the CI lanes of M10.1 and the whole-suite control of M11.4 declare', function () {
+    $fixture = gateFixture();
+    try {
+        gateDeclaredSkips($fixture, 'M10.1', macos: false);
+        gateDeclaredSkips($fixture, 'M11.4');
+        // A negative control counts its checks, not the tests in the suite junit files it keeps.
+        gateEditRecord($fixture, 'M11.4', function (array $r) {
+            $r['counts'] = ['discovered' => 7, 'passed' => 7, 'failed' => 0, 'skipped' => 0];
+
+            return $r;
+        });
+        $result = gateRun($fixture);
+
+        expect($result['exit'])->toBe(0, $result['output'])
+            ->and(gateRejections($result['report']))->toBe([]);
+    } finally {
+        gateRemoveTree($fixture['root']);
+    }
+});
+
+it('rejects the same suite skips under a subcase the keys do not name', function () {
+    gateControl(fn (array $f) => gateDeclaredSkips($f, 'M10.2', macos: false), 'M10.2', 'UNDECLARED_SKIP', 'M10');
 });
 
 it('rejects a PHP 8.3 skip in a run recorded on PHP 8.4', function () {
