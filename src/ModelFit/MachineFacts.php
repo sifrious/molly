@@ -132,18 +132,33 @@ final readonly class MachineFacts
     }
 
     /**
-     * The bytes Ollama holds in memory for this exact model, matched by name and digest,
-     * or null when it is not loaded, its size is unknown, or Molly could not read the list.
+     * The model Ollama holds in memory with this name and digest, or null when it is not
+     * loaded or Molly could not read the list.
+     *
+     * @return array{name: string, digest: string, size_bytes: int|null}|null
      */
-    public function loadedBytes(string $name, string $digest): ?int
+    public function loaded(string $name, string $digest): ?array
     {
         foreach ($this->loadedModels ?? [] as $model) {
             if ($model['name'] === $name && hash_equals(strtolower($digest), $model['digest'])) {
-                return $model['size_bytes'];
+                return $model;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether Ollama holds a model with this name, as LocalOllama::memory() matches it
+     * (the name or name:latest), or null when Molly could not read the list.
+     */
+    public function holds(string $name): ?bool
+    {
+        if ($this->loadedModels === null) {
+            return null;
+        }
+
+        return in_array(true, array_map(fn (array $model): bool => in_array($model['name'], [$name, $name.':latest'], true), $this->loadedModels), true);
     }
 
     /**

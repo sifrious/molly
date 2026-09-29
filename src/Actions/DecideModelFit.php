@@ -103,6 +103,12 @@ class DecideModelFit
         if ($configured !== null && $configured['admission'] !== 'approved') {
             $flags[] = 'configured_model_not_approved:'.$configured['name'];
         }
+        // Ollama may unload a model it holds to load another one, depending on OLLAMA_MAX_LOADED_MODELS.
+        if ($selected->status->fits() && ! $selected->loaded) {
+            foreach (array_unique(array_column($machine->loadedModels ?? [], 'name')) as $held) {
+                $flags[] = 'loaded_model_may_unload:'.$held;
+            }
+        }
 
         return $this->document($machine, $inputs, [
             'status' => $selected->status->value,
@@ -110,7 +116,7 @@ class DecideModelFit
             'reasons' => $selected->reasons,
             'constraints' => $selected->constraints,
             'runtime_selection' => $runtime,
-            'model_selection' => $selected->modelId === null ? null : $this->modelSelection($catalogue, $selected),
+            'model_selection' => $selected->modelId === null || ! $selected->status->fits() ? null : $this->modelSelection($catalogue, $selected),
             'install_allowed' => $blockers === [],
             'install_blockers' => $blockers,
             'flags' => $flags,
@@ -158,9 +164,27 @@ class DecideModelFit
             ModelFitStatus::MinimumFit => $selected->modelId.' meets its minimum requirements on this Mac, with constraints: '.implode(', ', $selected->constraints).'.',
             ModelFitStatus::AlreadyInstalled => $selected->modelId.' is installed with the approved digest and passed Molly\'s readiness check on this runtime.',
             ModelFitStatus::NoFit => self::NO_FIT_MESSAGE,
+            ModelFitStatus::MemoryUnavailable => $this->memoryUnavailable($selected, $headroom),
             ModelFitStatus::Unsupported => 'Molly\'s approved local Ollama configuration needs an Apple silicon Mac with macOS '.$runtime['minimum_os_version'].' or later. This machine does not qualify: '.implode(', ', $selected->reasons).'.',
             ModelFitStatus::Unknown => 'Molly could not decide whether a local Ollama configuration fits this Mac, because it could not measure: '.implode(', ', $selected->reasons).'. This is not a finding that the Mac is incompatible. Molly downloads nothing until the facts are measured.',
         };
+    }
+
+    /**
+     * Why no model is selected when a run would refuse every fitting model now: the
+     * memory a run needs before Ollama loads the model, and whether freeing memory can
+     * provide it or this Mac's total memory is smaller than that.
+     */
+    private function memoryUnavailable(ModelFitRecommendation $selected, InstallationHeadroom $headroom): string
+    {
+        $size = (int) $selected->required['model_bytes'];
+        $needs = 'a run needs '.InstallationHeadroom::gigabytes($size).' plus '.InstallationHeadroom::gigabytes($headroom->memoryBytes).' of headroom available before Ollama loads it';
+        $total = $selected->measured['total_memory_bytes'] ?? null;
+        $refused = 'Molly would refuse to load it with MODEL_MEMORY_INSUFFICIENT, so it selects no model.';
+
+        return is_int($total) && ! $headroom->fitsMemory($size, $total)
+            ? $selected->modelId.' meets its requirements on this Mac, but '.$needs.', which is more than this Mac\'s '.InstallationHeadroom::gigabytes($total).' of memory. '.$refused.' Only a model Ollama already holds can run here with molly.memory.headroom_gb at '.InstallationHeadroom::gigabytes($headroom->memoryBytes).'.'
+            : $selected->modelId.' meets its requirements on this Mac, but '.$needs.', and '.InstallationHeadroom::gigabytes((int) ($selected->measured['available_memory_bytes'] ?? 0)).' is available now. '.$refused.' Free memory, then run molly:preflight again.';
     }
 
     /** @return array<string, mixed> */

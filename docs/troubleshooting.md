@@ -146,7 +146,9 @@ If you installed with Composer yourself, run the same `composer require` again, 
 | Code | What to do |
 | --- | --- |
 | `NO_FIT` | No approved model fits this Mac. `molly:preflight` prints what it measured and what each model needs. |
-| `MODEL_FIT_UNKNOWN` | Molly could not measure a fact the decision needs. `molly:preflight` names the unknown fact and why. Fix the probe, for example start Ollama, then run the install again. |
+| `MODEL_FIT_UNKNOWN` | Molly could not measure a fact the decision needs. `molly:preflight` names the unknown fact and why. Fix the probe, then run the install again. |
+| `RUNTIME_UNREACHABLE` | Ollama did not answer at the configured URL, so Molly could not read the installed models. Start Ollama with `ollama serve`, or open the Ollama app, then run the install again. |
+| `MODEL_MEMORY_INSUFFICIENT` | Preflight reports `memory_unavailable`: a run would refuse every fitting model with the memory available now. Free memory and run `molly:preflight` again. When the message says this Mac's total memory is smaller than the model plus the headroom, only a model Ollama already holds can run. |
 | `DOWNLOAD_AUTHORIZATION_REQUIRED` | Run the printed command, which adds `--approve`, after you check the size and the volume. |
 | `DOWNLOAD_INTERRUPTED` | Run the same command again. Ollama resumes from the part it kept. |
 | `DOWNLOAD_OFFLINE` | Ollama could not reach its registry. Check the network, then run the command again. |
@@ -250,6 +252,7 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | --- | --- | --- |
 | `MODEL_MEMORY_INSUFFICIENT` | Ollama does not hold the model yet, and its size plus `molly.memory.headroom_gb` is more than the available memory. The message gives all three numbers. Molly refused before sending the request, so Ollama loaded nothing. | Choose a smaller installed model with `php artisan molly:setup`, or free memory and try again. See [Memory](reference/configuration.md#memory). |
 | `MEMORY_HEADROOM_INVALID` | `molly.memory.headroom_gb` is not a number of gigabytes, 0 or more. | Fix the value in `config/molly.php`, then run `php artisan config:clear`. |
+| `LOCAL_PROVIDER_INVALID` | The Ollama settings are not usable: another driver, a URL that is not loopback HTTP, a missing or cloud model, or a `molly.timeout` that is not a whole number of seconds, 1 or more. For the timeout, the message names the value. | Fix the setting. For the timeout, set `timeout` in `config/molly.php`, then run `php artisan config:clear`. |
 | `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. A run never pulls a model; `molly:install-model` installs an approved one after you authorize the download. |
 | `PROVIDER_ERROR` | Ollama answered with an HTTP error, such as 500, 503, or 429, or with its own `error` field in place of a chat response. The message gives the HTTP status and the model name, not Ollama's text. | Read the Ollama server log: the terminal running `ollama serve`, or `~/.ollama/logs/server.log` for the macOS app. Fix the cause, then try again. |
 | `PROVIDER_RESPONSE_INVALID` | Ollama answered, but the body was not a chat response: truncated JSON, plain text, an empty object, or fields Laravel AI cannot read. Molly uses none of it. | Check that `OLLAMA_URL` points at Ollama itself, then try again. |
