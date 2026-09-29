@@ -32,7 +32,9 @@ beforeEach(function (): void {
 afterEach(function (): void {
     File::deleteDirectory($this->mollyHome);
     File::deleteDirectory($this->laravelRoot);
-    File::delete($this->knowledgeDatabase);
+    foreach (['', '-wal', '-shm'] as $suffix) {
+        File::delete($this->knowledgeDatabase.$suffix);
+    }
     putenv('MOLLY_HOME');
     unset($_ENV['MOLLY_HOME']);
 });
