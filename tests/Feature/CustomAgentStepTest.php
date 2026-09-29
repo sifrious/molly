@@ -191,6 +191,23 @@ it('rejects a custom reviewer that drops one of the seven checks', function (): 
         ->toThrow(RuntimeException::class, 'REVIEW_INVALID');
 });
 
+it('rejects a custom reviewer that blocks on complexity it does not call accidental', function (): void {
+    app()->bind(TarpitReviewer::class, LenientTarpitReviewer::class);
+    $review = fn (string $classification): array => [...customStepReview(), 'findings' => [[
+        'code' => 'E', 'classification' => $classification, 'severity' => 'blocking', 'path' => 'routes/web.php', 'line' => 1,
+        'problem' => 'A new interface has one implementation.', 'recommendation' => 'Inline the interface.',
+    ]]];
+    $accidental = $review('accidental');
+    $accidental['checks']['E'] = ['status' => 'findings', 'evidence' => 'A new interface has one implementation.'];
+    $essential = $review('essential');
+    $essential['checks']['E'] = $accidental['checks']['E'];
+    LenientTarpitReviewer::fake([$accidental, $essential])->preventStrayPrompts();
+    $handle = fn () => app(ReviewChanges::class)->handle('Add GET /ready.', ['routes/web.php' => '<?php'], ['routes/web.php' => '<?php // ready']);
+
+    expect($handle()['findings'][0]['classification'])->toBe('accidental')
+        ->and($handle)->toThrow(RuntimeException::class, 'REVIEW_INVALID');
+});
+
 it('keeps a run failed when a custom step claims completion and Pest fails', function (): void {
     $workspace = sys_get_temp_dir().'/molly-custom-step-'.Str::uuid();
     File::ensureDirectoryExists($workspace.'/app');
