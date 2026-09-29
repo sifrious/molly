@@ -95,7 +95,7 @@ it('keeps the documented TeamChangeWriter example identical to the tested class'
 
 // docs/customize-steps.md shows this test verbatim. Keep the two identical.
 it('uses the team change writer', function () {
-    config(['molly.agent' => 'ollama']);
+    config(['molly.agent' => 'ollama', 'molly.model' => 'qwen2.5-coder:7b']);
     TeamChangeWriter::fake([[
         'summary' => 'Add the route.',
         'files' => [['path' => 'routes/web.php', 'content' => '<?php']],

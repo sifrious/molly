@@ -99,7 +99,7 @@ use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
 
 it('uses the team change writer', function () {
-    config(['molly.agent' => 'ollama']);
+    config(['molly.agent' => 'ollama', 'molly.model' => 'qwen2.5-coder:7b']);
     TeamChangeWriter::fake([[
         'summary' => 'Add the route.',
         'files' => [['path' => 'routes/web.php', 'content' => '<?php']],
@@ -116,7 +116,7 @@ it('uses the team change writer', function () {
 vendor/bin/pest --filter='uses the team change writer'
 ```
 
-The test sets `molly.agent` to `ollama` because the fake answers only through Laravel AI. With `MOLLY_AGENT=amp` in `.env`, Molly would call the `amp` CLI instead. Laravel AI keys fakes by the concrete class, so fake `TeamChangeWriter`, not `ChangeWriter`.
+The test sets `molly.agent` and `molly.model` so it passes whatever `.env` says. The fake answers only through Laravel AI's Ollama path: with `MOLLY_AGENT=amp`, Molly would call the `amp` CLI, and without a model name Molly refuses the Ollama path with `LOCAL_PROVIDER_INVALID`. The model name is not sent anywhere. Laravel AI keys fakes by the concrete class, so fake `TeamChangeWriter`, not `ChangeWriter`.
 
 Molly's own suite runs this test in `tests/Feature/CustomAgentStepTest.php`, and fails if the copy on this page or the `TeamChangeWriter` class above stops matching the tested code.
 

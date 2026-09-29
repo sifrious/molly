@@ -57,7 +57,7 @@ The file Molly wrote:
 
 // Acceptance criteria from https://github.com/sifrious/molly-demo/issues/42
 // Molly wrote one todo per criterion. Replace each todo with a test that
-// asserts the behavior. Pest reports a todo as incomplete, never as passed.
+// asserts the behavior. Molly fails verification while any todo remains.
 
 it('criterion 1: GET /ready returns HTTP 200.')->todo();
 it('criterion 2: The response body is exactly {"ready":true}.')->todo();
@@ -82,7 +82,7 @@ php artisan molly:task ready-issue --json
 
 ## Todos never pass
 
-Pest reports a todo as incomplete. Molly runs Pest with `--fail-on-skipped` and `--fail-on-incomplete`, and `VerifyChanges` returns `failed` with the reason `tests_skipped_or_incomplete` whenever any test in the file is a todo, skipped, or incomplete. That holds when every other test passes, too: the run ends `failed`, `completion_blockers` in the run report lists `pest`, and `molly:start` exits `1`. A todo cannot complete a task.
+Pest records a todo as a skipped test and lists it as `todo`. A plain `vendor/bin/pest` run still exits `0` with todos in the file. Molly runs Pest with `--fail-on-skipped` and `--fail-on-incomplete`, and `VerifyChanges` returns `failed` with the reason `tests_skipped_or_incomplete` whenever any test in the file is a todo, skipped, or incomplete. That holds when every other test passes, too: the run ends `failed`, `completion_blockers` in the run report lists `pest`, and `molly:start` exits `1`. A todo cannot complete a task.
 
 Locking the todo file fails for the same reason:
 

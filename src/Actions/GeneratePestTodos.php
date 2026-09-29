@@ -7,8 +7,8 @@ use RuntimeException;
 /**
  * Read the list under an "Acceptance criteria" heading in an issue body and
  * render one Pest todo per criterion. The file is a starting point for a
- * test-authoring run: Pest reports a todo as incomplete, so it never counts
- * as a passing test.
+ * test-authoring run: Pest records a todo as a skipped test, and Molly runs
+ * Pest with --fail-on-skipped, so a todo never counts as a passing test.
  */
 class GeneratePestTodos
 {
@@ -62,7 +62,7 @@ class GeneratePestTodos
             '',
             '// Acceptance criteria from '.$issueUrl,
             '// Molly wrote one todo per criterion. Replace each todo with a test that',
-            '// asserts the behavior. Pest reports a todo as incomplete, never as passed.',
+            '// asserts the behavior. Molly fails verification while any todo remains.',
             '',
         ];
         foreach ($criteria as $index => $criterion) {

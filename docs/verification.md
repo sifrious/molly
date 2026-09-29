@@ -52,7 +52,7 @@ Any of these keeps the run from completing:
 | `tests_failed` | An assertion failed or a test errored. |
 | `no_tests` | Pest found no test in the required file. A file without `<?php` looks like this. |
 | `no_assertions` | A test ran but asserted nothing. |
-| `tests_skipped_or_incomplete` | A skipped or incomplete test is not passing evidence. |
+| `tests_skipped_or_incomplete` | A skipped or incomplete test, including a Pest `->todo()`, is not passing evidence. |
 | `test_timeout` | Pest ran longer than `molly.test_timeout` (120 seconds by default). |
 | `junit_missing` or `junit_invalid` | Molly cannot trust the report Pest produced. |
 | `false_green` | The report passed but did not name the required file. |
