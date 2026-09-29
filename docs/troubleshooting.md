@@ -242,7 +242,7 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | `CHANGES_INVALID` | The proposal was empty, repeated a file, or named a file outside the allowed list. |
 | `FILE_TOO_LARGE` | A selected file or replacement is over `molly.max_file_bytes`. |
 | `NO_CHANGES` | The proposal left the selected files as they were. |
-| `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. |
+| `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. It also covers an `assertSee()`, `assertSeeText()`, `assertDontSee()`, or `assertDontSeeText()` of one character, such as `assertSee('1')`, which proves nothing. The retry sends the message to the model. |
 
 ## The model request fails
 

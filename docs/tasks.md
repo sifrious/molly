@@ -62,7 +62,15 @@ The first run writes the test. When it finishes, Molly runs the test and checks 
 
 For example, a test that creates a user in a fresh Laravel app fails with `no such table: users` when neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. That is `database_not_migrated`, not missing behavior, and the retry asks the model to add `uses(RefreshDatabase::class);` to the test file. The authoring run also gives the model `tests/Pest.php` to read, so it can see which `TestCase` and traits apply to every test. See [Troubleshooting](troubleshooting.md#the-authored-test-cannot-run) for each cause.
 
-Molly's instructions to the model are general Laravel guidance and name no application's components, text, or actions. When the task names signing in or signing out, the model covers each flow, with the routes the task names or Laravel's `/login` and `/logout`. When a behavior is limited to signed-in or authorized users, the test calls the protected action as a guest and expects `assertForbidden()`, rather than only checking that a control is hidden. The test never registers components, defines routes, or creates tables; it exercises the application.
+Molly's instructions to the model are general Laravel guidance and name no application's components, text, or actions. The story step asks for the negative cases a protected behavior needs, and the authoring run tests them even when a criterion leaves them out:
+
+- Signing in: valid credentials sign the user in, and invalid credentials are rejected with an error and leave the visitor a guest. The test uses the routes the task names, or Laravel's `/login` and `/logout`.
+- Signing out: the user is a guest afterwards, and the protected action refuses them again.
+- Protected actions: a guest who calls the action or its endpoint directly is refused with one exact outcome, `assertForbidden()` for an action or a redirect to the sign-in page for a page behind the auth middleware. Criteria and tests never accept either outcome, and a hidden control does not count as a refusal.
+- Changed state: the value before and after the action, after a fresh request when the change is kept, and what another user sees when the state belongs to one user.
+- Specific assertions: rendered text, a labelled value, or a component property. Molly rejects an authored test whose `assertSee()`, `assertSeeText()`, `assertDontSee()`, or `assertDontSeeText()` checks one character, such as `assertSee('1')`, with `TEST_AUTHORING_INVALID`, because such a check passes or fails on almost any page.
+
+The test never registers components, defines routes, or creates tables; it exercises the application.
 
 Read the test before the second command. `molly:lock-test --approve` locks the test, allows the implementation to change the derived files, prints them, and records the RED baseline. Pass `--file` to replace the derived files with your own. The last command runs the implementation against the locked test.
 

@@ -48,7 +48,7 @@ it('keeps the general authorization and authentication guidance the demo wording
         // Action-level 403 for an unauthorized component action.
         ->toContain('deny the unauthorized or unauthenticated caller inside that action with abort(403)')
         ->toContain('silent no-op')
-        ->toContain('call the protected action itself as a guest')
+        ->toContain('itself as a guest')
         // Sign-in and sign-out when the task names them.
         ->toContain('/login')
         ->toContain('/logout')

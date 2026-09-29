@@ -24,7 +24,7 @@ it('shows the counter to guests', function () {
 
 it('counts signed in users', function () {
     DB::table('users')->insert(['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'secret']);
-    $this->get('/counter')->assertSee('1');
+    $this->get('/counter')->assertSee('Signed in users: 1');
 });
 PHP;
 }
