@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 /*
  * These tests go through Artisan and the container binding for
@@ -116,4 +117,19 @@ it('runs molly:project-new with the container bootstrap', function (): void {
     } finally {
         File::deleteDirectory($parent);
     }
+});
+
+it('prints every step and the result when molly:project-init migrates the application it runs in', function (): void {
+    writeInitLock($this->laravelRoot, [['name' => 'laravel/framework', 'version' => 'v12.0.0']]);
+    // Run init in the application itself, so migrations go through a nested Artisan::call.
+    app()->setBasePath(str_replace('\\', '/', realpath($this->laravelRoot)));
+
+    $exit = Artisan::call('molly:project-init', ['--no-composer' => true], $buffer = new BufferedOutput);
+    $output = $buffer->fetch();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[migrate] Running migrations')
+        ->and($output)->toContain('[graphs] Knowledge graphs ready (Laravel 12.0.0)')
+        ->and($output)->toContain('[register] Wrote .molly/project.json and registered globally')
+        ->and($output)->toContain('Molly is initialized in '.base_path());
 });
