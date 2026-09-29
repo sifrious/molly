@@ -12,6 +12,7 @@ What Molly needs from the application, and which combinations the release tests 
 | Database | Any working Laravel connection |
 | Git | Required. The application must be in a Git repository with at least one commit, either at the repository root or in a subdirectory. Molly records the revision each run started from and never runs `git init` or commits for you. |
 | Pest | Pest 4 with `pest-plugin-laravel` 4 is tested. Pest 5 is accepted by doctor but not yet part of release testing. |
+| Paths | The application, workspace, and `MOLLY_HOME` paths may contain spaces, quotes, and non-ASCII characters. |
 
 ## What the release tests cover
 
@@ -21,6 +22,7 @@ What Molly needs from the application, and which combinations the release tests 
 | Fresh application install | New Laravel 12 and 13 applications: install, publish config, migrate, create and read a task, index Laravel knowledge, confirm `--no-dev` leaves Molly out |
 | Jev | The package suite against the accepted Laravel AI classification commit, with the live-capability tests required to run |
 | Sandbox | The Landlock sandbox tests run on Linux and skip on macOS |
+| Paths with spaces and Unicode | `molly:project-init`, `molly:create`, `molly:start` with the real Pest binary and Clever, `molly:show`, `molly:journal`, `molly:handoff`, `molly:story`, `molly:run`, `molly:worker`, and the Git commands `molly:project-new` prints, in a path such as `/tmp/Molly's Tëst ✓/app`. The model is faked. |
 
 The fresh-application job installs the checked-out package. It does not run a model.
 
