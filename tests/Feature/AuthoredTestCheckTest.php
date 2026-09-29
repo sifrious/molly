@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\File;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\MeasureComplexity;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
+use Sifrious\Molly\Actions\RecordRedBaseline;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Agents\TarpitReviewer;
 use Sifrious\Molly\Models\Task;
@@ -242,4 +243,99 @@ it('stops rewriting a test that keeps failing for the same cause at the repair b
         ->and($refused['report']['error'])->toStartWith('REPAIR_BUDGET_EXHAUSTED: Molly wrote tests/Feature/CounterTest.php 2 times and each time it could not run for the same cause (database_not_migrated, fingerprint ')
         ->and($refused['report']['error'])->toContain('then lock it with php artisan molly:lock-test '.$task->id.' --approve.')
         ->and($task->runs()->count())->toBe(2);
+});
+
+/** A workspace whose composer.lock lists the given packages, holding the RC9 authored test. */
+function rc9Workspace(string $workspace, array $packages): array
+{
+    $fixture = dirname(__DIR__).'/Fixtures/test-authoring/rc9-hello-counter';
+    File::put($workspace.'/composer.lock', json_encode(['packages' => [], 'packages-dev' => array_map(fn (string $name): array => ['name' => $name, 'version' => 'v4.1.0'], $packages)]));
+    File::copy($fixture.'/HelloCounterTest.rc9.php', $workspace.'/tests/Feature/HelloCounterTest.php');
+
+    return json_decode(File::get($fixture.'/verification.json'), true, flags: JSON_THROW_ON_ERROR);
+}
+
+it('classifies the RC9 authored test that calls get() and post() without importing them as a bootstrap error', function () {
+    $verification = rc9Workspace($this->workspace, ['pestphp/pest', 'pestphp/pest-plugin-laravel']);
+
+    $check = app(RecordRedBaseline::class)->classify($verification, $this->workspace, 'tests/Feature/HelloCounterTest.php');
+    $classified = array_column($check['classified_tests'], 'cause', 'name');
+
+    // RC9 saved this run as missing_behavior, so the lock would have frozen a test that can never pass.
+    expect($verification['rc9_classification'])->toBe('missing_behavior')
+        ->and($check['classification'])->toBe('bootstrap_error')
+        ->and($check['reason'])->toBe('test_helper_not_imported')
+        ->and($check['test_broken'])->toBeTrue()
+        ->and($check['causes'])->toHaveCount(1)
+        ->and($check['causes'][0]['cause'])->toBe('test_helper_not_imported')
+        ->and($check['causes'][0]['tests'])->toBe([
+            'it 1. Guest sees Hello stranger on home page',
+            'it 2. Guest does not see Increment button on home page',
+            'it 3. Guest is redirected to login when posting increment action',
+            'it 4. Guest can view login page with email, password fields and Login button',
+            'it 5. User can login with valid credentials and is redirected to home',
+            'it 11. After logout guest sees Hello stranger and no Increment button',
+        ])
+        ->and($check['causes'][0]['explanation'])->toBe('The tests call get() and post(), Pest plugin helpers that the test file does not import.')
+        ->and($check['causes'][0]['guidance'])->toContain('Add `use function Pest\Laravel\{get, post};` after the other `use` statements')
+        ->and($check['causes'][0]['guidance'])->toContain('`$this->get(...)`')
+        ->and(array_count_values(array_filter($classified)))->toBe(['test_helper_not_imported' => 6])
+        ->and(count($classified))->toBe(11)
+        // The five tests that ran and failed on assertions still fail for missing behavior.
+        ->and(array_keys(array_filter($classified, fn (?string $cause): bool => $cause === null)))->toBe([
+            'it 6. Authenticated user sees Hello world on home page',
+            'it 7. Authenticated user sees counter at 0 with Increment button',
+            'it 8. Authenticated user increments counter and sees count increase',
+            'it 9. Authenticated increment action returns 200 and updated count',
+            'it 10. Authenticated user can logout and is redirected to login',
+        ]);
+});
+
+it('tells the model to call the test case when the Pest Laravel plugin is not installed', function () {
+    $verification = rc9Workspace($this->workspace, ['pestphp/pest']);
+
+    $check = app(RecordRedBaseline::class)->classify($verification, $this->workspace, 'tests/Feature/HelloCounterTest.php');
+
+    expect($check['classification'])->toBe('bootstrap_error')
+        ->and($check['test_broken'])->toBeTrue()
+        ->and($check['causes'][0]['cause'])->toBe('test_plugin_missing')
+        ->and($check['causes'][0]['explanation'])->toBe('The tests call get() and post(), but pestphp/pest-plugin-laravel is not installed in the workspace.')
+        ->and($check['causes'][0]['guidance'])->toContain('Do not import them.')
+        ->and($check['causes'][0]['guidance'])->toContain('call the Laravel helpers on the test case, such as `$this->get(...)`');
+});
+
+it('refuses to lock an authored test that calls get() without importing it and retries with the import to add', function () {
+    // The workspace autoloads the Pest Laravel plugin from Molly's vendor directory; this marks it installed.
+    File::ensureDirectoryExists($this->workspace.'/vendor/pestphp/pest-plugin-laravel');
+    $task = authoringTask($this->workspace);
+    $test = "<?php\n\nit('shows the counter to guests', function () {\n    get('/counter')->assertOk();\n});\n\nit('shows the counter page', function () {\n    \$this->get('/counter')->assertSee('Counter page');\n});\n";
+    $imported = str_replace("<?php\n", "<?php\n\nuse function Pest\\Laravel\\get;\n", $test);
+    ChangeWriter::fake([
+        ['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => $test]]],
+        ['summary' => 'Import get().', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => $imported]]],
+    ])->preventStrayPrompts();
+    fakeAuthoringCollaborators(2);
+
+    [, $start] = mollyJson('molly:start', ['task' => $task->id]);
+    [$lockExit, $refusal] = mollyJson('molly:lock-test', ['task' => $task->id, '--approve' => true]);
+
+    expect($start['report']['authored_test']['classification'])->toBe('bootstrap_error')
+        ->and($start['report']['authored_test']['classified_tests'])->toBe([
+            ['name' => 'it shows the counter to guests', 'classification' => 'bootstrap_error', 'cause' => 'test_helper_not_imported'],
+            ['name' => 'it shows the counter page', 'classification' => 'missing_behavior', 'cause' => null],
+        ])
+        ->and($lockExit)->toBe(1)
+        ->and($refusal['error'])->toStartWith('AUTHORED_TEST_BROKEN: ')
+        ->and($refusal['error'])->toContain('(test_helper_not_imported) Affected tests: it shows the counter to guests.');
+
+    [, $retry] = mollyJson('molly:retry', ['task' => $task->id]);
+
+    ChangeWriter::assertPrompted(function ($prompt): bool {
+        $cause = json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR)['previous_attempt']['authored_test']['causes'][0] ?? null;
+
+        return $cause !== null && $cause['cause'] === 'test_helper_not_imported'
+            && str_contains($cause['guidance'], 'Add `use function Pest\Laravel\get;`');
+    });
+    expect($retry['report']['authored_test']['classification'])->toBe('missing_behavior')
+        ->and($retry['next']['command'])->toBe('php artisan molly:lock-test '.$task->id.' --approve');
 });

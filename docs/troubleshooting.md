@@ -195,13 +195,16 @@ The retry sends the model the cause and Molly's guidance for it in `previous_att
 | --- | --- | --- |
 | `database_not_migrated` | A test hit a missing table, and neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. | Add `uses(RefreshDatabase::class);` to the test file. |
 | `test_case_not_bound` | Laravel helpers such as `get()` are undefined because the file is not bound to `Tests\TestCase`. | Add `uses(Tests\TestCase::class);` to the test file. |
-| `test_support_missing` | A test helper class or Pest function is not loaded. | Import it or stop depending on it. |
+| `test_helper_not_imported` | The file calls a Pest plugin helper, such as `get()`, `post()`, `actingAs()`, or `livewire()`, without importing it, so PHP reports `Call to undefined function get()`. | The exact import, such as `use function Pest\Laravel\{get, post};`, or the test case form, such as `$this->get(...)`. |
+| `test_plugin_missing` | The file calls a Pest plugin helper, but the plugin, such as `pestphp/pest-plugin-laravel`, is not in the workspace's `composer.lock` or `vendor/`. | Call the test case instead, such as `$this->get(...)`, or `Livewire::test()` for components. |
+| `test_class_not_imported` | The file names a Laravel testing class, such as `RefreshDatabase`, `WithFaker`, or `Livewire`, without its `use` statement. | The exact `use` statement, such as `use Illuminate\Foundation\Testing\RefreshDatabase;`. |
+| `test_support_missing` | A test helper class or Pest function is not loaded, including a class under `Tests\`, `Pest\`, `PHPUnit\`, or Laravel's testing namespaces. | Import it or stop depending on it. |
 | `parse_error` | The file does not parse. | Return one complete PHP file. |
 | `no_tests` | Pest found no tests in the file. | Declare cases with `it()` or `test()`. |
 | `no_assertions` | The tests asserted nothing. | Assert the expected behavior. |
 | `tests_skipped` | Pest skipped the tests or marked them incomplete. | Remove `skip()` and `todo()`. |
 
-When a test that already applies `RefreshDatabase` hits a missing table, Molly counts it as missing behavior: the implementation has to add the migration.
+When a test that already applies `RefreshDatabase` hits a missing table, Molly counts it as missing behavior: the implementation has to add the migration. The same goes for a missing application class or function, such as `App\Livewire\Counter` or `greeting()`: the implementation has to add it. Only the Pest plugin helpers and Laravel testing classes above count as a broken test.
 
 You can also fix the test yourself and run `molly:lock-test TASK --approve` again. The lock runs the test again before it locks anything. When the same cause keeps coming back, the retry stops at `molly.repair.per_failure` with `REPAIR_BUDGET_EXHAUSTED`, and the message tells you to edit the test and lock it.
 
