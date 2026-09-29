@@ -22,10 +22,12 @@ use function Laravel\Prompts\warning;
  * Keep diagnostics on stderr. A failed Molly command prints its message on stderr; with
  * --json it still prints its JSON document on stdout and adds one `CODE: message` line
  * on stderr. When the command runs through Artisan::call there is no stderr, so the
- * message stays in the command output as before.
+ * message stays in the command output as before. JSON documents go through writeJson().
  */
 trait ReportsFailures
 {
+    use WritesJson;
+
     /**
      * Invalid arguments and options fail the same way instead of reaching Laravel's
      * exception renderer, which writes them to stdout.
@@ -41,7 +43,7 @@ trait ReportsFailures
 
             $message = 'ARGUMENTS_INVALID: '.$exception->getMessage().' Run php artisan '.$this->getName().' --help for usage.';
             if ($input->hasParameterOption('--json', true) && $this->getDefinition()->hasOption('json')) {
-                $output->writeln(json_encode(['status' => 'error', 'error' => $message], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES), OutputInterface::OUTPUT_RAW);
+                $this->writeJson(['status' => 'error', 'error' => $message]);
             }
             $output->getErrorOutput()->writeln(self::diagnosticLine($message), OutputInterface::OUTPUT_RAW);
 
@@ -60,7 +62,7 @@ trait ReportsFailures
         $stderr = $console instanceof ConsoleOutputInterface ? $console->getErrorOutput() : null;
 
         if ($json) {
-            $this->line(json_encode($document ?? ['status' => 'error', 'error' => $message], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson($document ?? ['status' => 'error', 'error' => $message]);
             $stderr?->writeln(self::diagnosticLine($message), OutputInterface::OUTPUT_RAW);
 
             return self::FAILURE;

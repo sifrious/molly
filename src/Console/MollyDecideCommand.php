@@ -26,7 +26,7 @@ class MollyDecideCommand extends Command
                 $this->option('task'),
             );
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } elseif ($result['created']) {
                 note('Decision saved: '.$result['path'].'. Commit that file if the project should keep it.');
             } else {

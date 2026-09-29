@@ -71,7 +71,7 @@ class MollySetupCommand extends Command
             }
             $result = ['status' => 'configured', 'agent' => $agent, 'model' => $model, 'next_commands' => $next];
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR));
+                $this->writeJson($result);
             } else {
                 $this->info('Saved the '.$agent.' configuration.');
                 foreach ($next as $command) {

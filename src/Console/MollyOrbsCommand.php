@@ -33,7 +33,7 @@ class MollyOrbsCommand extends Command
         }
 
         if ($this->option('json')) {
-            $this->line(json_encode(['status' => 'ok', 'orbs' => $rows], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson(['status' => 'ok', 'orbs' => $rows]);
 
             return self::SUCCESS;
         }

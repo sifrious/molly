@@ -40,7 +40,7 @@ class MollyJournalCommand extends Command
                     return $this->reportFailure((string) $result['reason'], $result);
                 }
                 if ($this->option('json')) {
-                    $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                    $this->writeJson($result);
                 } else {
                     note('Project journal saved: '.$result['journal_path']);
                     note('Project glossary saved: '.$result['glossary_path']);
@@ -54,7 +54,7 @@ class MollyJournalCommand extends Command
             }
             $result = $action->handle($reference);
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Journal saved: '.$result['path']);
                 note($result['attempt_count'].' saved '.($result['attempt_count'] === 1 ? 'attempt.' : 'attempts.'));

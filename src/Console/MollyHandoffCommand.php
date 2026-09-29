@@ -29,11 +29,11 @@ class MollyHandoffCommand extends Command
             );
             $payload = $envelope->toArray();
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Handoff '.$envelope->handoffId.' to '.$envelope->recipientWorkspaceId.'.');
                 note('Saved handoff envelope: '.$path);
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+                $this->writeJson($payload, JSON_PRETTY_PRINT);
             }
 
             return self::SUCCESS;

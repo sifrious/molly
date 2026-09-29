@@ -60,7 +60,7 @@ it('does not save agent selection when Amp MCP setup fails', function (): void {
 
 it('prints a session MCP configuration without launching chat in JSON mode', function (): void {
     $command = ['/test tools/amp', '--mcp-config', json_encode(['molly' => ['command' => PHP_BINARY, 'args' => [base_path('artisan'), 'mcp:start', 'molly']]], JSON_THROW_ON_ERROR)];
-    $this->artisan('molly:chat', ['--json' => true])->expectsOutput(json_encode(['command' => $command, 'workspace' => base_path()], JSON_THROW_ON_ERROR))->assertSuccessful();
+    $this->artisan('molly:chat', ['--json' => true])->expectsOutput(json_encode(['command' => $command, 'workspace' => base_path()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))->assertSuccessful();
     Process::assertNothingRan();
 });
 

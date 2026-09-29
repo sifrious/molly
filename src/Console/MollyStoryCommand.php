@@ -52,7 +52,7 @@ class MollyStoryCommand extends Command
             $next = ['php artisan molly:start '.$reference, 'php artisan molly:lock-test '.$reference.' --approve', 'php artisan molly:start '.$reference];
 
             if ($this->option('json')) {
-                $this->line(json_encode([
+                $this->writeJson([
                     'id' => $task->id,
                     'status' => $task->status,
                     'acceptance' => $task->source['acceptance'],
@@ -60,7 +60,7 @@ class MollyStoryCommand extends Command
                     'package_commands' => array_column($packages, 'command'),
                     'next' => $next,
                     'task' => $task->toArray(),
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                ]);
 
                 return self::SUCCESS;
             }

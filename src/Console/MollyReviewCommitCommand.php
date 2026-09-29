@@ -25,7 +25,7 @@ class MollyReviewCommitCommand extends Command
             }
             $result = $this->offeringChoices(fn (): array => $review->handle((string) ($this->option('workspace') ?: base_path()), $this->argument('ref') ?? 'HEAD', (bool) $this->option('staged')));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
+                $this->writeJson($result);
             } else {
                 table(['Check', 'Result'], [
                     ['PHP diff', $result['diff_bytes'].' bytes'],

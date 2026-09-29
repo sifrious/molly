@@ -45,7 +45,7 @@ class MollyGlossaryCommand extends Command
         ], $renderer->glossaryTerms());
 
         if ($this->option('json')) {
-            $this->line(json_encode(['status' => 'ok', 'workspace' => $root, 'path' => $path, 'exported' => is_file($path), 'terms' => $terms], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson(['status' => 'ok', 'workspace' => $root, 'path' => $path, 'exported' => is_file($path), 'terms' => $terms]);
 
             return self::SUCCESS;
         }

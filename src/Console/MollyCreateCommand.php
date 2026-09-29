@@ -32,7 +32,7 @@ class MollyCreateCommand extends Command
                 return $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
             });
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()]);
             } else {
                 $report->show($task);
                 note('Start this task with php artisan molly:start '.$task->reference().'.');

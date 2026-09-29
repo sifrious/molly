@@ -22,7 +22,7 @@ class MollyImportCommand extends Command
         try {
             $task = $this->offeringChoices(fn (): Task => $action->handle((string) $this->argument('issue'), (string) ($this->option('workspace') ?: base_path()), $this->option('file'), trim((string) $this->option('test')), nickname: $this->option('name') === null ? null : (string) $this->option('name'), allowTestEdits: (bool) $this->option('allow-test-edits'), todos: (bool) $this->option('todos')));
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()]);
             } else {
                 $report->show($task);
                 if ($this->option('todos')) {

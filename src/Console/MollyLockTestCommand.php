@@ -27,7 +27,7 @@ class MollyLockTestCommand extends Command
                 (string) ($this->option('reason') ?: 'Human approved the Pest test as the locked acceptance test.'),
             ));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Locked '.$result['test_path'].' at '.$result['after_digest'].'. The next run cannot edit that file.');
                 table(['File the implementation may change'], array_map(fn (string $path): array => [$path], $result['paths']));

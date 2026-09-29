@@ -54,10 +54,4 @@ class MollyRunCommand extends Command
             return $this->reportFailure($message, ['id' => null, 'status' => 'failed', 'report' => ['error' => $message, ...$choices]]);
         }
     }
-
-    /** @param array<string, mixed> $value */
-    private function writeJson(array $value): void
-    {
-        $this->line(json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-    }
 }

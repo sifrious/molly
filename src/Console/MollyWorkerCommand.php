@@ -44,7 +44,7 @@ class MollyWorkerCommand extends Command
         }
 
         if ($this->option('json')) {
-            $this->line(json_encode(['status' => 'ok', ...$result], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson(['status' => 'ok', ...$result]);
 
             return self::SUCCESS;
         }

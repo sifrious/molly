@@ -49,7 +49,7 @@ class MollyProjectInitCommand extends Command
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 $this->printNote('Molly is initialized in '.$result['project']->path);
                 $this->printNote('List projects: php artisan molly:projects');

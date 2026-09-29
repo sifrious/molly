@@ -22,7 +22,7 @@ class MollyAdviceCommand extends Command
         try {
             $advice = $action->handle((string) $this->argument('task'));
             if ($this->option('json')) {
-                $this->line(json_encode($advice, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($advice);
             } else {
                 note('Task '.$advice['task_reference'].' / '.$advice['observed']['task_status']);
                 note($advice['reason']);

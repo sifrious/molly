@@ -74,7 +74,7 @@ class MollyInstallModelCommand extends Command
         }
 
         if ($json) {
-            $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson($result);
 
             return self::SUCCESS;
         }

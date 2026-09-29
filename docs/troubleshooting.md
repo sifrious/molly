@@ -310,6 +310,18 @@ lsof -nP -iTCP:8000 -sTCP:LISTEN
 
 Advice and plan pages say why. `jev_disabled` is the default. `capability_missing` means `laravel/ai` in your application has no classification API, `invalid_config` means the key is missing, `provider_error` means the request failed, and `low_confidence` means Jev answered below the threshold and Molly kept its own guidance. Doctor reports the first three. See [Jev](reference/configuration.md#jev).
 
+## Output changes in an AI agent session
+
+New Laravel 13 applications require `laravel/pao` for development. When Artisan runs under an AI agent, pao finds the agent through environment variables such as `CLAUDECODE`, `AI_AGENT`, or `CODEX_SANDBOX`, and replaces Laravel's console output style with one that drops colors and box drawing, collapses runs of spaces, removes blank lines, and shortens `...` to `..`.
+
+Molly does not print `--json` documents through that output style. It writes them straight to stdout, so a script, Bloom, or `molly:preflight --snapshot` reads the same bytes in an agent session as in a terminal. The MCP server answers over stdio through `laravel/mcp`, which pao does not change. Tables, notes, and prompts still go through Laravel Prompts, so an agent sees them cleaned.
+
+Molly 0.2.0-RC10 and earlier printed `--json` through the output style, so in every terminal a value lost console style tags such as `<info>`, and in an agent session it also lost runs of spaces. A snapshot those versions saved from `molly:preflight --json` in an agent session lost the spaces in its raw `vm_stat` value, and `molly:preflight --snapshot` refuses it with `SNAPSHOT_INVALID: snapshot_sha256 does not match the facts in the snapshot.` Save the snapshot again with the current version. To see one command's terminal output without pao, set `PAO_DISABLE=1`:
+
+```bash
+PAO_DISABLE=1 php artisan molly:preflight
+```
+
 ## Still stuck
 
 - [Commands](reference/commands.md)

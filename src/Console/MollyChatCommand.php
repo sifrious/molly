@@ -26,7 +26,7 @@ class MollyChatCommand extends Command
         $config = ['molly' => ['command' => PHP_BINARY, 'args' => [base_path('artisan'), 'mcp:start', 'molly']]];
         $command = [$amp, '--mcp-config', json_encode($config, JSON_THROW_ON_ERROR)];
         if ($this->option('json')) {
-            $this->line(json_encode(['command' => $command, 'workspace' => base_path()], JSON_THROW_ON_ERROR));
+            $this->writeJson(['command' => $command, 'workspace' => base_path()]);
 
             return self::SUCCESS;
         }

@@ -31,7 +31,7 @@ class MollyNameCommand extends Command
 
             $task = $action->handle((string) $this->argument('task'), $nickname);
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()]);
             } else {
                 $report->show($task);
                 note('Read this task with php artisan molly:task '.$task->reference().'.');

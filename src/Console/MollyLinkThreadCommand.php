@@ -21,7 +21,7 @@ class MollyLinkThreadCommand extends Command
         try {
             $result = $link->handle((string) $this->argument('task'), (string) $this->argument('thread'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Thread linked. Read current connection status with php artisan molly:connections '.$this->argument('task').'.');
             }

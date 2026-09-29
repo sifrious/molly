@@ -21,7 +21,7 @@ class MollySettingsCommand extends Command
         try {
             $payload = ['status' => 'ok', ...$action->handle()];
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Settings file: '.$payload['path']);
                 note(json_encode($payload['settings'], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

@@ -31,7 +31,7 @@ final class MollyKnowledgeIndexCommand extends Command
                 default => throw new RuntimeException('KNOWLEDGE_NAMESPACE_INVALID: Choose laravel, nativephp, or tarpit.'),
             };
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } elseif ($namespace === 'nativephp') {
                 note('NativePHP Desktop v2 and Mobile v4 knowledge indexed. Tracks stay separate. Installed NativePHP packages are not required or claimed.');
                 table(['Sources', 'Nodes', 'Edges'], [[$result['sources'], $result['nodes'], $result['edges']]]);

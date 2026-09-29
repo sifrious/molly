@@ -22,7 +22,7 @@ final class MollyProjectIndexCommand extends Command
         try {
             $result = $index->handle((string) ($this->option('workspace') ?: base_path()));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Project graph indexed for '.$result['workspace'].'.');
                 table(['Sources', 'Nodes', 'Edges'], [[$result['sources'], $result['nodes'], $result['edges']]]);

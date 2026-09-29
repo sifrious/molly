@@ -75,10 +75,10 @@ class MollyPlanCommand extends Command
             }
             $sources = $guide->sourcesFor($plan->description, $plan->answers ?? []);
             if ($this->option('json')) {
-                $this->line(json_encode([
+                $this->writeJson([
                     'id' => $plan->id, 'status' => $plan->completed() ? 'ready' : 'draft',
                     'plan' => $plan->toArray(), 'next_step' => $plan->nextStep(), 'sources' => $sources,
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                ]);
             } else {
                 note('Saved plan '.$plan->id.' / '.($plan->completed() ? 'Ready for tasks' : 'Review in progress'));
                 if (($next = $plan->nextStep()) !== null) {

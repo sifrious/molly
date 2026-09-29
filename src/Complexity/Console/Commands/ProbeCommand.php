@@ -44,10 +44,7 @@ abstract class ProbeCommand extends Command
         $writer->mergeOne($result);
 
         if ((bool) $this->option('json')) {
-            $this->line((string) json_encode(
-                $result->toArray(),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-            ));
+            $this->writeJson($result->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
             return $result->status === ProbeStatus::Error ? self::FAILURE : self::SUCCESS;
         }

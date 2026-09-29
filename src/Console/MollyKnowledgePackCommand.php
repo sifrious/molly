@@ -34,7 +34,7 @@ final class MollyKnowledgePackCommand extends Command
             )->toArray();
 
             if ($this->option('json')) {
-                $this->line(json_encode($pack, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($pack);
 
                 return self::SUCCESS;
             }

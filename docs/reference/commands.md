@@ -1,6 +1,6 @@
 # Commands
 
-Every `molly:` and `clever:` command in this reference takes `--json` for structured output. The exception is `molly:check`, which the parallel check runner calls with an input and an output file and which you should not call yourself. Add `--no-interaction` in scripts. `TASK` is a task nickname or UUID; `RUN_ID` is a run UUID.
+Every `molly:` and `clever:` command in this reference takes `--json` for structured output. The exception is `molly:check`, which the parallel check runner calls with an input and an output file and which you should not call yourself. Molly writes each JSON document to stdout byte for byte, including when an AI agent runs Artisan in an app with `laravel/pao`; see [Output changes in an AI agent session](../troubleshooting.md#output-changes-in-an-ai-agent-session). Add `--no-interaction` in scripts. `TASK` is a task nickname or UUID; `RUN_ID` is a run UUID.
 
 For a first run, read [Getting started](../getting-started.md) instead of this page.
 

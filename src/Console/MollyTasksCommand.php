@@ -28,7 +28,7 @@ class MollyTasksCommand extends Command
             }
             $tasks = $action->handle($limit);
             if ($this->option('json')) {
-                $this->line(json_encode(['tasks' => $tasks->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['tasks' => $tasks->toArray()]);
             } elseif ($tasks->isEmpty()) {
                 note('No tasks yet. Create a task with php artisan molly:create.');
             } else {

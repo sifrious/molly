@@ -26,7 +26,7 @@ class MollyTaskCommand extends Command
             $inspection = $inspect->handle($task);
             if ($this->option('json')) {
                 $check = $task->latestAuthoredTest();
-                $this->line(json_encode([
+                $this->writeJson([
                     'id' => $task->id,
                     'status' => $task->status,
                     'display_status' => $inspection['display_status'],
@@ -34,7 +34,7 @@ class MollyTaskCommand extends Command
                     'issue_url' => $inspection['issue_url'],
                     ...($check === null ? [] : ['authored_test' => $check, 'next' => $task->authoringNextStep($check)]),
                     'task' => $task->toArray(),
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                ]);
             } else {
                 $report->show($task, $inspection);
             }

@@ -44,7 +44,7 @@ class MollyPreflightCommand extends Command
         }
 
         if ($this->option('json')) {
-            $this->line(json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION));
+            $this->writeJson($snapshot, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION);
 
             return self::SUCCESS;
         }
