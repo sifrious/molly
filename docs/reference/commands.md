@@ -92,7 +92,7 @@ With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (th
 | `molly:bloom-contract TASK --workspace-id=… --branch=… --base-sha=…` | Exports the task contract for a Bloom workspace. |
 | `molly:review-commit [REF] [--staged]` | Checks a PHP diff for whitespace problems and, with Jev on, asks for a review. |
 
-Molly never opens, comments on, or merges anything without `--approve`, and it never opens or merges a pull request at all.
+Molly never opens, comments on, or merges anything without `--approve`, and it never opens or merges a pull request at all. These commands are the only way to record a human decision: the MCP tool refuses the same operations with `HUMAN_APPROVAL_REQUIRED` and returns the command to run. See [Human decisions](../agents.md#human-decisions).
 
 ## Planning
 

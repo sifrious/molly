@@ -190,7 +190,7 @@ it('returns errors for missing saved records', function (string $operation, stri
     MollyServer::tool(MollyTask::class, ['operation' => $operation, 'id' => (string) Str::uuid()])->assertHasErrors()->assertSee($message);
 })->with([['show', 'TASK_NOT_FOUND'], ['show_run', 'RUN_NOT_FOUND'], ['start', 'TASK_NOT_FOUND'], ['stop', 'TASK_NOT_FOUND']]);
 
-it('records human approval through MCP without opening a pull request', function () {
+it('refuses to record human approval through MCP', function () {
     $scope = mcpTaskScope();
     $task = app(CreateTask::class)->handle('Return Hello.', $scope['workspace'], $scope['paths'], $scope['test_path']);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
@@ -203,19 +203,17 @@ it('records human approval through MCP without opening a pull request', function
     config(['molly.parallel_checks' => false]);
     app(StartTask::class)->handle($task->id);
 
-    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id])->assertHasErrors(['approve']);
-    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id, 'approve' => false])
-        ->assertHasErrors()->assertSee('APPROVAL_UNCONFIRMED');
-
-    MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id, 'approve' => true])->assertOk()
-        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('approved', true)->where('display_status', DisplayStatus::Approved->value)->where('task_id', $task->id)->etc());
+    foreach ([[], ['approve' => false], ['approve' => true]] as $flag) {
+        MollyServer::tool(MollyTask::class, ['operation' => 'approve', 'id' => $task->id, ...$flag])
+            ->assertHasErrors(['HUMAN_APPROVAL_REQUIRED', 'php artisan molly:approve '.$task->id.' --approve']);
+    }
 
     $log = app(RecordLifecycleEvent::class)->load($scope['workspace']);
-    expect($log->displayStatus($task->id))->toBe(DisplayStatus::Approved)
-        ->and($log->events($task->id)[array_key_last($log->events($task->id))]->payload['pull_request_opened'] ?? true)->toBeFalse();
+    expect($log->displayStatus($task->id))->toBe(DisplayStatus::AwaitingApproval)
+        ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->not->toContain('approval_resolved');
 });
 
-it('records an opened pull request and merge through MCP without opening GitHub', function () {
+it('refuses to record an opened pull request or merge through MCP', function () {
     $scope = mcpTaskScope();
     $task = app(CreateTask::class)->handle('Return Hello.', $scope['workspace'], $scope['paths'], $scope['test_path']);
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
@@ -231,16 +229,15 @@ it('records an opened pull request and merge through MCP without opening GitHub'
     $url = 'https://github.com/sifrious/molly/pull/12';
     $sha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-    MollyServer::tool(MollyTask::class, ['operation' => 'pr_opened', 'id' => $task->id, 'url' => $url])->assertHasErrors(['approve']);
-    MollyServer::tool(MollyTask::class, ['operation' => 'pr_opened', 'id' => $task->id, 'url' => $url, 'approve' => true])->assertOk()
-        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('opened', false)->where('recorded', true)->where('pull_request_url', $url)->etc());
-    MollyServer::tool(MollyTask::class, ['operation' => 'merged', 'id' => $task->id, 'sha' => $sha])->assertHasErrors(['approve']);
-    MollyServer::tool(MollyTask::class, ['operation' => 'merged', 'id' => $task->id, 'sha' => $sha, 'approve' => true])->assertOk()
-        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('merged', false)->where('recorded', true)->where('display_status', DisplayStatus::Merged->value)->etc());
+    MollyServer::tool(MollyTask::class, ['operation' => 'pr_opened', 'id' => $task->id, 'url' => $url, 'approve' => true])
+        ->assertHasErrors(['HUMAN_APPROVAL_REQUIRED', 'php artisan molly:pr-opened '.$task->id.' --url='.$url.' --approve']);
+    MollyServer::tool(MollyTask::class, ['operation' => 'merged', 'id' => $task->id, 'sha' => $sha, 'approve' => true])
+        ->assertHasErrors(['HUMAN_APPROVAL_REQUIRED', 'php artisan molly:merged '.$task->id.' --sha='.$sha.' --approve']);
 
     $log = app(RecordLifecycleEvent::class)->load($scope['workspace']);
-    expect($log->displayStatus($task->id))->toBe(DisplayStatus::Merged)
-        ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->toContain('pull_request_opened', 'merged');
+    expect($log->displayStatus($task->id))->toBe(DisplayStatus::Approved)
+        ->and(array_map(fn ($event) => $event->type()?->value, $log->events($task->id)))->not->toContain('pull_request_opened', 'merged')
+        ->and($task->fresh()->source['linked_pr'] ?? null)->toBeNull();
 });
 
 it('validates task arguments before saving or dispatching', function () {

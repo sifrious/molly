@@ -7,7 +7,8 @@ it('routes every MollyTask operation through exactly one named dispatch path', f
     $groups = [
         'dispatchRead' => ['list', 'show', 'show_run'],
         'dispatchCreate' => ['create', 'from_plan', 'import_github'],
-        'dispatchLifecycle' => ['comment', 'approve', 'lock_test', 'pr_body', 'pr_opened', 'merged', 'stop'],
+        'refuseHumanDecision' => ['approve', 'lock_test', 'pr_opened', 'merged', 'comment'],
+        'dispatchLifecycle' => ['pr_body', 'stop'],
         'dispatchHandoff' => ['handoff', 'name', 'link_thread'],
         'dispatchAdvice' => ['advice'],
         'dispatchQueue' => ['start', 'retry'],
@@ -42,8 +43,11 @@ it('keeps create start retry stop show lifecycle handoff name thread and advice 
         ->and($source)->not->toContain('OpenPullRequest')
         ->and($source)->not->toContain('MergePullRequest');
 
-    // Approve-gated lifecycle ops still require the approve flag in validation.
-    expect($source)->toContain("'approve' => ['required_if:operation,comment,approve,lock_test,pr_opened,merged', 'boolean']");
+    // Human decisions are refused over MCP; no approve flag can turn them on.
+    expect($source)->toContain("'approve', 'lock_test', 'pr_opened', 'merged', 'comment' => \$this->refuseHumanDecision(\$data)")
+        ->and($source)->toContain('private function refuseHumanDecision(array $data): never')
+        ->and($source)->not->toContain("'approve' => [")
+        ->and($source)->not->toContain("\$data['approve']");
 
     // Create/read paths do not queue work.
     expect($source)->toContain('private function dispatchCreate(array $data): array')

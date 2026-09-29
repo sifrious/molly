@@ -54,15 +54,31 @@ It is registered only in the `local` and `testing` environments and has no HTTP 
 
 | Tool | What it does |
 | --- | --- |
-| `molly_task` | Creates tasks, reads tasks and runs, names tasks, links Amp threads, imports GitHub issues, asks for advice, records approvals, locks a written test, records pull requests and merges, and queues a start or retry. |
+| `molly_task` | Creates tasks, reads tasks and runs, names tasks, links Amp threads, imports GitHub issues, asks for advice, prints a pull request description, and queues a start or retry. It refuses human decisions. |
 | `molly_plan` | Creates, reads, and answers plans, and requests a Jev suggestion. |
 | `molly_guide` | Reads Molly's bundled planning guide and the passages it cites. |
 | `molly_knowledge` | Reads the local Laravel, NativePHP, or Tarpit knowledge graph. |
 | `molly_connections` | Reads saved Amp thread links and, optionally, Amp's current connection state. |
 
-Operations that record a human decision (`approve`, `lock_test`, `pr_opened`, `merged`, `comment`) require `approve=true`. None of them opens or merges a pull request.
-
 A start or retry from MCP is queued through the application's queue and needs a worker. A queued reply means the work was dispatched, not that it ran. [Web interface](web-interface.md#queue-requirements) lists the supported queue drivers.
+
+## Human decisions
+
+An MCP client is an agent, so `molly_task` does not record a human decision. The `approve`, `lock_test`, `pr_opened`, `merged`, and `comment` operations fail with `HUMAN_APPROVAL_REQUIRED` and change nothing: no lifecycle event, task field, journal, or GitHub request. Passing `approve=true` makes no difference. The error ends with the Artisan command for a person to run, filled in with the arguments the client passed:
+
+```text
+HUMAN_APPROVAL_REQUIRED: Only a person can approve a verified change. molly_task changed nothing. Ask a person to run: php artisan molly:approve ready-check --approve
+```
+
+| Operation | Command a person runs |
+| --- | --- |
+| `approve` | `molly:approve TASK --approve` |
+| `lock_test` | `molly:lock-test TASK --approve [--file=PATH] [--reason=TEXT]` |
+| `pr_opened` | `molly:pr-opened TASK --url=URL --approve` |
+| `merged` | `molly:merged TASK --sha=SHA --approve` |
+| `comment` | `molly:comment TASK --approve [--close]` |
+
+When the client leaves out the pull request URL or merge SHA, the command shows `URL` or `SHA` in its place. After a person runs the command, `show` reports the new display status and `pr_body` prints the pull request description.
 
 ## Knowledge in prompts
 
@@ -90,7 +106,9 @@ This reads a bounded PHP diff, runs Git's whitespace check, and, when Jev is ena
 
 ## Limits
 
-An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is planned and described in [Execution targets](execution-targets.md).
+An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb.
+
+Molly treats the terminal as the person's. It refuses human decisions from MCP clients, but it cannot tell whether a person or an agent with shell access typed an Artisan command. Do not give an agent a shell where it can run `--approve` commands for you. Remote execution is planned and described in [Execution targets](execution-targets.md).
 
 ## Next
 
