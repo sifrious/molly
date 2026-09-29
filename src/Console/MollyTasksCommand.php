@@ -32,7 +32,7 @@ class MollyTasksCommand extends Command
             } elseif ($tasks->isEmpty()) {
                 note('No tasks yet. Create a task with php artisan molly:create.');
             } else {
-                table(['Name', 'Task ID', 'Status', 'Prompt'], $tasks->map(fn (Task $task): array => [$task->nickname ?? 'Unnamed', $task->id, $task->status, $task->prompt])->all());
+                table(['Name', 'Task ID', 'Status', 'Prompt'], $tasks->map(fn (Task $task): array => [$task->nickname ?? 'Unnamed', $task->id, $task->status, $task->redactedPrompt()])->all());
             }
 
             return self::SUCCESS;

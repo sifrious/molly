@@ -23,7 +23,7 @@ class TaskReport
         if ($task->nickname !== null) {
             note('Task ID: '.$task->id);
         }
-        note($task->prompt);
+        note($task->redactedPrompt());
         note('Workspace: '.$task->workspace);
         note('Required test: '.$task->test_path.($task->allow_test_edits ? ' (writable for this task)' : ' (protected)'));
         if ($task->test_digest) {

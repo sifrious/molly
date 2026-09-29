@@ -8,10 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Redaction\RedactedJson;
+use Sifrious\Molly\Redaction\RedactsPrompt;
 
 class Task extends Model
 {
     use HasUuids;
+    use RedactsPrompt;
 
     protected $table = 'molly_tasks';
 

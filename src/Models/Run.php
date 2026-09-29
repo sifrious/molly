@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Sifrious\Molly\Redaction\RedactedJson;
+use Sifrious\Molly\Redaction\RedactsPrompt;
 
 class Run extends Model
 {
     use HasUuids;
+    use RedactsPrompt;
 
     protected $table = 'molly_runs';
 
