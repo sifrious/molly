@@ -45,7 +45,7 @@ Molly saves the envelope to `.molly/handoffs/HANDOFF_ID.json` and prints it with
 
 ## Keep them out of Git
 
-Journals and handoff envelopes can contain task descriptions and review text, so read them before sharing. Molly writes them with owner-only permissions, `0700` for directories and `0600` for files, and adds an ignore rule inside `.molly/.gitignore`. Keep `.molly/` ignored in your repository as well; Molly does not edit your root `.gitignore`.
+Journals and handoff envelopes can contain task descriptions and review text, so read them before sharing. Molly writes them with owner-only permissions, `0700` for directories and `0600` for files, and adds an ignore rule inside `.molly/.gitignore`. Keep `.molly/` ignored in your repository as well. `molly:project-init` adds `.molly/` and `/storage/molly/` to the application's `.gitignore` when they are missing; no other command edits it.
 
 ## Record a decision
 

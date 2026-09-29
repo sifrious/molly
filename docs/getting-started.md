@@ -91,6 +91,8 @@ Add Molly's local files to `.gitignore`:
 /storage/molly/
 ```
 
+`molly:project-init` adds both lines when they are missing.
+
 Molly never creates a repository or a commit in your application. `composer create-project` does not create one either, so if `git status` says the directory is not a Git repository, commit the application yourself before you create a task:
 
 ```bash

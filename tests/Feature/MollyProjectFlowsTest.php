@@ -65,6 +65,33 @@ it('initializes an existing Laravel app without overwriting env or existing moll
         ->and($listed[0]->path)->toBe(str_replace('\\', '/', realpath($this->laravelRoot)));
 });
 
+it('ignores .molly/ and /storage/molly/ as the README asks, once each', function (string $before, string $after, bool $added): void {
+    File::put($this->laravelRoot.'/.gitignore', $before);
+    $init = fn (): array => (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(path: $this->laravelRoot, runComposerRequire: false, runMigrations: false, bootstrapGraphs: false);
+
+    $first = $init();
+    $second = $init();
+    $readme = File::get(dirname(__DIR__, 2).'/README.md');
+
+    expect(File::get($this->laravelRoot.'/.gitignore'))->toBe($after)
+        ->and($first['created']['gitignore'])->toBe($added)
+        ->and($second['created']['gitignore'])->toBeFalse()
+        ->and($readme)->toContain("```gitignore\n.molly/\n/storage/molly/\n```");
+})->with([
+    'neither' => ["/vendor\n", "/vendor\n.molly/\n/storage/molly/\n", true],
+    'only .molly/' => ["/vendor\n.molly/", "/vendor\n.molly/\n/storage/molly/\n", true],
+    'both, written differently' => ["/.molly\nstorage/molly\n", "/.molly\nstorage/molly\n", false],
+    'all of storage' => ["/storage/\n.molly/\n", "/storage/\n.molly/\n", false],
+]);
+
+it('reports which lines molly:project-init added to .gitignore', function (): void {
+    File::put($this->laravelRoot.'/.gitignore', "/vendor\n.molly/\n");
+
+    $result = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(path: $this->laravelRoot, runComposerRequire: false, runMigrations: false, bootstrapGraphs: false);
+
+    expect($result['steps'])->toContain('gitignore: Added /storage/molly/ to .gitignore');
+});
+
 it('refuses a non-laravel directory', function (): void {
     $empty = sys_get_temp_dir().'/molly-not-laravel-'.Str::uuid();
     File::ensureDirectoryExists($empty);

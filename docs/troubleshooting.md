@@ -130,7 +130,7 @@ Molly needs PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, not
 Run the same command again. `molly:project-init` writes `.molly/project.json` and the `projects.json` entry only after every step succeeds, so an install stopped partway, even with `kill -9`, is never listed as ready. The next run skips what is done and finishes the rest:
 
 - It runs `composer require` again unless `vendor/composer/installed.json` lists `sifrious/molly` and Composer's autoload map includes it. A package directory left behind by a stopped Composer does not count.
-- It keeps an existing `.molly/` line in `.gitignore`, an existing `config/molly.php`, and an existing `repositories` entry, and never adds a second one.
+- It keeps existing `.molly/` and `/storage/molly/` lines in `.gitignore`, including equivalent ones such as `/.molly` or `/storage/`, an existing `config/molly.php`, and an existing `repositories` entry, and never adds a second one.
 - It keeps the project ID from `.molly/identity.json`, so tasks saved before the interruption stay in the project.
 
 Molly writes `project.json`, `projects.json`, and `config/molly.php` to a temporary file in the same directory and renames it into place, so an interrupted write leaves the previous file or no file, never half of one.
