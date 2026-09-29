@@ -23,7 +23,7 @@ php artisan migrate:status
 ollama list
 ```
 
-`php -m` should print `dom` and `pdo_sqlite`. `git rev-parse HEAD` prints a commit SHA once the application has one commit; [Install Molly](#install-molly) shows how to make it. `php artisan migrate:status` fails when the database connection does not work. `ollama list` fails when Ollama is not running; start it with `ollama serve` or the Ollama app. With Amp instead, `amp --version` must work.
+`php -m` should print `dom` and `pdo_sqlite`. `git rev-parse HEAD` prints a commit SHA once the application has one commit; [Install Molly](#install-molly) shows how to make it. `php artisan migrate:status` fails when the database connection does not work. `ollama list` fails when Ollama is not running; start it with `ollama serve` or the Ollama app. With Amp instead, `command -v amp` must print a path; `molly:doctor` checks the Amp login later.
 
 If the application does not have Pest yet, install it:
 
@@ -35,10 +35,14 @@ composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
 
 New Laravel 12 and 13 applications list `phpunit/phpunit` (12 pins PHPUnit 11, and Pest 4 needs PHPUnit 12), so the first line removes it without resolving, and `-W` lets the second line resolve Pest and PHPUnit together. These applications already allow the `pestphp/pest-plugin` Composer plugin; an older application may need `composer config allow-plugins.pestphp/pest-plugin true` first. `./vendor/bin/pest --init` writes `tests/Pest.php`.
 
-Feature tests need the application test case. Check that `tests/Pest.php` contains:
+Feature tests need the application test case. Check that `tests/Pest.php` applies `Tests\TestCase` to the `Feature` directory. The file `./vendor/bin/pest --init` writes does it with these lines:
 
 ```php
-pest()->extend(Tests\TestCase::class)->in('Feature');
+use Tests\TestCase;
+
+pest()->extend(TestCase::class)
+ // ->use(RefreshDatabase::class)
+    ->in('Feature');
 ```
 
 [Compatibility](compatibility.md) lists the tested versions.
