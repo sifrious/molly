@@ -89,7 +89,7 @@ The full index is in the [documentation overview](docs/overview.md).
 
 Molly 0.2 is in prelaunch acceptance testing. The latest tag is `v0.1.3`; no 0.2 release is tagged yet, so the `^0.2` install line above resolves only after `v0.2.0` is published. Release candidates, named `0.2.0-RC<n>`, are acceptance builds installed from a local zip, not releases; [docs/acceptance/README.md](docs/acceptance/README.md) describes them. These docs follow `main`, which `v0.2.0` will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, local Ollama and Amp agents, local MCP tools, planning, a local web interface, project and Laravel knowledge graphs, journals, and optional Jev advice through Laravel AI.
 
-Molly does not open or merge pull requests. Remote execution on an Orb is not part of this release; every run executes on the machine where you run Artisan. The Bloom plugin's screens are built and load in Bloom Dev at commit `1599f05f`; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
+Molly does not open or merge pull requests. Remote execution on an Orb is not shipped: Molly refuses Orb requests, and every run executes on the machine where you run Artisan. The Bloom plugin's screens are built and load in Bloom Dev at commit `1599f05f`; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
 
 ## Name and license
 

@@ -12,8 +12,8 @@ final class SelectExecutionTarget
     public function __construct(private SandboxCapability $sandbox) {}
 
     /**
-     * Remote Orb execution is not part of this release. Every Orb request is
-     * refused, whatever target it names; Molly never dispatches remote work.
+     * Remote Orb execution is not shipped. Every Orb request is refused,
+     * whatever target it names; Molly never dispatches remote work.
      */
     public function handle(?ExecutionTargetRequest $request = null): ExecutionTargetSnapshot
     {

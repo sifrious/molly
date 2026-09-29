@@ -176,4 +176,4 @@ The two setups share every record. [Molly on its own](standalone.md) tours Artis
 
 ## Local execution, and why not an Orb
 
-Every run executes on the machine where you run Artisan, and `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review. Remote execution on an Orb is not part of this release: Molly refuses any Orb request with `ORB_UNVERIFIED`, and an Amp thread link does not change where a run executes. [Execution targets](execution-targets.md) shows the local evidence, the refusal, and the design notes for remote execution.
+Every run executes on the machine where you run Artisan. With the default parallel checks, `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review. Remote execution on an Orb is not shipped: Molly refuses any Orb request with `ORB_UNVERIFIED`, and an Amp thread link does not change where a run executes. [Execution targets](execution-targets.md) shows the local evidence, the refusal, and the design notes for remote execution.

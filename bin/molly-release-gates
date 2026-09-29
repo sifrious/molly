@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Mac-local release gates for sifrious/molly (MME-5399).
+# With --docs, run only the documentation gate.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+echo "==> documentation links, required alpha docs, and open alpha requirements"
+python3 bin/molly-docs-check --release
+if [ "${1:-}" = "--docs" ]; then
+  echo "DOCUMENTATION GATE PASSED"
+  exit 0
+fi
 PHP="${PHP_BINARY:-$(command -v php)}"
 echo "==> PHP: $($PHP -v | head -1)"
-echo "==> documentation links and required alpha docs"
-python3 bin/molly-docs-check
 echo "==> composer validate --strict"
 composer validate --strict
 echo "==> composer install (locked)"

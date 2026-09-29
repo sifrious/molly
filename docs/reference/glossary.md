@@ -62,4 +62,4 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | Handoff | An envelope that passes a task to a child Bloom workspace with the same scope. |
 | Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
 | Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
-| Orb | A remote execution environment. Not part of this release: Molly refuses Orb requests with `ORB_UNVERIFIED`. See [Execution targets](../execution-targets.md). |
+| Orb | A remote execution environment. Not shipped: Molly refuses Orb requests with `ORB_UNVERIFIED`. See [Execution targets](../execution-targets.md). |

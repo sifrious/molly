@@ -1,6 +1,6 @@
 # Execution targets
 
-Every Molly run executes on the machine where you run Artisan. That machine is the local execution target, and it is the only target this release supports. Remote execution on an Orb is not part of this release. Whether it joins a later release is a release-scope decision that has not been made.
+Every Molly run executes on the machine where you run Artisan. That machine is the local execution target, and it is the only target Molly supports. Remote execution on an Orb is not shipped, and Molly refuses every Orb request. Whether the alpha waits for Orb execution or ships without it is a release-scope decision that has not been made; [The Orb requirement is open](#the-orb-requirement-is-open) says what closes it.
 
 ## Local execution
 
@@ -22,7 +22,7 @@ verification  passed  local   Pest
 review        passed  local   ollama / qwen2.5-coder:7b
 ```
 
-The same value is saved in the run report as `branches[].execution_target`, so `molly:show RUN_ID --json` and the web run page show it too. With `molly.parallel_checks` set to `false`, the table says `Execution mode: serial` and the target is still `local`.
+The same value is saved in the run report as `branches[].execution_target`, so `molly:show RUN_ID --json` shows it too, and the web run page lists it under "Execution branch details". With `molly.parallel_checks` set to `false`, Pest and the review run one after the other inside the Artisan process and record no branches. The report then says `Execution mode: serial` and `No branch results recorded.`, and has no `Target` column. The checks still run on the local machine.
 
 Local execution uses the sandbox the host provides. On Linux with Landlock and user namespaces the writer and Pest run isolated; on macOS they need the override described in [macOS and the sandbox](getting-started.md#macos-and-the-sandbox).
 
@@ -43,10 +43,19 @@ app(SelectExecutionTarget::class)->handle(new ExecutionTargetRequest(ExecutionTa
 Molly refuses every Orb request, whatever target it names:
 
 ```text
-ORB_UNVERIFIED: This Molly release runs tasks only on the local machine. An Amp thread or connected executor is not a verified Orb. Select local execution.
+RuntimeException ORB_UNVERIFIED: This Molly release runs tasks only on the local machine. An Amp thread or connected executor is not a verified Orb. Select local execution.
 ```
 
-An Orb request without a target fails earlier, when the request is built, with `CONTRACT_FIELD_INVALID: An Orb execution target needs a target_id.` Calling `handle()` with no request selects local execution. `tests/Feature/SelectExecutionTargetTest.php` makes each of these calls.
+An Orb request without a target fails earlier, when the request is built, with `CONTRACT_FIELD_INVALID: An Orb execution target needs a target_id.` Calling `handle()` with no request selects local execution and returns a snapshot with `kind` and `target_id` set to `local`. `tests/Feature/SelectExecutionTargetTest.php` makes each of these calls.
+
+## The Orb requirement is open
+
+MME-5211 lists "Use local/Orb execution targeting" as an alpha tutorial requirement. This page documents the local half. The Orb half cannot be documented as a working tutorial, because Molly has no remote dispatch, so the requirement stays open. `python3 bin/molly-docs-check --release` reports it, and `bin/molly-release-gates` stops on it, until one of these is recorded:
+
+- Verified Orb dispatch ships with a runnable tutorial and execution-target evidence. [Planned remote execution](#planned-remote-execution) lists what that work must prove.
+- A release-scope decision moves Orb execution out of the alpha.
+
+[Work packages](work-packages.md) tracks the same follow-up as MOL-WP-07.
 
 ## Amp threads are not Orbs
 

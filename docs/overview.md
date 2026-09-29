@@ -57,7 +57,7 @@ Molly owns the task, the protected test, verification, the Tarpit review, the Cl
 | GitHub (`gh`) | Reads issues for `molly:import` and posts approved comments. Molly never opens or merges a pull request. | Supported. Optional |
 | Flux (free) and Livewire | Render the optional web interface. | Supported. Bundled |
 | Bloom | Owns the checkout, diff, and pull request screens when you use it. | Optional. The plugin is built against Bloom commit `1599f05f`; host-level acceptance is pending. See [Molly with Bloom](bloom.md) |
-| Orbs | Remote execution. | Not part of this release. Molly refuses Orb requests. See [Execution targets](execution-targets.md) |
+| Orbs | Remote execution. | Not shipped. Molly refuses Orb requests. Whether the alpha includes it is an open release-scope decision. See [Execution targets](execution-targets.md#the-orb-requirement-is-open) |
 | Prism | None. Molly has no Prism dependency and no Prism code; model calls go through Laravel AI. | Not supported. Optional Prism routing is in the documentation plan, with no code and no release |
 | Rudy and Super Native | None. No Rudy or Super Native client exists, and Molly has no code for one. A future client would use the interfaces Molly has today: Artisan commands with `--json`, the MCP server, and the local web routes. | Planned, with no release scope |
 
