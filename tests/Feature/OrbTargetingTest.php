@@ -524,6 +524,52 @@ it('starts, reports, and stops a queue worker for one Orb on that Orb queue', fu
         ->and(posix_kill($started['pid'], 0))->toBeFalse();
 });
 
+it('refuses a second worker on a SQLite database queue below PHP 8.4, and starts it on PHP 8.4 or later', function (): void {
+    $binary = $this->repository.'-php';
+    File::put($binary, "#!/bin/sh\ntrap 'exit 0' TERM\nwhile :; do sleep 1; done\n");
+    chmod($binary, 0755);
+    $this->cleanup[] = $binary;
+    config([
+        'molly.worker.php_binary' => $binary,
+        'queue.default' => 'database',
+        'queue.connections.database' => ['driver' => 'database', 'connection' => 'sqlite', 'table' => 'jobs', 'queue' => 'default', 'retry_after' => 3700],
+    ]);
+    registerOrb('big', 'gpt-oss:120b-code');
+    $small = registerOrb('small', 'gpt-oss:20b');
+    $worker = fn (string $action, array $options = []): array => mollyJson('molly:worker', ['action' => $action, '--workspace' => $this->repository, ...$options]);
+    $records = fn (): array => array_map(basename(...), glob($this->repository.'/.molly/worker/*.json') ?: []);
+
+    [$bigExit, $big] = $worker('start', ['--orb' => 'big']);
+    try {
+        expect($bigExit)->toBe(0, json_encode($big));
+        [$smallExit, $second] = $worker('start', ['--orb' => 'small']);
+        [$defaultExit, $default] = $worker('start');
+
+        if (PHP_VERSION_ID < 80400) {
+            foreach ([[$smallExit, $second], [$defaultExit, $default]] as [$exit, $refused]) {
+                expect($exit)->toBe(1)
+                    ->and($refused['error'])->toStartWith('WORKER_CONCURRENCY_UNSUPPORTED: Molly already runs a worker in this workspace as pid '.$big['pid'])
+                    ->and($refused['error'])->toContain('below PHP 8.4', 'PHP 8.4 or later', 'MySQL or PostgreSQL');
+            }
+            expect($records())->toBe([basename($big['pid_file'])])
+                ->and(processesMentioning($binary))->toHaveCount(1);
+
+            // A Redis queue is not affected on any PHP version.
+            config(['queue.default' => 'redis', 'queue.connections.redis' => ['driver' => 'redis', 'connection' => 'default', 'queue' => 'default', 'retry_after' => 3700]]);
+            [$smallExit, $second] = $worker('start', ['--orb' => 'small']);
+        } else {
+            expect($defaultExit)->toBe(0, json_encode($default))
+                ->and($default['state'])->toBe('running');
+        }
+        expect($smallExit)->toBe(0, json_encode($second))
+            ->and($second)->toMatchArray(['state' => 'running', 'orb' => ['id' => $small['id'], 'name' => 'small']]);
+    } finally {
+        foreach ([['--orb' => 'big'], ['--orb' => 'small'], []] as $options) {
+            $worker('stop', [...$options, '--timeout' => 5]);
+        }
+    }
+});
+
 it('refuses an Orb start through a worktree swapped for a link before it writes anything there', function (): void {
     registerOrb('big', 'gpt-oss:120b-code');
     $worktree = orbTargetingWorktree('ready');

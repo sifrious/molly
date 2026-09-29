@@ -135,7 +135,7 @@ ollama pull gpt-oss:120b-code
 ollama pull gpt-oss:20b
 ```
 
-Queued starts need a queue with a reservation time above 3600 seconds, and two SQLite workers need `transaction_mode` set to `IMMEDIATE`; [Queue requirements](web-interface.md#queue-requirements) has the settings. On macOS, the writer and Pest also need the override in [macOS and the sandbox](getting-started.md#macos-and-the-sandbox).
+Queued starts need a queue with a reservation time above 3600 seconds. This tutorial runs two workers at once, so on a SQLite queue it needs PHP 8.4 or later and `transaction_mode` set to `IMMEDIATE`. On PHP 8.3 the second `molly:worker start` fails with `WORKER_CONCURRENCY_UNSUPPORTED`; use a MySQL or PostgreSQL queue database there. [Queue requirements](web-interface.md#queue-requirements) has the settings. On macOS, the writer and Pest also need the override in [macOS and the sandbox](getting-started.md#macos-and-the-sandbox).
 
 ### Give each task a worktree
 

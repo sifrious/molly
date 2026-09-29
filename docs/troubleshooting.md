@@ -271,6 +271,10 @@ php artisan molly:task TASK
 
 When the process that ran the task was killed or its host restarted, run `php artisan molly:retry TASK`. On the same host, the retry sees that no process holds the task's lock, settles the task and its abandoned run with a `RUN_ABANDONED` error, and starts a new attempt. A claim from another host, or from a worker with a fixed `molly.agent_bus.worker_id`, can be recovered this way only after its lease expires. See [Recovery after a crash](tasks.md#recovery-after-a-crash).
 
+## A second worker is refused
+
+`WORKER_CONCURRENCY_UNSUPPORTED` from `molly:worker start` or `restart` means another Molly worker already runs in the workspace, the queue is the database driver on SQLite, and PHP is older than 8.4. Laravel ignores SQLite `transaction_mode` below PHP 8.4, so two workers would fail each other with `database is locked`. Molly started nothing. Stop the other worker with `php artisan molly:worker stop`, adding `--orb=ORB` for an Orb's worker, move to PHP 8.4 or later, or use a MySQL or PostgreSQL queue database. See [Queue requirements](web-interface.md#queue-requirements).
+
 ## Retry is rejected
 
 `molly:start` is for pending tasks and `molly:retry` for failed or stopped ones. `ATTEMPT_LIMIT_REACHED` means the task used its attempts (three by default). `REPAIR_BUDGET_EXHAUSTED` means the same failure came back `molly.repair.per_failure` times; for an authored test that cannot run, edit the test and lock it. `COMMAND_ALREADY_SUCCEEDED` means the task already completed. `php artisan molly:advice TASK` says what is allowed.

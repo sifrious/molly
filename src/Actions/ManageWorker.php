@@ -23,6 +23,9 @@ use Throwable;
  * the process is alive, still leads the recorded group, and still runs the
  * recorded command line, so a reused pid is never signalled. Start and restart
  * first settle tasks that a killed worker or a restarted host left running.
+ *
+ * Below PHP 8.4, start and restart refuse a second running worker in the workspace when
+ * the queue is the database driver on SQLite. See sqliteQueueAllowsOneWorker().
  */
 class ManageWorker
 {
@@ -73,6 +76,17 @@ class ManageWorker
 
     public function __construct(private RecoverAbandonedTasks $recovery) {}
 
+    /**
+     * Whether a queue allows only one worker at a time. Laravel applies the SQLite connection's
+     * transaction_mode only on PHP 8.4 and later. Below that, each worker begins deferred
+     * transactions, and two workers on one SQLite database fail each other with "database is
+     * locked". Other queue drivers and databases are not affected.
+     */
+    public static function sqliteQueueAllowsOneWorker(int $phpVersionId, ?string $queueDriver, ?string $databaseDriver): bool
+    {
+        return $phpVersionId < 80400 && $queueDriver === 'database' && $databaseDriver === 'sqlite';
+    }
+
     /** @return array<string, mixed> */
     public function status(string $workspace, ?Orb $orb = null): array
     {
@@ -95,6 +109,7 @@ class ManageWorker
             if ($state['state'] === 'running') {
                 throw new RuntimeException('WORKER_ALREADY_RUNNING: Molly already runs '.($orb === null ? 'a worker for this workspace' : 'the worker for Orb '.$orb->name).' as pid '.$record['pid'].'. Stop it with php artisan molly:worker stop'.($orb === null ? '' : ' --orb='.$orb->name).'.');
             }
+            $this->refuseSecondWorker($root, $orb);
             $replaced = $state['state'] === 'stale' ? $state['stale_reason'] : null;
             File::delete($this->recordPath($root, $orb));
 
@@ -120,6 +135,7 @@ class ManageWorker
         $this->refuseRevoked($orb);
 
         return $this->locked($root, $timeout, function () use ($root, $timeout, $orb): array {
+            $this->refuseSecondWorker($root, $orb);
             $stopped = $this->stopLocked($root, $timeout, $orb);
             $recovery = $this->recoverAbandoned();
             $record = $this->launch($root, $orb);
@@ -132,6 +148,30 @@ class ManageWorker
     {
         if ($orb?->revoked_at !== null) {
             throw new RuntimeException('ORB_REVOKED: Orb '.$orb->name.' was revoked at '.$orb->revoked_at->toIso8601String().' and takes no work, so Molly starts no worker for it.');
+        }
+    }
+
+    /**
+     * Refuse to start a worker while another Molly worker runs in this workspace, when the
+     * queue allows only one. Nothing has started or changed yet when this refuses.
+     */
+    private function refuseSecondWorker(string $root, ?Orb $orb): void
+    {
+        $connection = (string) config('queue.default');
+        $database = config('queue.connections.'.$connection.'.connection') ?? config('database.default');
+        if (! self::sqliteQueueAllowsOneWorker(PHP_VERSION_ID, config('queue.connections.'.$connection.'.driver'), config('database.connections.'.$database.'.driver'))) {
+            return;
+        }
+
+        $own = $this->recordPath($root, $orb);
+        foreach ([dirname($own).'/worker.json', ...(glob(dirname($own).'/orb-*.json') ?: [])] as $path) {
+            if ($path === $own || ! is_file($path)) {
+                continue;
+            }
+            $other = $this->readRecordAt($path);
+            if ($this->inspect($other)['state'] === 'running') {
+                throw new RuntimeException('WORKER_CONCURRENCY_UNSUPPORTED: Molly already runs a worker in this workspace as pid '.$other['pid'].' ('.$path.'). The '.$connection.' queue uses SQLite, and Laravel ignores SQLite transaction_mode below PHP 8.4, so two workers would fail each other with "database is locked". Run a second worker on PHP 8.4 or later, or use a MySQL or PostgreSQL queue database. Otherwise stop the other worker first.');
+            }
         }
     }
 
@@ -325,10 +365,13 @@ class ManageWorker
     private function readRecord(string $root, ?Orb $orb = null): ?array
     {
         $path = $this->recordPath($root, $orb);
-        if (! is_file($path)) {
-            return null;
-        }
 
+        return is_file($path) ? $this->readRecordAt($path) : null;
+    }
+
+    /** @return array{pid: int, pgid: int, command: list<string>, connection: string, queue: string, started_at: string} */
+    private function readRecordAt(string $path): array
+    {
         $record = json_decode((string) file_get_contents($path), true);
         if (! is_array($record) || ! is_int($record['pid'] ?? null) || $record['pid'] < 2 || ! is_int($record['pgid'] ?? null)
             || ! is_array($record['command'] ?? null) || ! is_string($record['started_at'] ?? null)) {
