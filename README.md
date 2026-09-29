@@ -75,7 +75,7 @@ The full index is in the [documentation overview](docs/overview.md).
 
 ## Status
 
-Molly is a `0.1.x` release; these docs follow `main`, which the next tag will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, local Ollama and Amp agents, local MCP tools, planning, a local web interface, project and Laravel knowledge graphs, journals, and optional Jev advice through Laravel AI.
+Molly is a `0.1.x` release; these docs follow `main`, which the next tag will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, local Ollama and Amp agents, local MCP tools, planning, a local web interface, project and Laravel knowledge graphs, learning paths, journals, and optional Jev advice through Laravel AI.
 
 Molly does not open or merge pull requests. Remote execution on an Orb is planned and not shipped. The Bloom desktop integration is unfinished; every workflow works from Artisan and the local web interface.
 

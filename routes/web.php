@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Sifrious\Molly\Http\ChangeImpactController;
+use Sifrious\Molly\Http\LearningPathController;
 use Sifrious\Molly\Http\LocalUi;
 use Sifrious\Molly\Http\PlanController;
 use Sifrious\Molly\Http\ProjectGraphController;
@@ -14,6 +15,8 @@ Route::middleware(['web', LocalUi::class])->prefix(config('molly.ui.prefix', 'mo
     Route::get('/', [TaskController::class, 'index'])->name('tasks.index');
     Route::get('/graph', [ProjectGraphController::class, 'show'])->name('graph');
     Route::get('/change-impact', [ChangeImpactController::class, 'show'])->name('change-impact');
+    Route::get('/learn', [LearningPathController::class, 'index'])->name('learning-paths.index');
+    Route::get('/learn/{templateId}', [LearningPathController::class, 'show'])->name('learning-paths.show');
     Route::get('/guide', [PlanController::class, 'guide'])->name('guide');
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('/plans/{plan}/suggest', [PlanController::class, 'suggest'])->name('plans.suggest');
