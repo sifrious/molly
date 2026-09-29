@@ -190,9 +190,19 @@ final class InitializeMollyInExistingProject
         return str_replace('\\', '/', $root);
     }
 
+    /**
+     * Composer lists a package in vendor/composer/installed.json after extracting it, then writes the
+     * autoload map. A composer require killed partway can leave vendor/sifrious/molly behind without
+     * either, so the rerun runs composer require again unless both name Molly.
+     */
     private function packageInstalled(string $root): bool
     {
-        return is_dir($root.'/vendor/sifrious/molly');
+        $installed = json_decode((string) @file_get_contents($root.'/vendor/composer/installed.json'), true);
+        $packages = is_array($installed) ? ($installed['packages'] ?? $installed) : [];
+        $names = array_map(fn (mixed $package): mixed => is_array($package) ? ($package['name'] ?? null) : null, is_array($packages) ? $packages : []);
+
+        return in_array('sifrious/molly', $names, true)
+            && str_contains((string) @file_get_contents($root.'/vendor/composer/autoload_psr4.php'), "/sifrious/molly/src'");
     }
 
     private function composerRequire(string $root): void
@@ -270,14 +280,9 @@ final class InitializeMollyInExistingProject
         }
 
         Directory::ensure($root.'/config');
-        try {
-            $copied = File::copy($stub, $destination);
-        } catch (Throwable $exception) {
-            $copied = false;
-        }
-        if (! $copied) {
-            throw new RuntimeException('CONFIG_UNWRITABLE: Molly could not write '.$destination.(isset($exception) ? $this->reason($exception) : '').'. Check free disk space and that the config directory is writable.');
-        }
+        // Write a staged copy and rename it into place, so an interrupted init never leaves a
+        // truncated config/molly.php that the rerun would keep because the file exists.
+        Directory::replaceFile($destination, File::get($stub), 'CONFIG_UNWRITABLE', 0644);
 
         return true;
     }

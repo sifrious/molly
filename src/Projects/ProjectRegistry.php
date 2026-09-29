@@ -109,7 +109,7 @@ final class ProjectRegistry
 
         $file = Directory::molly($normalized->path, 'project.json');
         Directory::ensure(dirname($file), 0700);
-        $this->put($file, json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
+        $this->replace($file, json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
 
         $this->registerPath($normalized->path);
     }
@@ -186,7 +186,7 @@ final class ProjectRegistry
     private function writeIndex(array $paths): void
     {
         Directory::ensure($this->home(), 0700);
-        $this->put($this->globalIndexPath(), json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_INDEX_UNWRITABLE');
+        $this->replace($this->globalIndexPath(), json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_INDEX_UNWRITABLE');
     }
 
     /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}|null */
@@ -246,6 +246,26 @@ final class ProjectRegistry
         }
 
         return $identity;
+    }
+
+    /**
+     * Replace a file through a private staged copy beside it. rename() swaps the whole file, so a
+     * killed or failed write leaves the previous file instead of a truncated one a rerun cannot read.
+     */
+    private function replace(string $path, string $contents, string $code): void
+    {
+        $staged = dirname($path).'/.'.basename($path).'-'.bin2hex(random_bytes(8)).'.tmp';
+        try {
+            $this->put($staged, $contents, $code, $path);
+            [$renamed, $reason] = Directory::attempt(fn (): bool => rename($staged, $path));
+            if (! $renamed) {
+                throw new RuntimeException($code.': Molly could not write '.$path.($reason !== '' ? ' ('.$reason.')' : '').'. Check free disk space and that the directory is writable.');
+            }
+        } finally {
+            if (is_file($staged)) {
+                @unlink($staged);
+            }
+        }
     }
 
     /** Write a private file, or fail with a code that names the path and the reason. */
