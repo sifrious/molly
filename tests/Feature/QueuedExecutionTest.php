@@ -3,53 +3,6 @@
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Process;
 
-function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, bool $stop = false): string
-{
-    $root = sys_get_temp_dir().'/molly-queue-'.bin2hex(random_bytes(8));
-    foreach (['app', 'tests', 'storage/logs', 'storage/framework/views', 'bootstrap/cache'] as $path) {
-        mkdir($root.'/'.$path, 0700, true);
-    }
-    symlink(dirname(__DIR__, 2).'/vendor', $root.'/vendor');
-    touch($root.'/database.sqlite');
-    file_put_contents($root.'/runtime.json', json_encode(compact('duplicate', 'stop'), JSON_THROW_ON_ERROR));
-    file_put_contents($root.'/artisan', '<?php define("MOLLY_QUEUE_TEST_ROOT", __DIR__); require '.var_export(dirname(__DIR__).'/Fixtures/queued-runtime.php', true).';');
-    file_put_contents($root.'/app/Flag.php', "<?php\nreturn false;\n");
-    file_put_contents($root.'/phpunit.xml', '<phpunit bootstrap="vendor/autoload.php" cacheDirectory="storage/phpunit"><testsuites><testsuite name="Flag"><directory>tests</directory></testsuite></testsuites></phpunit>');
-    $assertion = $fail ? 'assertFalse' : 'assertTrue';
-    file_put_contents($root.'/tests/QueuedFlagTest.php', str_replace('ASSERTION', $assertion, <<<'PHPTEST'
-<?php
-final class QueuedFlagTest extends PHPUnit\Framework\TestCase
-{
-    public function test_flag_value(): void
-    {
-        $this->ASSERTION(require dirname(__DIR__).'/app/Flag.php');
-    }
-}
-PHPTEST));
-    commitGitWorkspace($root);
-    try {
-        $setup = Process::path($root)->timeout(15)->run([PHP_BINARY, $root.'/artisan', 'fixture:setup', '--no-interaction']);
-        expect($setup->successful())->toBeTrue($setup->output().$setup->errorOutput());
-    } catch (Throwable $exception) {
-        (new Filesystem)->deleteDirectory($root);
-        throw $exception;
-    }
-
-    return $root;
-}
-
-/** @return array{task: array, runs: list<array>, jobs: int, failed: list<array>} */
-function queuedExecutionState(string $root): array
-{
-    $database = new PDO('sqlite:'.$root.'/database.sqlite');
-    $runs = $database->query('select * from molly_runs')->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($runs as &$run) {
-        $run['report'] = json_decode($run['report'], true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    return ['task' => $database->query('select * from molly_tasks')->fetch(PDO::FETCH_ASSOC), 'runs' => $runs, 'jobs' => (int) $database->query('select count(*) from jobs')->fetchColumn(), 'failed' => $database->query('select * from failed_jobs')->fetchAll(PDO::FETCH_ASSOC)];
-}
-
 function runQueuedExecutionWorkers(string $root, int $count): void
 {
     $workers = [];

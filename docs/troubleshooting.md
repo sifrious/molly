@@ -62,6 +62,9 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `JOURNAL_WRITE_FAILED` | `.molly/JOURNAL.md`, `.molly/GLOSSARY.md`, a file in `.molly/journal`, or a handoff envelope in `.molly/handoffs`. A handoff that cannot be saved is not recorded. `molly:journal --project --json` keeps its `status: unavailable` document on stdout and prints the coded line on stderr. |
 | `KNOWLEDGE_MANIFEST_UNWRITABLE` | `.molly/graphs/manifest.json`, from `molly:graphs-bootstrap`. A missing `.molly/graphs` directory fails with `DIRECTORY_UNWRITABLE`. |
 | `SETTINGS_UNWRITABLE` | `settings.json` in `MOLLY_HOME`, from `molly:settings-set`. The file is left unchanged. |
+| `WORKSPACE_WRITE_FAILED` | A selected file, or the directory that holds it, when a run applies the proposal. The path is relative to the workspace. |
+
+Before a run applies the model's proposal, Molly checks that you can write every selected file and the directory that holds it. When one is read-only, the run fails with a message such as `WORKSPACE_WRITE_FAILED: Molly cannot write app/Greeting.php (Permission denied). No files were changed.`, and nothing in the workspace changes. When a write fails partway, for example on a full disk, the message names the file that failed and the reason, and Molly restores the files it had already written. Make the file or directory writable, then run `molly:retry TASK`.
 
 ## Not a Git repository
 
@@ -244,7 +247,9 @@ php artisan molly:stop TASK
 php artisan molly:task TASK
 ```
 
-`WORKSPACE_BUSY` means another run holds the workspace lock. Check whether it is still working before doing anything else. Do not delete files under `.molly/` to force a retry; an expired lease is recovered on its own.
+`WORKSPACE_BUSY` means another run holds the workspace lock. Check whether it is still working before doing anything else. Do not delete files under `.molly/` to force a retry.
+
+When the process that ran the task was killed or its host restarted, run `php artisan molly:retry TASK`. On the same host, the retry sees that no process holds the task's lock, settles the task and its abandoned run with a `RUN_ABANDONED` error, and starts a new attempt. A claim from another host, or from a worker with a fixed `molly.agent_bus.worker_id`, can be recovered this way only after its lease expires. See [Recovery after a crash](tasks.md#recovery-after-a-crash).
 
 ## Retry is rejected
 

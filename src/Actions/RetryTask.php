@@ -13,4 +13,10 @@ class RetryTask
     {
         return $this->start->handle($id, $progress, retry: true);
     }
+
+    /** Stop the running attempt because the process received $signal. See StartTask::interrupt(). */
+    public function interrupt(int $signal): void
+    {
+        $this->start->interrupt($signal);
+    }
 }

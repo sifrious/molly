@@ -3,11 +3,13 @@
 namespace Sifrious\Molly\Actions;
 
 use Closure;
+use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\AgentBus\LocalAgentBus;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Verification\PestAssertionHints;
 use Sifrious\Molly\Workspace;
 use Throwable;
@@ -17,6 +19,12 @@ class StartTask
     /** Columns a claim changes. A refused start writes these back exactly. */
     private const CLAIM_COLUMNS = ['status', 'attempt_number', 'idempotency_key', 'stop_requested_at', 'worker_id', 'claimed_at', 'heartbeat_at', 'lease_expires_at'];
 
+    /** The signal that interrupted this start, set by interrupt(). */
+    private ?int $interruptedBy = null;
+
+    /** The task this start has claimed, while its attempt runs. */
+    private ?string $claimed = null;
+
     public function __construct(
         private RunTask $runTask,
         private RefreshProjectJournal $journal,
@@ -25,6 +33,24 @@ class StartTask
         private LocalAgentBus $bus,
         private PestAssertionHints $pestAssertionHints,
     ) {}
+
+    /**
+     * Stop the attempt this start is running because the process received $signal, such as
+     * SIGINT from Ctrl-C. Like molly:stop, this records a stop request, so the run ends as
+     * stopped at its next step, and it sends SIGTERM to the processes the run started, such as
+     * Pest and the parallel checks. A model request that is waiting for an answer finishes or
+     * times out first. A signal that arrives before the claim leaves the task unclaimed.
+     * Commands call this from a signal handler, so it does not wait for anything: the run
+     * itself records the stopped result when it reaches its next step.
+     */
+    public function interrupt(int $signal): void
+    {
+        $this->interruptedBy ??= $signal;
+        if ($this->claimed !== null) {
+            Task::whereKey($this->claimed)->where('status', 'running')->whereNull('stop_requested_at')->update(['stop_requested_at' => now()]);
+        }
+        $this->terminateChildren();
+    }
 
     public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
     {
@@ -52,19 +78,63 @@ class StartTask
         }
 
         return $workspace->exclusivelyForTask($id, function () use ($id, $progress, $retry, $idempotencyKey): Run {
-            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id));
+            // This process now holds the task lock, so a claim made on this host that is still
+            // marked running belongs to a process that exited, such as one killed with SIGKILL.
+            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id), taskLockHeld: true);
             if (($blocked = $task->redBaselineError()) !== null) {
                 $this->recordRefusal($task, $blocked, $retry);
                 throw new RuntimeException($blocked);
+            }
+            if ($this->interruptedBy !== null) {
+                throw new RunStopped('RUN_STOPPED: Molly received '.$this->signalName().' before the attempt began. The task was not claimed.');
             }
             $workerId = $this->workerId();
             // Snapshot after recovering an abandoned claim, so a refusal restores the recovered state.
             $unclaimed = $task->only(self::CLAIM_COLUMNS);
             $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
-            $this->journal->handle($task->refresh());
+            $this->claimed = $task->id;
+            try {
+                if ($this->interruptedBy !== null) {
+                    $this->interrupt($this->interruptedBy);
+                }
+                $this->journal->handle($task->refresh());
 
-            return $this->execute($task->refresh(), $progress, $retry, $workerId, $unclaimed);
+                return $this->execute($task->refresh(), $progress, $retry, $workerId, $unclaimed);
+            } finally {
+                $this->claimed = null;
+            }
         });
+    }
+
+    /**
+     * Send SIGTERM to each child process of this one, and to its whole process group when it
+     * leads one, which each parallel check does. The run then sees each check or Pest process end.
+     */
+    private function terminateChildren(): void
+    {
+        if (! function_exists('posix_kill') || ! function_exists('posix_getpgid')) {
+            return;
+        }
+        try {
+            $children = Process::timeout(5)->run(['pgrep', '-P', (string) getmypid()])->output();
+        } catch (Throwable) {
+            return;
+        }
+        foreach (preg_split('/\s+/', trim($children)) ?: [] as $pid) {
+            $pid = (int) $pid;
+            if ($pid > 1) {
+                posix_kill(posix_getpgid($pid) === $pid ? -$pid : $pid, SIGTERM);
+            }
+        }
+    }
+
+    private function signalName(): string
+    {
+        return match ($this->interruptedBy) {
+            SIGINT => 'SIGINT',
+            SIGTERM => 'SIGTERM',
+            default => 'signal '.$this->interruptedBy,
+        };
     }
 
     /** @param  array<string, mixed>  $unclaimed  The task's claim columns before this claim. */
@@ -95,7 +165,7 @@ class StartTask
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,
                 ...[
                     'taskId' => $id,
-                    'shouldStop' => fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                    'shouldStop' => fn (): bool => $this->interruptedBy !== null || Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
                     'heartbeat' => fn () => $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds()),
                     'prepared' => $prepared,
                     ...($previousAttempt === null ? [] : ['previousAttempt' => $previousAttempt]),
@@ -104,7 +174,8 @@ class StartTask
             $finished = Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')
                 ->update(['status' => $run->status]);
             if ($finished === 0 && $task->fresh()->stop_requested_at !== null) {
-                $run->update(['status' => 'stopped', 'report' => [...$run->report, 'stop_reason' => 'The task received a stop request.']]);
+                $reason = $this->interruptedBy === null ? 'The task received a stop request.' : 'Molly received '.$this->signalName().' and stopped at the next step.';
+                $run->update(['status' => 'stopped', 'report' => [...$run->report, 'stop_reason' => $reason]]);
                 Task::whereKey($id)->where('status', 'running')->update(['status' => 'stopped']);
             }
 

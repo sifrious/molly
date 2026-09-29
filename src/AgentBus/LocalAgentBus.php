@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\AgentBus;
 
 use DateTimeInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
@@ -134,11 +135,12 @@ final class LocalAgentBus
     }
 
     /**
-     * Deterministically mark abandoned running claims as failed so they can be retried.
+     * Recover running tasks whose lease expired, oldest lease first and at most $limit in one
+     * call, the way recoverIfAbandoned recovers one.
      *
      * @return list<string> recovered task ids
      */
-    public function recoverAbandoned(?DateTimeInterface $now = null): array
+    public function recoverAbandoned(?DateTimeInterface $now = null, int $limit = 100): array
     {
         $now = $now === null ? now() : $now;
         $recovered = [];
@@ -147,25 +149,97 @@ final class LocalAgentBus
             ->where('status', 'running')
             ->whereNotNull('lease_expires_at')
             ->where('lease_expires_at', '<', $now)
-            ->pluck('id');
+            ->orderBy('lease_expires_at')
+            ->orderBy('id')
+            ->limit(max(0, $limit))
+            ->get();
 
-        foreach ($candidates as $id) {
-            $changed = Task::query()
-                ->whereKey($id)
-                ->where('status', 'running')
-                ->where('lease_expires_at', '<', $now)
-                ->update([
-                    'status' => 'failed',
-                    'worker_id' => null,
-                    'lease_expires_at' => null,
-                    'heartbeat_at' => null,
-                ]);
-            if ($changed === 1) {
-                $recovered[] = (string) $id;
+        foreach ($candidates as $task) {
+            if ($this->recover($task, 'lease_expired', $now)) {
+                $recovered[] = (string) $task->id;
             }
         }
 
         return $recovered;
+    }
+
+    /**
+     * Whether Molly's default worker ID says a process on this host made the claim.
+     * StartTask names a worker hostname:pid unless molly.agent_bus.worker_id is set.
+     */
+    public function claimedOnThisHost(Task $task): bool
+    {
+        $host = gethostname();
+
+        return is_string($task->worker_id) && is_string($host) && $host !== ''
+            && preg_match('/\A(.+):\d+\z/', $task->worker_id, $match) === 1 && $match[1] === $host;
+    }
+
+    /**
+     * Why a running task has no live worker, or null while its claim may still be live: the
+     * lease expired (`lease_expired`), or the caller holds the task's workspace lock and the
+     * claim was made on this host (`worker_exited`). A live run holds that lock for its whole
+     * attempt, so a free lock means the process that claimed the task has exited.
+     */
+    public function abandonment(Task $task, bool $taskLockHeld = false): ?string
+    {
+        if ($task->status !== 'running') {
+            return null;
+        }
+        if ($this->leaseExpired($task)) {
+            return 'lease_expired';
+        }
+
+        return $taskLockHeld && $this->claimedOnThisHost($task) ? 'worker_exited' : null;
+    }
+
+    /**
+     * Settle a running task whose worker is gone, for the reason abandonment() gave: the task
+     * becomes failed and retryable, or stopped when a stop was requested, its claim is cleared,
+     * and each run its worker left running gets the same status with a RUN_ABANDONED error.
+     * The update applies only while the task still holds the claim that was read, so a worker
+     * that finished or renewed its lease in the meantime keeps its result.
+     */
+    public function recover(Task $task, string $reason, ?DateTimeInterface $now = null): bool
+    {
+        $now = $now === null ? now() : $now;
+        $workerId = $task->worker_id;
+        $leaseExpiresAt = $task->lease_expires_at?->toIso8601String();
+        $status = $task->stop_requested_at === null ? 'failed' : 'stopped';
+        $error = $reason === 'lease_expired'
+            ? 'RUN_ABANDONED: Worker '.($workerId ?? 'unknown').' stopped renewing its lease, which expired at '.($leaseExpiresAt ?? 'an unknown time').', before this run finished. Saved evidence remains available.'
+            : 'RUN_ABANDONED: Worker '.($workerId ?? 'unknown').' exited before this run finished, and no process holds the task lock. Saved evidence remains available.';
+
+        $runIds = DB::transaction(function () use ($task, $reason, $now, $workerId, $status, $error): ?array {
+            $claim = Task::query()->whereKey($task->id)->where('status', 'running')
+                ->where('attempt_number', $task->attempt_number);
+            $workerId === null ? $claim->whereNull('worker_id') : $claim->where('worker_id', $workerId);
+            if ($reason === 'lease_expired') {
+                $claim->where('lease_expires_at', '<', $now);
+            }
+            if ($claim->update(['status' => $status, 'worker_id' => null, 'lease_expires_at' => null, 'heartbeat_at' => null]) !== 1) {
+                return null;
+            }
+
+            $runIds = [];
+            foreach ($task->runs()->where('status', 'running')->get() as $run) {
+                $run->update(['status' => $status, 'report' => [...($run->report ?? []), 'error' => $error, 'recovery' => [
+                    'reason' => $reason,
+                    'worker_id' => $workerId,
+                    'recovered_at' => Carbon::parse($now)->toIso8601String(),
+                ]]]);
+                $runIds[] = (string) $run->id;
+            }
+
+            return $runIds;
+        });
+        if ($runIds === null) {
+            return false;
+        }
+
+        DB::afterCommit(fn () => $this->recordRecovery($task->refresh(), $status, $reason, $workerId, $leaseExpiresAt, $runIds));
+
+        return true;
     }
 
     public function clearClaim(Task $task): void
@@ -229,44 +303,34 @@ final class LocalAgentBus
     }
 
     /**
-     * Mark a running task whose lease has expired as failed so it can be retried.
+     * Recover a running task whose worker is gone (see abandonment() and recover()). Pass
+     * $taskLockHeld only while holding the task's workspace lock.
      * Callers snapshot the task after this, so a refused start restores the recovered state.
-     * When .molly/lifecycle.jsonl already exists, a failed event with reason lease_expired is
-     * appended once the recovery commits, so the displayed status matches the task row.
+     * When .molly/lifecycle.jsonl already exists, a failed or stopped event with the reason
+     * is appended once the recovery commits, so the displayed status matches the task row.
      */
-    public function recoverIfAbandoned(Task $task): Task
+    public function recoverIfAbandoned(Task $task, bool $taskLockHeld = false): Task
     {
-        if ($task->status === 'running' && $this->leaseExpired($task)) {
-            $workerId = $task->worker_id;
-            $leaseExpiresAt = $task->lease_expires_at?->toIso8601String();
-            $recovered = Task::query()
-                ->whereKey($task->id)
-                ->where('status', 'running')
-                ->where('lease_expires_at', '<', now())
-                ->update([
-                    'status' => 'failed',
-                    'worker_id' => null,
-                    'lease_expires_at' => null,
-                    'heartbeat_at' => null,
-                ]);
+        $reason = $this->abandonment($task, $taskLockHeld);
+        if ($reason !== null) {
+            $this->recover($task, $reason);
             $task->refresh();
-            if ($recovered === 1) {
-                DB::afterCommit(fn () => $this->recordRecovery($task, $workerId, $leaseExpiresAt));
-            }
         }
 
         return $task;
     }
 
-    private function recordRecovery(Task $task, ?string $workerId, ?string $leaseExpiresAt): void
+    /** @param  list<string>  $runIds */
+    private function recordRecovery(Task $task, string $status, string $reason, ?string $workerId, ?string $leaseExpiresAt, array $runIds): void
     {
         if (! is_file(rtrim($task->workspace, '/').'/.molly/lifecycle.jsonl')) {
             return;
         }
-        $this->lifecycle->handle($task->workspace, LifecycleEventType::Failed, $task->id, payload: [
-            'reason' => 'lease_expired',
+        $this->lifecycle->handle($task->workspace, $status === 'stopped' ? LifecycleEventType::Stopped : LifecycleEventType::Failed, $task->id, $runIds[0] ?? null, [
+            'reason' => $reason,
             'worker_id' => $workerId,
             'lease_expires_at' => $leaseExpiresAt,
+            'runs' => $runIds,
         ]);
     }
 }

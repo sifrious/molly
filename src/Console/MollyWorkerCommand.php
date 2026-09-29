@@ -9,6 +9,7 @@ use Throwable;
 
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 class MollyWorkerCommand extends Command
 {
@@ -57,6 +58,16 @@ class MollyWorkerCommand extends Command
         }
         if (isset($result['signal'])) {
             note('Stopped pid '.$result['previous_pid'].' with '.$result['signal'].'.');
+        }
+        $recovery = $result['recovery'] ?? null;
+        if (($recovery['status'] ?? null) === 'failed') {
+            warning($recovery['error']);
+        }
+        foreach ($recovery['recovered'] ?? [] as $task) {
+            note('Recovered task '.$task['reference'].' as '.$task['status'].' ('.$task['reason'].'). Retry it with php artisan molly:retry '.$task['reference'].'.');
+        }
+        if ($recovery['limit_reached'] ?? false) {
+            note('The recovery check stopped at its limit. Molly recovers the remaining tasks when they are started or retried, or at the next worker start.');
         }
 
         return self::SUCCESS;

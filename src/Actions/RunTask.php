@@ -296,6 +296,8 @@ class RunTask
     {
         $sandbox = $this->sandbox;
         if ($sandbox->available() && ! $sandbox->allowUnsafe()) {
+            // The sandboxed writer reports only that it failed, so name an unwritable file first.
+            $workspace->assertWritable(array_column($edits, 'path'));
             $sandbox->apply($workspace->path, $edits, array_keys($before), $evidence);
 
             return;

@@ -10,8 +10,8 @@ For a first run, read [Getting started](../getting-started.md) instead of this p
 | --- | --- |
 | `molly:create [PROMPT]` | Saves a pending task. Does not call the model. |
 | `molly:story [STORY] --test=… [--file=…]` | Asks the configured model for numbered acceptance criteria and the files the implementation will change, saves them on a new test-authoring task, and prints the next three commands. Run them as printed. |
-| `molly:start TASK` | Runs a pending task in the terminal. Exits `0` only when the run completes. |
-| `molly:retry TASK` | Starts another attempt for a failed or stopped task. |
+| `molly:start TASK` | Runs a pending task in the terminal. Exits `0` only when the run completes. Ctrl-C or `SIGTERM` stops the run at its next step, saves it as `stopped`, and exits `130` or `143`. |
+| `molly:retry TASK` | Starts another attempt for a failed or stopped task, and recovers a task a killed process left `running`. Handles Ctrl-C and `SIGTERM` like `molly:start`. |
 | `molly:stop TASK` | Stops a pending task, or asks a running one to stop at its next step. |
 | `molly:tasks [--limit=20]` | Lists saved tasks, newest first. |
 | `molly:task TASK` | Shows one task, its display status, recorded pull request, and attempts. |
@@ -63,12 +63,14 @@ Queued starts from the web interface and MCP need a queue worker. `molly:worker`
 
 | Command | What it does |
 | --- | --- |
-| `molly:worker start [--workspace=PATH] [--timeout=10]` | Starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
+| `molly:worker start [--workspace=PATH] [--timeout=10]` | Settles tasks a previous worker left running, then starts `php artisan queue:work` on the default connection and queue as its own process group. Refuses when Molly's worker is already running. |
 | `molly:worker status [--workspace=PATH]` | Reports `state` (`running`, `stopped`, or `stale`), pid, process group, uptime, queue, and log path. |
 | `molly:worker stop [--workspace=PATH] [--timeout=30]` | Sends `SIGTERM` to the worker's process group, then `SIGKILL` after the timeout. |
-| `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, then starts a new one. |
+| `molly:worker restart [--workspace=PATH] [--timeout=30]` | Stops the worker, settles tasks it left running, then starts a new one. |
 
 The worker is recorded in `.molly/worker/worker.json` and writes to `.molly/worker/worker.log`. Only your user can read them: the directory has mode `0700` and both files `0600`. A record is `stale` when its process has exited (`process_gone`) or its pid now belongs to a different command or process group (`pid_reused`). Molly reads the process's command from `/proc` on Linux and from `ps` with the `en_US.UTF-8` locale elsewhere, so a worker whose command has spaces or non-ASCII characters is still recognized when Molly runs without a locale, as it does under Bloom. Molly never signals a stale pid; `start` replaces a stale record, and `stop` removes it. Only one `molly:worker` command runs at a time per workspace. Another one waits up to `--timeout` seconds for `.molly/worker/worker.lock` (10 for `start`, 30 for `stop` and `restart`) and then fails with `WORKER_BUSY`. If Molly cannot write `worker.json` or `worker.log`, `start` fails with `WORKER_START_FAILED` and leaves no worker running. The command never prompts. See [Configuration](configuration.md#database-and-queue) for `molly.worker.php_binary`.
+
+Before `start` and `restart` launch the queue worker, they run a recovery check over every task marked `running` in the database. This is how the records become consistent after a worker was killed or the host restarted. The check recovers a task whose lease expired, and a task claimed by a process on this host whose task lock it can take at once, because a live run holds that lock. It never waits for a lock and leaves every other running task alone. Each recovered task becomes `failed`, or `stopped` when a stop was requested, and so does each run it left `running`; [Recovery after a crash](../tasks.md#recovery-after-a-crash) describes the records. One check looks at no more than 50 tasks per pass, oldest first. With `--json`, `start` and `restart` report `recovery` with `status` (`checked` or `failed`), `recovered` (each task's `task_id`, `reference`, `status`, and `reason`), and `limit_reached`. When the check cannot read the database, `status` is `failed`, `error` starts with `WORKER_RECOVERY_FAILED`, and the worker starts anyway, because it also runs your application's own jobs. The check does not run when you start `queue:work` yourself. A crashed task is then recovered when you run `molly:retry TASK`.
 
 With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (the `molly:doctor` report), `tasks` (`scope`, `running`, and `pending`, each task with `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at`, and `lease_expired`), `worker` (the `molly:worker status` report), `graphs` (the [graph freshness](../knowledge-graph.md#stale-graphs) report for the workspace), and `config` (`molly` settings without credentials or prompts, and the `queue` connection, driver, queue, and `retry_after`). Without `--workspace` it lists tasks from every workspace. It exits `0` whenever it can read that state, even when a check failed, and `1` when it cannot.
 

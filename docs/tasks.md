@@ -72,9 +72,11 @@ When the model names no usable file, `molly:story` fails with `SCOPE_EMPTY` and 
 php artisan molly:start ready-check
 ```
 
-The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise. No queue worker is needed for Artisan.
+The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise, and `130` or `143` when Ctrl-C or `SIGTERM` stopped it (see [Stop a task](#stop-a-task)). No queue worker is needed for Artisan.
 
 Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed.
+
+You do not need a clean working tree. A run writes only the task's selected files. Other edits, staged changes, and untracked files stay exactly as they were, and Molly never stages or commits. When a write fails partway, Molly restores the selected files it had written, with their original contents and file modes.
 
 ## Inspect tasks and runs
 
@@ -117,6 +119,8 @@ php artisan molly:stop ready-check
 ```
 
 A pending task stops immediately. A running task is asked to stop at its next step, and Molly records the request. Applied edits may already be in the working tree, so check `git status` afterward. A stopped task can be retried.
+
+To stop a run in your own terminal, press Ctrl-C while `molly:start` or `molly:retry` runs. Sending `SIGTERM` to the command does the same. Molly records the stop request, as `molly:stop` does, and sends `SIGTERM` to the processes the run started, such as Pest and the parallel checks. The run ends at its next step as `stopped`, its report gets a `stop_reason` that names the signal, the task becomes `stopped`, and the command exits with `130` for Ctrl-C or `143` for `SIGTERM`. With `--json`, the command still prints the run document. A model request already waiting for an answer finishes or reaches `molly.timeout` first, and Molly then stops before it applies any change. A signal that arrives before the task is claimed leaves the task unchanged. `SIGKILL` cannot be handled; see [Recovery after a crash](#recovery-after-a-crash). `molly:run` does not handle these signals.
 
 ## Name a task
 
@@ -161,7 +165,20 @@ php artisan molly:merged ready-check --sha MERGE_SHA --approve
 | `failed` | The attempt ended without the evidence needed to complete. |
 | `stopped` | Work stopped before completion. |
 
-When `molly:start` or `molly:retry` is refused before an attempt begins, for example with `GIT_MISSING`, `SANDBOX_UNAVAILABLE`, `RED_BASELINE_MISSING`, `WORKSPACE_BUSY`, or `PROTECTED_TEST_MISSING`, no run is saved. The task keeps its state and attempt count, and `.molly/lifecycle.jsonl` gets one `start_refused` event with the code and message when that file already exists. The state, input, Git, and sandbox checks run before Molly takes the task lock, so those refusals never create `.molly/`. `WORKSPACE_BUSY` and `BASELINE_MISSING` come after the claim, which is then written back exactly as it was. Fix the cause and run the same command again. A task left `running` by a worker whose lease expired is first recovered as `failed`, so a refused `molly:retry` leaves it `failed` and retryable, not `running`. When `.molly/lifecycle.jsonl` exists, the recovery appends a `failed` event with `reason` `lease_expired` and the old `worker_id`, so `molly:task` and MCP `molly_task` show `failed` as the display status too. A failure after the run is saved still marks the task `failed`.
+When `molly:start` or `molly:retry` is refused before an attempt begins, for example with `GIT_MISSING`, `SANDBOX_UNAVAILABLE`, `RED_BASELINE_MISSING`, `WORKSPACE_BUSY`, or `PROTECTED_TEST_MISSING`, no run is saved. The task keeps its state and attempt count, and `.molly/lifecycle.jsonl` gets one `start_refused` event with the code and message when that file already exists. The state, input, Git, and sandbox checks run before Molly takes the task lock, so those refusals never create `.molly/`. `WORKSPACE_BUSY` and `BASELINE_MISSING` come after the claim, which is then written back exactly as it was. Fix the cause and run the same command again. A failure after the run is saved still marks the task `failed`.
+
+### Recovery after a crash
+
+A process that is killed, for example with `kill -9`, or that dies with its host cannot record anything, so its task and run stay `running`. Molly recovers such a task in two cases:
+
+- Its lease expired. A live run renews the lease at every step, for longer than the slowest step (`molly.timeout` or `molly.test_timeout`, plus 30 seconds).
+- The claim came from a process on this host, and no process holds the task's lock in `.molly/`. A live run holds that lock for its whole attempt, so a free lock means the process exited. Molly checks this when `molly:start` or `molly:retry` takes the lock. A worker ID set in `molly.agent_bus.worker_id` does not name a host, so those claims wait for the lease.
+
+`molly:start` and `molly:retry` recover the task they were asked to run. `molly:worker start` and `molly:worker restart` check every running task before they launch the queue worker, so after a host restart, starting the worker settles what the old one left behind. See [Queue worker](reference/commands.md#queue-worker).
+
+Recovery marks the task `failed` and retryable, or `stopped` when a stop had been requested, and clears the claim. Each run the dead process left `running` gets the same status, an `error` that starts with `RUN_ABANDONED:` and names the worker, and a `recovery` entry with the `reason` (`lease_expired` or `worker_exited`), `worker_id`, and `recovered_at`. The run keeps the evidence it had saved. When `.molly/lifecycle.jsonl` exists, the recovery appends a `failed` or `stopped` event with the same `reason`, the old `worker_id`, and the recovered run IDs, so `molly:task` and MCP `molly_task` show the recovered status too.
+
+After a crash, run `php artisan molly:retry TASK`. The retry recovers the task, then starts a new attempt from the recorded baseline. When the retry is then refused, for example with `SANDBOX_UNAVAILABLE`, the task stays `failed` and retryable, not `running`. `molly:start` recovers it too, then refuses with `TASK_NOT_PENDING`. Nothing runs the task again on its own. A queued start job that a killed worker had reserved is delivered again after the queue's `retry_after`, and Laravel fails it with `MaxAttemptsExceededException` because Molly's jobs allow one attempt.
 
 `molly:task` also shows a display status that folds in approvals and pull requests: `awaiting_approval`, `approved`, `handed_off`, and `merged`.
 
