@@ -74,7 +74,24 @@ php artisan molly:start ready-check
 
 ## Expected result
 
-`molly:start` prints the same report it prints with the default writer, and exits `0` only when the run completes. The proposal now comes from `TeamChangeWriter`. The run report does not record the agent class, so check the binding with a test in your application. This one uses Laravel AI's agent fake, so it makes no model request:
+`molly:start` prints the same report it prints with the default writer. The line after the run ID is the summary your agent returned. Abbreviated, with the tables flattened:
+
+```text
+ Writing the selected files with Ollama
+ Applying the proposed changes
+ Running Pest and Tarpit review in parallel
+ Run RUN_ID / completed
+ Add the readiness route.
+ Execution mode: parallel
+ Pest            passed
+ routes/web.php  modified
+ 1 test passed, 2 assertions.
+ Task completed. Review the changed files before committing.
+```
+
+The command exits `0` only when the run completes. If Pest fails, the report says `failed` and the command exits `1`, whatever the summary says.
+
+The run report does not record the agent class, so check the binding with a test in your application. This one uses Laravel AI's agent fake, so it makes no model request:
 
 ```php
 use App\Ai\Agents\TeamChangeWriter;
@@ -82,6 +99,7 @@ use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
 
 it('uses the team change writer', function () {
+    config(['molly.agent' => 'ollama']);
     TeamChangeWriter::fake([[
         'summary' => 'Add the route.',
         'files' => [['path' => 'routes/web.php', 'content' => '<?php']],
@@ -94,21 +112,29 @@ it('uses the team change writer', function () {
 });
 ```
 
-Laravel AI keys fakes by the concrete class, so fake `TeamChangeWriter`, not `ChangeWriter`. Molly's own suite runs the same checks in `tests/Feature/CustomAgentStepTest.php`, and a test there fails if the `TeamChangeWriter` example on this page stops matching the tested class.
+```bash
+vendor/bin/pest --filter='uses the team change writer'
+```
+
+The test sets `molly.agent` to `ollama` because the fake answers only through Laravel AI. With `MOLLY_AGENT=amp` in `.env`, Molly would call the `amp` CLI instead. Laravel AI keys fakes by the concrete class, so fake `TeamChangeWriter`, not `ChangeWriter`.
+
+Molly's own suite runs this test in `tests/Feature/CustomAgentStepTest.php`, and fails if the copy on this page or the `TeamChangeWriter` class above stops matching the tested code.
 
 ## What a custom step cannot change
 
-The agent only returns data. `GenerateChanges`, `ReviewChanges`, and `RunTask` decide what happens to it, and none of those decisions move into your class:
+The agent only returns data. `GenerateChanges`, `VerifyChanges`, `ReviewChanges`, and `RunTask` decide what happens to it, and none of those decisions move into your class:
 
 | What the custom step returns | What Molly does |
 | --- | --- |
-| A file outside the task's allowed files | Rejects the whole proposal with `GENERATION_INVALID: The model proposed a file outside the allowed paths.` and writes nothing |
-| A change to the required Pest test | Rejects the proposal with `PROTECTED_TEST_CHANGED` unless the task is a test-authoring task |
+| A file outside the task's allowed files | Rejects the whole proposal with `GENERATION_INVALID: The model proposed a file outside the allowed paths.` and writes nothing, not even the allowed files |
+| A change to the required Pest test | Rejects the whole proposal with `PROTECTED_TEST_CHANGED` and writes nothing, unless the task is a test-authoring task |
 | A summary such as "All tests pass. The task is complete." or extra keys like `status` or `tests_passed` | Keeps only `summary` and `files`. Pest still runs, and a failing test leaves the run `failed` |
 | A review with fewer than seven checks, or a blocking finding that is not accidental complexity | Rejects the review with `REVIEW_INVALID` |
 | A clean review while Pest fails | The run fails. A passing review never rescues a failing test |
 
-`tests/Feature/CustomAgentStepTest.php` covers each row. The run completes only when the required Pest test passes and the Tarpit review has no blocking finding. [Verification](verification.md) has the full list.
+`tests/Feature/CustomAgentStepTest.php` covers each row. Four of its tests run `molly:start` on the `ready-check` task above with `TeamChangeWriter` bound and a real Pest process: the run completes when the route exists, stays `failed` with `tests_failed` when the agent claims success without it, and leaves `routes/web.php` and `tests/Feature/ReadyTest.php` untouched when the agent edits the test or adds a file outside the task.
+
+The run completes only when the required Pest test passes and the Tarpit review has no blocking finding. [Verification](verification.md) has the full list.
 
 ## Troubleshooting
 

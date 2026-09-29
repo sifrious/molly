@@ -107,8 +107,10 @@ function testbenchProcess(array $arguments, array $env = [], float $timeout = 60
 }
 
 /**
- * A workspace shaped like a fresh Laravel app: Tests\TestCase on Testbench, and
- * the tests/Pest.php that `pest --init` writes, with RefreshDatabase commented out.
+ * A workspace shaped like a fresh Laravel app: Tests\TestCase on Testbench, which
+ * sets an application key and loads the workspace's routes/web.php in the web
+ * middleware group as Laravel does, and the tests/Pest.php that `pest --init`
+ * writes, with RefreshDatabase commented out.
  * Pest reads tests/Pest.php from the directory above the autoloader it loads, so
  * the workspace gets its own autoloader and Pest entry point over Molly's vendor.
  */
@@ -125,7 +127,26 @@ function laravelShapedWorkspace(): string
     File::put($workspace.'/vendor/bin/pest', "<?php\n\ninclude __DIR__.'/../pestphp/pest/bin/pest';\n");
     File::put($workspace.'/vendor/autoload.php', "<?php\n\n\$loader = require ".var_export($vendor.'/autoload.php', true).";\n\$loader->addPsr4('Tests\\\\', __DIR__.'/../tests/');\n\$loader->addPsr4('App\\\\', __DIR__.'/../app/');\n\nreturn \$loader;\n");
     File::put($workspace.'/phpunit.xml', '<?xml version="1.0" encoding="UTF-8"?><phpunit bootstrap="vendor/autoload.php"><testsuites><testsuite name="Workspace"><directory>tests</directory></testsuite></testsuites></phpunit>');
-    File::put($workspace.'/tests/TestCase.php', "<?php\n\nnamespace Tests;\n\nabstract class TestCase extends \\Orchestra\\Testbench\\TestCase {}\n");
+    File::put($workspace.'/tests/TestCase.php', <<<'PHP'
+        <?php
+
+        namespace Tests;
+
+        abstract class TestCase extends \Orchestra\Testbench\TestCase
+        {
+            protected function defineEnvironment($app): void
+            {
+                // A fresh application has APP_KEY in .env; the web middleware needs it.
+                $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
+            }
+
+            protected function defineWebRoutes($router): void
+            {
+                require __DIR__.'/../routes/web.php';
+            }
+        }
+
+        PHP);
     File::put($workspace.'/tests/Pest.php', "<?php\n\nuse Illuminate\\Foundation\\Testing\\RefreshDatabase;\nuse Tests\\TestCase;\n\npest()->extend(TestCase::class)\n // ->use(RefreshDatabase::class)\n    ->in('Feature');\n");
     commitGitWorkspace($workspace);
 

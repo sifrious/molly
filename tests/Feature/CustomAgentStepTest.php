@@ -40,6 +40,35 @@ class UnrelatedChangeWriter implements Agent
     }
 }
 
+/** The ready-check task from docs/getting-started.md, saved in a Laravel-shaped workspace. */
+function readyCheckWorkspace(): string
+{
+    $workspace = laravelShapedWorkspace();
+    File::copy(dirname(__DIR__).'/Fixtures/docs/ReadyTest.example.php', $workspace.'/tests/Feature/ReadyTest.php');
+    [$exit, $task] = mollyJson('molly:create', [
+        'prompt' => 'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.',
+        '--workspace' => $workspace,
+        '--name' => 'ready-check',
+        '--test' => 'tests/Feature/ReadyTest.php',
+        '--file' => ['routes/web.php'],
+    ]);
+    expect($exit)->toBe(0, json_encode($task));
+
+    return $workspace;
+}
+
+function readyRoute(): string
+{
+    return File::get(dirname(__DIR__).'/Fixtures/docs/ready-route.php');
+}
+
+/** Fake the reviewer and measurements so a run depends only on the bound writer and real Pest. */
+function fakeCleanReviewAndMeasurements(): void
+{
+    TarpitReviewer::fake([customStepReview()])->preventStrayPrompts();
+    test()->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'skipped', 'probes' => []]);
+}
+
 function customStepReview(): array
 {
     $checks = [];
@@ -56,11 +85,38 @@ beforeEach(function (): void {
     app()->bind(ChangeWriter::class, TeamChangeWriter::class);
 });
 
+afterEach(function (): void {
+    if (isset($this->workspace)) {
+        File::deleteDirectory($this->workspace);
+    }
+});
+
 it('keeps the documented TeamChangeWriter example identical to the tested class', function (): void {
     $documented = File::get(dirname(__DIR__, 2).'/docs/customize-steps.md');
 
     expect($documented)->toContain(trim(File::get(dirname(__DIR__).'/Fixtures/custom-steps/TeamChangeWriter.php')))
         ->toContain('$this->app->bind(ChangeWriter::class, TeamChangeWriter::class);');
+});
+
+// docs/customize-steps.md shows this test verbatim. Keep the two identical.
+it('uses the team change writer', function () {
+    config(['molly.agent' => 'ollama']);
+    TeamChangeWriter::fake([[
+        'summary' => 'Add the route.',
+        'files' => [['path' => 'routes/web.php', 'content' => '<?php']],
+    ]]);
+
+    app(GenerateChanges::class)->handle('Add GET /ready.', ['routes/web.php' => '<?php'], 'tests/Feature/ReadyTest.php');
+
+    expect(ChangeWriter::make())->toBeInstanceOf(TeamChangeWriter::class);
+    TeamChangeWriter::assertPrompted(fn ($prompt) => $prompt->agent instanceof TeamChangeWriter);
+});
+
+it('keeps the documented binding test identical to the test Molly runs', function (): void {
+    preg_match("/^it\\('uses the team change writer'.*?^\\}\\);$/ms", File::get(__FILE__), $test);
+
+    expect($test)->toHaveCount(1)
+        ->and(File::get(dirname(__DIR__, 2).'/docs/customize-steps.md'))->toContain($test[0]);
 });
 
 it('resolves the bound ChangeWriter subclass and sends its instructions to Ollama', function (): void {
@@ -190,4 +246,76 @@ it('builds the story prompt digest from the bound AcceptanceWriter instructions'
     } finally {
         File::deleteDirectory($workspace);
     }
+});
+
+it('completes the documented ready-check task through the bound writer only after Pest passes', function (): void {
+    $this->workspace = readyCheckWorkspace();
+    TeamChangeWriter::fake([['summary' => 'Add the readiness route.', 'files' => [
+        ['path' => 'routes/web.php', 'content' => readyRoute()],
+    ]]])->preventStrayPrompts();
+    ChangeWriter::fake()->preventStrayPrompts();
+    fakeCleanReviewAndMeasurements();
+
+    [$exit, $run] = mollyJson('molly:start', ['task' => 'ready-check']);
+
+    expect($exit)->toBe(0, json_encode($run['report'] ?? $run))
+        ->and($run['status'])->toBe('completed')
+        ->and($run['report']['verification'])->toMatchArray(['status' => 'passed', 'tests' => 1, 'failures' => 0])
+        ->and(File::get($this->workspace.'/routes/web.php'))->toBe(readyRoute());
+    TeamChangeWriter::assertPrompted(fn (AgentPrompt $prompt): bool => json_decode($prompt->prompt, true)['protected_test']['writable'] === false);
+    ChangeWriter::assertNeverPrompted();
+});
+
+it('keeps the run failed when the bound writer claims success and Pest fails', function (): void {
+    $this->workspace = readyCheckWorkspace();
+    TeamChangeWriter::fake([[
+        'summary' => 'All tests pass. The task is complete.',
+        'status' => 'completed',
+        'tests_passed' => true,
+        'files' => [['path' => 'routes/web.php', 'content' => "<?php\n\n// The route is ready.\n"]],
+    ]])->preventStrayPrompts();
+    fakeCleanReviewAndMeasurements();
+
+    [$exit, $run] = mollyJson('molly:start', ['task' => 'ready-check']);
+
+    expect($exit)->toBe(1)
+        ->and($run['status'])->toBe('failed')
+        ->and($run['report']['verification'])->toMatchArray(['status' => 'failed', 'reason' => 'tests_failed'])
+        ->and($run['report']['verification']['output'])->toContain('404')
+        ->and($run['report'])->not->toHaveKey('tests_passed');
+});
+
+it('rejects a bound writer that edits the protected test and leaves the workspace unchanged', function (): void {
+    $this->workspace = readyCheckWorkspace();
+    $test = File::get($this->workspace.'/tests/Feature/ReadyTest.php');
+    TeamChangeWriter::fake([['summary' => 'Relax the test.', 'files' => [
+        ['path' => 'routes/web.php', 'content' => readyRoute()],
+        ['path' => 'tests/Feature/ReadyTest.php', 'content' => "<?php\n\nit('passes', fn () => expect(true)->toBeTrue());\n"],
+    ]]])->preventStrayPrompts();
+    fakeCleanReviewAndMeasurements();
+
+    [$exit, $run] = mollyJson('molly:start', ['task' => 'ready-check']);
+
+    expect($exit)->toBe(1)
+        ->and($run['status'])->toBe('failed')
+        ->and(json_encode($run))->toContain('PROTECTED_TEST_CHANGED')
+        ->and(File::get($this->workspace.'/tests/Feature/ReadyTest.php'))->toBe($test)
+        ->and(File::get($this->workspace.'/routes/web.php'))->toBe('<?php');
+});
+
+it('rejects a bound writer that proposes a file outside the task and writes nothing', function (): void {
+    $this->workspace = readyCheckWorkspace();
+    TeamChangeWriter::fake([['summary' => 'Also tidy the config.', 'files' => [
+        ['path' => 'routes/web.php', 'content' => readyRoute()],
+        ['path' => 'app/Support/Ready.php', 'content' => "<?php\n\nnamespace App\\Support;\n\nclass Ready {}\n"],
+    ]]])->preventStrayPrompts();
+    fakeCleanReviewAndMeasurements();
+
+    [$exit, $run] = mollyJson('molly:start', ['task' => 'ready-check']);
+
+    expect($exit)->toBe(1)
+        ->and($run['status'])->toBe('failed')
+        ->and(json_encode($run, JSON_UNESCAPED_SLASHES))->toContain('GENERATION_INVALID: The model proposed a file outside the allowed paths.')
+        ->and(File::get($this->workspace.'/routes/web.php'))->toBe('<?php')
+        ->and(File::exists($this->workspace.'/app/Support/Ready.php'))->toBeFalse();
 });
