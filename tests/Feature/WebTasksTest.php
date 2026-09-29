@@ -148,6 +148,21 @@ it('shows incomplete evidence and skipped measurements without claiming success'
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertSee('Run status: failed')->assertSee('branch_timeout')->assertSee('timed_out')->assertSee('G. Caches and dependencies')->assertSee('Not run')->assertSee('No Git history')->assertSee('Authorship is not ownership.')->assertSee('clever:lonely-files')->assertDontSee('<script>bad()</script>', false)->assertDontSee('Task completed.');
 });
 
+it('labels failed Clever scans and probe errors as errors on the run page', function () {
+    $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'completed', 'report' => [
+        'complexity_before' => ['status' => 'error', 'probes' => [], 'reason' => 'clever_scan_failed', 'detail' => 'The report directory is not writable.'],
+        'complexity_after' => ['status' => 'error', 'probes' => [['key' => 'c4', 'name' => 'The hotspots', 'status' => 'error', 'skip_reason' => 'Git log failed after the repository checks passed.', 'caveats' => ['Churn counts commits that touch a path.']]]],
+    ]]);
+
+    $this->get('/molly/runs/'.$run->id)->assertOk()
+        ->assertSee('Clever: before error; after error.')
+        ->assertSee('Before changes: clever_scan_failed')
+        ->assertSee('Before changes detail: The report directory is not writable.')
+        ->assertSee('After error: Git log failed after the repository checks passed.')
+        ->assertDontSee('After skipped: Git log failed')
+        ->assertSee('Churn counts commits that touch a path.');
+});
+
 it('calls the shared start or retry action from a serialized queue job', function (bool $retry) {
     $task = webMollyTask();
     $start = Mockery::mock(StartTask::class);

@@ -40,8 +40,8 @@ class RunReport
         table(['Required check', 'Result'], [
             ['Pest', $report['verification']['status'] ?? 'Not run'],
             ['Tarpit review', $report['review']['status'] ?? (isset($report['review']['checks']) ? 'See findings below' : 'Not run')],
-            ['Clever before changes', $report['complexity_before']['status'] ?? 'Not run'],
-            ['Clever after changes', $report['complexity_after']['status'] ?? 'Not run'],
+            ['Clever before changes (advisory)', $report['complexity_before']['status'] ?? 'Not run'],
+            ['Clever after changes (advisory)', $report['complexity_after']['status'] ?? 'Not run'],
         ]);
         foreach (['verification' => 'Pest', 'review' => 'Tarpit review'] as $key => $label) {
             foreach (['reason', 'error'] as $detail) {
@@ -263,6 +263,9 @@ class RunReport
             if (! empty($measurement['reason'])) {
                 note($label.': '.$measurement['reason']);
             }
+            if (! empty($measurement['detail'])) {
+                note($label.' detail: '.$this->describe($measurement['detail']));
+            }
             if (! empty($measurement['report'])) {
                 note($label.' full measurements: '.$measurement['report']);
             }
@@ -296,7 +299,10 @@ class RunReport
         }
         foreach (['Before' => $before, 'After' => $after] as $label => $value) {
             if (! empty($value['skip_reason'])) {
-                note($label.' skipped: '.$this->describe($value['skip_reason']));
+                note($label.' '.(($value['status'] ?? null) === 'error' ? 'error' : 'skipped').': '.$this->describe($value['skip_reason']));
+            }
+            foreach ($value['warnings'] ?? [] as $warning) {
+                note($label.' warning: '.$this->describe($warning));
             }
             if ($verbose && $value !== []) {
                 $this->showProbeDetails($value, $label);
@@ -316,7 +322,7 @@ class RunReport
                 note(str_replace('_', ' ', $name).': '.$value);
             }
         }
-        foreach (['caveats', 'warnings', 'notes'] as $key) {
+        foreach (['caveats', 'notes'] as $key) {
             foreach ($probe[$key] ?? [] as $detail) {
                 note($this->describe($detail));
             }
