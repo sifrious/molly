@@ -81,7 +81,7 @@ Molly checks the placement when it queues the task, and again when the attempt s
 
 | Code | Why the Orb refused |
 | --- | --- |
-| `ORB_NOT_FOUND` | No registered Orb has that name or ID. |
+| `ORB_NOT_FOUND` | No registered Orb has that name or ID. `molly:start` and `molly:retry` check the name before Git and the sandbox. |
 | `ORB_REVOKED` | The Orb was revoked. |
 | `ORB_BUSY` | The Orb holds another task. |
 | `ORB_CAPABILITY_MISMATCH` | The Orb does not have the required runtime or model. |

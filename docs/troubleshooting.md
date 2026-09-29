@@ -74,7 +74,7 @@ Commands that create or run a task refuse a workspace that is not a Git reposito
 WORKSPACE_NOT_GIT: /path/to/app is not a Git repository. Run git init and commit your work, then try again.
 ```
 
-Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `molly:start` and `molly:retry` check, in order, the task's state and inputs, `GIT_MISSING`, `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING`, and then `SANDBOX_UNAVAILABLE`, all before they take the task lock. When the workspace already has `.molly/lifecycle.jsonl`, the refusal is appended to it as a `start_refused` event; otherwise the command only prints the error. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
+Molly refuses before it writes anything, so no task, `.molly` directory, or demo file is created. `molly:start` and `molly:retry` check, in order, the task's state and inputs, including an Orb named with `--orb` (`ORB_NOT_FOUND`), `GIT_MISSING`, `WORKSPACE_NOT_GIT` or `WORKSPACE_REVISION_MISSING`, and then `SANDBOX_UNAVAILABLE`, all before they take the task lock. When the workspace already has `.molly/lifecycle.jsonl`, the refusal is appended to it as a `start_refused` event; otherwise the command only prints the error. `composer create-project laravel/laravel` and `molly:project-new` do not create a repository. Commit the application yourself, with your own Git identity:
 
 ```bash
 git init

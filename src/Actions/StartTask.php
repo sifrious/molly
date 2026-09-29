@@ -94,13 +94,16 @@ class StartTask
         $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
 
         // Before taking the task lock, which creates .molly/, check what needs no write: the task's
-        // state, its inputs, Git, a committed checkout, and the sandbox, in that order. A task that
-        // is still running goes straight to the lock, which reports WORKSPACE_BUSY while its run
-        // holds it and TASK_NOT_PENDING otherwise.
+        // state, its inputs, including a named Orb, Git, a committed checkout, and the sandbox, in
+        // that order. A task that is still running goes straight to the lock, which reports
+        // WORKSPACE_BUSY while its run holds it and TASK_NOT_PENDING otherwise.
         $task = $this->bus->recoverIfAbandoned($task);
         if ($task->status !== 'running') {
             $this->bus->refuseUnclaimable($task, $retry, $idempotencyKey);
             try {
+                if (($orbTarget?->targetId ?? '') !== '') {
+                    $this->orbs->find($orbTarget->targetId);
+                }
                 $this->runTask->refuseUnready($task->prompt, $workspace, $task->paths, $task->test_path, $task);
             } catch (RuntimeException $exception) {
                 $this->recordRefusal($task, $exception->getMessage(), $retry);
