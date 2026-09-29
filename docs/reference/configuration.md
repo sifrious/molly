@@ -22,7 +22,7 @@ Restart queue workers after configuration changes.
 | `molly.agent` | `ollama` | `ollama` or `amp`. Environment: `MOLLY_AGENT`. |
 | `molly.model` | `null` | The exact local Ollama model name. Environment: `MOLLY_LOCAL_MODEL`. |
 | `molly.timeout` | `180` | Seconds allowed for each model request. A request that runs longer fails with `PROVIDER_TIMEOUT`. |
-| `molly.memory.headroom_gb` | `11` | Gigabytes (10^9 bytes) that must stay free beyond an Ollama model's size before Molly lets Ollama load it. See [Memory](#memory). |
+| `molly.memory.headroom_gb` | `11` | Gigabytes (10^9 bytes) that must stay free beyond an Ollama model's size, both when the fit decision checks total memory and before Molly lets Ollama load the model. See [Memory](#memory). |
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
 | `molly.max_attempts` | `3` | Runs a task may make, from 1 to 10. |
 | `molly.repair.per_failure` | `3` | Failed runs with the same failure fingerprint before Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`, from 1 to 10. `molly.max_attempts` still caps the total. |
@@ -82,9 +82,23 @@ Before each model request from `molly:story`, `molly:start`, and the Tarpit revi
 - When the model's size plus `molly.memory.headroom_gb` is more than the available memory, Molly refuses with `MODEL_MEMORY_INSUFFICIENT` and never asks Ollama to load the model. `molly:doctor` reports the same comparison as `model_exceeds_memory`.
 - When the available memory, the model's size, or the list of loaded models is unknown, Molly does not refuse. Doctor reports `model_memory_unknown` with the status `unknown`, which does not fail doctor.
 
-`molly.memory.headroom_gb` takes a number of gigabytes, 0 or more; 11 is the default. Any other value fails with `MEMORY_HEADROOM_INVALID`, and doctor reports `memory_headroom_invalid`.
+`molly.memory.headroom_gb` takes a number of gigabytes, 0 or more; 11 is the default, which covers 8 GB for macOS and other applications, 2 GB for Bloom, and 1 GB for Molly. Any other value fails with `MEMORY_HEADROOM_INVALID`, and doctor reports `memory_headroom_invalid`.
 
-Molly measures memory on macOS only, so on other systems the check is always unknown. Memory held by another model that Ollama has loaded counts as used. Molly never pulls, deletes, unloads, or switches a model to make room; choose a smaller installed model with `php artisan molly:setup` or free memory yourself.
+The fit decision in `molly:preflight` uses the same rule with total memory in place of available memory: a model fits with headroom when its size plus `molly.memory.headroom_gb` is no more than the Mac's total memory. `Sifrious\Molly\ModelFit\InstallationHeadroom` holds the rule for both. A download must also leave 15% of the destination volume free; that fraction is fixed. See [The fit decision](../ollama-quickstart.md#the-fit-decision).
+
+Molly measures memory on macOS only, so on other systems the check is always unknown. Memory held by another model that Ollama has loaded counts as used. A run never pulls, deletes, unloads, or switches a model to make room; choose a smaller installed model with `php artisan molly:setup` or free memory yourself. `molly:install-model` is the only command that asks Ollama to download a model, and only after you authorize it.
+
+### Local model records
+
+The approved catalogue ships with Molly in `resources/models/catalogue.v1.json` and is not a setting. Molly keeps machine-level model records under `MOLLY_HOME/models`:
+
+| File | Contents |
+| --- | --- |
+| `readiness.json` | The last readiness check of each model: digest, runtime version, both steps, latency, and memory. A passed record for the approved digest and the pinned runtime makes the fit decision `already_installed`. |
+| `install-journal.json` | The last install state of each model, such as `downloading`, `interrupted`, `failed`, `installed`, `ready`, or `not_ready`, with the code of a failure. |
+| `install.lock` | Held while `molly:install-model` runs, so a second install stops with `INSTALL_IN_PROGRESS`. |
+
+Molly writes each JSON file to a temporary file and renames it into place. When `MOLLY_HOME` is not writable, the install fails with `MODEL_RECORDS_UNWRITABLE`.
 
 ## Amp
 
@@ -186,6 +200,7 @@ The worker's record, `.molly/worker/worker.json`, holds its pid, process group, 
 | `MOLLY_AGENT` | `ollama` or `amp` |
 | `MOLLY_LOCAL_MODEL` | Installed Ollama model name |
 | `OLLAMA_URL` | Local Ollama endpoint |
+| `OLLAMA_MODELS` | The models directory `molly:preflight` and `molly:install-model` measure when `--destination` is not given |
 | `MOLLY_SANDBOX_ALLOW_UNSAFE` | Run without the Linux sandbox |
 | `MOLLY_UI_ENABLED` | Enable the web interface |
 | `MOLLY_FALSE_GREEN` | Enable false-green detection |
@@ -195,7 +210,7 @@ The worker's record, `.molly/worker/worker.json`, holds its pid, process group, 
 | `MOLLY_COMPLEXITY_ENABLED` | Force Clever on or off |
 | `MOLLY_PREVIEW_COMMAND`, `MOLLY_PREVIEW_URL`, `MOLLY_PREVIEW_VIEWPORT` | Component previews |
 | `MOLLY_WORKER_PHP_BINARY` | PHP binary for `molly:worker` |
-| `MOLLY_HOME` | Where global settings, conversations, and the graph cache live. Defaults to `~/.molly`. |
+| `MOLLY_HOME` | Where global settings, conversations, the graph cache, and local model records live. Defaults to `~/.molly`. |
 | `APP_ENV`, `QUEUE_CONNECTION` | The application's environment and queue |
 
 Timeouts, size limits, the memory headroom, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.

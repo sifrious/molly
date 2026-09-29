@@ -118,7 +118,9 @@ class MollyPreflightCommand extends Command
             warning('Flag: '.$flag);
         }
 
-        if ($decision['install_blockers'] !== []) {
+        if ($decision['model_selection'] !== null && $decision['install_allowed']) {
+            note('Next: php artisan molly:install-model '.$decision['model_selection']['model']);
+        } elseif ($decision['install_blockers'] !== []) {
             note('Molly will not install a model now: '.implode(', ', $decision['install_blockers']).'.');
         }
     }

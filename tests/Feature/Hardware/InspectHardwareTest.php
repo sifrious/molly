@@ -168,6 +168,7 @@ describe('molly:preflight', function () {
             ->and($output)->toContain('Model fit: recommended_fit. gpt-oss:120b-code fits this Mac and leaves 11 GB of memory headroom.')
             ->and($output)->toContain('qwen2.5-coder:7b')
             ->and($output)->toContain('origin_not_us_developed')
+            ->and($output)->toContain('Next: php artisan molly:install-model gpt-oss:120b-code')
             ->and($output)->toContain('Molly downloaded nothing.')
             ->and($output)->toContain('Snapshot ');
     });
