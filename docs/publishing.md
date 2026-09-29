@@ -36,7 +36,7 @@ The script stops at the first failure and exits non-zero. In order, it runs:
 3. `composer install --no-interaction --prefer-dist` from the lock file
 4. `composer audit --locked`, which needs network access to the advisory database
 5. The full package suite, `vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning`
-6. `composer archive` into `/tmp/molly-release-archive.zip`, failing if `composer.lock` is inside
+6. `composer archive` into a temporary directory, failing if `composer.lock` is inside the zip
 
 It ends with `ALL GATES PASSED on` and the PHP version. The documentation check cannot tell whether an example still runs. The tests that keep examples in step with fixtures do that: `tests/Feature/CustomAgentStepTest.php`, `tests/Feature/GitHubPestTodosTest.php`, and `tests/Feature/DocsExamplesTest.php`, all part of step 5.
 

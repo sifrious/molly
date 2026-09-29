@@ -16,9 +16,12 @@ composer audit --locked
 echo "==> package tests"
 ./vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
 echo "==> archive inspect"
-composer archive --format=zip --file=/tmp/molly-release-archive
-unzip -l /tmp/molly-release-archive.zip | head -40
-if unzip -l /tmp/molly-release-archive.zip | grep -q 'composer.lock'; then
+# composer archive writes --file relative to --dir, so an absolute --file lands inside the package.
+ARCHIVE_DIR="$(mktemp -d)"
+trap 'rm -rf "$ARCHIVE_DIR"' EXIT
+composer archive --format=zip --dir="$ARCHIVE_DIR" --file=molly-release-archive
+unzip -l "$ARCHIVE_DIR/molly-release-archive.zip" | head -40
+if unzip -l "$ARCHIVE_DIR/molly-release-archive.zip" | grep -q 'composer.lock'; then
   echo "FAIL: composer.lock must stay out of the package archive" >&2
   exit 1
 fi
