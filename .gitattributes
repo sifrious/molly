@@ -18,3 +18,6 @@
 /bloom-plugin/Surfaces.bundle export-ignore
 /vendor export-ignore
 /work export-ignore
+
+# The model catalogue is checked against its SHA-256 file, so Git must not change its line endings.
+/resources/models/* -text

@@ -53,6 +53,20 @@ class HardwareProbe
     }
 
     /**
+     * The Ollama facts, measured the way facts() measures them: the binary, the CLI and
+     * API versions, and the installed and loaded models. The installer reads these after
+     * a download to verify the runtime version and the model digest.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function ollamaFacts(): array
+    {
+        $this->runs = [];
+
+        return $this->ollama();
+    }
+
+    /**
      * @param  array<string, array<string, mixed>>  $platform
      * @return array{0: bool, 1: string} Whether to run macOS probes, and the reason recorded when Molly does not.
      */

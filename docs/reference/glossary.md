@@ -52,6 +52,9 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | Jev gate | The single switch, `MOLLY_JEV_ENABLED`, and the states doctor reports: `disabled`, `unavailable`, `unconfigured`, `ready`. |
 | MCP server | Molly's local stdio server for editors and chat clients. No HTTP route. |
 | Sandbox | Landlock plus private user and network namespaces around the writer and Pest on Linux. |
+| Fit decision | What `molly:preflight` concludes about this Mac and the approved models: `recommended_fit`, `minimum_fit`, `already_installed`, `no_fit`, `unsupported`, or `unknown`. Unknown is never incompatible. |
+| Approved catalogue | The Ollama artifacts Molly may install, with their digests, licences, origin evidence, and the pinned Ollama version. It ships with Molly and is checked against its SHA-256. |
+| Readiness check | The bounded inference and the small Molly task that `molly:install-model` runs before it calls a model ready. |
 
 ## Bloom and GitHub
 

@@ -118,8 +118,11 @@ Molly is ready in:
 
 Standalone (no Bloom required):
 1. cd "$TARGET"
-2. Choose a local model: ollama pull qwen2.5-coder:7b
-   php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+2. Choose a local model. Preflight decides which approved model fits this Mac,
+   and install-model asks before it downloads anything:
+   php artisan molly:preflight
+   php artisan molly:install-model
+   php artisan molly:setup --agent=ollama --model=MODEL   (the name install-model prints)
 3. Check setup:    php artisan molly:doctor
    Doctor reports whether this host can sandbox the writer and verifier.
    macOS usually cannot. Read the sandbox section of

@@ -105,17 +105,18 @@ Molly is a development dependency. A production `composer install --no-dev` does
 
 ## Choose a model
 
-Molly sends the change request to a local Ollama model by default. Pull a model and tell Molly its exact name:
+Molly sends the change request to a local Ollama model by default. Install Ollama 0.34.4, then let Molly decide which approved model fits this Mac and install it:
 
 ```bash
-ollama pull qwen2.5-coder:7b
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 ```
 
-`molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. It stores no secrets. Any model from `ollama list` works; `qwen2.5-coder:7b` is a starting point that needs about 8 GB of free memory. If Ollama is unreachable, Molly stops rather than falling back to a hosted service.
+`molly:preflight` prints the fit decision and downloads nothing. On a 96 GB Mac it selects `gpt-oss:120b-code`, on a Mac with 16 GB or more `gpt-oss:20b`, and on a smaller Mac it prints `No supported local Ollama configuration fits this Mac.` `molly:install-model` shows the download size and the volume, asks before it downloads, verifies the model, and runs a readiness check that includes a small Molly task. It prints the `molly:setup` line to run; replace `MODEL` with that name. `molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. It stores no secrets. If Ollama is unreachable, Molly stops rather than falling back to a hosted service.
 
-Small models handle the demo. They often cannot write a Pest test file or answer Molly's review questions on their own, so a larger model is worth the download for real work. [Ollama](ollama-quickstart.md) has the details and the doctor codes.
+You can still select any installed model with `molly:setup --model=NAME`. Small models often cannot write a Pest test file or answer Molly's review questions, which is why the readiness check includes both a change and a review. [Ollama](ollama-quickstart.md) has the details and the doctor codes.
 
 To use Amp instead, see [Agents](agents.md#amp).
 

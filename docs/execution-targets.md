@@ -19,7 +19,7 @@ With the default parallel checks, the report has one row per check, and the `Tar
 Execution mode: parallel
 Branch        Status  Target  Provider / model
 verification  passed  local   Pest
-review        passed  local   ollama / qwen2.5-coder:7b
+review        passed  local   ollama / gpt-oss:20b
 ```
 
 The same value is saved in the run report as `branches[].execution_target`, so `molly:show RUN_ID --json` shows it too, and the web run page lists it under "Execution branch details". With `molly.parallel_checks` set to `false`, Pest and the review run one after the other inside the Artisan process and record no branches. The report then says `Execution mode: serial` and `No branch results recorded.`, and has no `Target` column. The checks still run on the local machine.

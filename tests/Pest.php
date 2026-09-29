@@ -1,7 +1,12 @@
 <?php
 
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Process\Factory as ProcessFactory;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process as ProcessFacade;
 use Sifrious\Molly\Classification\ChoiceClassification;
 use Sifrious\Molly\Classification\ChoiceClassifier;
 use Sifrious\Molly\Tests\Support\FakeChoiceClassifier;
@@ -9,6 +14,11 @@ use Sifrious\Molly\Tests\TestCase;
 use Symfony\Component\Process\Process;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
+
+/** Manifest digests of the Ollama models on the acceptance Mac, as the bundled catalogue records them. */
+const GPT_OSS_20B_DIGEST = '17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7';
+const GPT_OSS_120B_CODE_DIGEST = '4dda6ee4a98ead297f4cdeae389ecdc1963ed4cad90b10c8a11e1cc2a7b0fcaf';
+const GPT_OSS_120B_DIGEST = 'a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9';
 
 /**
  * No test may turn the Testbench skeleton at base_path() into a Git repository. Record what
@@ -279,4 +289,58 @@ function processGroupMembers(int $pgid): array
     }
 
     return $members;
+}
+
+/**
+ * Replay one simulated fixture from tests/Fixtures/hardware through Process::fake and Http::fake.
+ * $commands replaces command results by pattern, and $http replaces Ollama API responses by path,
+ * where null makes that endpoint refuse the connection. With $fakeHttp false the caller registers
+ * the Ollama responses itself, from the returned fixture's `http` entries.
+ *
+ * @param  array<string, array{exit: int, stdout: string, stderr: string}|Closure>  $commands
+ * @param  array<string, array{status: int, json: mixed}|null>  $http
+ * @return array<string, mixed> The fixture, with {workspace} resolved.
+ */
+function replayHardwareFixture(string $name, array $commands = [], array $http = [], bool $fakeHttp = true): array
+{
+    $fixture = json_decode(File::get(__DIR__.'/Fixtures/hardware/'.$name.'.json'), true, flags: JSON_THROW_ON_ERROR);
+    $workspace = sys_get_temp_dir().'/molly-hardware-'.bin2hex(random_bytes(4));
+    File::ensureDirectoryExists($workspace);
+    $fixture['destination'] = str_replace('{workspace}', $workspace, $fixture['destination']);
+    $fixture['commands'] = array_replace($fixture['commands'], $commands);
+    $fixture['http'] = array_replace(array_is_list($fixture['http'] ?? []) ? [] : $fixture['http'], $http);
+
+    // Start from fresh fakes, so a second replay in the same test replaces the first one's commands and responses.
+    ProcessFacade::swap(new ProcessFactory);
+    $fakes = [];
+    foreach ($fixture['commands'] + ['*' => ['exit' => 127, 'stdout' => '', 'stderr' => 'not simulated']] as $pattern => $result) {
+        $fakes[$pattern] = $result instanceof Closure ? $result : ProcessFacade::result($result['stdout'], $result['stderr'], $result['exit']);
+    }
+    ProcessFacade::preventStrayProcesses();
+    ProcessFacade::fake($fakes);
+
+    if ($fakeHttp) {
+        Http::swap(new HttpFactory(app('events')));
+        Http::preventStrayRequests();
+        $responses = [];
+        foreach (['/api/version', '/api/tags', '/api/ps'] as $path) {
+            $response = $fixture['http'][$path] ?? null;
+            $responses['localhost:11434'.$path] = $response === null ? Http::failedConnection() : Http::response($response['json'], $response['status']);
+        }
+        Http::fake($responses);
+    }
+    config(['ai.providers.ollama.url' => 'http://localhost:11434']);
+
+    return $fixture;
+}
+
+/** A command result for replayHardwareFixture() overrides. */
+function commandOutput(string $stdout, int $exit = 0, string $stderr = ''): array
+{
+    return ['exit' => $exit, 'stdout' => $stdout, 'stderr' => $stderr];
+}
+
+function hardwareFact(array $snapshot, string $path): array
+{
+    return Arr::get($snapshot['facts'], $path) ?? throw new RuntimeException("Missing fact {$path}");
 }

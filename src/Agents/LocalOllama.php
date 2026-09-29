@@ -11,6 +11,7 @@ use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Sifrious\Molly\Hardware\HardwareProbe;
+use Sifrious\Molly\ModelFit\InstallationHeadroom;
 use Throwable;
 use TypeError;
 
@@ -69,8 +70,9 @@ class LocalOllama
     }
 
     /**
-     * Compare the model with the memory molly:preflight measures, before Ollama loads it.
-     * A model Ollama already holds needs no more memory. When the available memory, the
+     * Compare the model with the memory molly:preflight measures, before Ollama loads it,
+     * using the same InstallationHeadroom rule as the fit decision. A model Ollama already
+     * holds needs no more memory. When the available memory, the
      * model's size, or the list of loaded models is unknown, the status is unknown and
      * Molly does not refuse. This reads facts only; it never pulls, loads, or unloads a model.
      *
@@ -78,10 +80,7 @@ class LocalOllama
      */
     public function memory(string $model): array
     {
-        $headroom = config('molly.memory.headroom_gb', 11);
-        if (! is_numeric($headroom) || (float) $headroom < 0) {
-            throw new RuntimeException('MEMORY_HEADROOM_INVALID: Set molly.memory.headroom_gb to a number of gigabytes, 0 or more.');
-        }
+        $headroom = InstallationHeadroom::fromConfig();
 
         $facts = $this->probe->memoryFacts();
         $loaded = $this->listed($facts['ollama']['loaded_models'], $model);
@@ -102,16 +101,15 @@ class LocalOllama
             return ['status' => 'unknown', 'message' => 'Molly could not compare '.$model.' with free memory because '.$unknown.', so it does not refuse the model. php artisan molly:preflight shows each fact and why it is unknown.'];
         }
 
-        $headroomBytes = (float) $headroom * 1e9;
-        $needs = $model.' needs '.self::gigabytes($size).' plus '.self::gigabytes($headroomBytes).' of headroom';
-        if ($size + $headroomBytes <= $available) {
-            return ['status' => 'fits', 'message' => $needs.', and '.self::gigabytes($available).' is available.'];
+        $needs = $model.' needs '.InstallationHeadroom::gigabytes($size).' plus '.InstallationHeadroom::gigabytes($headroom->memoryBytes).' of headroom';
+        if ($headroom->fitsMemory($size, $available)) {
+            return ['status' => 'fits', 'message' => $needs.', and '.InstallationHeadroom::gigabytes($available).' is available.'];
         }
         if ($loaded === null) {
-            return ['status' => 'unknown', 'message' => $needs.', and only '.self::gigabytes($available).' is available, but Ollama did not say which models it holds, so Molly does not refuse the model.'];
+            return ['status' => 'unknown', 'message' => $needs.', and only '.InstallationHeadroom::gigabytes($available).' is available, but Ollama did not say which models it holds, so Molly does not refuse the model.'];
         }
 
-        return ['status' => 'exceeds', 'message' => $needs.', but only '.self::gigabytes($available).' is available. Molly did not ask Ollama to load it. Choose a smaller installed model with php artisan molly:setup, or free memory and try again.'];
+        return ['status' => 'exceeds', 'message' => $needs.', but only '.InstallationHeadroom::gigabytes($available).' is available. Molly did not ask Ollama to load it. Choose a smaller installed model with php artisan molly:setup, or free memory and try again.'];
     }
 
     /**
@@ -130,11 +128,6 @@ class LocalOllama
         }
 
         return false;
-    }
-
-    private static function gigabytes(int|float $bytes): string
-    {
-        return rtrim(rtrim(number_format($bytes / 1e9, 1, '.', ''), '0'), '.').' GB';
     }
 
     /**

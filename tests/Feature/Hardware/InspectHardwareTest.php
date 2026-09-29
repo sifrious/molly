@@ -10,41 +10,6 @@ use Sifrious\Molly\Hardware\HardwareProbe;
 use Sifrious\Molly\Hardware\HardwareSnapshot;
 use Sifrious\Molly\Hardware\ProbeOutput;
 
-/**
- * Replay one simulated fixture from tests/Fixtures/hardware through Process::fake and Http::fake.
- *
- * @return array<string, mixed> The fixture, with {workspace} resolved.
- */
-function replayHardwareFixture(string $name): array
-{
-    $fixture = json_decode(File::get(__DIR__.'/../../Fixtures/hardware/'.$name.'.json'), true, flags: JSON_THROW_ON_ERROR);
-    $workspace = sys_get_temp_dir().'/molly-hardware-'.bin2hex(random_bytes(4));
-    File::ensureDirectoryExists($workspace);
-    $fixture['destination'] = str_replace('{workspace}', $workspace, $fixture['destination']);
-
-    $fakes = [];
-    foreach ($fixture['commands'] + ['*' => ['exit' => 127, 'stdout' => '', 'stderr' => 'not simulated']] as $pattern => $result) {
-        $fakes[$pattern] = Process::result($result['stdout'], $result['stderr'], $result['exit']);
-    }
-    Process::preventStrayProcesses();
-    Process::fake($fakes);
-
-    $http = [];
-    foreach (['/api/version', '/api/tags', '/api/ps'] as $path) {
-        $response = $fixture['http'][$path] ?? null;
-        $http['localhost:11434'.$path] = $response === null ? Http::failedConnection() : Http::response($response['json'], $response['status']);
-    }
-    Http::fake($http);
-    config(['ai.providers.ollama.url' => 'http://localhost:11434']);
-
-    return $fixture;
-}
-
-function hardwareFact(array $snapshot, string $path): array
-{
-    return Arr::get($snapshot['facts'], $path) ?? throw new RuntimeException("Missing fact {$path}");
-}
-
 dataset('hardware fixtures', fn (): array => array_map(
     fn (string $file): string => basename($file, '.json'),
     glob(__DIR__.'/../../Fixtures/hardware/*.json') ?: [],
@@ -190,7 +155,7 @@ describe('molly:preflight', function () {
             ->and($snapshot)->toHaveKeys(['measured_at', 'host', 'facts', 'unknowns', 'canonicalization']);
     });
 
-    it('shows a readable table and the snapshot digest', function () {
+    it('shows a readable table, the fit decision, and the snapshot digest', function () {
         $fixture = replayHardwareFixture('m3-ultra-96gb');
 
         $exit = Artisan::call('molly:preflight', ['--destination' => $fixture['destination']]);
@@ -200,7 +165,11 @@ describe('molly:preflight', function () {
             ->and($output)->toContain('memory.total_bytes')
             ->and($output)->toContain('103079215104')
             ->and($output)->toContain('sysctl -n hw.memsize')
-            ->and($output)->toContain('did not choose a model')
+            ->and($output)->toContain('Model fit: recommended_fit. gpt-oss:120b-code fits this Mac and leaves 11 GB of memory headroom.')
+            ->and($output)->toContain('qwen2.5-coder:7b')
+            ->and($output)->toContain('origin_not_us_developed')
+            ->and($output)->toContain('Next: php artisan molly:install-model gpt-oss:120b-code')
+            ->and($output)->toContain('Molly downloaded nothing.')
             ->and($output)->toContain('Snapshot ');
     });
 
