@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Sifrious\Molly\Actions\RecoverAbandonedTasks;
+use Sifrious\Molly\Models\Task;
 use Symfony\Component\Process\Process;
 
 /** A stand-in for php that runs until signalled. With $ignoreTerm it only dies to SIGKILL. */
@@ -283,6 +285,47 @@ it('keeps the worker directory, log, and record private to the user', function (
     expect(fileperms($this->workspace.'/.molly/worker') & 0777)->toBe(0700)
         ->and(fileperms($this->workspace.'/.molly/worker/worker.log') & 0777)->toBe(0600)
         ->and(fileperms($this->workspace.'/.molly/worker/worker.json') & 0777)->toBe(0600);
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});
+
+it('settles tasks a killed worker left running before it starts a new worker', function (): void {
+    $gone = new Process(['true']);
+    $gone->start();
+    $pid = $gone->getPid();
+    $gone->wait();
+    $task = Task::create([
+        'prompt' => 'Return Hello.', 'workspace' => $this->workspace, 'paths' => ['app/Greeting.php'], 'test_path' => 'tests/GreetingTest.php',
+        'status' => 'running', 'attempt_number' => 1, 'worker_id' => gethostname().':'.$pid, 'claimed_at' => now()->subMinute(), 'lease_expires_at' => now()->addMinutes(5),
+    ]);
+    $run = $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $this->workspace, 'status' => 'running', 'report' => []]);
+
+    $started = worker('start', $this->workspace);
+
+    expect($started['exit'])->toBe(0)
+        ->and($started['state'])->toBe('running')
+        ->and($started['recovery'])->toBe(['status' => 'checked', 'recovered' => [
+            ['task_id' => $task->id, 'reference' => $task->id, 'status' => 'failed', 'reason' => 'worker_exited'],
+        ], 'limit_reached' => false])
+        ->and($task->fresh()->status)->toBe('failed')
+        ->and($run->fresh()->status)->toBe('failed')
+        ->and($run->fresh()->report['error'])->toStartWith('RUN_ABANDONED:');
+
+    $restarted = worker('restart', $this->workspace, ['--timeout' => 5]);
+    expect($restarted['recovery'])->toBe(['status' => 'checked', 'recovered' => [], 'limit_reached' => false]);
+
+    worker('stop', $this->workspace, ['--timeout' => 5]);
+});
+
+it('starts the worker and reports the reason when the recovery check fails', function (): void {
+    $this->mock(RecoverAbandonedTasks::class)->shouldReceive('handle')->andThrow(new RuntimeException('SQLSTATE[HY000]: General error: 5 database is locked'));
+
+    $started = worker('start', $this->workspace);
+
+    expect($started['exit'])->toBe(0)
+        ->and($started['state'])->toBe('running')
+        ->and($started['recovery']['status'])->toBe('failed')
+        ->and($started['recovery']['error'])->toBe('WORKER_RECOVERY_FAILED: Molly could not check for tasks a previous worker left running. SQLSTATE[HY000]: General error: 5 database is locked');
 
     worker('stop', $this->workspace, ['--timeout' => 5]);
 });

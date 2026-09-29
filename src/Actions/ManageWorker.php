@@ -18,7 +18,8 @@ use Throwable;
  * process group. Its pid, process group, and command line are recorded in
  * .molly/worker/worker.json. A recorded pid only counts as Molly's worker while
  * the process is alive, still leads the recorded group, and still runs the
- * recorded command line, so a reused pid is never signalled.
+ * recorded command line, so a reused pid is never signalled. Start and restart
+ * first settle tasks that a killed worker or a restarted host left running.
  */
 class ManageWorker
 {
@@ -42,6 +43,8 @@ class ManageWorker
         "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 &
         echo $!
         SH;
+
+    public function __construct(private RecoverAbandonedTasks $recovery) {}
 
     /** @return array<string, mixed> */
     public function status(string $workspace): array
@@ -67,9 +70,10 @@ class ManageWorker
             $replaced = $state['state'] === 'stale' ? $state['stale_reason'] : null;
             File::delete($this->recordPath($root));
 
+            $recovery = $this->recoverAbandoned();
             $record = $this->launch($root);
 
-            return [...$this->report($root, 'start', $record, $this->inspect($record)), 'replaced_stale' => $replaced];
+            return [...$this->report($root, 'start', $record, $this->inspect($record)), 'replaced_stale' => $replaced, 'recovery' => $recovery];
         });
     }
 
@@ -88,10 +92,27 @@ class ManageWorker
 
         return $this->locked($root, $timeout, function () use ($root, $timeout): array {
             $stopped = $this->stopLocked($root, $timeout);
+            $recovery = $this->recoverAbandoned();
             $record = $this->launch($root);
 
-            return [...$this->report($root, 'restart', $record, $this->inspect($record)), 'stop' => $stopped];
+            return [...$this->report($root, 'restart', $record, $this->inspect($record)), 'stop' => $stopped, 'recovery' => $recovery];
         });
+    }
+
+    /**
+     * Settle tasks a killed worker or a restarted host left running before a new worker starts.
+     * The queue worker also runs the host application's own jobs, so a failed check is reported
+     * with its reason and does not stop the worker from starting.
+     *
+     * @return array{status: string, recovered: list<array<string, string>>, limit_reached: bool, error?: string}
+     */
+    private function recoverAbandoned(): array
+    {
+        try {
+            return ['status' => 'checked', ...$this->recovery->handle()];
+        } catch (Throwable $exception) {
+            return ['status' => 'failed', 'recovered' => [], 'limit_reached' => false, 'error' => 'WORKER_RECOVERY_FAILED: Molly could not check for tasks a previous worker left running. '.$exception->getMessage()];
+        }
     }
 
     /** @return array<string, mixed> */
