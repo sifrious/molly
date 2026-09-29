@@ -20,6 +20,25 @@ const GPT_OSS_20B_DIGEST = '17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0
 const GPT_OSS_120B_CODE_DIGEST = '4dda6ee4a98ead297f4cdeae389ecdc1963ed4cad90b10c8a11e1cc2a7b0fcaf';
 const GPT_OSS_120B_DIGEST = 'a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9';
 
+/*
+ * GitHub's runners have no global Git identity, so a test commit that relies on one passes on a
+ * developer's machine and fails in CI. Point Git at a private global config with a test identity
+ * for this process and every process it starts, so each commit a test makes, and each script that
+ * checks for an identity, sees the same settings everywhere and none of the developer's own.
+ */
+(static function (): void {
+    $config = tempnam(sys_get_temp_dir(), 'molly-gitconfig-');
+    file_put_contents($config, "[user]\n\tname = Molly Tests\n\temail = tests@example.com\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n");
+    putenv('GIT_CONFIG_GLOBAL='.$config);
+    $_ENV['GIT_CONFIG_GLOBAL'] = $_SERVER['GIT_CONFIG_GLOBAL'] = $config;
+    $owner = getmypid();
+    register_shutdown_function(static function () use ($config, $owner): void {
+        if (getmypid() === $owner) {
+            @unlink($config);
+        }
+    });
+})();
+
 /**
  * No test may turn the Testbench skeleton at base_path() into a Git repository. Record what
  * the skeleton holds before the suite and fail the run if a repository or bind marker appears.
@@ -258,21 +277,26 @@ function waitUntil(Closure $condition, string $message, float $seconds = 20): vo
 }
 
 /**
- * Start $command through /bin/sh with job control on, so it runs as its own process group the
- * way a terminal runs a foreground command, and Ctrl-C can be sent with posix_kill(-$pid, SIGINT).
- * Its output goes to $base.out and $base.err, and its exit status to $base.exit.
+ * Start $command through /bin/sh as its own process group, the way a terminal runs a foreground
+ * command, so Ctrl-C can be sent with posix_kill(-$pid, SIGINT). The shell uses setsid where it
+ * exists, because dash, the /bin/sh of Linux runners, turns job control off without a terminal,
+ * and job control elsewhere, as on macOS. Its output goes to $base.out and $base.err, and its
+ * exit status to $base.exit.
  *
  * @param  list<string>  $command
  * @return array{shell: Process, pid: int}
  */
 function startInOwnProcessGroup(array $command, string $cwd, string $base): array
 {
-    $script = 'set -m; "$@" >"$0.out" 2>"$0.err" & echo $! >"$0.pid.tmp" && mv "$0.pid.tmp" "$0.pid"; wait $!; echo $? >"$0.exit"';
+    $script = 'if command -v setsid >/dev/null 2>&1; then detach=setsid; else detach=; set -m; fi; $detach "$@" >"$0.out" 2>"$0.err" & echo $! >"$0.pid.tmp" && mv "$0.pid.tmp" "$0.pid"; wait $!; echo $? >"$0.exit"';
     $shell = new Process(['/bin/sh', '-c', $script, $base, ...$command], $cwd, timeout: 120);
     $shell->start();
     waitUntil(fn (): bool => is_file($base.'.pid'), 'the command started');
+    $pid = (int) file_get_contents($base.'.pid');
+    // setsid moves the command into its group after the shell forks it.
+    waitUntil(fn (): bool => posix_getpgid($pid) === $pid || is_file($base.'.exit'), 'the command leads its own process group');
 
-    return ['shell' => $shell, 'pid' => (int) file_get_contents($base.'.pid')];
+    return ['shell' => $shell, 'pid' => $pid];
 }
 
 /** @return list<int> the live processes in process group $pgid */

@@ -18,6 +18,16 @@
 /bloom-plugin/Surfaces.bundle export-ignore
 /vendor export-ignore
 /work export-ignore
+# Maintainer tooling that runs from a clone: acceptance, release, and documentation checks.
+/bin/molly-acceptance-gate export-ignore
+/bin/molly-candidate export-ignore
+/bin/molly-docs-check export-ignore
+/bin/molly-docs-walkthrough export-ignore
+/bin/molly-release-gates export-ignore
+/bloom-plugin/Surfaces/Tests export-ignore
+/bloom-plugin/Surfaces/.gitignore export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
 
 # The model catalogue is checked against its SHA-256 file, so Git must not change its line endings.
 /resources/models/* -text

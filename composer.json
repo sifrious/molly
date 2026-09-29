@@ -78,7 +78,16 @@
             "/pint.json",
             "/testbench.yaml",
             "/bloom-plugin/Surfaces.bundle",
-            "/bloom-plugin/Surfaces/.build"
+            "/bloom-plugin/Surfaces/.build",
+            "/bin/molly-acceptance-gate",
+            "/bin/molly-candidate",
+            "/bin/molly-docs-check",
+            "/bin/molly-docs-walkthrough",
+            "/bin/molly-release-gates",
+            "/bloom-plugin/Surfaces/Tests",
+            "/bloom-plugin/Surfaces/.gitignore",
+            "/.gitattributes",
+            "/.gitignore"
         ]
     },
     "bin": [

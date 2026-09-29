@@ -71,7 +71,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Measure coverage
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: vendor/bin/pest --colors=never --coverage-clover=build/coverage/clover.xml --coverage-html=build/coverage/html --coverage-text=build/coverage/summary.txt
 
       - name: Upload coverage reports

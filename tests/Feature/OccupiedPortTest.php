@@ -76,9 +76,12 @@ it('fails with a named error and exit 1 when the port given to serve --port is t
 });
 
 it('moves serve to the next free port and prints it when no port is given', function (): void {
-    [$socket, $port] = occupyLoopbackPort();
-    // A port in --host, like the default 8000, leaves --port empty, so serve may try the next port.
-    $serve = testbenchProcess(['serve', '--host=127.0.0.1:'.$port, '--tries=5', '--no-reload'], timeout: 60);
+    // Without --port, serve starts at 8000, as the troubleshooting guide says. Laravel 12.0 reads a
+    // port written into --host as part of the host, so the test uses the default port instead of a
+    // random one. It holds 8000 unless another program already does; either way 8000 is taken.
+    $port = 8000;
+    $socket = @stream_socket_server('tcp://127.0.0.1:'.$port);
+    $serve = testbenchProcess(['serve', '--host=127.0.0.1', '--no-reload'], timeout: 60);
     $serve->start();
 
     try {
@@ -104,6 +107,8 @@ it('moves serve to the next free port and prints it when no port is given', func
         fclose($client);
     } finally {
         stopServe($serve);
-        fclose($socket);
+        if ($socket !== false) {
+            fclose($socket);
+        }
     }
 });

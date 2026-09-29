@@ -29,18 +29,28 @@ class ManageWorker
     public const DEFAULT_LOCK_WAIT = 10;
 
     /**
-     * `set -m` puts the background job in its own process group. The shell first closes
-     * every descriptor above stderr that it inherited from the Artisan command, such as
-     * the caller's stdout pipe or worker.lock, then points the worker's stdio at the log.
-     * The shell prints the worker pid and returns at once, and the worker outlives the
-     * command without holding the caller's pipe open.
+     * The worker needs its own process group so stop can signal everything it started.
+     * Where setsid exists, as on Linux, it starts the worker in a new session and process
+     * group. Elsewhere, as on macOS, `set -m` turns on job control, which puts the background
+     * job in its own group. dash, the /bin/sh of Debian and Ubuntu, turns job control off
+     * without a terminal, so the script exits with an error when neither works rather than
+     * start a worker that stop cannot reach. The shell then closes every descriptor above
+     * stderr that it inherited from the Artisan command, such as the caller's stdout pipe or
+     * worker.lock, and points the worker's stdio at the log. It prints the worker pid and
+     * returns at once, and the worker outlives the command without holding the caller's pipe.
      */
     private const LAUNCH_SCRIPT = <<<'SH'
-        set -m
+        if command -v setsid >/dev/null 2>&1; then
+            detach=setsid
+        else
+            detach=
+            set -m
+            case $- in *m*) ;; *) echo 'Neither setsid nor shell job control is available to give the worker its own process group.' >&2; exit 1 ;; esac
+        fi
         for fd in $(ls /dev/fd); do
             case "$fd" in 0|1|2) ;; *) eval "exec $fd>&-" 2>/dev/null ;; esac
         done
-        "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 &
+        $detach "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 &
         echo $!
         SH;
 
