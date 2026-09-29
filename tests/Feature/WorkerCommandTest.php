@@ -76,6 +76,43 @@ it('starts a worker in its own process group, reports it, and stops it with SIGT
     expect(worker('status', $this->workspace))->toMatchArray(['exit' => 0, 'state' => 'stopped', 'alive' => false, 'pid' => null]);
 });
 
+it('recognizes its worker in a path with spaces and Unicode when the locale is not UTF-8', function (): void {
+    // ps prints non-ASCII bytes as escapes under the C locale, which apps opened from the Finder
+    // get. base_path() is fixed in tests, so the queue name carries the non-ASCII characters.
+    $workspace = $this->workspace.'/Molly Tëst ✓/app';
+    File::ensureDirectoryExists($workspace);
+    config(['molly.worker.php_binary' => fakeWorkerBinary($workspace), 'queue.connections.sync.queue' => 'Tëst ✓']);
+    $locale = ['env' => getenv('LC_ALL'), 'server' => $_SERVER['LC_ALL'] ?? null, 'dotenv' => $_ENV['LC_ALL'] ?? null];
+    putenv('LC_ALL=C');
+    $_SERVER['LC_ALL'] = $_ENV['LC_ALL'] = 'C';
+
+    try {
+        $started = worker('start', $workspace);
+        expect($started['exit'])->toBe(0, (string) ($started['error'] ?? ''))
+            ->and($started['state'])->toBe('running')
+            ->and($started['command'])->toContain('--queue=Tëst ✓')
+            ->and($started['log'])->toBe($workspace.'/.molly/worker/worker.log')
+            ->and(worker('status', $workspace))->toMatchArray(['state' => 'running', 'pid' => $started['pid']]);
+
+        $stopped = worker('stop', $workspace, ['--timeout' => 5]);
+        expect($stopped['signal'])->toBe('SIGTERM')
+            ->and(processAlive($started['pid']))->toBeFalse();
+    } finally {
+        $locale['env'] === false ? putenv('LC_ALL') : putenv('LC_ALL='.$locale['env']);
+        foreach (['server' => '_SERVER', 'dotenv' => '_ENV'] as $key => $global) {
+            if ($locale[$key] === null) {
+                unset($GLOBALS[$global]['LC_ALL']);
+            } else {
+                $GLOBALS[$global]['LC_ALL'] = $locale[$key];
+            }
+        }
+        $record = $workspace.'/.molly/worker/worker.json';
+        if (is_file($record)) {
+            @posix_kill(-json_decode(File::get($record), true)['pgid'], SIGKILL);
+        }
+    }
+});
+
 it('refuses a second start while the owned worker is alive', function (): void {
     $first = worker('start', $this->workspace);
     $second = worker('start', $this->workspace);

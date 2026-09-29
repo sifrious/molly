@@ -20,6 +20,8 @@ php artisan serve --host=127.0.0.1 --port=8000
 
 Open `http://127.0.0.1:8000/molly`. The route prefix is `molly.ui.prefix` in `config/molly.php`.
 
+`--port=8000` tells `serve` to use only port 8000. If another program holds it, `serve` prints `Failed to listen on 127.0.0.1:8000 (reason: Address already in use)` and exits with status 1. Leave out `--port` and `serve` moves to the next free port and prints the address it chose. Molly itself opens no port; see [The port is already in use](troubleshooting.md#the-port-is-already-in-use).
+
 Molly accepts requests only in the `local` and `testing` environments and only from `localhost`, `127.0.0.1`, or `[::1]`. A custom development domain, a tunnel, or a remote client gets a 403.
 
 ## The pages

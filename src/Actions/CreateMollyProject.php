@@ -62,7 +62,7 @@ final class CreateMollyProject
             }
             if ($this->directoryNotEmpty($path)) {
                 if (! $force) {
-                    throw new RuntimeException('PROJECT_PATH_NOT_EMPTY: Choose an empty directory or pass --force.');
+                    throw new RuntimeException('PROJECT_PATH_NOT_EMPTY: '.$path.' is not empty. Choose an empty directory, or pass --force to delete it and create the application again, for example after an interrupted molly:project-new.');
                 }
                 $note('force', 'Removing non-empty target because --force was set');
                 File::deleteDirectory($path);

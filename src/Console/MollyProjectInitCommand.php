@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
+use Laravel\Prompts\Prompt;
 use Sifrious\Molly\Actions\InitializeMollyInExistingProject;
 use Throwable;
 
@@ -35,7 +36,7 @@ class MollyProjectInitCommand extends Command
                 runMigrations: ! $this->option('no-migrate'),
                 bootstrapGraphs: ! $this->option('no-graphs'),
                 progress: $this->option('json') ? null : function (string $step, string $message): void {
-                    note('['.$step.'] '.$message);
+                    $this->printNote('['.$step.'] '.$message);
                 },
             );
 
@@ -50,13 +51,26 @@ class MollyProjectInitCommand extends Command
             if ($this->option('json')) {
                 $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
             } else {
-                note('Molly is initialized in '.$result['project']->path);
-                note('List projects: php artisan molly:projects');
+                $this->printNote('Molly is initialized in '.$result['project']->path);
+                $this->printNote('List projects: php artisan molly:projects');
             }
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
+            Prompt::setOutput($this->output);
+
             return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
+    }
+
+    /**
+     * Initializing the application this command runs in migrates through Artisan::call, which
+     * leaves Prompts writing to that call's buffer, so every later note was lost. Point Prompts
+     * back at this command before each note.
+     */
+    private function printNote(string $message): void
+    {
+        Prompt::setOutput($this->output);
+        note($message);
     }
 }
