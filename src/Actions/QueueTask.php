@@ -23,12 +23,14 @@ class QueueTask
     public function handle(string $id, bool $retry = false, ?ExecutionTargetRequest $target = null): Task
     {
         $task = $this->show->handle($id) ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
-        $driver = config('queue.connections.'.config('queue.default').'.driver');
+        $connection = (string) config('queue.default');
+        $driver = config('queue.connections.'.$connection.'.driver');
         if (! in_array($driver, ['database', 'redis', 'sqs', 'beanstalkd'], true)) {
-            throw new RuntimeException('Choose a database, Redis, SQS, or Beanstalkd queue connection and start a queue worker before running tasks.');
+            throw new RuntimeException('QUEUE_DRIVER_UNSUPPORTED: The '.$connection.' queue connection uses the '.(is_string($driver) ? $driver : 'unknown').' driver. Choose a database, Redis, SQS, or Beanstalkd queue connection and start a queue worker before running tasks.');
         }
-        if (in_array($driver, ['database', 'redis', 'beanstalkd'], true) && (int) config('queue.connections.'.config('queue.default').'.retry_after', 0) <= 3600) {
-            throw new RuntimeException('Set the queue connection retry_after above 3600 seconds so a task cannot be reserved again while its worker is running.');
+        $retryAfter = (int) config('queue.connections.'.$connection.'.retry_after', 0);
+        if (in_array($driver, ['database', 'redis', 'beanstalkd'], true) && $retryAfter <= 3600) {
+            throw new RuntimeException('QUEUE_RETRY_AFTER_TOO_SHORT: Set the '.$connection.' queue connection retry_after above 3600 seconds so a task cannot be reserved again while its worker is running. It is '.$retryAfter.'.');
         }
         if ($target === null || $target->kind !== ExecutionTargetKind::Orb) {
             StartSavedTask::dispatch($task->id, $retry);
