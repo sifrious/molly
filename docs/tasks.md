@@ -76,6 +76,8 @@ The run happens in your terminal: the model proposes a change, Molly applies it,
 
 Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed.
 
+You do not need a clean working tree. A run writes only the task's selected files. Other edits, staged changes, and untracked files stay exactly as they were, and Molly never stages or commits. When a write fails partway, Molly restores the selected files it had written, with their original contents and file modes.
+
 ## Inspect tasks and runs
 
 ```bash

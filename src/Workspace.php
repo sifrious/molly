@@ -411,7 +411,9 @@ class Workspace
                         throw new RuntimeException('Could not remove the new file.');
                     }
                 } else {
-                    File::replace($absolute, $before[$path]);
+                    // apply() kept the file's mode, so keep it again here. Without a mode,
+                    // File::replace gives the file 0777 - umask, and Git reports a mode change.
+                    File::replace($absolute, $before[$path], is_file($absolute) ? fileperms($absolute) & 0777 : 0666 & ~umask());
                     if (File::get($absolute) !== $before[$path]) {
                         throw new RuntimeException('Could not restore the original contents.');
                     }
