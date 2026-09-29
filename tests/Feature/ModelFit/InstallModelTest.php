@@ -258,8 +258,10 @@ describe('authorization', function () {
     it('shows every fact of the download in full before it asks, in an 80-column terminal', function () {
         $fixture = installHost('m2-pro-16gb-external');
         fakeOllamaApi();
-        $destination = $fixture['destination'].'/Shared Models/team/ollama/models';
+        // The path must be longer than the terminal on every host; /tmp on Linux is much shorter than macOS's temporary folder.
+        $destination = $fixture['destination'].'/Shared Models/team/ollama/models for the shared acceptance machine';
         File::ensureDirectoryExists($destination);
+        expect(mb_strlen(' Destination: '.$destination))->toBeGreaterThan(80);
         $columns = getenv('COLUMNS');
         putenv('COLUMNS=80');
 
