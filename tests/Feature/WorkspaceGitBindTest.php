@@ -326,7 +326,7 @@ it('refuses an untracked app in a committed repository in create, project-init, 
 
     try {
         expect(fn () => app(CreateTask::class)->handle('Return Hello.', $app, ['app/Hello.php'], 'tests/HelloTest.php'))
-            ->toThrow(RuntimeException::class, 'WORKSPACE_REVISION_MISSING: '.$app.' has no files in the HEAD commit of the Git repository at '.realpath($root));
+            ->toThrow(RuntimeException::class, 'WORKSPACE_REVISION_MISSING: '.realpath($app).' has no files in the HEAD commit of the Git repository at '.realpath($root));
 
         foreach ([
             ['molly:create', ['prompt' => 'Return Hello.', '--workspace' => $app, '--file' => ['app/Hello.php'], '--test' => 'tests/HelloTest.php', '--json' => true]],

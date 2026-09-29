@@ -10,6 +10,8 @@ final class ObserveCheckout
     /**
      * The path stays the workspace (the Laravel app, where .molly/ lives); repository_root is
      * the top level of the Git work tree that tracks it, which may be a parent directory.
+     * A relative path, such as ../orbs/greeting, is resolved once against the current
+     * directory, and the observation reports the absolute path.
      *
      * @return array{path: string, repository_root: string, branch: ?string, head: ?string, remote_url: ?string, remote_identity: ?string}
      */
@@ -33,7 +35,7 @@ final class ObserveCheckout
         $remoteIdentity = $this->remoteIdentity($remote);
 
         return [
-            'path' => is_dir($path) ? $path : $real,
+            'path' => str_starts_with($path, '/') && is_dir($path) ? $path : $real,
             'repository_root' => $root,
             'branch' => $branch !== '' ? $branch : null,
             'head' => $head !== '' ? strtolower($head) : null,
@@ -188,12 +190,15 @@ final class ObserveCheckout
     }
 
     /**
+     * Run Git in the directory. The directory is given once, as the process's working
+     * directory: with git -C as well, Git would resolve a relative path a second time.
+     *
      * @param  list<string>  $args
      * @return array{0: int, 1: string, 2: string}
      */
     private static function run(string $cwd, array $args): array
     {
-        $cmd = array_merge(['git', '-C', $cwd], $args);
+        $cmd = array_merge(['git'], $args);
         $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
         if (! is_resource($proc)) {
             throw new RuntimeException('WORKSPACE_GIT_FAILED: Could not start git.');
