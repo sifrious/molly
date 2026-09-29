@@ -70,17 +70,20 @@ final class Git
     }
 
     /**
-     * Run `git log --no-merges` with the given extra arguments and return
-     * its raw output, or null on failure. core.quotepath=off keeps
-     * non-ASCII paths unescaped in --name-only output. the one intentional
-     * flag the hand-verify one-liners do not pass.
+     * Run `git log --no-merges --relative` with the given extra arguments and
+     * return its raw output, or null on failure. --relative prints paths
+     * relative to the configured root, so a workspace in a subdirectory of
+     * its repository, such as backend/ in a monorepo, gets paths that
+     * resolve under that root. core.quotepath=off keeps non-ASCII paths
+     * unescaped in --name-only output. the one intentional flag the
+     * hand-verify one-liners do not pass.
      *
      * @param  list<string>  $extraArgs
      */
     public function log(array $extraArgs): ?string
     {
         try {
-            $result = $this->run(['git', '-c', 'core.quotepath=off', 'log', '--no-merges', ...$extraArgs]);
+            $result = $this->run(['git', '-c', 'core.quotepath=off', 'log', '--no-merges', '--relative', ...$extraArgs]);
         } catch (Throwable) {
             return null;
         }

@@ -39,7 +39,7 @@ final class LonelyFilesProbe extends BaseProbe
     public function handVerify(): string
     {
         return <<<'CMD'
-        git log --no-merges --pretty=format:'@%an' --name-only -- '*.php' \
+        git log --no-merges --relative --pretty=format:'@%an' --name-only -- '*.php' \
           | awk '/^@/ {au=substr($0,2); next}
                  NF {ch[$0]++; if (!seen[$0","au]++) auth[$0]++}
                  END {for (f in ch) if (auth[f]==1) print ch[f], f}' \
