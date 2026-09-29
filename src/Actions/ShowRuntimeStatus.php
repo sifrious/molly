@@ -55,7 +55,7 @@ class ShowRuntimeStatus
             'graphs' => $this->graphs->handle($root),
             'config' => [
                 'molly' => Arr::only((array) config('molly'), [
-                    'agent', 'model', 'timeout', 'test_timeout', 'max_files', 'max_file_bytes', 'max_attempts', 'agent_bus',
+                    'agent', 'model', 'timeout', 'memory', 'test_timeout', 'max_files', 'max_file_bytes', 'max_attempts', 'agent_bus',
                     'parallel_checks', 'verification', 'verification_actions', 'false_green', 'sandbox', 'knowledge', 'preview', 'ui',
                 ]) + ['jev' => Arr::only((array) config('molly.jev'), ['enabled', 'model', 'confidence_threshold', 'timeout'])]
                     + ['worker' => ['php_binary' => config('molly.worker.php_binary') ?: PHP_BINARY]],

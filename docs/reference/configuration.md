@@ -21,7 +21,8 @@ Restart queue workers after configuration changes.
 | --- | --- | --- |
 | `molly.agent` | `ollama` | `ollama` or `amp`. Environment: `MOLLY_AGENT`. |
 | `molly.model` | `null` | The exact local Ollama model name. Environment: `MOLLY_LOCAL_MODEL`. |
-| `molly.timeout` | `180` | Seconds allowed for each model request. |
+| `molly.timeout` | `180` | Seconds allowed for each model request. A request that runs longer fails with `PROVIDER_TIMEOUT`. |
+| `molly.memory.headroom_gb` | `11` | Gigabytes (10^9 bytes) that must stay free beyond an Ollama model's size before Molly lets Ollama load it. See [Memory](#memory). |
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
 | `molly.max_attempts` | `3` | Runs a task may make, from 1 to 10. |
 | `molly.repair.per_failure` | `3` | Failed runs with the same failure fingerprint before Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`, from 1 to 10. `molly.max_attempts` still caps the total. |
@@ -72,6 +73,18 @@ Molly uses Laravel AI's Ollama provider, configured in `config/ai.php`:
 | `ai.providers.ollama.url` | `http://localhost:11434` | Must be a loopback HTTP URL. Environment: `OLLAMA_URL`. |
 
 The model name must match `ollama list` and must not look like a hosted model.
+
+### Memory
+
+Before each model request from `molly:story`, `molly:start`, and the Tarpit review, Molly compares the configured model with the memory that `molly:preflight` measures, using the same probe. The model's size is the size Ollama reports in `/api/tags`, the number `ollama list` shows. Available memory is the free, inactive, and speculative pages from `vm_stat`.
+
+- When Ollama already holds the model, according to `/api/ps`, the request goes ahead. Loading it again needs no more memory.
+- When the model's size plus `molly.memory.headroom_gb` is more than the available memory, Molly refuses with `MODEL_MEMORY_INSUFFICIENT` and never asks Ollama to load the model. `molly:doctor` reports the same comparison as `model_exceeds_memory`.
+- When the available memory, the model's size, or the list of loaded models is unknown, Molly does not refuse. Doctor reports `model_memory_unknown` with the status `unknown`, which does not fail doctor.
+
+`molly.memory.headroom_gb` takes a number of gigabytes, 0 or more; 11 is the default. Any other value fails with `MEMORY_HEADROOM_INVALID`, and doctor reports `memory_headroom_invalid`.
+
+Molly measures memory on macOS only, so on other systems the check is always unknown. Memory held by another model that Ollama has loaded counts as used. Molly never pulls, deletes, unloads, or switches a model to make room; choose a smaller installed model with `php artisan molly:setup` or free memory yourself.
 
 ## Amp
 
@@ -185,7 +198,7 @@ The worker's record, `.molly/worker/worker.json`, holds its pid, process group, 
 | `MOLLY_HOME` | Where global settings, conversations, and the graph cache live. Defaults to `~/.molly`. |
 | `APP_ENV`, `QUEUE_CONNECTION` | The application's environment and queue |
 
-Timeouts, size limits, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.
+Timeouts, size limits, the memory headroom, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.
 
 ## Next
 

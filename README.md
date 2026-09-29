@@ -52,7 +52,7 @@ php artisan molly:demo
 php artisan molly:start demo-greeting
 ```
 
-`molly:preflight` reports what this Mac can hold before you download a model; it measures and never downloads. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
+`molly:preflight` reports what this Mac can hold before you download a model; it measures and never downloads. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
 
 On macOS, doctor reports that the writer sandbox is unavailable, because it needs Linux Landlock. Molly refuses to start a task until you opt out of isolation for a trusted checkout. [Getting started](docs/getting-started.md#macos-and-the-sandbox) explains that choice.
 

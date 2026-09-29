@@ -39,7 +39,8 @@ php artisan config:clear
 php artisan molly:doctor
 ```
 
-Molly never switches models on its own. Small coder models want about 8 GB of free memory; larger ones need proportionally more.
+Molly never switches models on its own. Small coder models want about 8 GB of free memory; larger ones need proportionally more. Before Ollama loads a model it does not already hold, Molly checks that the model's size plus `molly.memory.headroom_gb` (11 GB by default) fits in the available memory, and refuses with `MODEL_MEMORY_INSUFFICIENT` when it does not. See [Memory](reference/configuration.md#memory).
+
 Doctor prints a **Code** column so failures stay distinguishable:
 
 | Code | Meaning |
@@ -48,6 +49,9 @@ Doctor prints a **Code** column so failures stay distinguishable:
 | `ollama_reachable` | Ollama answered `/api/tags` |
 | `model_ready` | Configured model is installed |
 | `model_missing` | Ollama is up, but that model is not pulled |
+| `model_fits_memory` / `model_loaded` | The model and the headroom fit in available memory, or Ollama already holds the model |
+| `model_exceeds_memory` | The model and the headroom do not fit in available memory |
+| `model_memory_unknown` | Molly could not measure memory or the model's size, so it does not refuse the model |
 | `ollama_unreachable` | Connection failed — start Ollama or fix the URL |
 | `ollama_config_invalid` | Driver/URL/timeout/model shape refused for local QuickStart |
 | `model_not_configured` | No `MOLLY_LOCAL_MODEL` yet |
@@ -74,6 +78,11 @@ Molly refuses a non-loopback URL for this path. Pointing Molly at Ollama on anot
 | `ollama_unreachable` | The connection failed. | Start Ollama with `ollama serve` or fix `OLLAMA_URL`. |
 | `model_ready` | The configured model is installed. | Nothing. |
 | `model_missing` | Ollama is up, but the model is not pulled. | `ollama pull NAME`, or fix `MOLLY_LOCAL_MODEL`. |
+| `model_fits_memory` | The model's size plus `molly.memory.headroom_gb` fits in the available memory. | Nothing. |
+| `model_loaded` | Ollama already holds the model in memory. | Nothing. |
+| `model_exceeds_memory` | The model's size plus the headroom is more than the available memory. A run refuses it with `MODEL_MEMORY_INSUFFICIENT`. | Choose a smaller installed model, or free memory. |
+| `model_memory_unknown` | Molly could not measure the available memory, the model's size, or the loaded models. The status is `unknown`, and doctor does not fail on it. | Nothing required. `molly:preflight` shows which fact is unknown. |
+| `memory_headroom_invalid` | `molly.memory.headroom_gb` is not a number, 0 or more. | Fix the value in `config/molly.php`. |
 | `model_not_configured` | No model name is set. | Run `molly:setup --agent=ollama --model=NAME`. |
 | `model_not_local` | The name looks like a hosted model. | Choose an installed local model. |
 | `ollama_config_invalid` | The driver, URL, timeout, or model name is not usable. | Use loopback HTTP, the Ollama driver, and a positive `molly.timeout`. |
@@ -82,15 +91,19 @@ Doctor never prints API keys or account details.
 
 ## Timeouts
 
-`molly.timeout` in `config/molly.php` allows 180 seconds per model request by default. A slow model hitting that limit fails the run with a timeout rather than waiting. Prefer a smaller task or a faster model before raising it; if you do raise it, clear the configuration cache and run doctor again.
+`molly.timeout` in `config/molly.php` allows 180 seconds per model request by default. A slow model hitting that limit fails with `PROVIDER_TIMEOUT`, which names the model and the timeout, rather than waiting. A refused connection is a different failure, `PROVIDER_UNREACHABLE`. Prefer a smaller task or a faster model before raising the timeout; if you do raise it, clear the configuration cache and run doctor again.
 
 ## Common problems
 
 | Symptom | Likely code | Fix |
 | --- | --- | --- |
-| Connection refused | `ollama_unreachable` | `ollama serve`, then check the URL. |
-| Model name unknown | `model_missing` | `ollama pull NAME`. |
-| Out of memory or context errors | none (runtime) | A smaller model or more free memory. |
+| Connection refused | `ollama_unreachable` in doctor, `PROVIDER_UNREACHABLE` in a run | `ollama serve`, then check the URL. |
+| The model takes longer than `molly.timeout` | `PROVIDER_TIMEOUT` | A smaller task or a faster model, or a longer timeout. |
+| Model name unknown | `model_missing` in doctor, `MODEL_MISSING` in a run | `ollama pull NAME`. |
+| The model is larger than free memory | `model_exceeds_memory` in doctor, `MODEL_MEMORY_INSUFFICIENT` in a run | A smaller model or more free memory. |
+| Out of memory or context errors after the model loads | none (runtime) | A smaller model or more free memory. |
+| Ollama answers with an HTTP error | `PROVIDER_ERROR` | Read the Ollama server log, fix the cause, and try again. |
+| Ollama's reply is not a chat response | `PROVIDER_RESPONSE_INVALID` | Check that `OLLAMA_URL` points at Ollama itself. |
 | The model returns malformed changes | `GENERATION_INVALID` in the run | Retry once; if it repeats, use a larger model. |
 | The review keeps coming back `REVIEW_INVALID` | in the run | Use a larger model. |
 

@@ -41,8 +41,8 @@ Paths must be under `app/`, `routes/`, `resources/`, or `tests/`.
 
 | Command | What it does |
 | --- | --- |
-| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, Git, whether the workspace is a Git repository with a commit (`git_repository` or `workspace_not_git`), the sandbox, parallel checks, the agent, Clever, and the Jev gate. A `--workspace` that is not an existing directory fails with `WORKSPACE_INVALID` before any check runs. |
-| `molly:preflight [--destination=PATH]` | Measures this Mac before a model download: architecture, Rosetta translation, macOS version, memory and memory pressure, Metal, the installed Ollama runtime and models, and free space on the volume that holds the models. Facts it cannot read are listed as unknown. It does not choose or download a model. |
+| `molly:doctor [--workspace=PATH]` | Checks the database, Pest, Git, whether the workspace is a Git repository with a commit (`git_repository` or `workspace_not_git`), the sandbox, parallel checks, the agent, whether an installed Ollama model fits in the memory `molly:preflight` measures (`model_fits_memory`, `model_loaded`, `model_exceeds_memory`, or `model_memory_unknown`), Clever, and the Jev gate. A check it cannot measure has the status `unknown` and does not fail doctor. A `--workspace` that is not an existing directory fails with `WORKSPACE_INVALID` before any check runs. |
+| `molly:preflight [--destination=PATH]` | Measures this Mac before a model download: architecture, Rosetta translation, macOS version, memory and memory pressure, Metal, the installed Ollama runtime and models, and free space on the volume that holds the models. Facts it cannot read are listed as unknown. It does not choose or download a model. Doctor and each Ollama model request reuse its memory and model measurements; see [Memory](configuration.md#memory). |
 | `molly:setup --agent=ollama --model=NAME` | Saves a local Ollama model. |
 | `molly:setup --agent=amp [--no-login]` | Saves Amp as the agent and connects its MCP client. |
 | `molly:settings` | Shows global settings from `~/.molly/settings.json`. |

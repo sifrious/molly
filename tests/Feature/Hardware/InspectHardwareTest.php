@@ -155,6 +155,20 @@ it('hashes the same facts to the same digest regardless of key order', function 
         ->and(HardwareSnapshot::hash($facts))->not->toBe(HardwareSnapshot::hash(['disk' => ['free_bytes' => ['status' => 'measured', 'value' => 3]]] + $facts));
 });
 
+it('measures memory and Ollama models for a model-load check exactly as the full snapshot does', function (string $name) {
+    $fixture = replayHardwareFixture($name);
+    $probe = app(HardwareProbe::class);
+
+    $memory = $probe->memoryFacts();
+    Process::assertDidntRun(fn ($process): bool => preg_match('/system_profiler|ollama|df -kP|diskutil|sw_vers/', $process->command) === 1);
+    $facts = $probe->facts($fixture['destination']);
+
+    expect($memory)->toBe([
+        'memory' => $facts['memory'],
+        'ollama' => Arr::only($facts['ollama'], ['installed_models', 'loaded_models']),
+    ]);
+})->with('hardware fixtures');
+
 it('parses df rows whose mount point contains spaces', function () {
     expect(ProbeOutput::dfPortable("Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk6s1 100 40 60 40% /Volumes/Model Disk\n"))
         ->toBe(['device' => '/dev/disk6s1', 'total_kib' => 100, 'used_kib' => 40, 'available_kib' => 60, 'mount_point' => '/Volumes/Model Disk'])
