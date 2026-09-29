@@ -7,9 +7,9 @@ it('routes every MollyTask operation through exactly one named dispatch path', f
     $groups = [
         'dispatchRead' => ['list', 'show', 'show_run'],
         'dispatchCreate' => ['create', 'from_plan', 'import_github'],
-        'refuseHumanDecision' => ['approve', 'lock_test', 'pr_opened', 'merged', 'comment'],
+        'refuseHumanDecision' => ['approve', 'lock_test', 'pr_opened', 'merged', 'comment', 'handoff'],
         'dispatchLifecycle' => ['pr_body', 'stop'],
-        'dispatchHandoff' => ['handoff', 'name', 'link_thread'],
+        'dispatchLinks' => ['name', 'link_thread'],
         'dispatchAdvice' => ['advice'],
         'dispatchQueue' => ['start', 'retry'],
     ];
@@ -44,7 +44,7 @@ it('keeps create start retry stop show lifecycle handoff name thread and advice 
         ->and($source)->not->toContain('MergePullRequest');
 
     // Human decisions are refused over MCP; no approve flag can turn them on.
-    expect($source)->toContain("'approve', 'lock_test', 'pr_opened', 'merged', 'comment' => \$this->refuseHumanDecision(\$data)")
+    expect($source)->toContain("'approve', 'lock_test', 'pr_opened', 'merged', 'comment', 'handoff' => \$this->refuseHumanDecision(\$data)")
         ->and($source)->toContain('private function refuseHumanDecision(array $data): never')
         ->and($source)->not->toContain("'approve' => [")
         ->and($source)->not->toContain("\$data['approve']");
@@ -56,8 +56,8 @@ it('keeps create start retry stop show lifecycle handoff name thread and advice 
         ->and($source)->toContain("'linked_pr' => \$inspection['linked_pr']")
         ->and($source)->toContain("'issue_url' => \$inspection['issue_url']");
 
-    // Handoff / name / thread / advice keep named action collaborators.
-    expect($source)->toContain('app(HandOffTask::class)')
+    // Name / thread / advice keep named action collaborators; handoff is a human decision.
+    expect($source)->not->toContain('HandOffTask')
         ->and($source)->toContain('app(NameTask::class)')
         ->and($source)->toContain('app(LinkTaskThread::class)')
         ->and($source)->toContain('app(RecommendTaskNextStep::class)')
@@ -77,7 +77,6 @@ it('keeps compatible return-shape keys for each MollyTask operation family', fun
         ->and($source)->toContain("['task' => app(QueueTask::class)")
         ->and($source)->toContain("['task' => app(StopTask::class)")
         ->and($source)->toContain("['task' => app(NameTask::class)")
-        ->and($source)->toContain("['handoff' => app(HandOffTask::class)")
         ->and($source)->toContain("['association' => app(LinkTaskThread::class)")
         ->and($source)->toContain("['advice' => app(RecommendTaskNextStep::class)");
 });

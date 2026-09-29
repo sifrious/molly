@@ -4,7 +4,7 @@ use Sifrious\Molly\Mcp\MollyTask;
 
 it('dispatches molly_task operations through named private methods', function () {
     $reflection = new ReflectionClass(MollyTask::class);
-    foreach (['dispatchRead', 'dispatchCreate', 'dispatchLifecycle', 'dispatchHandoff', 'dispatchAdvice', 'dispatchQueue'] as $method) {
+    foreach (['dispatchRead', 'dispatchCreate', 'dispatchLifecycle', 'dispatchLinks', 'dispatchAdvice', 'dispatchQueue'] as $method) {
         expect($reflection->hasMethod($method))->toBeTrue()
             ->and($reflection->getMethod($method)->isPrivate())->toBeTrue();
     }
@@ -13,7 +13,7 @@ it('dispatches molly_task operations through named private methods', function ()
     expect($source)->toContain('$this->dispatchRead($data)')
         ->and($source)->toContain('$this->dispatchCreate($data)')
         ->and($source)->toContain('$this->dispatchLifecycle($data)')
-        ->and($source)->toContain('$this->dispatchHandoff($data)')
+        ->and($source)->toContain('$this->dispatchLinks($data)')
         ->and($source)->toContain('$this->dispatchAdvice($data)')
         ->and($source)->toContain('$this->dispatchQueue($data)');
 });
@@ -34,7 +34,7 @@ it('keeps MollyTask schema and validation operations in sync from one list', fun
     }
 
     $dispatchOps = [];
-    foreach (['dispatchRead', 'dispatchCreate', 'dispatchLifecycle', 'dispatchHandoff'] as $method) {
+    foreach (['dispatchRead', 'dispatchCreate', 'dispatchLifecycle', 'dispatchLinks'] as $method) {
         $body = $reflection->getMethod($method)->getFileName();
     }
     // Every OPERATIONS entry appears in the top-level handle match arms or as start/retry/advice

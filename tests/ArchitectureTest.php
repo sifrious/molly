@@ -27,6 +27,7 @@ arch('MCP tools never call the actions that record a human decision')
         'Sifrious\Molly\Actions\RecordPullRequestOpened',
         'Sifrious\Molly\Actions\RecordMerged',
         'Sifrious\Molly\Actions\PublishGitHubIssueStatus',
+        'Sifrious\Molly\Actions\HandOffTask',
     ]);
 
 arch('bundled measurements do not depend on task execution or agents')

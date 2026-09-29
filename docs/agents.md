@@ -64,7 +64,7 @@ A start or retry from MCP is queued through the application's queue and needs a 
 
 ## Human decisions
 
-An MCP client is an agent, so `molly_task` does not record a human decision. The `approve`, `lock_test`, `pr_opened`, `merged`, and `comment` operations fail with `HUMAN_APPROVAL_REQUIRED` and change nothing: no lifecycle event, task field, journal, or GitHub request. Passing `approve=true` makes no difference. The error ends with the Artisan command for a person to run, filled in with the arguments the client passed:
+An MCP client is an agent, so `molly_task` does not record a human decision. The `approve`, `lock_test`, `pr_opened`, `merged`, `comment`, and `handoff` operations fail with `HUMAN_APPROVAL_REQUIRED` and change nothing: no lifecycle event, task field, journal, or GitHub request. Passing `approve=true` makes no difference. The error ends with the Artisan command for a person to run, filled in with the arguments the client passed:
 
 ```text
 HUMAN_APPROVAL_REQUIRED: Only a person can approve a verified change. molly_task changed nothing. Ask a person to run: php artisan molly:approve ready-check --approve
@@ -77,8 +77,9 @@ HUMAN_APPROVAL_REQUIRED: Only a person can approve a verified change. molly_task
 | `pr_opened` | `molly:pr-opened TASK --url=URL --approve` |
 | `merged` | `molly:merged TASK --sha=SHA --approve` |
 | `comment` | `molly:comment TASK --approve [--close]` |
+| `handoff` | `molly:handoff TASK --from=UUID --to=UUID [--action=ACTION] [--context=TEXT] --approve` |
 
-When the client leaves out the pull request URL or merge SHA, the command shows `URL` or `SHA` in its place. After a person runs the command, `show` reports the new display status and `pr_body` prints the pull request description.
+When the client leaves out the pull request URL, merge SHA, or workspace UUIDs, the command shows `URL`, `SHA`, or `UUID` in its place. After a person runs the command, `show` reports the new display status and `pr_body` prints the pull request description.
 
 ## Knowledge in prompts
 

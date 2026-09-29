@@ -15,7 +15,6 @@ use RuntimeException;
 use Sifrious\Molly\Actions\ComposePullRequestBody;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\CreateTaskFromPlan;
-use Sifrious\Molly\Actions\HandOffTask;
 use Sifrious\Molly\Actions\ImportGitHubIssue;
 use Sifrious\Molly\Actions\InspectTask;
 use Sifrious\Molly\Actions\LinkTaskThread;
@@ -28,7 +27,7 @@ use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Actions\StopTask;
 
 #[Name('molly_task')]
-#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. import_github reads GitHub using the host gh login. approve, lock_test, pr_opened, merged, and comment record a human decision, so molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the php artisan command a person runs instead. pr_body prints a pull request description and handoff prints an envelope; neither opens or merges a pull request or creates a worktree.')]
+#[Description('Save bounded tasks, read evidence, name tasks, record an Amp thread link, import a GitHub issue, request stop, or queue start/retry. create/from_plan/import_github require workspace and test_path; paths lists optional additional files. Task operations accept nicknames or UUIDs. Creating or linking a task does not execute code. start/retry require a background queue and worker; queued=true means requested, not running or passed. import_github reads GitHub using the host gh login. approve, lock_test, pr_opened, merged, comment, and handoff record a human decision, so molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the php artisan command a person runs instead. pr_body prints a pull request description; it does not open or merge a pull request or create a worktree.')]
 #[IsDestructive]
 class MollyTask extends Tool
 {
@@ -44,6 +43,7 @@ class MollyTask extends Tool
         'pr_opened' => 'Only a person can record an opened pull request.',
         'merged' => 'Only a person can record a merge.',
         'comment' => 'Only a person can approve posting a GitHub issue comment.',
+        'handoff' => 'Only a person can hand a task to another workspace.',
     ];
 
     /** @var list<string> */
@@ -71,8 +71,8 @@ class MollyTask extends Tool
             'close' => ['sometimes', 'boolean'],
             'url' => ['sometimes', 'string', 'max:2048'],
             'sha' => ['sometimes', 'string', 'max:40'],
-            'from_workspace_id' => ['required_if:operation,handoff', 'uuid'],
-            'to_workspace_id' => ['required_if:operation,handoff', 'uuid'],
+            'from_workspace_id' => ['sometimes', 'uuid'],
+            'to_workspace_id' => ['sometimes', 'uuid'],
             'next_action' => ['sometimes', 'string', 'max:64'],
             'context' => ['sometimes', 'string', 'max:8192'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
@@ -81,9 +81,9 @@ class MollyTask extends Tool
             $result = match ($data['operation']) {
                 'list', 'show', 'show_run' => $this->dispatchRead($data),
                 'create', 'from_plan', 'import_github' => $this->dispatchCreate($data),
-                'approve', 'lock_test', 'pr_opened', 'merged', 'comment' => $this->refuseHumanDecision($data),
+                'approve', 'lock_test', 'pr_opened', 'merged', 'comment', 'handoff' => $this->refuseHumanDecision($data),
                 'pr_body', 'stop' => $this->dispatchLifecycle($data),
-                'handoff', 'name', 'link_thread' => $this->dispatchHandoff($data),
+                'name', 'link_thread' => $this->dispatchLinks($data),
                 'advice' => $this->dispatchAdvice($data),
                 'start', 'retry' => $this->dispatchQueue($data),
             };
@@ -151,6 +151,11 @@ class MollyTask extends Tool
             'pr_opened' => 'molly:pr-opened '.$task.' --url='.(isset($data['url']) ? $quote($data['url']) : 'URL').' --approve',
             'merged' => 'molly:merged '.$task.' --sha='.(isset($data['sha']) ? $quote($data['sha']) : 'SHA').' --approve',
             'comment' => 'molly:comment '.$task.' --approve'.(($data['close'] ?? false) ? ' --close' : ''),
+            'handoff' => 'molly:handoff '.$task
+                .' --from='.($data['from_workspace_id'] ?? 'UUID').' --to='.($data['to_workspace_id'] ?? 'UUID')
+                .(isset($data['next_action']) ? ' --action='.$quote($data['next_action']) : '')
+                .(isset($data['context']) ? ' --context='.$quote($data['context']) : '')
+                .' --approve',
         };
 
         throw new RuntimeException('HUMAN_APPROVAL_REQUIRED: '.self::HUMAN_DECISIONS[$data['operation']]
@@ -160,10 +165,9 @@ class MollyTask extends Tool
     /** @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function dispatchHandoff(array $data): array
+    private function dispatchLinks(array $data): array
     {
         return match ($data['operation']) {
-            'handoff' => ['handoff' => app(HandOffTask::class)->handle($data['id'], $data['from_workspace_id'], $data['to_workspace_id'], $data['next_action'] ?? 'implement', $data['context'] ?? 'Implement the locked acceptance test without changing protected files.')->toArray()],
             'name' => ['task' => app(NameTask::class)->handle($data['id'], $data['nickname'])->toArray()],
             'link_thread' => ['association' => app(LinkTaskThread::class)->handle($data['id'], $data['thread'])],
         };
@@ -204,7 +208,7 @@ class MollyTask extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'operation' => $schema->string()->enum(self::OPERATIONS)->description('advice checks limits and may use optional default-off Jev classification through Laravel AI when enabled; it is advisory and state-preserving and does not promise a provider request. It saves advice but does not start or retry work. approve, lock_test, pr_opened, merged, and comment are human decisions: molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the command a person runs.')->required(),
+            'operation' => $schema->string()->enum(self::OPERATIONS)->description('advice checks limits and may use optional default-off Jev classification through Laravel AI when enabled; it is advisory and state-preserving and does not promise a provider request. It saves advice but does not start or retry work. approve, lock_test, pr_opened, merged, comment, and handoff are human decisions: molly_task refuses them with HUMAN_APPROVAL_REQUIRED, changes nothing, and returns the command a person runs.')->required(),
             'id' => $schema->string()->description('Task nickname or UUID, or a run UUID for show_run.'),
             'nickname' => $schema->string()->description('Optional nickname when saving a task; required for name. Unique, 1 to 64 letters, digits, or hyphens, starting with a letter.'),
             'thread' => $schema->string()->description('Amp thread ID beginning with T-, required for link_thread. Records a user association without starting work.'),
@@ -219,10 +223,10 @@ class MollyTask extends Tool
             'close' => $schema->boolean()->description('For pr_body, include closing language only after required checks pass. For comment it becomes --close in the command a person runs. Molly still does not merge.'),
             'url' => $schema->string()->description('HTTPS github.com pull request URL. For pr_opened it becomes --url in the command a person runs; molly_task records nothing.'),
             'sha' => $schema->string()->description('40-character merge commit SHA. For merged it becomes --sha in the command a person runs; molly_task records nothing.'),
-            'from_workspace_id' => $schema->string()->description('Sender Bloom workspace UUID; required for handoff.'),
-            'to_workspace_id' => $schema->string()->description('Recipient Bloom workspace UUID; required for handoff.'),
-            'next_action' => $schema->string()->description('Requested next action for handoff. Cannot be merge or open_pull_request.'),
-            'context' => $schema->string()->description('Bounded context for the recipient agent. Maximum 8192 bytes.'),
+            'from_workspace_id' => $schema->string()->description('Sender Bloom workspace UUID. For handoff it becomes --from in the command a person runs.'),
+            'to_workspace_id' => $schema->string()->description('Recipient Bloom workspace UUID. For handoff it becomes --to in the command a person runs.'),
+            'next_action' => $schema->string()->description('Requested next action. For handoff it becomes --action in the command a person runs. Cannot be merge or open_pull_request.'),
+            'context' => $schema->string()->description('Bounded context for the recipient agent. For handoff it becomes --context in the command a person runs. Maximum 8192 bytes.'),
             'limit' => $schema->integer()->min(1)->max(100)->description('Task list limit; defaults to 20.'),
         ];
     }

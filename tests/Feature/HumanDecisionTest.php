@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
@@ -20,7 +21,8 @@ use Sifrious\Molly\Models\Task;
 
 /*
  * MCP callers are agents. Every molly_task operation that records a human decision must
- * refuse, change nothing, and name the Artisan command a person runs instead.
+ * refuse, change nothing, and name the Artisan command a person runs instead. On the
+ * command line, each of those commands refuses without --approve and changes nothing.
  */
 
 beforeEach(function () {
@@ -36,7 +38,7 @@ afterEach(function () {
 });
 
 /** A task whose required checks passed, so Molly waits for a person to approve it. */
-function mcpTaskAwaitingApproval(string $workspace, array $source = []): Task
+function taskAwaitingHumanDecision(string $workspace, array $source = []): Task
 {
     $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', $source);
     test()->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'ok', 'probes' => []]);
@@ -53,7 +55,7 @@ function mcpTaskAwaitingApproval(string $workspace, array $source = []): Task
 }
 
 /** Everything a human decision could change: the task row, its runs, the test file, and every file under .molly. */
-function mcpHumanDecisionState(Task $task): array
+function humanDecisionState(Task $task): array
 {
     $files = [];
     if (is_dir($task->workspace.'/.molly')) {
@@ -75,7 +77,7 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
     $task = $prepare($this->workspace);
     $status = app(RecordLifecycleEvent::class)->load($this->workspace)->displayStatus($task->id);
     Process::fake();
-    $before = mcpHumanDecisionState($task);
+    $before = humanDecisionState($task);
 
     MollyServer::tool(MollyTask::class, ['operation' => $operation, 'id' => $task->id, 'approve' => true, ...$arguments])
         ->assertHasErrors([
@@ -84,13 +86,13 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
             'Ask a person to run: php artisan '.str_replace('TASK', $task->id, $command),
         ]);
 
-    expect(mcpHumanDecisionState($task))->toBe($before)
+    expect(humanDecisionState($task))->toBe($before)
         ->and(app(RecordLifecycleEvent::class)->load($this->workspace)->displayStatus($task->id))->toBe($status);
     Process::assertNothingRan();
 })->with([
     'approve a verified change' => [
         'approve',
-        fn (string $workspace): Task => mcpTaskAwaitingApproval($workspace),
+        fn (string $workspace): Task => taskAwaitingHumanDecision($workspace),
         [],
         'molly:approve TASK --approve',
     ],
@@ -108,7 +110,7 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
     'record an opened pull request' => [
         'pr_opened',
         function (string $workspace): Task {
-            $task = mcpTaskAwaitingApproval($workspace);
+            $task = taskAwaitingHumanDecision($workspace);
             app(ApproveTask::class)->handle($task->id, true);
 
             return $task;
@@ -119,7 +121,7 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
     'record a merge' => [
         'merged',
         function (string $workspace): Task {
-            $task = mcpTaskAwaitingApproval($workspace);
+            $task = taskAwaitingHumanDecision($workspace);
             app(ApproveTask::class)->handle($task->id, true);
             app(RecordPullRequestOpened::class)->handle($task->id, true, 'https://github.com/sifrious/molly/pull/12');
 
@@ -130,7 +132,7 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
     ],
     'post a GitHub issue comment' => [
         'comment',
-        fn (string $workspace): Task => mcpTaskAwaitingApproval($workspace, [
+        fn (string $workspace): Task => taskAwaitingHumanDecision($workspace, [
             'repository' => 'sifrious/molly',
             'issue_number' => 42,
             'issue_url' => 'https://github.com/sifrious/molly/issues/42',
@@ -138,9 +140,25 @@ it('refuses a human decision over MCP, changes nothing, and names the command a 
         ['close' => true],
         'molly:comment TASK --approve --close',
     ],
+    'hand a task to another workspace' => [
+        'handoff',
+        function (string $workspace): Task {
+            $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+            $task->runs()->create(['prompt' => $task->prompt, 'workspace' => $task->workspace, 'status' => 'failed', 'report' => []]);
+
+            return $task;
+        },
+        [
+            'from_workspace_id' => '11111111-1111-4111-8111-111111111111',
+            'to_workspace_id' => '22222222-2222-4222-8222-222222222222',
+            'next_action' => 'implement',
+            'context' => 'Implement the locked greeting test.',
+        ],
+        "molly:handoff TASK --from=11111111-1111-4111-8111-111111111111 --to=22222222-2222-4222-8222-222222222222 --action=implement --context='Implement the locked greeting test.' --approve",
+    ],
 ]);
 
-it('fills placeholders when the caller leaves out the pull request URL or merge SHA', function (string $operation, string $command) {
+it('fills placeholders when the caller leaves out the pull request URL, merge SHA, or workspaces', function (string $operation, string $command) {
     $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
 
     MollyServer::tool(MollyTask::class, ['operation' => $operation, 'id' => $task->id])
@@ -148,10 +166,11 @@ it('fills placeholders when the caller leaves out the pull request URL or merge 
 })->with([
     ['pr_opened', 'molly:pr-opened TASK --url=URL --approve'],
     ['merged', 'molly:merged TASK --sha=SHA --approve'],
+    ['handoff', 'molly:handoff TASK --from=UUID --to=UUID --approve'],
 ]);
 
 it('keeps reading evidence over MCP after a person approves on the command line', function () {
-    $task = mcpTaskAwaitingApproval($this->workspace);
+    $task = taskAwaitingHumanDecision($this->workspace);
     app(ApproveTask::class)->handle($task->id, true);
 
     MollyServer::tool(MollyTask::class, ['operation' => 'show', 'id' => $task->id])->assertOk()
@@ -159,3 +178,26 @@ it('keeps reading evidence over MCP after a person approves on the command line'
     MollyServer::tool(MollyTask::class, ['operation' => 'pr_body', 'id' => $task->id])->assertOk()
         ->assertSee('A human must approve opening or merging a pull request.');
 });
+
+it('refuses each human decision on the command line without --approve and changes nothing', function (string $command, array $options, string $code) {
+    $task = taskAwaitingHumanDecision($this->workspace, [
+        'repository' => 'sifrious/molly',
+        'issue_number' => 42,
+        'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+    ]);
+    Process::fake();
+    $before = humanDecisionState($task);
+
+    expect(Artisan::call($command, ['task' => $task->id, ...$options, '--json' => true]))->toBe(1)
+        ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'])->toStartWith($code.': ')
+        ->and(humanDecisionState($task))->toBe($before)
+        ->and(app(RecordLifecycleEvent::class)->load($this->workspace)->displayStatus($task->id))->toBe(DisplayStatus::AwaitingApproval);
+    Process::assertNothingRan();
+})->with([
+    'approve' => ['molly:approve', [], 'APPROVAL_UNCONFIRMED'],
+    'lock the test' => ['molly:lock-test', ['--file' => ['app/Greeting.php']], 'TEST_LOCK_UNCONFIRMED'],
+    'record a pull request' => ['molly:pr-opened', ['--url' => 'https://github.com/sifrious/molly/pull/12'], 'PR_RECORD_UNCONFIRMED'],
+    'record a merge' => ['molly:merged', ['--sha' => str_repeat('a', 40)], 'MERGE_RECORD_UNCONFIRMED'],
+    'post a comment' => ['molly:comment', [], 'GITHUB_WRITEBACK_UNAPPROVED'],
+    'hand off' => ['molly:handoff', ['--from' => '11111111-1111-4111-8111-111111111111', '--to' => '22222222-2222-4222-8222-222222222222'], 'HANDOFF_UNCONFIRMED'],
+]);

@@ -17,12 +17,17 @@ class HandOffTask
      */
     public function handle(
         string $reference,
+        bool $approved,
         string $senderWorkspaceId,
         string $recipientWorkspaceId,
         string $requestedNextAction,
         string $boundedContext,
         array $overrides = [],
     ): HandoffEnvelope {
+        if (! $approved) {
+            throw new RuntimeException('HANDOFF_UNCONFIRMED: Molly hands a task to another workspace only after --approve. It still does not merge or open a pull request.');
+        }
+
         $task = app(ShowTask::class)->handle($reference)
             ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
         if ($task->allow_test_edits) {

@@ -12,7 +12,7 @@ class MollyHandoffCommand extends Command
 {
     use ReportsFailures;
 
-    protected $signature = 'molly:handoff {task : Saved task name or ID} {--from= : Sender Bloom workspace UUID} {--to= : Recipient Bloom workspace UUID} {--action=implement : Requested next action} {--context= : Bounded context for the recipient} {--json : Print JSON only}';
+    protected $signature = 'molly:handoff {task : Saved task name or ID} {--from= : Sender Bloom workspace UUID} {--to= : Recipient Bloom workspace UUID} {--action=implement : Requested next action} {--context= : Bounded context for the recipient} {--approve : Confirm handing the task to the recipient workspace} {--json : Print JSON only}';
 
     protected $description = 'Print a handoff envelope for a child Bloom workspace without widening scope';
 
@@ -21,6 +21,7 @@ class MollyHandoffCommand extends Command
         try {
             $envelope = $handoff->handle(
                 (string) $this->argument('task'),
+                (bool) $this->option('approve'),
                 (string) $this->option('from'),
                 (string) $this->option('to'),
                 (string) $this->option('action'),
