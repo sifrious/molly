@@ -55,6 +55,7 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `WORKER_START_FAILED` | `.molly/worker`. |
 | `GITIGNORE_UNWRITABLE` | `.gitignore`, from `molly:project-init`. |
 | `CONFIG_UNWRITABLE` | `config/molly.php`, from `molly:project-init`. |
+| `DEMO_FILE_UNWRITABLE` | `app/Greeting.php` or `tests/Feature/GreetingTest.php`, from `molly:demo`. When `molly:demo` cannot update `.gitignore`, it fails with `GITIGNORE_UNWRITABLE`. |
 | `WORKSPACE_IDENTITY_UNWRITABLE` | `.molly/identity.json`. |
 | `PROJECT_RECORD_UNWRITABLE` | `.molly/project.json`. |
 | `PROJECT_INDEX_UNWRITABLE` | `projects.json` in `MOLLY_HOME`. |

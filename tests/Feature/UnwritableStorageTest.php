@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CheckEnvironment;
+use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace\Directory;
 
 /*
@@ -76,6 +77,25 @@ it('names the directory molly:demo could not create', function (): void {
     expect($exit)->toBe(1)
         ->and(json_decode(Artisan::output(), true)['error'])->toStartWith('DIRECTORY_UNWRITABLE: Molly could not create '.$this->directory.'/app');
 });
+
+it('names the file molly:demo could not write instead of printing a PHP warning', function (string $readOnly, string $file, string $code): void {
+    File::put($this->directory.'/.gitignore', "/vendor/\n");
+    File::ensureDirectoryExists($this->directory.'/tests/Feature');
+    File::put($this->directory.'/tests/Feature/.gitkeep', '');
+    commitGitWorkspace($this->directory);
+    chmod($this->directory.'/'.$readOnly, is_dir($this->directory.'/'.$readOnly) ? 0555 : 0444);
+
+    $exit = Artisan::call('molly:demo', ['--workspace' => $this->directory, '--json' => true]);
+    $error = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['error'];
+
+    expect($exit)->toBe(1)
+        ->and($error)->toStartWith($code.': Molly could not write '.$this->directory.'/'.$file.' (Permission denied).')
+        ->and($error)->not->toContain('file_put_contents')
+        ->and(Task::count())->toBe(0);
+})->with([
+    'read-only tests/Feature' => ['tests/Feature', 'tests/Feature/GreetingTest.php', 'DEMO_FILE_UNWRITABLE'],
+    'read-only .gitignore' => ['.gitignore', '.gitignore', 'GITIGNORE_UNWRITABLE'],
+]);
 
 it('reports database_unwritable when the database cannot accept a write', function (): void {
     $database = $this->directory.'/database.sqlite';
