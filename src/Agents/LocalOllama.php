@@ -3,10 +3,13 @@
 namespace Sifrious\Molly\Agents;
 
 use Illuminate\Http\Client\RequestException;
+use JsonException;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Throwable;
+use TypeError;
 
 /**
  * The one place Molly prompts the local Ollama provider. Every model call site
@@ -61,6 +64,12 @@ class LocalOllama
         if ($request instanceof RequestException && $request->response->status() === 404
             && str_contains(strtolower((string) $request->response->json('error')), 'not found')) {
             return new RuntimeException('MODEL_MISSING: Ollama has no model named '.$model.'. Run ollama list, or choose an installed model with php artisan molly:setup.', 0, $exception);
+        }
+        // Laravel AI passes a body that does not decode to an array straight into a typed
+        // parameter, and reports an empty object as an unknown Ollama error.
+        if ($exception instanceof TypeError || $exception instanceof JsonException
+            || ($exception instanceof AiException && str_ends_with($exception->getMessage(), 'Unknown Ollama error.'))) {
+            return new RuntimeException('PROVIDER_RESPONSE_INVALID: Ollama answered, but the body was not a chat response Molly can read. Molly used none of it. Check that OLLAMA_URL points at Ollama and try again.', 0, $exception);
         }
 
         return $exception;
