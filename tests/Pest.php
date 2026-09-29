@@ -10,6 +10,25 @@ use Symfony\Component\Process\Process;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
 
+/*
+ * GitHub's runners have no global Git identity, so a test commit that relies on one passes on a
+ * developer's machine and fails in CI. Point Git at a private global config with a test identity
+ * for this process and every process it starts, so each commit a test makes, and each script that
+ * checks for an identity, sees the same settings everywhere and none of the developer's own.
+ */
+(static function (): void {
+    $config = tempnam(sys_get_temp_dir(), 'molly-gitconfig-');
+    file_put_contents($config, "[user]\n\tname = Molly Tests\n\temail = tests@example.com\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n");
+    putenv('GIT_CONFIG_GLOBAL='.$config);
+    $_ENV['GIT_CONFIG_GLOBAL'] = $_SERVER['GIT_CONFIG_GLOBAL'] = $config;
+    $owner = getmypid();
+    register_shutdown_function(static function () use ($config, $owner): void {
+        if (getmypid() === $owner) {
+            @unlink($config);
+        }
+    });
+})();
+
 /**
  * No test may turn the Testbench skeleton at base_path() into a Git repository. Record what
  * the skeleton holds before the suite and fail the run if a repository or bind marker appears.
