@@ -41,6 +41,9 @@ use Sifrious\Molly\Console\MollyLinkThreadCommand;
 use Sifrious\Molly\Console\MollyLockTestCommand;
 use Sifrious\Molly\Console\MollyMergedCommand;
 use Sifrious\Molly\Console\MollyNameCommand;
+use Sifrious\Molly\Console\MollyOrbRegisterCommand;
+use Sifrious\Molly\Console\MollyOrbRevokeCommand;
+use Sifrious\Molly\Console\MollyOrbsCommand;
 use Sifrious\Molly\Console\MollyPlanCommand;
 use Sifrious\Molly\Console\MollyPrBodyCommand;
 use Sifrious\Molly\Console\MollyPreflightCommand;
@@ -50,6 +53,7 @@ use Sifrious\Molly\Console\MollyProjectNewCommand;
 use Sifrious\Molly\Console\MollyProjectQueryCommand;
 use Sifrious\Molly\Console\MollyProjectsCommand;
 use Sifrious\Molly\Console\MollyPrOpenedCommand;
+use Sifrious\Molly\Console\MollyQueueCommand;
 use Sifrious\Molly\Console\MollyReceiptCommand;
 use Sifrious\Molly\Console\MollyRetryCommand;
 use Sifrious\Molly\Console\MollyReviewCommitCommand;
@@ -152,6 +156,7 @@ class MollyServiceProvider extends ServiceProvider
             MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
             MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
             MollyPreflightCommand::class, MollyStoryCommand::class,
+            MollyOrbsCommand::class, MollyOrbRegisterCommand::class, MollyOrbRevokeCommand::class, MollyQueueCommand::class,
         ]);
         if ($this->app->make(Clever::class)->enabled()) {
             $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);

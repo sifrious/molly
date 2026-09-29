@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
 use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Execution\LocalOrbProvider;
+use Sifrious\Molly\Models\Orb;
 use Sifrious\Molly\Models\Task;
 
 /**
@@ -15,7 +17,7 @@ use Sifrious\Molly\Models\Task;
  */
 final class LocalAgentBus
 {
-    public function __construct(private RecordLifecycleEvent $lifecycle) {}
+    public function __construct(private RecordLifecycleEvent $lifecycle, private LocalOrbProvider $orbs) {}
 
     public function leaseSeconds(): int
     {
@@ -43,19 +45,24 @@ final class LocalAgentBus
     /**
      * Atomically claim a task for one worker. Racing workers: only one succeeds.
      * Abandoned (expired lease) running tasks are recoverable into a new claim.
+     * With $orbId, the same transaction takes that Orb for the task, so a claim that
+     * cannot hold the Orb changes nothing.
      */
-    public function claim(string $taskId, string $workerId, bool $retry = false, ?string $idempotencyKey = null): Task
+    public function claim(string $taskId, string $workerId, bool $retry = false, ?string $idempotencyKey = null, ?string $orbId = null): Task
     {
         if (trim($workerId) === '') {
             throw new RuntimeException('WORKER_ID_INVALID: A non-empty worker identity is required to claim work.');
         }
 
-        return DB::transaction(function () use ($taskId, $workerId, $retry, $idempotencyKey): Task {
+        return DB::transaction(function () use ($taskId, $workerId, $retry, $idempotencyKey, $orbId): Task {
             $task = Task::query()->whereKey($taskId)->lockForUpdate()->first()
                 ?? throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
 
             $this->recoverIfAbandoned($task);
             $this->refuseUnclaimable($task, $retry, $idempotencyKey);
+            if ($orbId !== null) {
+                $this->orbs->occupy($orbId, $task);
+            }
 
             $now = now();
             $expires = $now->copy()->addSeconds($this->leaseSeconds());
@@ -222,14 +229,21 @@ final class LocalAgentBus
             }
 
             $runIds = [];
+            $recoveredAt = Carbon::parse($now)->toIso8601String();
             foreach ($task->runs()->where('status', 'running')->get() as $run) {
-                $run->update(['status' => $status, 'report' => [...($run->report ?? []), 'error' => $error, 'recovery' => [
+                $report = [...($run->report ?? []), 'error' => $error, 'recovery' => [
                     'reason' => $reason,
                     'worker_id' => $workerId,
-                    'recovered_at' => Carbon::parse($now)->toIso8601String(),
-                ]]]);
+                    'recovered_at' => $recoveredAt,
+                ]];
+                if (is_array($report['execution_target'] ?? null)) {
+                    $report['execution_target'] = [...$report['execution_target'], 'finished_at' => $recoveredAt, 'result' => $status];
+                }
+                $run->update(['status' => $status, 'report' => $report]);
                 $runIds[] = (string) $run->id;
             }
+            // The worker is gone, so the Orb it ran on is free for its next task.
+            Orb::releaseTask($task->id);
 
             return $runIds;
         });
@@ -242,6 +256,7 @@ final class LocalAgentBus
         return true;
     }
 
+    /** Clear the task's claim and free any Orb it holds, so the Orb can take its next task. */
     public function clearClaim(Task $task): void
     {
         Task::query()->whereKey($task->id)->update([
@@ -250,6 +265,7 @@ final class LocalAgentBus
             'lease_expires_at' => null,
             'heartbeat_at' => null,
         ]);
+        Orb::releaseTask($task->id);
     }
 
     public function leaseExpired(Task $task, ?DateTimeInterface $now = null): bool

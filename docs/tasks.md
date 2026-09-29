@@ -74,7 +74,7 @@ php artisan molly:start ready-check
 
 The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise, and `130` or `143` when Ctrl-C or `SIGTERM` stopped it (see [Stop a task](#stop-a-task)). No queue worker is needed for Artisan.
 
-Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed.
+Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed. To run the task on a registered local Orb, with that Orb's model, add `--orb=NAME`; [Execution targets](execution-targets.md#local-orbs) covers Orbs.
 
 You do not need a clean working tree. A run writes only the task's selected files. Other edits, staged changes, and untracked files stay exactly as they were, and Molly never stages or commits. When a write fails partway, Molly restores the selected files it had written, with their original contents and file modes.
 
@@ -176,7 +176,7 @@ A process that is killed, for example with `kill -9`, or that dies with its host
 
 `molly:start` and `molly:retry` recover the task they were asked to run. `molly:worker start` and `molly:worker restart` check every running task before they launch the queue worker, so after a host restart, starting the worker settles what the old one left behind. See [Queue worker](reference/commands.md#queue-worker).
 
-Recovery marks the task `failed` and retryable, or `stopped` when a stop had been requested, and clears the claim. Each run the dead process left `running` gets the same status, an `error` that starts with `RUN_ABANDONED:` and names the worker, and a `recovery` entry with the `reason` (`lease_expired` or `worker_exited`), `worker_id`, and `recovered_at`. The run keeps the evidence it had saved. When `.molly/lifecycle.jsonl` exists, the recovery appends a `failed` or `stopped` event with the same `reason`, the old `worker_id`, and the recovered run IDs, so `molly:task` and MCP `molly_task` show the recovered status too.
+Recovery marks the task `failed` and retryable, or `stopped` when a stop had been requested, and clears the claim. Each run the dead process left `running` gets the same status, an `error` that starts with `RUN_ABANDONED:` and names the worker, and a `recovery` entry with the `reason` (`lease_expired` or `worker_exited`), `worker_id`, and `recovered_at`. The run keeps the evidence it had saved, and an Orb the task held is free for its next task. When `.molly/lifecycle.jsonl` exists, the recovery appends a `failed` or `stopped` event with the same `reason`, the old `worker_id`, and the recovered run IDs, so `molly:task` and MCP `molly_task` show the recovered status too.
 
 After a crash, run `php artisan molly:retry TASK`. The retry recovers the task, then starts a new attempt from the recorded baseline. When the retry is then refused, for example with `SANDBOX_UNAVAILABLE`, the task stays `failed` and retryable, not `running`. `molly:start` recovers it too, then refuses with `TASK_NOT_PENDING`. Nothing runs the task again on its own. A queued start job that a killed worker had reserved is delivered again after the queue's `retry_after`, and Laravel fails it with `MaxAttemptsExceededException` because Molly's jobs allow one attempt.
 

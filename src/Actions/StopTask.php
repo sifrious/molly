@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Actions;
 
 use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Models\Orb;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
 
@@ -20,6 +21,10 @@ class StopTask
             'status' => 'stopped',
             'stop_requested_at' => now(),
         ]);
+        if ($stopped > 0) {
+            // A stopped task no longer holds the Orb it was queued on.
+            Orb::releaseTask($id);
+        }
 
         $requested = Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update([
             'stop_requested_at' => now(),
@@ -69,11 +74,16 @@ class StopTask
             }
 
             foreach ($task->runs()->where('status', 'running')->get() as $run) {
+                $report = [...$run->report, 'error' => 'RUN_INTERRUPTED: The original process no longer holds the workspace lock. Saved evidence remains available.'];
+                if (is_array($report['execution_target'] ?? null)) {
+                    $report['execution_target'] = [...$report['execution_target'], 'finished_at' => now()->toIso8601String(), 'result' => 'stopped'];
+                }
                 $run->newQuery()->whereKey($run->id)->where('status', 'running')->update([
                     'status' => 'stopped',
-                    'report' => [...$run->report, 'error' => 'RUN_INTERRUPTED: The original process no longer holds the workspace lock. Saved evidence remains available.'],
+                    'report' => $report,
                 ]);
             }
+            Orb::releaseTask($task->id);
         });
     }
 }

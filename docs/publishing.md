@@ -25,7 +25,7 @@ A requirement whose behavior has not shipped is also listed in `OPEN`, with the 
 python3 bin/molly-docs-check --release
 ```
 
-Today one requirement is open: local and Orb execution targeting. Remote Orb execution is not shipped, and [The Orb requirement is open](execution-targets.md#the-orb-requirement-is-open) says what closes it. `--release` exits `1` with `Release blocked: 1 alpha requirement(s) open.` until that entry is resolved.
+Today one requirement is open: local and Orb execution targeting. Local Orbs ship with [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs), and the entry stays until the commit that removes it cites the release-scope decision. `--release` exits `1` with `Release blocked: 1 alpha requirement(s) open.` until that entry is resolved.
 
 `bin/molly-docs-walkthrough` regenerates the web interface screenshots under `docs/v0.1/walkthrough/` from a running application.
 

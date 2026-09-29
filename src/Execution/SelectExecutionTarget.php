@@ -6,20 +6,26 @@ use RuntimeException;
 use Sifrious\Molly\Contracts\ExecutionTargetKind;
 use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 use Sifrious\Molly\Contracts\ExecutionTargetSnapshot;
+use Sifrious\Molly\Models\Task;
 
+/**
+ * The one place Molly decides where a task runs. With no request it selects this machine.
+ * An Orb request goes to LocalOrbProvider, which chooses and reserves a registered local Orb
+ * for the task. Hosted Orbs are not shipped; a hosted provider would join here.
+ */
 final class SelectExecutionTarget
 {
-    public function __construct(private SandboxCapability $sandbox) {}
+    public function __construct(private SandboxCapability $sandbox, private LocalOrbProvider $orbs) {}
 
-    /**
-     * Remote Orb execution is not shipped. Every Orb request is refused,
-     * whatever target it names; Molly never dispatches remote work.
-     */
-    public function handle(?ExecutionTargetRequest $request = null): ExecutionTargetSnapshot
+    public function handle(?ExecutionTargetRequest $request = null, ?Task $task = null): ExecutionTargetSnapshot
     {
         $request ??= ExecutionTargetRequest::local('Local execution is the default.');
         if ($request->kind === ExecutionTargetKind::Orb) {
-            throw new RuntimeException('ORB_UNVERIFIED: This Molly release runs tasks only on the local machine. An Amp thread or connected executor is not a verified Orb. Select local execution.');
+            if ($task === null) {
+                throw new RuntimeException('ORB_TASK_REQUIRED: An Orb runs a saved task. Save the task with php artisan molly:create, then place it on an Orb.');
+            }
+
+            return $this->orbs->place($request, $task);
         }
 
         $snapshot = $this->sandbox->snapshot();

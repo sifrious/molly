@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Actions;
 
 use Closure;
+use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Contracts\LifecycleEventType;
@@ -16,6 +17,7 @@ use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Sifrious\Molly\Workspace\Directory;
 use Sifrious\Molly\Workspace\GitBinary;
 use Sifrious\Molly\Workspace\ObserveCheckout;
+use Symfony\Component\Process\Process;
 use Throwable;
 
 class RunTask
@@ -45,23 +47,31 @@ class RunTask
      * @param  list<string>  $paths
      * @param  Closure|null  $heartbeat  Renews the caller's task lease at each checkpoint.
      * @param  Closure|null  $prepared  Runs once the preconditions pass and the run is saved.
+     * @param  array<string, mixed>|null  $executionTarget  The Orb evidence when the run executes on an Orb.
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null, ?Closure $prepared = null): Run
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress = null, ?string $taskId = null, ?Closure $shouldStop = null, ?array $previousAttempt = null, ?Closure $heartbeat = null, ?Closure $prepared = null, ?array $executionTarget = null): Run
     {
         $files = new Workspace($workspace);
         $task = $taskId === null ? null : Task::find($taskId);
         [$paths, $testDigest] = $this->refuseUnready($prompt, $files, $paths, $testPath, $task);
         $allowTestEdits = (bool) ($task?->allow_test_edits);
 
-        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat, $prepared): Run {
+        return $files->exclusively(function (string $workspaceLease) use ($files, $paths, $prompt, $testPath, $progress, $taskId, $shouldStop, $previousAttempt, $allowTestEdits, $testDigest, $heartbeat, $prepared, $executionTarget): Run {
             $before = $files->read($paths);
             // Refresh the task once under the lease; outer load stays for safe pre-lease digest/path prep.
             $taskRow = $taskId === null ? null : Task::find($taskId);
             $overrides = is_array($taskRow?->context_snapshot['settings_overrides'] ?? null)
                 ? $taskRow->context_snapshot['settings_overrides']
                 : [];
+            if (is_array($executionTarget['orb'] ?? null)) {
+                // The snapshot records the runtime and model the Orb supplies, not the global settings.
+                $overrides = [...$overrides, 'agent' => $executionTarget['orb']['runtime'], 'model' => $executionTarget['orb']['model']];
+            }
             $effectiveConfig = $this->resolveEffectiveRunConfig->handle($overrides);
             $identity = $this->runIdentity($taskRow, $files->path);
+            if ($executionTarget !== null) {
+                $executionTarget = [...$executionTarget, 'starting_revision' => $identity['base_sha'], 'started_at' => now()->toIso8601String()];
+            }
             $run = Run::create([
                 'prompt' => $prompt,
                 'task_id' => $taskId,
@@ -78,7 +88,10 @@ class RunTask
                 'identity_status' => $identity['identity_status'],
                 'status' => 'running',
                 'effective_config' => $effectiveConfig,
-                'report' => $this->initialReport($files, $before, $paths, $testPath, $testDigest, $allowTestEdits, $taskRow),
+                'report' => [
+                    ...$this->initialReport($files, $before, $paths, $testPath, $testDigest, $allowTestEdits, $taskRow),
+                    ...($executionTarget === null ? [] : ['execution_target' => $executionTarget]),
+                ],
             ]);
             if ($prepared !== null) {
                 $prepared($run);
@@ -138,9 +151,7 @@ class RunTask
             // status and reason, never as passing, and the run continues.
             $report['complexity_before'] = $this->measure->handle($workspace->path, $evidence.'/before');
 
-            $this->record($workspace->path, LifecycleEventType::DispatchRequested, $taskId, $run->id, [
-                'target' => 'local',
-            ]);
+            $this->record($workspace->path, LifecycleEventType::DispatchRequested, $taskId, $run->id, $this->dispatchPayload($report));
             $this->record($workspace->path, LifecycleEventType::AgentStarted, $taskId, $run->id);
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $generationStarted = hrtime(true);
@@ -182,7 +193,7 @@ class RunTask
                 $results = $this->evaluate->handle($run->prompt, $workspace->path, $before, $after, $testPath, $evidence, $shouldStop, $workspaceLease, function (array $branches) use ($run, &$report): void {
                     $report['branches'] = $branches;
                     $run->update(['report' => $report]);
-                });
+                }, $report['execution_target']['target_id'] ?? 'local');
                 $report['verification'] = $results['verification'];
                 $report['review'] = $results['review'];
                 $report['branches'] = $results['branches'];
@@ -247,6 +258,7 @@ class RunTask
     {
         $report['verification_outcomes'] = $decision['outcomes'];
         $report['completion_blockers'] = $decision['blockers'];
+        $this->recordWorktreeDiff($report, $workspace, $run->id);
         $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
         $classification = $this->classify->handle([
             'run_id' => $run->id,
@@ -281,6 +293,7 @@ class RunTask
             $decision = $this->decideCompletion->forTerminated($report);
             $report['verification_outcomes'] = $decision['outcomes'];
             $report['completion_blockers'] = $decision['blockers'];
+            $this->recordWorktreeDiff($report, $workspace, $run->id);
             $report['verification_receipts'] = $this->receipts->handle($workspace->path, $run->id, $report);
             $report['terminated_before_completion'] = true;
         } catch (Throwable $receiptFailure) {
@@ -327,6 +340,93 @@ class RunTask
     {
         $report['snapshots']['after'] = $this->withPreview($workspace, $contents, 'after');
         $report['components'] = ['status' => 'compared', 'changes' => $workspace->componentChanges($report['changes'] ?? [], $before)];
+    }
+
+    /**
+     * Where the run was dispatched, for the dispatch_requested lifecycle event.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    private function dispatchPayload(array $report): array
+    {
+        $target = $report['execution_target'] ?? null;
+        if (! is_array($target) || ($target['kind'] ?? null) !== 'orb') {
+            return ['target' => 'local'];
+        }
+
+        return [
+            'target' => 'orb',
+            'orb_id' => $target['target_id'] ?? null,
+            'orb_name' => $target['orb']['name'] ?? null,
+            'device' => $target['orb']['device'] ?? null,
+            'runtime' => $target['orb']['runtime'] ?? null,
+            'model' => $target['orb']['model'] ?? null,
+            'capabilities' => $target['capabilities'] ?? [],
+            'repository' => $target['repository']['path'] ?? null,
+            'worktree' => $target['worktree'] ?? null,
+            'starting_revision' => $target['starting_revision'] ?? null,
+            'prompt_sha256' => $target['prompt_sha256'] ?? null,
+            'selection_reason' => $target['selection_reason'] ?? null,
+        ];
+    }
+
+    /**
+     * For a run on an Orb, save the difference between the starting revision and the worktree
+     * for the task's files as a patch beside the run's evidence, and record its path, size, and
+     * SHA-256 digest. A new file is compared with an empty one. The receipts cover the digest.
+     *
+     * @param  array<string, mixed>  $report
+     */
+    private function recordWorktreeDiff(array &$report, Workspace $workspace, string $runId): void
+    {
+        $target = $report['execution_target'] ?? null;
+        if (! is_array($target) || ($target['kind'] ?? null) !== 'orb') {
+            return;
+        }
+        $base = $target['starting_revision'] ?? null;
+        $paths = array_values(array_unique(array_filter([...($report['scope'] ?? []), $report['protected_test']['path'] ?? null], is_string(...))));
+        sort($paths, SORT_STRING);
+        try {
+            if (! is_string($base) || preg_match('/\A[0-9a-f]{40}\z/', $base) !== 1) {
+                throw new RuntimeException('The run has no starting revision.');
+            }
+            $patch = '';
+            foreach ($paths as $path) {
+                $tracked = $this->git($workspace->path, ['cat-file', '-e', $base.':'.$path])->isSuccessful();
+                $diff = $tracked
+                    ? $this->git($workspace->path, ['diff', '--no-color', '--no-ext-diff', '--binary', $base, '--', $path])
+                    : (is_file($workspace->path.'/'.$path) ? $this->git($workspace->path, ['diff', '--no-color', '--no-ext-diff', '--binary', '--no-index', '--', '/dev/null', $path]) : null);
+                if ($diff !== null && ! in_array($diff->getExitCode(), [0, 1], true)) {
+                    throw new RuntimeException('git diff failed for '.$path.': '.trim($diff->getErrorOutput()));
+                }
+                $patch .= $diff?->getOutput() ?? '';
+            }
+            $file = storage_path('molly/'.$runId.'/worktree.patch');
+            Directory::ensure(dirname($file), 0700);
+            File::put($file, $patch);
+            @chmod($file, 0600);
+            $report['execution_target']['diff'] = [
+                'status' => 'captured',
+                'base' => $base,
+                'paths' => $paths,
+                'path' => $file,
+                'bytes' => strlen($patch),
+                'sha256' => hash('sha256', $patch),
+            ];
+        } catch (Throwable $exception) {
+            $report['execution_target']['diff'] = ['status' => 'unavailable', 'reason' => 'WORKTREE_DIFF_UNAVAILABLE: '.$exception->getMessage()];
+        }
+    }
+
+    /** @param  list<string>  $arguments */
+    private function git(string $directory, array $arguments): Process
+    {
+        $process = new Process(['git', '-C', $directory, ...$arguments]);
+        $process->setTimeout(30);
+        $process->run();
+
+        return $process;
     }
 
     /** @param  array<string, mixed>  $payload */

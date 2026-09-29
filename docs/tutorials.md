@@ -112,6 +112,8 @@ php artisan molly:start ready
 
 Each workspace keeps its own `.molly/` directory, receipts, and lock, so neither start sees `WORKSPACE_BUSY`. The tasks share the application database, so `php artisan molly:tasks` lists both. Review and merge the `ready` branch as you would any other, then remove the checkout with `git worktree remove ../app-ready`.
 
+To queue tasks side by side with a queue worker and a model for each, register a local Orb for each; [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs) shows how.
+
 ## Tune Laravel AI
 
 Molly reaches models through Laravel AI, so provider settings live in `config/ai.php` and Molly's policy in `config/molly.php`.
@@ -174,6 +176,6 @@ Open `http://127.0.0.1:8000/molly`. Creating a task from the form saves it exact
 
 The two setups share every record. [Molly on its own](standalone.md) tours Artisan and the web interface. [Molly with Bloom](bloom.md) explains what Bloom adds and what still runs outside it.
 
-## Local execution, and why not an Orb
+## Local execution and local Orbs
 
-Every run executes on the machine where you run Artisan. With the default parallel checks, `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review. Remote execution on an Orb is not shipped: Molly refuses any Orb request with `ORB_UNVERIFIED`, and an Amp thread link does not change where a run executes. [Execution targets](execution-targets.md) shows the local evidence, the refusal, and the design notes for remote execution.
+A run executes on the machine where you run Artisan unless you place it on a local Orb. With the default parallel checks, `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review, or the Orb for a run on an Orb. An Amp thread link does not change where a run executes. [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs) registers two Orbs and runs a task on each at the same time. Hosted Orbs are not shipped.

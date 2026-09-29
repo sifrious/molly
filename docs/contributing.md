@@ -26,4 +26,4 @@ The docs are plain Markdown under `docs/`, read on GitHub; there is no site gene
 
 Recorded live checks cover small tasks through Ollama and Amp, saved tasks, queue-backed web execution, retries, GitHub issue import, Amp connection observation, and Jev advice, plan suggestions, and commit review against TypeSafe. Those checks show that the exercised paths worked in those environments, not that every model or project is supported.
 
-Remote execution on an Orb is planned. The alpha backlog is in [Work packages](work-packages.md).
+Local Orbs ship; hosted Orbs on another machine are a planned follow-up, described in [Hosted Orbs](execution-targets.md#hosted-orbs). The historical alpha backlog is in [Work packages](work-packages.md).

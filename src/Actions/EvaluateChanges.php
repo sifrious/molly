@@ -15,15 +15,16 @@ class EvaluateChanges
     /**
      * @param  array<string, string|null>  $before
      * @param  array<string, string>  $after
+     * @param  string  $target  Where the checks run: local, or the ID of the Orb that runs the attempt.
      * @return array{verification: array, review: array, branches: list<array>, mode: string}
      */
-    public function handle(string $prompt, string $workspace, array $before, array $after, string $testPath, string $evidenceDirectory, ?Closure $shouldStop = null, ?string $workspaceLease = null, ?Closure $recordBranches = null): array
+    public function handle(string $prompt, string $workspace, array $before, array $after, string $testPath, string $evidenceDirectory, ?Closure $shouldStop = null, ?string $workspaceLease = null, ?Closure $recordBranches = null, string $target = 'local'): array
     {
         $attempt = bin2hex(random_bytes(16));
         $branches = $processes = $inputs = $results = [];
         foreach (['verification', 'review'] as $kind) {
             $id = $kind.'-'.bin2hex(random_bytes(12));
-            $branches[$kind] = ['kind' => $kind, 'branch_id' => $id, 'attempt_id' => $attempt, 'execution_target' => 'local', 'provider' => $kind === 'review' ? config('molly.agent', 'ollama') : null, 'model' => $kind === 'review' && config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null, 'started_at' => now()->toISOString(), 'finished_at' => null, 'status' => 'running', 'result_ref' => $evidenceDirectory.'/'.$id.'.json', 'failure_classification' => null];
+            $branches[$kind] = ['kind' => $kind, 'branch_id' => $id, 'attempt_id' => $attempt, 'execution_target' => $target, 'provider' => $kind === 'review' ? config('molly.agent', 'ollama') : null, 'model' => $kind === 'review' && config('molly.agent', 'ollama') === 'ollama' ? config('molly.model') : null, 'started_at' => now()->toISOString(), 'finished_at' => null, 'status' => 'running', 'result_ref' => $evidenceDirectory.'/'.$id.'.json', 'failure_classification' => null];
             $inputs[$kind] = $evidenceDirectory.'/'.$id.'-input.json';
             try {
                 $this->writeInput($inputs[$kind], [...$branches[$kind], 'prompt' => $prompt, 'workspace' => $workspace, 'workspace_lease' => $workspaceLease, 'before' => $before, 'after' => $after, 'test_path' => $testPath, 'evidence_directory' => $evidenceDirectory, 'config' => $this->settings()]);

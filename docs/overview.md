@@ -24,7 +24,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 | [Journals and decisions](journal.md) | You want Markdown views of tasks or a committed decision record. |
 | [Inspecting tasks and runs](inspection.md) | You want to follow a task to its runs and conversations. |
 | [Component snapshots](component-snapshots.md) | You want before-and-after evidence for views and components. |
-| [Execution targets](execution-targets.md) | You want to know where a run executes and why Orb requests are refused. |
+| [Execution targets](execution-targets.md) | You want to know where a run executes, or to run tasks on local Orbs in separate worktrees. |
 | [Amp thread links](connections.md) | You want to tie a task to an Amp conversation. |
 | [Settings](settings.md) | You want global defaults across projects. |
 | [Compatibility](compatibility.md) | You want the tested PHP, Laravel, and Pest versions. |
@@ -57,7 +57,7 @@ Molly owns the task, the protected test, verification, the Tarpit review, the Cl
 | GitHub (`gh`) | Reads issues for `molly:import` and posts approved comments. Molly never opens or merges a pull request. | Supported. Optional |
 | Flux (free) and Livewire | Render the optional web interface. | Supported. Bundled |
 | Bloom | Owns the checkout, diff, and pull request screens when you use it. | Optional. The plugin is built against Bloom commit `1599f05f`; host-level acceptance is pending. See [Molly with Bloom](bloom.md) |
-| Orbs | Remote execution. | Not shipped. Molly refuses Orb requests. Whether the alpha includes it is an open release-scope decision. See [Execution targets](execution-targets.md#the-orb-requirement-is-open) |
+| Orbs | Local Orbs run tasks on this machine, one task per Orb, each in its own Git worktree. Hosted Orbs would run them on another machine. | Local Orbs supported. Hosted Orbs not shipped. See [Execution targets](execution-targets.md#local-orbs) |
 | Prism | None. Molly has no Prism dependency and no Prism code; model calls go through Laravel AI. | Not supported. The MME-5211 documentation outline lists optional Prism routing, but no code exists and no release includes it |
 | Rudy and Super Native | None. No Rudy or Super Native client exists, and Molly has no code for one. A future client would use the interfaces Molly has today: Artisan commands with `--json`, the MCP server, and the local web routes. | Planned. The MME-5211 outline lists a future client. Not built, and no release includes it |
 

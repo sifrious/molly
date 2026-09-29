@@ -82,7 +82,7 @@ class TaskReport
             if ($task->runs->isEmpty()) {
                 note('No runs yet. Start this task with php artisan molly:start '.$task->reference().'.');
             } else {
-                table(['Run', 'Status'], $task->runs->map(fn (Run $run): array => [$run->id, $run->status])->all());
+                table(['Run', 'Status', 'Target'], $task->runs->map(fn (Run $run): array => [$run->id, $run->status, isset($run->report['execution_target']['orb']['name']) ? 'orb '.$run->report['execution_target']['orb']['name'] : 'local'])->all());
                 note('Read a run report with php artisan molly:show RUN_ID.');
             }
         }

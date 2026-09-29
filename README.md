@@ -80,16 +80,16 @@ Start with [Getting started](docs/getting-started.md). Then:
 
 - [Tasks](docs/tasks.md), [Verification](docs/verification.md), and [Troubleshooting](docs/troubleshooting.md)
 - [Molly on its own](docs/standalone.md) and [Molly with Bloom](docs/bloom.md)
-- [Tutorials](docs/tutorials.md) for the longer workflows, including [Pest todos from a GitHub issue](docs/github-todos.md) and [a custom Laravel AI step](docs/customize-steps.md)
+- [Tutorials](docs/tutorials.md) for the longer workflows, including [Pest todos from a GitHub issue](docs/github-todos.md), [a custom Laravel AI step](docs/customize-steps.md), and [two tasks on two local Orbs](docs/execution-targets.md#run-tasks-on-two-local-orbs)
 - [Commands](docs/reference/commands.md) and [Configuration](docs/reference/configuration.md)
 
 The full index is in the [documentation overview](docs/overview.md).
 
 ## Status
 
-Molly 0.2 is in prelaunch acceptance testing. The latest tag is `v0.1.3`; no 0.2 release is tagged yet, so the `^0.2` install line above resolves only after `v0.2.0` is published. Release candidates, named `0.2.0-RC<n>`, are acceptance builds installed from a local zip, not releases; [docs/acceptance/README.md](docs/acceptance/README.md) describes them. These docs follow `main`, which `v0.2.0` will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, Pest todos from GitHub issue acceptance criteria, local Ollama and Amp agents, agent steps you can replace with your own Laravel AI agent class, local MCP tools, planning, a local web interface, project and Laravel knowledge graphs, journals, and optional Jev advice through Laravel AI.
+Molly 0.2 is in prelaunch acceptance testing. The latest tag is `v0.1.3`; no 0.2 release is tagged yet, so the `^0.2` install line above resolves only after `v0.2.0` is published. Release candidates, named `0.2.0-RC<n>`, are acceptance builds installed from a local zip, not releases; [docs/acceptance/README.md](docs/acceptance/README.md) describes them. These docs follow `main`, which `v0.2.0` will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, Pest todos from GitHub issue acceptance criteria, local Ollama and Amp agents, agent steps you can replace with your own Laravel AI agent class, local MCP tools, local Orbs that run tasks in separate Git worktrees, planning, a local web interface, project and Laravel knowledge graphs, journals, and optional Jev advice through Laravel AI.
 
-Molly does not open or merge pull requests. MCP clients cannot approve a change, lock a test, record a pull request or merge, post a GitHub comment, or hand off a task; a person runs those Artisan commands with `--approve`. Remote execution on an Orb is not shipped: Molly refuses Orb requests, and every run executes on the machine where you run Artisan. The Bloom plugin is built against Bloom commit `1599f05f` and is not in the Composer package; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
+Molly does not open or merge pull requests. MCP clients cannot approve a change, lock a test, record a pull request or merge, post a GitHub comment, or hand off a task; a person runs those Artisan commands with `--approve`. A run executes on the machine where you run Artisan, or on a local Orb: a registered worker on the same machine with its own ID, model, and Git worktree per task, so two Orbs can run two tasks at once. Hosted Orbs on another machine are not shipped; see [Execution targets](docs/execution-targets.md). The Bloom plugin is built against Bloom commit `1599f05f` and is not in the Composer package; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
 
 ## Name and license
 

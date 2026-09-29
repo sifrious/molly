@@ -4,6 +4,7 @@ namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\RetryTask;
+use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Throwable;
 
@@ -14,7 +15,12 @@ class MollyRetryCommand extends Command implements SignalableCommandInterface
     use ReportsFailures;
     use StopsRunOnSignal;
 
-    protected $signature = 'molly:retry {task : Saved task name or ID} {--json : Print JSON only}';
+    protected $signature = 'molly:retry
+        {task : Saved task name or ID}
+        {--orb= : Run on this registered Orb, by name or ID}
+        {--orb-runtime= : Run on an idle Orb with this runtime, ollama or amp}
+        {--orb-model= : Run on an idle Orb with this model}
+        {--json : Print JSON only}';
 
     protected $description = 'Retry a saved task and report tests and complexity';
 
@@ -22,7 +28,11 @@ class MollyRetryCommand extends Command implements SignalableCommandInterface
     {
         $this->runningAction = $action;
         try {
-            $run = $action->handle((string) $this->argument('task'), $this->option('json') ? null : fn (string $message) => note($message));
+            $target = ExecutionTargetRequest::orb($this->option('orb'), $this->option('orb-runtime'), $this->option('orb-model'));
+            $progress = $this->option('json') ? null : fn (string $message) => note($message);
+            $run = $target === null
+                ? $action->handle((string) $this->argument('task'), $progress)
+                : $action->handle((string) $this->argument('task'), $progress, $target);
             if ($this->option('json')) {
                 $this->line(json_encode(['id' => $run->id, 'task_id' => $run->task_id, 'status' => $run->status, 'report' => $run->report, ...array_filter(['next' => $report->next($run)])], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
             } else {

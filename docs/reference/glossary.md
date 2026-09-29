@@ -62,4 +62,4 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | Handoff | An envelope that passes a task to a child Bloom workspace with the same scope, after a person confirms it with `molly:handoff --approve`. Saved in `.molly/handoffs/`. |
 | Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
 | Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
-| Orb | A remote execution environment. Not shipped: Molly refuses Orb requests with `ORB_UNVERIFIED`. See [Execution targets](../execution-targets.md). |
+| Orb | A registered local worker with its own UUID, runtime and model, repository, and approved worktree root. It runs one task at a time in that task's own Git worktree. Hosted Orbs on another machine are not shipped. See [Execution targets](../execution-targets.md#local-orbs). |

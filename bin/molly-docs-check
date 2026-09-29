@@ -28,7 +28,7 @@ REQUIRED = {
     'Run the first task': 'docs/getting-started.md#run-the-demo-task',
     'Run a bounded parallel workflow': 'docs/tutorials.md#two-tasks-at-once',
     'Customize a step with Laravel AI': 'docs/customize-steps.md#write-the-agent',
-    'Local and Orb execution targeting': 'docs/execution-targets.md#the-orb-requirement-is-open',
+    'Local and Orb execution targeting': 'docs/execution-targets.md#run-tasks-on-two-local-orbs',
     'Import a GitHub issue and generate Pest todos': 'docs/github-todos.md#import-with-todos',
     'Pest verification and completion evidence': 'docs/verification.md',
     'Before and after component change set': 'docs/tutorials.md#before-and-after-evidence-for-a-component',
@@ -41,8 +41,8 @@ REQUIRED = {
 # is not shipped. Each stays here until the behavior ships with a tutorial or a
 # recorded release-scope decision moves it out of the alpha.
 OPEN = {
-    'Local and Orb execution targeting': 'Remote Orb execution is not shipped and SelectExecutionTarget refuses Orb requests. '
-    'See docs/execution-targets.md#the-orb-requirement-is-open.',
+    'Local and Orb execution targeting': 'Local Orbs are implemented and documented in docs/execution-targets.md#run-tasks-on-two-local-orbs. '
+    'The entry stays until the release commit removes it.',
 }
 
 

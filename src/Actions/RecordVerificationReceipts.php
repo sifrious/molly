@@ -113,8 +113,10 @@ final class RecordVerificationReceipts
 
     /**
      * Run facts every receipt carries beside the verifier outcome: the RED
-     * baseline of the locked test and the identity of the model that wrote
-     * the changes. The evidence digest covers them.
+     * baseline of the locked test, the identity of the model that wrote
+     * the changes, and, for a run on an Orb, the Orb, its worktree, the
+     * starting revision, and the worktree diff digest. The evidence digest
+     * covers them.
      *
      * @param  array<string, mixed>  $report
      * @return array<string, mixed>
@@ -129,6 +131,9 @@ final class RecordVerificationReceipts
         }
         if (is_array($report['model_identity'] ?? null)) {
             $context['model_identity'] = $report['model_identity'];
+        }
+        if (is_array($report['execution_target'] ?? null)) {
+            $context['execution_target'] = $report['execution_target'];
         }
 
         return $context;

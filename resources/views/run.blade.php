@@ -100,7 +100,15 @@
 </section>
 @endif
 <h2>Run details</h2>
-<details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd></dl></details>
+<details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd>
+@if(($report['execution_target']['kind'] ?? null) === 'orb')
+@php($target = $report['execution_target'])
+<dt>Execution target</dt><dd>Orb {{ $target['orb']['name'] ?? 'unknown' }} (<code>{{ $target['target_id'] ?? 'no ID' }}</code>), {{ $target['orb']['runtime'] ?? 'unknown runtime' }} / {{ $target['orb']['model'] ?? 'chosen by Amp' }}</dd>
+<dt>Starting revision</dt><dd><code>{{ $target['starting_revision'] ?? 'Not recorded' }}</code></dd>
+<dt>Worktree diff</dt><dd>{{ ($target['diff']['status'] ?? null) === 'captured' ? 'sha256 '.$target['diff']['sha256'].', '.$target['diff']['bytes'].' bytes' : ($target['diff']['reason'] ?? 'Not recorded') }}</dd>
+<dt>Result</dt><dd>{{ $target['result'] ?? 'Not recorded' }}</dd>
+@endif
+</dl></details>
 @if(!empty($report['branches']))
 <details><summary>Execution branch details</summary>
 <p>Execution mode: {{ $report['mode'] ?? 'Not recorded' }}. A branch result is separate from the run's completion decision.</p>

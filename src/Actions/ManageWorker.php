@@ -6,17 +6,20 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Sifrious\Molly\Models\Orb;
 use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 use Symfony\Component\Process\ExecutableFinder;
 use Throwable;
 
 /**
- * Start, stop, and inspect the one queue worker Molly owns in a workspace.
+ * Start, stop, and inspect the one queue worker Molly owns in a workspace, and one
+ * worker for each Orb.
  *
  * The worker runs `php artisan queue:work` in the host application as its own
  * process group. Its pid, process group, and command line are recorded in
- * .molly/worker/worker.json. A recorded pid only counts as Molly's worker while
+ * .molly/worker/worker.json. An Orb's worker reads only that Orb's queue and is
+ * recorded in .molly/worker/orb-ORB_ID.json. A recorded pid only counts as Molly's worker while
  * the process is alive, still leads the recorded group, and still runs the
  * recorded command line, so a reused pid is never signalled. Start and restart
  * first settle tasks that a killed worker or a restarted host left running.
@@ -47,56 +50,65 @@ class ManageWorker
     public function __construct(private RecoverAbandonedTasks $recovery) {}
 
     /** @return array<string, mixed> */
-    public function status(string $workspace): array
+    public function status(string $workspace, ?Orb $orb = null): array
     {
         $root = (new Workspace($workspace))->path;
-        $record = $this->readRecord($root);
+        $record = $this->readRecord($root, $orb);
         $state = $this->inspect($record);
 
-        return $this->report($root, 'status', $record, $state);
+        return $this->report($root, 'status', $record, $state, $orb);
     }
 
     /** @return array<string, mixed> */
-    public function start(string $workspace, int $lockWait = self::DEFAULT_LOCK_WAIT): array
+    public function start(string $workspace, int $lockWait = self::DEFAULT_LOCK_WAIT, ?Orb $orb = null): array
     {
         $root = (new Workspace($workspace))->path;
+        $this->refuseRevoked($orb);
 
-        return $this->locked($root, $lockWait, function () use ($root): array {
-            $record = $this->readRecord($root);
+        return $this->locked($root, $lockWait, function () use ($root, $orb): array {
+            $record = $this->readRecord($root, $orb);
             $state = $this->inspect($record);
             if ($state['state'] === 'running') {
-                throw new RuntimeException('WORKER_ALREADY_RUNNING: Molly already runs a worker for this workspace as pid '.$record['pid'].'. Stop it with php artisan molly:worker stop.');
+                throw new RuntimeException('WORKER_ALREADY_RUNNING: Molly already runs '.($orb === null ? 'a worker for this workspace' : 'the worker for Orb '.$orb->name).' as pid '.$record['pid'].'. Stop it with php artisan molly:worker stop'.($orb === null ? '' : ' --orb='.$orb->name).'.');
             }
             $replaced = $state['state'] === 'stale' ? $state['stale_reason'] : null;
-            File::delete($this->recordPath($root));
+            File::delete($this->recordPath($root, $orb));
 
             $recovery = $this->recoverAbandoned();
-            $record = $this->launch($root);
+            $record = $this->launch($root, $orb);
 
-            return [...$this->report($root, 'start', $record, $this->inspect($record)), 'replaced_stale' => $replaced, 'recovery' => $recovery];
+            return [...$this->report($root, 'start', $record, $this->inspect($record), $orb), 'replaced_stale' => $replaced, 'recovery' => $recovery];
         });
     }
 
     /** @return array<string, mixed> */
-    public function stop(string $workspace, int $timeout = self::DEFAULT_STOP_TIMEOUT): array
+    public function stop(string $workspace, int $timeout = self::DEFAULT_STOP_TIMEOUT, ?Orb $orb = null): array
     {
         $root = (new Workspace($workspace))->path;
 
-        return $this->locked($root, $timeout, fn (): array => $this->stopLocked($root, $timeout));
+        return $this->locked($root, $timeout, fn (): array => $this->stopLocked($root, $timeout, $orb));
     }
 
     /** @return array<string, mixed> */
-    public function restart(string $workspace, int $timeout = self::DEFAULT_STOP_TIMEOUT): array
+    public function restart(string $workspace, int $timeout = self::DEFAULT_STOP_TIMEOUT, ?Orb $orb = null): array
     {
         $root = (new Workspace($workspace))->path;
+        $this->refuseRevoked($orb);
 
-        return $this->locked($root, $timeout, function () use ($root, $timeout): array {
-            $stopped = $this->stopLocked($root, $timeout);
+        return $this->locked($root, $timeout, function () use ($root, $timeout, $orb): array {
+            $stopped = $this->stopLocked($root, $timeout, $orb);
             $recovery = $this->recoverAbandoned();
-            $record = $this->launch($root);
+            $record = $this->launch($root, $orb);
 
-            return [...$this->report($root, 'restart', $record, $this->inspect($record)), 'stop' => $stopped, 'recovery' => $recovery];
+            return [...$this->report($root, 'restart', $record, $this->inspect($record), $orb), 'stop' => $stopped, 'recovery' => $recovery];
         });
+    }
+
+    private function refuseRevoked(?Orb $orb): void
+    {
+        if ($orb?->revoked_at !== null) {
+            throw new RuntimeException('ORB_REVOKED: Orb '.$orb->name.' was revoked at '.$orb->revoked_at->toIso8601String().' and takes no work, so Molly starts no worker for it.');
+        }
     }
 
     /**
@@ -116,13 +128,13 @@ class ManageWorker
     }
 
     /** @return array<string, mixed> */
-    private function stopLocked(string $root, int $timeout): array
+    private function stopLocked(string $root, int $timeout, ?Orb $orb = null): array
     {
         if ($timeout < 1 || $timeout > 3600) {
             throw new RuntimeException('WORKER_TIMEOUT_INVALID: Use --timeout with a whole number of seconds from 1 to 3600.');
         }
 
-        $record = $this->readRecord($root);
+        $record = $this->readRecord($root, $orb);
         $state = $this->inspect($record);
         $signal = null;
 
@@ -139,10 +151,10 @@ class ManageWorker
             }
         }
 
-        File::delete($this->recordPath($root));
+        File::delete($this->recordPath($root, $orb));
 
         return [
-            ...$this->report($root, 'stop', null, ['state' => 'stopped', 'alive' => false, 'stale_reason' => null]),
+            ...$this->report($root, 'stop', null, ['state' => 'stopped', 'alive' => false, 'stale_reason' => null], $orb),
             'previous_state' => $state['state'],
             'previous_pid' => $record['pid'] ?? null,
             'stale_reason' => $state['stale_reason'],
@@ -151,18 +163,20 @@ class ManageWorker
     }
 
     /** @return array{pid: int, pgid: int, command: list<string>, connection: string, queue: string, started_at: string} */
-    private function launch(string $root): array
+    private function launch(string $root, ?Orb $orb = null): array
     {
-        [$connection, $queue] = $this->queue();
+        [$connection, $queue] = $this->queue($orb);
         $command = [$this->phpBinary(), base_path('artisan'), 'queue:work', $connection, '--queue='.$queue];
         $directory = $this->directory($root);
-        $this->assertWritable($directory);
-        $logOffset = is_file($directory.'/worker.log') ? (int) filesize($directory.'/worker.log') : 0;
-        @touch($directory.'/worker.log');
-        @chmod($directory.'/worker.log', 0600);
+        $name = $this->name($orb);
+        $log = $directory.'/'.$name.'.log';
+        $this->assertWritable($directory, $name);
+        $logOffset = is_file($log) ? (int) filesize($log) : 0;
+        @touch($log);
+        @chmod($log, 0600);
 
         $result = Process::path(base_path())
-            ->env(['MOLLY_WORKER_LOG' => $directory.'/worker.log'])
+            ->env(['MOLLY_WORKER_LOG' => $log])
             ->timeout(15)
             ->run(['/bin/sh', '-c', self::LAUNCH_SCRIPT, 'molly-worker', ...$command]);
         $pid = (int) trim($result->output());
@@ -182,17 +196,17 @@ class ManageWorker
             if ($state['alive']) {
                 posix_kill(-$pid, SIGKILL);
             }
-            throw new RuntimeException('WORKER_START_FAILED: The queue worker exited or did not start. Worker log: '.$this->logExcerpt($directory.'/worker.log', $logOffset));
+            throw new RuntimeException('WORKER_START_FAILED: The queue worker exited or did not start. Worker log: '.$this->logExcerpt($log, $logOffset));
         }
 
         try {
-            File::put($this->recordPath($root), json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
-            @chmod($this->recordPath($root), 0600);
+            File::put($this->recordPath($root, $orb), json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+            @chmod($this->recordPath($root, $orb), 0600);
         } catch (Throwable $exception) {
             // An unrecorded worker is invisible to status and stop, so it must not outlive this command.
             posix_kill(-$pid, SIGKILL);
             $this->waitForExit($pid, 5);
-            throw new RuntimeException('WORKER_START_FAILED: Molly stopped the new worker because it could not write '.$this->recordPath($root).'. '.$exception->getMessage(), 0, $exception);
+            throw new RuntimeException('WORKER_START_FAILED: Molly stopped the new worker because it could not write '.$this->recordPath($root, $orb).'. '.$exception->getMessage(), 0, $exception);
         }
 
         return $record;
@@ -202,9 +216,9 @@ class ManageWorker
      * Refuse to launch when Molly could not record the worker: an unrecorded worker keeps
      * running where molly:worker status and stop cannot see it.
      */
-    private function assertWritable(string $directory): void
+    private function assertWritable(string $directory, string $name): void
     {
-        foreach ([$directory, $directory.'/worker.json', $directory.'/worker.log'] as $path) {
+        foreach ([$directory, $directory.'/'.$name.'.json', $directory.'/'.$name.'.log'] as $path) {
             if (file_exists($path) ? ! is_writable($path) : ! is_writable($directory)) {
                 throw new RuntimeException('WORKER_START_FAILED: Molly cannot write '.$path.'. Make '.$directory.' writable by this user, then start the worker again.');
             }
@@ -257,9 +271,9 @@ class ManageWorker
      * @param  array{state: string, alive: bool, stale_reason: string|null}  $state
      * @return array<string, mixed>
      */
-    private function report(string $root, string $action, ?array $record, array $state): array
+    private function report(string $root, string $action, ?array $record, array $state, ?Orb $orb = null): array
     {
-        [$connection, $queue] = $this->queue();
+        [$connection, $queue] = $this->queue($orb);
         $running = $state['state'] === 'running';
         $started = $running ? Carbon::parse($record['started_at']) : null;
 
@@ -276,15 +290,16 @@ class ManageWorker
             'command' => $record['command'] ?? null,
             'connection' => $record['connection'] ?? $connection,
             'queue' => $record['queue'] ?? $queue,
-            'pid_file' => $this->recordPath($root),
-            'log' => $root.'/.molly/worker/worker.log',
+            'orb' => $orb === null ? null : ['id' => $orb->id, 'name' => $orb->name],
+            'pid_file' => $this->recordPath($root, $orb),
+            'log' => $root.'/.molly/worker/'.$this->name($orb).'.log',
         ];
     }
 
     /** @return array{pid: int, pgid: int, command: list<string>, connection: string, queue: string, started_at: string}|null */
-    private function readRecord(string $root): ?array
+    private function readRecord(string $root, ?Orb $orb = null): ?array
     {
-        $path = $this->recordPath($root);
+        $path = $this->recordPath($root, $orb);
         if (! is_file($path)) {
             return null;
         }
@@ -298,12 +313,18 @@ class ManageWorker
         return $record;
     }
 
-    /** @return array{0: string, 1: string} */
-    private function queue(): array
+    /** @return array{0: string, 1: string} the connection and queue: the connection's default queue, or the Orb's own queue */
+    private function queue(?Orb $orb = null): array
     {
         $connection = (string) config('queue.default');
 
-        return [$connection, (string) (config('queue.connections.'.$connection.'.queue') ?? 'default')];
+        return [$connection, $orb?->queue() ?? (string) (config('queue.connections.'.$connection.'.queue') ?? 'default')];
+    }
+
+    /** The record and log name: worker, or orb-ORB_ID for an Orb's worker. */
+    private function name(?Orb $orb): string
+    {
+        return $orb === null ? 'worker' : 'orb-'.strtolower($orb->id);
     }
 
     private function phpBinary(): string
@@ -341,9 +362,9 @@ class ManageWorker
         return $directory;
     }
 
-    private function recordPath(string $root): string
+    private function recordPath(string $root, ?Orb $orb = null): string
     {
-        return Directory::molly($root, 'worker/worker.json');
+        return Directory::molly($root, 'worker/'.$this->name($orb).'.json');
     }
 
     private function logExcerpt(string $path, int $offset): string

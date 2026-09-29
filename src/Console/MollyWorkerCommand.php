@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Console;
 use Illuminate\Console\Command;
 use RuntimeException;
 use Sifrious\Molly\Actions\ManageWorker;
+use Sifrious\Molly\Execution\LocalOrbProvider;
 use Throwable;
 
 use function Laravel\Prompts\note;
@@ -18,22 +19,24 @@ class MollyWorkerCommand extends Command
     protected $signature = 'molly:worker
         {action : start, stop, status, or restart}
         {--workspace= : Workspace that records the worker under .molly/worker (defaults to the application)}
+        {--orb= : Manage the worker for this Orb, by name or ID, which reads only that Orb\'s queue}
         {--timeout= : Seconds to wait for another molly:worker command to finish (default 10 for start), and after SIGTERM before SIGKILL when stopping (default 30)}
         {--json : Print JSON only}';
 
-    protected $description = 'Start, stop, or inspect the queue worker Molly owns for this workspace';
+    protected $description = 'Start, stop, or inspect the queue worker Molly owns for this workspace or for one Orb';
 
-    public function handle(ManageWorker $worker): int
+    public function handle(ManageWorker $worker, LocalOrbProvider $orbs): int
     {
         $action = (string) $this->argument('action');
 
         try {
             $workspace = (string) ($this->option('workspace') ?: base_path());
+            $orb = $this->option('orb') === null ? null : $orbs->find((string) $this->option('orb'));
             $result = match ($action) {
-                'start' => $worker->start($workspace, $this->option('timeout') === null ? ManageWorker::DEFAULT_LOCK_WAIT : $this->timeout()),
-                'stop' => $worker->stop($workspace, $this->timeout()),
-                'restart' => $worker->restart($workspace, $this->timeout()),
-                'status' => $worker->status($workspace),
+                'start' => $worker->start($workspace, $this->option('timeout') === null ? ManageWorker::DEFAULT_LOCK_WAIT : $this->timeout(), $orb),
+                'stop' => $worker->stop($workspace, $this->timeout(), $orb),
+                'restart' => $worker->restart($workspace, $this->timeout(), $orb),
+                'status' => $worker->status($workspace, $orb),
                 default => throw new RuntimeException('WORKER_ACTION_INVALID: Use start, stop, status, or restart.'),
             };
         } catch (Throwable $exception) {
@@ -47,6 +50,7 @@ class MollyWorkerCommand extends Command
         }
 
         table(['Field', 'Value'], [
+            ...($result['orb'] === null ? [] : [['Orb', $result['orb']['name'].' ('.$result['orb']['id'].')']]),
             ['State', $result['state']],
             ['Pid', (string) ($result['pid'] ?? 'none')],
             ['Uptime', $result['uptime_seconds'] === null ? 'none' : $result['uptime_seconds'].'s'],
