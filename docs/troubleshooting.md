@@ -137,7 +137,7 @@ Molly writes `project.json`, `projects.json`, and `config/molly.php` to a tempor
 
 `molly:project-new` refuses a directory that an interrupted run left behind with `PROJECT_PATH_NOT_EMPTY`. Run it again with `--force` to delete that directory and create the application again. The demo installer also refuses a non-empty directory; run `bash molly-demo DIR --force` to start over.
 
-If you installed with Composer yourself, run the same `composer require` again, then `php artisan vendor:publish --tag=molly-config` and `php artisan migrate`. Each one skips what is already done.
+If you installed with Composer yourself, run the same `composer require` again, then `php artisan vendor:publish --tag=molly-config` and `php artisan migrate`. Each one skips what is already done. SQLite and MySQL do not run schema changes in a transaction, and Laravel records a migration only after it finishes, so a `migrate` stopped partway, even with `kill -9`, can leave a Molly table, column, or index without its migration recorded. Each Molly migration checks for every table, column, index, and foreign key before it adds one, so the next `migrate` adds only what is missing. On SQLite this includes the copy of `molly_runs` that Laravel makes to add a foreign key: Molly discards the copy, or renames it into place when `molly_runs` was already dropped. Laravel's own migrations in a new application, such as `create_users_table` and `create_jobs_table`, have no such checks, so a kill inside one of them still fails the next `migrate` with `table ... already exists`.
 
 ## A model install stops
 

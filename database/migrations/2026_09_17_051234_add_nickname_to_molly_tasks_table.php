@@ -11,9 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('molly_tasks', function (Blueprint $table) {
-            $table->string('nickname', 64)->nullable()->unique();
-        });
+        // The column and its unique index are separate statements, and an interrupted migrate can
+        // leave the column without the index. Running it again adds only what is missing.
+        if (! Schema::hasColumn('molly_tasks', 'nickname')) {
+            Schema::table('molly_tasks', function (Blueprint $table) {
+                $table->string('nickname', 64)->nullable()->unique();
+            });
+        }
+        if (! Schema::hasIndex('molly_tasks', ['nickname'], 'unique')) {
+            Schema::table('molly_tasks', function (Blueprint $table) {
+                $table->unique('nickname');
+            });
+        }
     }
 
     /**

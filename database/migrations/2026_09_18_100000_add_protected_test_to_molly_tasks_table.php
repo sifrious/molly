@@ -8,10 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('molly_tasks', function (Blueprint $table) {
-            $table->string('test_digest', 64)->nullable();
-            $table->boolean('allow_test_edits')->default(false);
-        });
+        // Each column is its own statement, so an interrupted migrate can add one without the other.
+        if (! Schema::hasColumn('molly_tasks', 'test_digest')) {
+            Schema::table('molly_tasks', function (Blueprint $table) {
+                $table->string('test_digest', 64)->nullable();
+            });
+        }
+        if (! Schema::hasColumn('molly_tasks', 'allow_test_edits')) {
+            Schema::table('molly_tasks', function (Blueprint $table) {
+                $table->boolean('allow_test_edits')->default(false);
+            });
+        }
     }
 
     public function down(): void

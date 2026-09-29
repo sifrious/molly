@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('molly_tasks', 'journal_status')) {
+            return;
+        }
+
         Schema::table('molly_tasks', function (Blueprint $table): void {
             $table->json('journal_status')->nullable();
         });
