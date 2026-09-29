@@ -191,14 +191,25 @@ final class CreateMollyProject
         return 'php artisan molly:project-init '.escapeshellarg($path).($name !== basename($path) ? ' --name='.escapeshellarg($name) : '');
     }
 
+    /**
+     * The target as an absolute path. A relative path, such as ../shop, resolves once against
+     * the current directory, so the reported path and the printed commands work from anywhere.
+     */
     private function expand(string $path): string
     {
         if (str_starts_with($path, '~/')) {
             $home = getenv('HOME') ?: (getenv('USERPROFILE') ?: '');
             $path = rtrim(str_replace('\\', '/', $home), '/').'/'.substr($path, 2);
         }
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        if ($path === '' || str_starts_with($path, '/') || preg_match('#\A[A-Za-z]:/#', $path) === 1) {
+            return $path;
+        }
+        $parent = realpath(dirname($path));
 
-        return rtrim(str_replace('\\', '/', $path), '/');
+        return $parent === false
+            ? rtrim(str_replace('\\', '/', (string) getcwd()), '/').'/'.$path
+            : rtrim(str_replace('\\', '/', $parent), '/').'/'.basename($path);
     }
 
     private function directoryNotEmpty(string $path): bool

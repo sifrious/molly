@@ -75,11 +75,12 @@ final class InitializeMollyInExistingProject
         }
 
         try {
-            $createdGitignore = $this->ensureGitignored($root);
+            $ignored = $this->ensureGitignored($root);
         } catch (Throwable $exception) {
-            throw new RuntimeException('GITIGNORE_UNWRITABLE: Molly could not add .molly/ to '.$root.'/.gitignore'.$this->reason($exception).'. Check free disk space and that the file is writable.', 0, $exception);
+            throw new RuntimeException('GITIGNORE_UNWRITABLE: Molly could not add .molly/ and /storage/molly/ to '.$root.'/.gitignore'.$this->reason($exception).'. Check free disk space and that the file is writable.', 0, $exception);
         }
-        $note('gitignore', $createdGitignore ? 'Added .molly/ to .gitignore' : '.molly/ already ignored');
+        $createdGitignore = $ignored !== [];
+        $note('gitignore', $createdGitignore ? 'Added '.implode(' and ', $ignored).' to .gitignore' : '.molly/ and /storage/molly/ already ignored');
 
         $createdConfig = false;
         if (! is_file($root.'/config/molly.php')) {
@@ -310,24 +311,31 @@ final class InitializeMollyInExistingProject
         return $base !== false && str_replace('\\', '/', $base) === $root;
     }
 
-    private function ensureGitignored(string $root): bool
+    /**
+     * Ignore Molly's local files as the README asks: .molly/ and /storage/molly/. A line
+     * that already covers one, such as /.molly or /storage/, counts, and nothing is added
+     * twice. Returns the lines Molly added.
+     *
+     * @return list<string>
+     */
+    private function ensureGitignored(string $root): array
     {
         $gitignore = $root.'/.gitignore';
-        $needle = '.molly/';
-        if (! is_file($gitignore)) {
-            File::put($gitignore, $needle.PHP_EOL);
-
-            return true;
+        $contents = is_file($gitignore) ? File::get($gitignore) : '';
+        $covered = [
+            '.molly/' => '/\A\/?\.molly\/?\z/',
+            '/storage/molly/' => '/\A\/?storage(\/molly)?\/?\z/',
+        ];
+        $lines = array_map(trim(...), preg_split('/\R/', $contents) ?: []);
+        $missing = array_keys(array_filter($covered, fn (string $pattern): bool => preg_grep($pattern, $lines) === []));
+        if ($missing === []) {
+            return [];
         }
 
-        $contents = File::get($gitignore);
-        if (preg_match('/(^|\\n)\\s*\\.molly\\/?\\s*($|\\n)/', $contents) === 1) {
-            return false;
-        }
+        // Append, so an interrupted write never loses the lines already there.
+        File::append($gitignore, ($contents === '' || str_ends_with($contents, "\n") ? '' : "\n").implode("\n", $missing)."\n");
 
-        File::append($gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n");
-
-        return true;
+        return $missing;
     }
 
     /** PHP's reason without the function name and path, which the message already names. */

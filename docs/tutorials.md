@@ -25,7 +25,7 @@ php artisan molly:show RUN_ID --verbose
 cat tests/Feature/ReadyTest.php
 ```
 
-Molly checks the written file before running it and rejects a PHPUnit class or a file without `<?php` with `TEST_AUTHORING_INVALID`. Small local models trip on this; see [Choosing a model](ollama-quickstart.md#choosing-a-model).
+Molly checks the written file before running it and rejects a PHPUnit class, a file without `<?php`, or an `assertSee()` of one character with `TEST_AUTHORING_INVALID`. Small local models trip on this; see [Choosing a model](ollama-quickstart.md#choosing-a-model).
 
 When the test says what you meant, lock it. This records its digest, marks the lock as your approval, and turns the same task into the implementation task with a fresh attempt budget:
 

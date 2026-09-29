@@ -35,8 +35,11 @@ class CreateTask
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
         }
 
-        // Check the task's own inputs before binding, which runs Git in the workspace.
+        // Check the task's own inputs before binding, which runs Git in the workspace. The
+        // workspace is canonical from here on: a relative --workspace, a trailing "/.", and
+        // similar forms resolve once, and the task saves the real path.
         $files = new Workspace($workspace);
+        $workspace = $files->path;
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
         $testDigest = $files->testDigest($testPath);
         if (! $allowTestEdits && $testDigest === null) {
@@ -45,8 +48,6 @@ class CreateTask
 
         $reference = $this->bindWorkspace->handle($workspace);
         $reference->assertAvailableForExecution();
-        // Normalize trailing "/." and similar; persist realpath as observed metadata.
-        $workspace = $files->path;
 
         $contents = [...$files->read($paths), ...$files->readProtectedTest($testPath)];
         $snapshot = $files->snapshot($contents);

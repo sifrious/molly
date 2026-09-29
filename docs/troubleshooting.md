@@ -84,7 +84,7 @@ git commit -m "Start"
 
 The application does not have to be the repository root. A Laravel app in `backend/` of a repository rooted one level up is accepted, and so is a linked worktree or a submodule, where `.git` is a file. Molly asks Git for the top level with `git rev-parse --show-toplevel`. The workspace stays the app directory: tasks, `.molly/`, and the protected test paths belong to the app, while the revision, branch, and checkout kind come from the repository that contains it. Do not run `git init` inside an app that already sits in a repository. A directory the enclosing repository ignores, such as a scratch copy under an ignored path, is refused with `WORKSPACE_NOT_GIT` and a message naming the repository that ignores it, because its files are in no commit.
 
-A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists, and the same commands write nothing. So does an app whose files are in no commit of the repository that holds it, such as an untracked, not ignored `backend/`: Molly checks `git ls-tree HEAD` under the app and prints the `git -C <repository> add <path>` and `git -C <repository> commit` commands to run. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
+A repository with no commit fails with `WORKSPACE_REVISION_MISSING` until the first commit exists, and the same commands write nothing. So does an app whose files are in no commit of the repository that holds it, such as an untracked, not ignored `backend/`: Molly checks `git ls-tree HEAD` under the app and prints the `git -C <repository> add <path>` and `git -C <repository> commit` commands to run. A relative `--workspace` or `PATH`, such as `../orbs/greeting`, resolves once against the directory you run the command in. When Git itself is missing, commands fail with `GIT_MISSING` first. `molly:doctor` and `molly:status` report `workspace_not_git` in the `Git repository` check and never create a repository; `molly:status` still exits `0`.
 
 ## .molly is a link
 
@@ -130,7 +130,7 @@ Molly needs PHP 8.3 or later and Laravel 12 or 13. Install a tagged release, not
 Run the same command again. `molly:project-init` writes `.molly/project.json` and the `projects.json` entry only after every step succeeds, so an install stopped partway, even with `kill -9`, is never listed as ready. The next run skips what is done and finishes the rest:
 
 - It runs `composer require` again unless `vendor/composer/installed.json` lists `sifrious/molly` and Composer's autoload map includes it. A package directory left behind by a stopped Composer does not count.
-- It keeps an existing `.molly/` line in `.gitignore`, an existing `config/molly.php`, and an existing `repositories` entry, and never adds a second one.
+- It keeps existing `.molly/` and `/storage/molly/` lines in `.gitignore`, including equivalent ones such as `/.molly` or `/storage/`, an existing `config/molly.php`, and an existing `repositories` entry, and never adds a second one.
 - It keeps the project ID from `.molly/identity.json`, so tasks saved before the interruption stay in the project.
 
 Molly writes `project.json`, `projects.json`, and `config/molly.php` to a temporary file in the same directory and renames it into place, so an interrupted write leaves the previous file or no file, never half of one.
@@ -146,7 +146,9 @@ If you installed with Composer yourself, run the same `composer require` again, 
 | Code | What to do |
 | --- | --- |
 | `NO_FIT` | No approved model fits this Mac. `molly:preflight` prints what it measured and what each model needs. |
-| `MODEL_FIT_UNKNOWN` | Molly could not measure a fact the decision needs. `molly:preflight` names the unknown fact and why. Fix the probe, for example start Ollama, then run the install again. |
+| `MODEL_FIT_UNKNOWN` | Molly could not measure a fact the decision needs. `molly:preflight` names the unknown fact and why. Fix the probe, then run the install again. |
+| `RUNTIME_UNREACHABLE` | Ollama did not answer at the configured URL, so Molly could not read the installed models. Start Ollama with `ollama serve`, or open the Ollama app, then run the install again. |
+| `MODEL_MEMORY_INSUFFICIENT` | Preflight reports `memory_unavailable`: a run would refuse every fitting model with the memory available now. Free memory and run `molly:preflight` again. When the message says this Mac's total memory is smaller than the model plus the headroom, only a model Ollama already holds can run. |
 | `DOWNLOAD_AUTHORIZATION_REQUIRED` | Run the printed command, which adds `--approve`, after you check the size and the volume. |
 | `DOWNLOAD_INTERRUPTED` | Run the same command again. Ollama resumes from the part it kept. |
 | `DOWNLOAD_OFFLINE` | Ollama could not reach its registry. Check the network, then run the command again. |
@@ -195,13 +197,16 @@ The retry sends the model the cause and Molly's guidance for it in `previous_att
 | --- | --- | --- |
 | `database_not_migrated` | A test hit a missing table, and neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. | Add `uses(RefreshDatabase::class);` to the test file. |
 | `test_case_not_bound` | Laravel helpers such as `get()` are undefined because the file is not bound to `Tests\TestCase`. | Add `uses(Tests\TestCase::class);` to the test file. |
-| `test_support_missing` | A test helper class or Pest function is not loaded. | Import it or stop depending on it. |
+| `test_helper_not_imported` | The file calls a Pest plugin helper, such as `get()`, `post()`, `actingAs()`, or `livewire()`, without importing it, so PHP reports `Call to undefined function get()`. | The exact import, such as `use function Pest\Laravel\{get, post};`, or the test case form, such as `$this->get(...)`. |
+| `test_plugin_missing` | The file calls a Pest plugin helper, but the plugin, such as `pestphp/pest-plugin-laravel`, is not in the workspace's `composer.lock` or `vendor/`. | Call the test case instead, such as `$this->get(...)`, or `Livewire::test()` for components. |
+| `test_class_not_imported` | The file names a Laravel testing class, such as `RefreshDatabase`, `WithFaker`, or `Livewire`, without its `use` statement. | The exact `use` statement, such as `use Illuminate\Foundation\Testing\RefreshDatabase;`. |
+| `test_support_missing` | A test helper class or Pest function is not loaded, including a class under `Tests\`, `Pest\`, `PHPUnit\`, or Laravel's testing namespaces. | Import it or stop depending on it. |
 | `parse_error` | The file does not parse. | Return one complete PHP file. |
 | `no_tests` | Pest found no tests in the file. | Declare cases with `it()` or `test()`. |
 | `no_assertions` | The tests asserted nothing. | Assert the expected behavior. |
 | `tests_skipped` | Pest skipped the tests or marked them incomplete. | Remove `skip()` and `todo()`. |
 
-When a test that already applies `RefreshDatabase` hits a missing table, Molly counts it as missing behavior: the implementation has to add the migration.
+When a test that already applies `RefreshDatabase` hits a missing table, Molly counts it as missing behavior: the implementation has to add the migration. The same goes for a missing application class or function, such as `App\Livewire\Counter` or `greeting()`: the implementation has to add it. Only the Pest plugin helpers and Laravel testing classes above count as a broken test.
 
 You can also fix the test yourself and run `molly:lock-test TASK --approve` again. The lock runs the test again before it locks anything. When the same cause keeps coming back, the retry stops at `molly.repair.per_failure` with `REPAIR_BUDGET_EXHAUSTED`, and the message tells you to edit the test and lock it.
 
@@ -237,7 +242,7 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | `CHANGES_INVALID` | The proposal was empty, repeated a file, or named a file outside the allowed list. |
 | `FILE_TOO_LARGE` | A selected file or replacement is over `molly.max_file_bytes`. |
 | `NO_CHANGES` | The proposal left the selected files as they were. |
-| `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. |
+| `TEST_AUTHORING_INVALID` | A written test is not a Pest file Molly can run: missing `<?php`, PHPUnit classes, or routes and schema inside the test. It also covers an `assertSee()`, `assertSeeText()`, `assertDontSee()`, or `assertDontSeeText()` of one character, such as `assertSee('1')`, which proves nothing. The retry sends the message to the model. |
 
 ## The model request fails
 
@@ -247,6 +252,7 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | --- | --- | --- |
 | `MODEL_MEMORY_INSUFFICIENT` | Ollama does not hold the model yet, and its size plus `molly.memory.headroom_gb` is more than the available memory. The message gives all three numbers. Molly refused before sending the request, so Ollama loaded nothing. | Choose a smaller installed model with `php artisan molly:setup`, or free memory and try again. See [Memory](reference/configuration.md#memory). |
 | `MEMORY_HEADROOM_INVALID` | `molly.memory.headroom_gb` is not a number of gigabytes, 0 or more. | Fix the value in `config/molly.php`, then run `php artisan config:clear`. |
+| `LOCAL_PROVIDER_INVALID` | The Ollama settings are not usable: another driver, a URL that is not loopback HTTP, a missing or cloud model, or a `molly.timeout` that is not a whole number of seconds, 1 or more. For the timeout, the message names the value. | Fix the setting. For the timeout, set `timeout` in `config/molly.php`, then run `php artisan config:clear`. |
 | `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. A run never pulls a model; `molly:install-model` installs an approved one after you authorize the download. |
 | `PROVIDER_ERROR` | Ollama answered with an HTTP error, such as 500, 503, or 429, or with its own `error` field in place of a chat response. The message gives the HTTP status and the model name, not Ollama's text. | Read the Ollama server log: the terminal running `ollama serve`, or `~/.ollama/logs/server.log` for the macOS app. Fix the cause, then try again. |
 | `PROVIDER_RESPONSE_INVALID` | Ollama answered, but the body was not a chat response: truncated JSON, plain text, an empty object, or fields Laravel AI cannot read. Molly uses none of it. | Check that `OLLAMA_URL` points at Ollama itself, then try again. |

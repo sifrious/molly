@@ -5,6 +5,7 @@ use Laravel\Ai\Prompts\AgentPrompt;
 use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Actions\ReviewChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
+use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Agents\TarpitReviewer;
 
 function cleanMollyReview(): array
@@ -184,3 +185,14 @@ it('accepts an app-scoped Pest Feature file when allow_test_edits authors the te
         return $payload['protected_test']['writable'] === true;
     });
 });
+
+it('names an invalid molly.timeout instead of the generic provider message', function (mixed $timeout, string $shown): void {
+    config(['molly.timeout' => $timeout]);
+
+    expect(fn () => LocalOllama::validate('gpt-oss:20b'))
+        ->toThrow(RuntimeException::class, 'LOCAL_PROVIDER_INVALID: molly.timeout must be a whole number of seconds, 1 or more, and it is '.$shown.'. Set timeout in config/molly.php, then run php artisan config:clear.');
+})->with([
+    'zero' => [0, '0'],
+    'negative' => [-5, '-5'],
+    'text' => ['soon', '"soon"'],
+]);

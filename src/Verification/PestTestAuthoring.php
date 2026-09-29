@@ -45,7 +45,7 @@ class PestTestAuthoring
         }
 
         if ($this->registersLivewire($content)) {
-            $issues[] = 'Do not register Livewire components inside the acceptance Pest file; assert against App\\Livewire\\… instead.';
+            $issues[] = 'Do not register Livewire components inside the acceptance Pest file; assert against the application\'s own component classes instead.';
         }
 
         if ($this->registersRoutes($content)) {
@@ -54,6 +54,11 @@ class PestTestAuthoring
 
         if ($this->definesAnonymousComponent($content)) {
             $issues[] = 'Do not embed anonymous Livewire components in the acceptance Pest file.';
+        }
+
+        $vacuous = $this->vacuousSeeAssertions($content);
+        if ($vacuous !== []) {
+            $issues[] = 'Assert specific rendered text, not a single character: '.implode(', ', $vacuous).(count($vacuous) === 1 ? ' passes or fails on almost any page, so it proves' : ' pass or fail on almost any page, so they prove').' nothing.';
         }
 
         return $issues;
@@ -83,6 +88,19 @@ class PestTestAuthoring
     private function registersRoutes(string $content): bool
     {
         return (bool) preg_match('/\bRoute\s*::\s*(get|post|put|patch|delete|any|match|view|redirect|middleware|group)\s*\(/', $content);
+    }
+
+    /**
+     * assertSee(), assertSeeText(), assertDontSee(), or assertDontSeeText() calls whose
+     * expected text is empty or one character, such as assertSee('1') or assertDontSee(0).
+     *
+     * @return list<string>
+     */
+    private function vacuousSeeAssertions(string $content): array
+    {
+        preg_match_all('/\bassert(?:Dont)?See(?:Text)?\s*\(\s*(?:\'[^\'\\\\]?\'|"[^"\\\\$]?"|-?\d)\s*[,)]/', $content, $matches);
+
+        return array_values(array_unique(array_map(fn (string $call): string => rtrim(preg_replace('/\s+/', '', $call), ',').(str_ends_with(rtrim($call), ')') ? '' : ')'), $matches[0])));
     }
 
     private function definesAnonymousComponent(string $content): bool

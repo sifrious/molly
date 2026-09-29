@@ -28,19 +28,22 @@ curl -s http://127.0.0.1:11434/api/tags
 
 | Status | Meaning |
 | --- | --- |
-| `recommended_fit` | The model fits and leaves `molly.memory.headroom_gb` of memory for macOS, Bloom, and Molly. |
+| `recommended_fit` | The model fits and leaves `molly.memory.headroom_gb` of memory for macOS, Bloom, and Molly. With `memory_held_by_loaded_model`, Ollama already holds the model under warning memory pressure. |
 | `minimum_fit` | The model meets its minimum requirements. The decision lists the constraints, such as `memory_headroom_below_budget`, `memory_pressure_warning`, or `process_translated`. |
 | `already_installed` | Ollama lists the approved artifact with the approved digest, and it passed Molly's readiness check on the pinned runtime. |
 | `no_fit` | The message is `No supported local Ollama configuration fits this Mac.` The decision lists what Molly measured, what each model needs, and the reason codes. |
+| `memory_unavailable` | An approved model fits this Mac, but a run would refuse to load every fitting model with `MODEL_MEMORY_INSUFFICIENT` with the memory available now. Molly selects no model. The message names the model, the memory a run needs, and either the memory available now or, when the Mac's total memory is smaller than that, says only a model Ollama already holds can run. |
 | `unsupported` | This is not an Apple silicon Mac running macOS 14.0 or later. The reason is `platform_unsupported:intel`, `platform_unsupported:linux`, or `os_version_unsupported`. |
 | `unknown` | Molly could not measure a fact the decision needs, and the reasons name it. Unknown is not a finding that the Mac is incompatible. Molly downloads nothing until the fact is measured. |
 
-Molly selects the largest approved model that fits with headroom. When none does, it selects the smallest model that meets its minimum. A 96 GB Mac Studio gets `gpt-oss:120b-code`, a 24 GB Mac gets `gpt-oss:20b`, a 16 GB Mac gets `gpt-oss:20b` as a `minimum_fit`, and an 8 GB Mac has no fit.
+Molly selects the largest approved model that fits with headroom. When none does, it selects the smallest model that meets its minimum. Within the same tier, a model Ollama already holds that passed Molly's readiness check comes first, because it runs without loading anything. Molly never selects a model a run would refuse to load now; see the memory rule below. A 96 GB Mac Studio gets `gpt-oss:120b-code`, including when Ollama already holds that model and macOS reports warning pressure, a 24 GB Mac gets `gpt-oss:20b`, and an 8 GB Mac has no fit. A 16 GB Mac meets the minimum for `gpt-oss:20b`, so preflight selects it to install. A run then needs 13.8 GB plus the 11 GB default headroom available, more than 16 GB, so once the model is installed and Ollama does not hold it, preflight reports `memory_unavailable`.
 
 The decision applies these rules:
 
 - A model meets its minimum when total memory is at least the catalogue's minimum: 16 GiB for `gpt-oss:20b` and 96 GiB for `gpt-oss:120b-code`. It fits with headroom when total memory is at least its size plus `molly.memory.headroom_gb`, and at least the catalogue's recommended memory. A run uses the same headroom rule against available memory before Ollama loads a model; see [Memory](reference/configuration.md#memory).
-- A `warning` or `critical` memory pressure level downgrades a recommended fit to `minimum_fit`, so a Mac under pressure gets the smaller model. Under `critical` pressure Molly also refuses to install. Pressure is a reading from the moment preflight ran, so the selection can change with load; `molly:install-model MODEL` still installs any approved model that fits.
+- A `warning` or `critical` memory pressure level downgrades a recommended fit to `minimum_fit`, so a Mac under pressure gets the smaller model. One case is different: under `warning` pressure, a model Ollama already holds in memory, with the approved digest, keeps its fit when the available memory plus the memory Ollama holds for it covers its size and `molly.memory.headroom_gb`. Using that model needs no new memory, which is how `molly:doctor` (`model_loaded`) and a run treat it too, and the pressure may come from the model itself. The decision still lists `memory_pressure_warning` and adds `memory_held_by_loaded_model`. A model Ollama does not hold, or one whose available memory is unknown, is still downgraded. Under `critical` pressure every model is downgraded, and Molly also refuses to install. Pressure is a reading from the moment preflight ran, so the selection can change with load; `molly:install-model MODEL` still installs any approved model that fits.
+- A run checks memory before Ollama loads a model it does not hold: the installed size plus `molly.memory.headroom_gb` must fit in the available memory, or the run stops with `MODEL_MEMORY_INSUFFICIENT`. The decision applies the same check to each installed model, adds `memory_available_insufficient` to a model the run would refuse, and never selects it. A model that is not installed yet is not checked, because a run cannot use it. When every fitting model would be refused, the status is `memory_unavailable`.
+- When the selected model is not the one Ollama holds, the decision adds the flag `loaded_model_may_unload:NAME` for each model Ollama holds. Ollama may unload a model to load another, depending on `OLLAMA_MAX_LOADED_MODELS`. Molly does not read or change Ollama's settings.
 - When PHP runs under Rosetta translation, `uname -m` reports `x86_64`. Molly reads `hw.optional.arm64` first, so it does not mistake an Apple silicon Mac for an Intel Mac, and it downgrades the fit to `minimum_fit` with `process_translated`, because an Ollama started from the same shell may run translated too.
 - A download must leave 15% of the destination volume free, the models directory must be writable, and its volume must be mounted. A model that is already installed needs no disk space.
 
@@ -99,7 +102,8 @@ Every refusal and failure exits 1 with one of these codes. The install journal i
 | `CATALOGUE_STALE` | The catalogue is past its review date. |
 | `RUNTIME_VERSION_MISMATCH` | Ollama reports a version other than the pinned 0.34.4, before or after the download. |
 | `RUNTIME_UNVERIFIED` | Molly could not read the Ollama version from the CLI or the API. |
-| `RUNTIME_UNREACHABLE` | The local Ollama API did not answer. |
+| `RUNTIME_UNREACHABLE` | The local Ollama API did not answer, before the plan or during the download. The message names the URL. Start Ollama with `ollama serve`, or open the Ollama app. |
+| `MODEL_MEMORY_INSUFFICIENT` | Without a model name, the decision is `memory_unavailable`: a run would refuse every fitting model with the memory available now. The message is the decision's message. |
 | `MEMORY_PRESSURE_CRITICAL` | macOS reports critical memory pressure. |
 | `INSTALLED_DIGEST_CONFLICT` | A model with the approved name but another digest is installed. Molly does not replace it. |
 | `BASE_DIGEST_CONFLICT` | The base of a derived model is installed with another digest. Molly does not replace it. |

@@ -65,14 +65,15 @@ function passedReadiness(string $model, string $digest, string $runtime = '0.34.
 
 dataset('fixture outcomes', [
     'M3 Ultra 96 GB: recommended fit' => ['m3-ultra-96gb', 'recommended_fit', 'gpt-oss:120b-code', ['recommended_memory_available'], []],
-    '16 GB M-series: minimum fit with constraints' => ['m2-pro-16gb-external', 'minimum_fit', 'gpt-oss:20b', ['minimum_requirements_met', 'artifact_installed_unverified'], ['memory_headroom_below_budget']],
+    // 13.8 GB plus 11 GB of headroom is more than 16 GB, so a run refuses gpt-oss:20b unless Ollama holds it.
+    '16 GB M-series: minimum fit that a run would refuse' => ['m2-pro-16gb-external', 'memory_unavailable', null, ['memory_available_insufficient'], ['memory_headroom_below_budget', 'memory_available_insufficient']],
     '8 GB MacBook Air: no fit' => ['macbook-air-8gb', 'no_fit', null, ['insufficient_memory', 'insufficient_disk'], []],
     'Intel Mac: unsupported' => ['intel-mac-x86_64', 'unsupported', null, ['platform_unsupported:intel'], []],
     'Linux: unsupported' => ['linux-x86_64', 'unsupported', null, ['platform_unsupported:linux'], []],
     'macOS 13 on Apple silicon: unsupported' => ['apple-silicon-macos-13', 'unsupported', null, ['os_version_unsupported'], []],
     'every probe failed: unknown' => ['probes-unknown', 'unknown', null, ['compatibility_unknown:platform.macos', 'runtime_prerequisite_unknown:metal', 'compatibility_unknown:memory.total_bytes', 'compatibility_unknown:disk.free_bytes', 'compatibility_unknown:ollama.installed_models'], []],
-    'Rosetta translated: downgraded' => ['rosetta-translated', 'minimum_fit', 'gpt-oss:20b', ['minimum_requirements_met', 'artifact_installed_unverified'], ['process_translated']],
-    'critical memory pressure: downgraded' => ['high-memory-pressure', 'minimum_fit', 'gpt-oss:20b', ['minimum_requirements_met', 'artifact_installed_unverified'], ['memory_headroom_below_budget', 'memory_pressure_critical']],
+    'Rosetta translated: downgraded, and a run would refuse it with 12.9 GB available' => ['rosetta-translated', 'memory_unavailable', null, ['memory_available_insufficient'], ['process_translated', 'memory_available_insufficient']],
+    'critical memory pressure: downgraded, and a run would refuse it' => ['high-memory-pressure', 'memory_unavailable', null, ['memory_available_insufficient'], ['memory_headroom_below_budget', 'memory_pressure_critical', 'memory_available_insufficient']],
     'removed external volume: only the installed model fits' => ['external-volume-removed', 'recommended_fit', 'gpt-oss:20b', ['recommended_memory_available', 'artifact_installed_unverified'], []],
 ]);
 
@@ -131,7 +132,8 @@ it('reads Apple silicon from the arm64 capability when Rosetta translates the pr
         ->and($decision['measured'])->toMatchArray(['apple_silicon' => true, 'translated' => true, 'architecture' => 'x86_64'])
         ->and(fitCandidate($decision, 'gpt-oss:20b')['fit'])->toBe('minimum_fit');
 
-    [, $native] = decideFixture('rosetta-translated', ['sysctl -n sysctl.proc_translated' => commandOutput("0\n"), 'uname -m' => commandOutput("arm64\n")]);
+    // Ollama holds gpt-oss:20b, so the memory a run needs is not what this checks.
+    [, $native] = decideFixture('rosetta-translated', ['sysctl -n sysctl.proc_translated' => commandOutput("0\n"), 'uname -m' => commandOutput("arm64\n")], ['/api/ps' => psResponse([['gpt-oss:20b', GPT_OSS_20B_DIGEST, 14000000000]])]);
 
     expect($native['status'])->toBe('recommended_fit')
         ->and($native['constraints'])->toBe([]);
@@ -182,12 +184,118 @@ it('downgrades a recommended fit under warning memory pressure', function () {
         ->and($decision['install_allowed'])->toBeTrue();
 });
 
+/** Ollama's /api/ps response holding these models, each as [name, digest, bytes in memory]. */
+function psResponse(array $models): array
+{
+    return ['status' => 200, 'json' => ['models' => array_map(fn (array $model): array => ['name' => $model[0], 'model' => $model[0], 'digest' => $model[1], 'size' => $model[2], 'size_vram' => $model[2]], $models)]];
+}
+
+it('keeps the loaded gpt-oss:120b-code on the RC10 Mac Studio under warning pressure, as doctor does', function () {
+    // RC10 measured 23.4 GB available and warning pressure while Ollama held 64.5 GB for gpt-oss:120b-code.
+    [$snapshot, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded');
+
+    expect($snapshot['facts']['memory']['pressure_level']['value'])->toBe('warning')
+        ->and($decision['status'])->toBe('recommended_fit')
+        ->and($decision['model_selection']['model'])->toBe('gpt-oss:120b-code')
+        ->and($decision['constraints'])->toBe(['memory_pressure_warning', 'memory_held_by_loaded_model'])
+        ->and($decision['message'])->toBe('gpt-oss:120b-code fits this Mac and leaves 11 GB of memory headroom. Memory pressure is warning, but Ollama already holds gpt-oss:120b-code, and the memory it holds counts as available to it.')
+        ->and($decision['measured']['available_memory_bytes'])->toBe(23410393088)
+        ->and($decision['flags'])->not->toContain('loaded_model_may_unload:gpt-oss:120b-code')
+        // gpt-oss:20b is not loaded, so the warning still lowers it, and a run would refuse it now.
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['fit'])->toBe('minimum_fit')
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['constraints'])->toBe(['memory_pressure_warning', 'memory_available_insufficient'])
+        ->and(app(LocalOllama::class)->memory('gpt-oss:120b-code')['status'])->toBe('loaded')
+        ->and(app(LocalOllama::class)->memory('gpt-oss:20b')['status'])->toBe('exceeds');
+});
+
+it('still lowers gpt-oss:120b-code under warning pressure when Ollama does not hold it, and selects no model a run would refuse', function () {
+    [, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded', http: ['/api/ps' => psResponse([])]);
+
+    expect($decision['status'])->toBe('memory_unavailable')
+        ->and($decision['model_selection'])->toBeNull()
+        ->and($decision['reasons'])->toBe(['memory_available_insufficient'])
+        ->and($decision['message'])->toBe('gpt-oss:20b meets its requirements on this Mac, but a run needs 13.8 GB plus 11 GB of headroom available before Ollama loads it, and 23.4 GB is available now. Molly would refuse to load it with MODEL_MEMORY_INSUFFICIENT, so it selects no model. Free memory, then run molly:preflight again.')
+        ->and($decision['install_allowed'])->toBeFalse()
+        ->and($decision['install_blockers'])->toBe(['memory_unavailable'])
+        ->and(fitCandidate($decision, 'gpt-oss:120b-code')['fit'])->toBe('minimum_fit')
+        ->and(fitCandidate($decision, 'gpt-oss:120b-code')['constraints'])->toBe(['memory_pressure_warning', 'memory_available_insufficient'])
+        ->and(app(LocalOllama::class)->memory('gpt-oss:20b')['status'])->toBe('exceeds')
+        ->and(app(LocalOllama::class)->memory('gpt-oss:120b-code')['status'])->toBe('exceeds');
+});
+
+it('selects the model Ollama holds when a run would refuse to load any other, as on the M13.17 Mac Studio', function () {
+    // M13.17: 10.3 GB available and warning pressure while Ollama held 64.5 GB for gpt-oss:120b-code.
+    $vmStat = vmStatWithFreePages(intdiv(10_318_118_912, 16384));
+    [, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded', ['vm_stat' => $vmStat]);
+
+    expect($decision['status'])->toBe('minimum_fit')
+        ->and($decision['model_selection']['model'])->toBe('gpt-oss:120b-code')
+        // Held memory plus 10.3 GB available is short of 76.4 GB, so the warning still lowers the tier.
+        ->and($decision['constraints'])->toBe(['memory_pressure_warning'])
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['constraints'])->toContain('memory_available_insufficient')
+        ->and(app(LocalOllama::class)->memory('gpt-oss:20b')['message'])->toBe('gpt-oss:20b needs 13.8 GB plus 11 GB of headroom, but only 10.3 GB is available. Molly did not ask Ollama to load it. Choose a smaller installed model with php artisan molly:setup, or free memory and try again.')
+        ->and(app(LocalOllama::class)->memory('gpt-oss:120b-code')['status'])->toBe('loaded');
+});
+
+it('prefers the verified model Ollama holds over a smaller unverified one in the same tier', function () {
+    // Critical pressure lowers both models to minimum_fit; 40 GB available lets a run load either one.
+    $commands = ['vm_stat' => vmStatWithFreePages(intdiv(40_000_000_000, 16384)), 'sysctl -n kern.memorystatus_vm_pressure_level' => commandOutput("4\n")];
+    [, $unverified] = decideFixture('m3-ultra-96gb-120b-code-loaded', $commands);
+    passedReadiness('gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST);
+    [, $verified] = decideFixture('m3-ultra-96gb-120b-code-loaded', $commands);
+
+    expect($unverified['model_selection']['model'])->toBe('gpt-oss:20b')
+        ->and($unverified['flags'])->toContain('loaded_model_may_unload:gpt-oss:120b-code')
+        ->and($verified['status'])->toBe('already_installed')
+        ->and($verified['model_selection'])->toMatchArray(['model' => 'gpt-oss:120b-code', 'fit' => 'minimum_fit', 'verified' => true])
+        ->and(fitCandidate($verified, 'gpt-oss:120b-code')['loaded'])->toBeTrue()
+        ->and($verified['flags'])->not->toContain('loaded_model_may_unload:gpt-oss:120b-code');
+});
+
+it('explains that a Mac whose memory is below a model plus the headroom can only run a model Ollama holds', function () {
+    [, $idle] = decideFixture('m2-pro-16gb-external');
+    [, $held] = decideFixture('m2-pro-16gb-external', http: ['/api/ps' => psResponse([['gpt-oss:20b', GPT_OSS_20B_DIGEST, 14000000000]])]);
+
+    expect($idle['status'])->toBe('memory_unavailable')
+        ->and($idle['message'])->toBe('gpt-oss:20b meets its requirements on this Mac, but a run needs 13.8 GB plus 11 GB of headroom available before Ollama loads it, which is more than this Mac\'s 17.2 GB of memory. Molly would refuse to load it with MODEL_MEMORY_INSUFFICIENT, so it selects no model. Only a model Ollama already holds can run here with molly.memory.headroom_gb at 11 GB.')
+        ->and($held['status'])->toBe('minimum_fit')
+        ->and($held['model_selection']['model'])->toBe('gpt-oss:20b')
+        ->and($held['constraints'])->toBe(['memory_headroom_below_budget']);
+});
+
+it('counts the memory a loaded model holds only for that exact model, and only under warning pressure', function (array $commands, array $loaded, string $fit) {
+    [, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded', $commands, ['/api/ps' => psResponse($loaded)]);
+
+    expect(fitCandidate($decision, 'gpt-oss:120b-code')['fit'])->toBe($fit);
+})->with([
+    // 65.4 GB model plus 11 GB headroom is 76.4 GB; 23.4 GB available plus 64.5 GB held covers it.
+    'held with enough memory' => [[], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'recommended_fit'],
+    'held, but available plus held is short' => [['vm_stat' => vmStatWithFreePages(intdiv(76_369_818_623 - 64_485_704_334 - 1, 16384))], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+    'held, exactly enough' => [['vm_stat' => vmStatWithFreePages(intdiv(76_369_818_623 - 64_485_704_334, 16384) + 1)], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'recommended_fit'],
+    'another model held' => [[], [['gpt-oss:120b', 'a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9', 64485704334]], 'minimum_fit'],
+    'same name, another digest' => [[], [['gpt-oss:120b-code', str_repeat('0', 64), 64485704334]], 'minimum_fit'],
+    'critical pressure' => [['sysctl -n kern.memorystatus_vm_pressure_level' => commandOutput("4\n")], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+    'available memory unknown' => [['vm_stat' => commandOutput('', 1, 'vm_stat failed')], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+]);
+
+it('agrees with the README: a 96 GB Mac gets gpt-oss:120b-code', function () {
+    $readme = File::get(dirname(__DIR__, 3).'/README.md');
+    [, $idle] = decideFixture('m3-ultra-96gb');
+    [, $busy] = decideFixture('m3-ultra-96gb-120b-code-loaded');
+
+    expect($readme)->toContain('`gpt-oss:120b-code` on a 96 GB Mac')
+        ->and($idle['model_selection']['model'])->toBe('gpt-oss:120b-code')
+        ->and($busy['model_selection']['model'])->toBe('gpt-oss:120b-code');
+});
+
 it('refuses installs under critical memory pressure but still reports the fit', function () {
     [, $decision] = decideFixture('high-memory-pressure');
 
-    expect($decision['status'])->toBe('minimum_fit')
+    expect($decision['status'])->toBe('memory_unavailable')
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['fit'])->toBe('minimum_fit')
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['install_blockers'])->toBe(['memory_pressure_critical'])
         ->and($decision['install_allowed'])->toBeFalse()
-        ->and($decision['install_blockers'])->toBe(['memory_pressure_critical']);
+        ->and($decision['install_blockers'])->toBe(['memory_unavailable', 'memory_pressure_critical']);
 });
 
 it('refuses a download that would leave less than 15 percent of the destination volume free', function () {
@@ -244,9 +352,11 @@ it('refuses a read-only or missing destination only when something must be downl
 });
 
 it('reports already installed and verified only after a readiness record for the same digest and runtime', function () {
-    [, $before] = decideFixture('m2-pro-16gb-external');
+    // The readiness check loads the model, so Ollama holds it afterwards.
+    $held = ['/api/ps' => psResponse([['gpt-oss:20b', GPT_OSS_20B_DIGEST, 14000000000]])];
+    [, $before] = decideFixture('m2-pro-16gb-external', http: $held);
     passedReadiness('gpt-oss:20b', GPT_OSS_20B_DIGEST);
-    [, $after] = decideFixture('m2-pro-16gb-external');
+    [, $after] = decideFixture('m2-pro-16gb-external', http: $held);
 
     expect($before['status'])->toBe('minimum_fit')
         ->and($before['reasons'])->toContain('artifact_installed_unverified')
@@ -259,7 +369,8 @@ it('reports already installed and verified only after a readiness record for the
 it('does not trust a readiness record for another digest or runtime version', function (string $digest, string $runtime, array $commands) {
     passedReadiness('gpt-oss:20b', $digest, $runtime);
 
-    [, $decision] = decideFixture('m2-pro-16gb-external', $commands, $commands === [] ? [] : ['/api/version' => ['status' => 200, 'json' => ['version' => '0.33.1']]]);
+    $held = ['/api/ps' => psResponse([['gpt-oss:20b', GPT_OSS_20B_DIGEST, 14000000000]])];
+    [, $decision] = decideFixture('m2-pro-16gb-external', $commands, $held + ($commands === [] ? [] : ['/api/version' => ['status' => 200, 'json' => ['version' => '0.33.1']]]));
 
     expect($decision['status'])->toBe('minimum_fit')
         ->and(fitCandidate($decision, 'gpt-oss:20b')['verified'])->toBeFalse();

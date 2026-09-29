@@ -229,14 +229,14 @@ it('chooses the first idle healthy Orb by name that has the required runtime and
     expect($chosen($first, 'gpt-oss:20b'))->toBe('alpha')
         ->and($chosen($second, 'gpt-oss:20b'))->toBe('charlie')
         ->and($chosen($big, 'gpt-oss:120b-code', 'ollama'))->toBe('bravo')
-        ->and(fn () => placeOnOrb($third, null, 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs any runtime gpt-oss:20b can take task third. alpha: ORB_BUSY: Orb alpha is reserved for task first, which is queued on it.')
-        ->and(fn () => placeOnOrb($third, null, 'llama3', 'ollama'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs ollama llama3 can take task third. Register one with php artisan molly:orb-register.')
+        ->and(fn () => placeOnOrb($third, null, 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs gpt-oss:20b can take task third. alpha: ORB_BUSY: Orb alpha is reserved for task first, which is queued on it.')
+        ->and(fn () => placeOnOrb($third, null, 'llama3', 'ollama'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs ollama with llama3 can take task third. Register one with php artisan molly:orb-register.')
         ->and(fn () => placeOnOrb($third, 'bravo', 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_BUSY');
 
     mollyJson('molly:stop', ['task' => 'first']);
     expect(placeOnOrb($third, null, null, 'ollama')->selectionReason)->toBe('Orb alpha is the first idle Orb by name that runs ollama.');
     mollyJson('molly:stop', ['task' => 'big-task']);
-    expect(fn () => placeOnOrb($first->fresh(), 'bravo', 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_CAPABILITY_MISMATCH: Orb bravo runs ollama gpt-oss:120b-code, not any runtime gpt-oss:20b.');
+    expect(fn () => placeOnOrb($first->fresh(), 'bravo', 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_CAPABILITY_MISMATCH: Orb bravo runs ollama with gpt-oss:120b-code, and the task asks for gpt-oss:20b.');
 });
 
 it('refuses a busy Orb, a task placed on another Orb, and an occupied worktree', function (): void {
@@ -329,7 +329,7 @@ it('revokes an Orb so it takes no task, a queued task loses its place, and a run
         ->and($running->fresh()->stop_requested_at)->not->toBeNull()
         ->and($again['already_revoked'])->toBeTrue()
         ->and(fn () => placeOnOrb($queued, 'big'))->toThrow(RuntimeException::class, 'ORB_REVOKED: Orb big was revoked at')
-        ->and(fn () => placeOnOrb($queued, null, 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs any runtime gpt-oss:20b can take task queued. Register one')
+        ->and(fn () => placeOnOrb($queued, null, 'gpt-oss:20b'))->toThrow(RuntimeException::class, 'ORB_UNAVAILABLE: No registered Orb that runs gpt-oss:20b can take task queued. Register one')
         ->and($workerExit)->toBe(1)
         ->and($worker['error'])->toStartWith('ORB_REVOKED: Orb big was revoked')
         ->and(fn () => registerOrb('big', 'gpt-oss:20b'))->toThrow(Exception::class);

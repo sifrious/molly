@@ -7,7 +7,9 @@ namespace Sifrious\Molly\ModelFit;
  * assessed on its own, then the best fit is selected: the largest model that fits with
  * the memory headroom, otherwise the smallest model that meets its minimum. Precedence
  * inside one assessment is fixed: an unsupported platform, then a measured shortfall
- * (no_fit), then an unknown fact (unknown), then the memory tier. Unknown never becomes
+ * (no_fit), then an unknown fact (unknown), then the memory tier. Warning or critical
+ * memory pressure lowers the tier, except that warning pressure does not lower a model
+ * Ollama already holds when that model has its memory and headroom. Unknown never becomes
  * no_fit or unsupported. The recommender reads facts only and has no side effects.
  */
 final class ModelFitRecommender
@@ -56,24 +58,29 @@ final class ModelFitRecommender
 
     /**
      * The selected candidate, or a decision without a model that names why none fits.
+     * A model a run would refuse to load with the memory available now is never
+     * selected. Among the rest, a recommended fit comes before a minimum fit; within a
+     * tier, a model Ollama holds that passed Molly's readiness check comes first, then
+     * the largest model with headroom or the smallest at the minimum. When every
+     * fitting model would be refused, the status is memory_unavailable and names the
+     * model that would be selected once that memory is free.
      *
      * @param  list<ModelFitRecommendation>  $candidates
      */
     public function select(array $candidates, MachineFacts $machine): ModelFitRecommendation
     {
-        $fits = array_values(array_filter($candidates, fn (ModelFitRecommendation $candidate): bool => $candidate->status->fits()));
-        usort($fits, static function (ModelFitRecommendation $a, ModelFitRecommendation $b): int {
-            $tier = ($a->fit === ModelFitStatus::RecommendedFit ? 0 : 1) <=> ($b->fit === ModelFitStatus::RecommendedFit ? 0 : 1);
-            if ($tier !== 0) {
-                return $tier;
-            }
-            $size = $a->required['model_bytes'] <=> $b->required['model_bytes'];
-
-            // With headroom, the larger model is more capable; at the minimum, the smaller one leaves more room.
-            return $a->fit === ModelFitStatus::RecommendedFit ? -$size : $size;
-        });
+        $fits = $this->ranked(array_values(array_filter($candidates, fn (ModelFitRecommendation $candidate): bool => $candidate->status->fits())));
+        $runnable = array_values(array_filter($fits, fn (ModelFitRecommendation $candidate): bool => ! in_array('memory_available_insufficient', $candidate->constraints, true)));
+        if ($runnable !== []) {
+            return $runnable[0];
+        }
         if ($fits !== []) {
-            return $fits[0];
+            $best = $fits[0];
+
+            return new ModelFitRecommendation(
+                ModelFitStatus::MemoryUnavailable, $best->modelId, $best->runtime, ['memory_available_insufficient'], $best->constraints, $best->fit,
+                $best->measured, $best->required, $best->installed, $best->verified, $best->downloadBytes, $best->loaded,
+            );
         }
 
         $statuses = array_map(fn (ModelFitRecommendation $candidate): ModelFitStatus => $candidate->status, $candidates);
@@ -88,6 +95,31 @@ final class ModelFitRecommender
             : array_values(array_unique(array_merge(...array_map(fn (ModelFitRecommendation $candidate): array => $candidate->reasons, $candidates))));
 
         return new ModelFitRecommendation($status, null, null, $reasons, measured: $this->measured($machine));
+    }
+
+    /**
+     * @param  list<ModelFitRecommendation>  $fits
+     * @return list<ModelFitRecommendation>
+     */
+    private function ranked(array $fits): array
+    {
+        usort($fits, static function (ModelFitRecommendation $a, ModelFitRecommendation $b): int {
+            $tier = ($a->fit === ModelFitStatus::RecommendedFit ? 0 : 1) <=> ($b->fit === ModelFitStatus::RecommendedFit ? 0 : 1);
+            if ($tier !== 0) {
+                return $tier;
+            }
+            // A model Ollama holds and Molly verified runs now without loading anything.
+            $ready = ($a->loaded && $a->verified ? 0 : 1) <=> ($b->loaded && $b->verified ? 0 : 1);
+            if ($ready !== 0) {
+                return $ready;
+            }
+            $size = $a->required['model_bytes'] <=> $b->required['model_bytes'];
+
+            // With headroom, the larger model is more capable; at the minimum, the smaller one leaves more room.
+            return $a->fit === ModelFitStatus::RecommendedFit ? -$size : $size;
+        });
+
+        return $fits;
     }
 
     /**
@@ -219,7 +251,10 @@ final class ModelFitRecommender
         if ($downgrade !== null) {
             $constraints[] = $downgrade;
         }
-        if (in_array($downgrade, ['memory_pressure_warning', 'memory_pressure_critical'], true)) {
+        if ($downgrade === 'memory_pressure_warning' && $this->holdsItsOwnMemory($entry, $machine, $headroom)) {
+            // The pressure may come from this very model: the memory it holds counts as available to it.
+            $constraints[] = 'memory_held_by_loaded_model';
+        } elseif (in_array($downgrade, ['memory_pressure_warning', 'memory_pressure_critical'], true)) {
             $fit = ModelFitStatus::MinimumFit;
         }
         if ($machine->translated === true) {
@@ -227,6 +262,10 @@ final class ModelFitRecommender
             $fit = ModelFitStatus::MinimumFit;
         }
         $constraints = [...$constraints, ...$installConstraints];
+        if ($this->memoryGateRefuses($entry, $machine, $headroom)) {
+            $constraints[] = 'memory_available_insufficient';
+        }
+        $loaded = $machine->loaded($entry['artifact']['name'], $entry['artifact']['digest']) !== null;
 
         $verified = $installedMatch
             && $runtime['status'] === 'verified'
@@ -246,8 +285,44 @@ final class ModelFitRecommender
 
         return new ModelFitRecommendation(
             $status, $modelId, $runtimeName, $reasons, array_values(array_unique($constraints)), $fit,
-            $measured, $required, $installedMatch, $verified, $download,
+            $measured, $required, $installedMatch, $verified, $download, $loaded,
         );
+    }
+
+    /**
+     * Whether Ollama already holds this exact model and the model has its size plus the
+     * headroom once the memory it holds counts as available to it. Doctor and a run treat a
+     * loaded model the same way: using it needs no new memory. When the loaded model or the
+     * available memory is unknown, the answer is no, so warning pressure still downgrades.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function holdsItsOwnMemory(array $entry, MachineFacts $machine, InstallationHeadroom $headroom): bool
+    {
+        $loaded = $machine->loaded($entry['artifact']['name'], $entry['artifact']['digest'])['size_bytes'] ?? null;
+
+        return $loaded !== null && $machine->availableMemoryBytes !== null
+            && $headroom->fitsMemory($entry['artifact']['size_bytes'], $machine->availableMemoryBytes + $loaded);
+    }
+
+    /**
+     * Whether a run would refuse to load this model now with MODEL_MEMORY_INSUFFICIENT.
+     * This is LocalOllama::memory() on the snapshot's facts: a model Ollama holds needs
+     * no new memory; otherwise the installed size plus the headroom must fit in the
+     * available memory. When the size, the available memory, or the loaded list is
+     * unknown, a run does not refuse, and neither does this.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function memoryGateRefuses(array $entry, MachineFacts $machine, InstallationHeadroom $headroom): bool
+    {
+        $name = $entry['artifact']['name'];
+        $holds = $machine->holds($name);
+        $installed = $machine->installed($name);
+        $size = is_array($installed) ? $installed['size_bytes'] : null;
+
+        return $holds === false && $size !== null && $machine->availableMemoryBytes !== null
+            && ! $headroom->fitsMemory($size, $machine->availableMemoryBytes);
     }
 
     /**
@@ -342,6 +417,7 @@ final class ModelFitRecommender
             'apple_silicon' => $machine->appleSilicon(),
             'translated' => $machine->translated,
             'total_memory_bytes' => $machine->totalMemoryBytes,
+            'available_memory_bytes' => $machine->availableMemoryBytes,
             'memory_pressure' => $machine->memoryPressure,
             'metal_available' => $machine->metalAvailable,
             'destination' => $machine->destination,

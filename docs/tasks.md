@@ -40,6 +40,8 @@ The configured model returns three things, and Molly saves each on the task:
 
 - Numbered acceptance criteria, in `source.acceptance`.
 - The application files the implementation will create or change, in `source.scope.files`. Molly checks each path with the [file scope](#file-scope) rules and keeps the ones that pass. A path it drops, such as `config/app.php`, a migration, or the test itself, is listed in `source.scope.rejected` with the reason. The authoring run cannot write these files; it writes only the test.
+
+  Molly reads the `livewire/livewire` version from `composer.lock`, or from `vendor/composer/installed.json`, and tells the model where that version looks for components: `App\Http\Livewire` in `app/Http/Livewire` for Livewire 2, and `App\Livewire` in `app/Livewire` for Livewire 3 and 4, with views in `resources/views/livewire`. Without Livewire, it uses the Livewire 3 and 4 layout. A component class the model puts in the other layout moves to the installed one, and each component class brings the view Livewire renders for it, such as `resources/views/livewire/user-table.blade.php` for `app/Livewire/UserTable.php`, within the file limit. Both changes are listed in `source.scope.adjusted` with a `LIVEWIRE_LAYOUT` or `LIVEWIRE_VIEW` reason, and `molly:story` prints them. The test-authoring run and the implementation run get the same layout in the model input as `livewire`.
 - The Composer packages the behavior needs, in `source.scope.required_packages`. Molly compares each name with the `require` list in `composer.json` and with `composer.lock`, and marks it `required`, `dev_only`, `transitive`, or `missing`.
 
 The command prints the criteria, the files, and three commands. Run them as printed:
@@ -59,6 +61,16 @@ The first run writes the test. When it finishes, Molly runs the test and checks 
 | `already_passing` | The test passed before any implementation, so it proves nothing. Molly still prints the lock command, and the implementation run then refuses with `RED_BASELINE_INVALID`. Edit the test so it asserts the new behavior, then lock it again. |
 
 For example, a test that creates a user in a fresh Laravel app fails with `no such table: users` when neither the test file nor `tests/Pest.php` applies `RefreshDatabase`. That is `database_not_migrated`, not missing behavior, and the retry asks the model to add `uses(RefreshDatabase::class);` to the test file. The authoring run also gives the model `tests/Pest.php` to read, so it can see which `TestCase` and traits apply to every test. See [Troubleshooting](troubleshooting.md#the-authored-test-cannot-run) for each cause.
+
+Molly's instructions to the model are general Laravel guidance and name no application's components, text, or actions. The story step asks for the negative cases a protected behavior needs, and the authoring run tests them even when a criterion leaves them out:
+
+- Signing in: valid credentials sign the user in, and invalid credentials are rejected with an error and leave the visitor a guest. The test uses the routes the task names, or Laravel's `/login` and `/logout`.
+- Signing out: the user is a guest afterwards, and the protected action refuses them again.
+- Protected actions: a guest who calls the action or its endpoint directly is refused with one exact outcome, `assertForbidden()` for an action or a redirect to the sign-in page for a page behind the auth middleware. Criteria and tests never accept either outcome, and a hidden control does not count as a refusal.
+- Changed state: the value before and after the action, after a fresh request when the change is kept, and what another user sees when the state belongs to one user.
+- Specific assertions: rendered text, a labelled value, or a component property. Molly rejects an authored test whose `assertSee()`, `assertSeeText()`, `assertDontSee()`, or `assertDontSeeText()` checks one character, such as `assertSee('1')`, with `TEST_AUTHORING_INVALID`, because such a check passes or fails on almost any page.
+
+The test never registers components, defines routes, or creates tables; it exercises the application.
 
 Read the test before the second command. `molly:lock-test --approve` locks the test, allows the implementation to change the derived files, prints them, and records the RED baseline. Pass `--file` to replace the derived files with your own. The last command runs the implementation against the locked test.
 

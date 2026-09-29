@@ -486,3 +486,28 @@ it('prints the steps it took when it installs from the terminal', function () {
         ->toContain('readiness: The bounded inference and the Molly task both passed.')
         ->toContain('php artisan molly:setup --agent=ollama --model=gpt-oss:120b-code');
 });
+
+it('names the stopped runtime instead of an unknown fit when Ollama does not answer', function () {
+    $fixture = replayHardwareFixture('m3-ultra-96gb', http: ['/api/version' => null, '/api/tags' => null, '/api/ps' => null]);
+
+    $plan = app(InstallModel::class)->plan(destination: $fixture['destination']);
+
+    expect($plan['status'])->toBe('refused')
+        ->and($plan['code'])->toBe('RUNTIME_UNREACHABLE')
+        ->and($plan['message'])->toStartWith('Ollama did not answer at http://localhost:11434 (')
+        ->and($plan['message'])->toEndWith('so Molly cannot read which models are installed or check one. Start Ollama with ollama serve, or open the Ollama app, then run this command again. Molly downloaded nothing.')
+        ->and($plan['decision']['status'])->toBe('unknown');
+});
+
+it('refuses to pick a model a run would refuse to load, and says why', function () {
+    // 16 GB Mac with gpt-oss:20b installed and not loaded: a run needs 24.8 GB available.
+    $fixture = replayHardwareFixture('m2-pro-16gb-external');
+
+    $plan = app(InstallModel::class)->plan(destination: $fixture['destination']);
+
+    expect($plan['status'])->toBe('refused')
+        ->and($plan['code'])->toBe('MODEL_MEMORY_INSUFFICIENT')
+        ->and($plan['model'])->toBeNull()
+        ->and($plan['message'])->toStartWith('gpt-oss:20b meets its requirements on this Mac, but a run needs 13.8 GB plus 11 GB of headroom available before Ollama loads it')
+        ->and($plan['message'])->toEndWith('Molly downloaded nothing.');
+});

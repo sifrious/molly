@@ -383,7 +383,7 @@ final class LocalOrbProvider
             throw $this->busy($orb, $holder);
         }
         if (($request->runtime !== null && $request->runtime !== $orb->runtime) || ($request->model !== null && $request->model !== $orb->model)) {
-            throw new RuntimeException('ORB_CAPABILITY_MISMATCH: Orb '.$orb->name.' runs '.$orb->runtime.($orb->model === null ? '' : ' '.$orb->model).', not '.$this->describe($request).'.');
+            throw new RuntimeException('ORB_CAPABILITY_MISMATCH: Orb '.$orb->name.' runs '.$orb->runtime.($orb->model === null ? '' : ' with '.$orb->model).', and the task asks for '.$this->describe($request).'.');
         }
         $worktree = $this->worktree($orb, $task);
         $elsewhere = Orb::where('current_task_id', $task->id)->whereKeyNot($orb->id)->first();
@@ -558,9 +558,15 @@ final class LocalOrbProvider
             : ['unhealthy', 'ORB_RUNTIME_UNAVAILABLE: The Amp CLI is missing or not signed in. Install it and run amp login.', null];
     }
 
+    /** The requested runtime and model as they follow "runs", such as ollama with gpt-oss:20b, ollama, or gpt-oss:20b. */
     private function describe(ExecutionTargetRequest $request): string
     {
-        return trim(($request->runtime ?? 'any runtime').($request->model === null ? '' : ' '.$request->model));
+        return match (true) {
+            $request->runtime !== null && $request->model !== null => $request->runtime.' with '.$request->model,
+            $request->runtime !== null => $request->runtime,
+            $request->model !== null => $request->model,
+            default => 'a runtime and model',
+        };
     }
 
     private function revoked(Orb $orb): RuntimeException

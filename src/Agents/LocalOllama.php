@@ -32,6 +32,8 @@ class LocalOllama
         $url = $provider['url'] ?? '';
         $parts = is_string($url) ? parse_url($url) : false;
 
+        $timeout = config('molly.timeout');
+
         if (($provider['driver'] ?? null) !== 'ollama'
             || ! is_array($parts)
             || ($parts['scheme'] ?? '') !== 'http'
@@ -40,9 +42,11 @@ class LocalOllama
             || isset($parts['query']) || isset($parts['fragment'])
             || ! in_array($parts['path'] ?? '', ['', '/'], true)
             || ! is_string($model) || trim($model) === ''
-            || str_contains($model, 'cloud')
-            || ! is_int(config('molly.timeout')) || config('molly.timeout') < 1) {
+            || str_contains($model, 'cloud')) {
             throw new RuntimeException('LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.');
+        }
+        if (! is_int($timeout) || $timeout < 1) {
+            throw new RuntimeException('LOCAL_PROVIDER_INVALID: molly.timeout must be a whole number of seconds, 1 or more, and it is '.json_encode($timeout).'. Set timeout in config/molly.php, then run php artisan config:clear.');
         }
     }
 

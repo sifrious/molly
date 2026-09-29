@@ -37,6 +37,8 @@ Add Molly's local files to `.gitignore`:
 /storage/molly/
 ```
 
+`molly:project-init` adds both lines when they are missing.
+
 Molly records the commit each task starts from, so the application must be a Git repository with at least one commit. Molly never runs `git init` or commits for you. For a fresh `composer create-project` app, run `git init && git add -A && git commit -m "Start"` before `molly:demo`; otherwise Molly stops with `WORKSPACE_NOT_GIT`.
 
 ## Run the demo with a local model
@@ -53,7 +55,7 @@ php artisan molly:demo
 php artisan molly:start demo-greeting
 ```
 
-`molly:preflight` measures this Mac and decides which approved model fits: `gpt-oss:120b-code` on a 96 GB Mac, `gpt-oss:20b` on a Mac with 16 GB or more, or no fit. It downloads nothing. `molly:install-model` shows the download size and the volume it goes to, asks before it downloads, verifies the model's digest, and checks that the model can do a Molly task. Replace `MODEL` with the name it prints. [Ollama](docs/ollama-quickstart.md) explains the decision and the approved catalogue. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
+`molly:preflight` measures this Mac and decides which approved model fits: `gpt-oss:120b-code` on a 96 GB Mac, `gpt-oss:20b` on a Mac with 16 GB or more, or no fit. It never selects an installed model that a run would refuse to load with the memory available now, and says so with `memory_unavailable`. It downloads nothing. `molly:install-model` shows the download size and the volume it goes to, asks before it downloads, verifies the model's digest, and checks that the model can do a Molly task. Replace `MODEL` with the name it prints. [Ollama](docs/ollama-quickstart.md) explains the decision and the approved catalogue. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
 
 On macOS, doctor reports that the writer sandbox is unavailable, because it needs Linux Landlock. Molly refuses to start a task until you opt out of isolation for a trusted checkout. [Getting started](docs/getting-started.md#macos-and-the-sandbox) explains that choice.
 

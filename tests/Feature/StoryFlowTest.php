@@ -140,7 +140,8 @@ it('drops derived files outside the workspace rules and records why', function (
     $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
     $rejected = collect($task->source['scope']['rejected'])->pluck('reason', 'path');
 
-    expect($task->source['scope']['files'])->toBe(['routes/web.php', 'app/Livewire/Counter.php'])
+    // The Livewire component brings the view Livewire renders for it.
+    expect($task->source['scope']['files'])->toBe(['routes/web.php', 'app/Livewire/Counter.php', 'resources/views/livewire/counter.blade.php'])
         ->and($rejected->keys()->all())->toBe(['/etc/passwd', 'app/../.env', 'tests/Feature/StoryTest.php', 'vendor/livewire/livewire/src/Component.php', '.env', '.molly/identity.json', '.git/config', 'database/migrations/2026_01_01_000000_create_counts_table.php'])
         ->and($rejected['tests/Feature/StoryTest.php'])->toStartWith('TEST_PROTECTED:')
         ->and($rejected['app/../.env'])->toStartWith('PATH_INVALID:')
@@ -241,4 +242,58 @@ it('tells the user to install a missing package before the implementation run', 
     ])->expectsOutputToContain('The implementation run cannot add Composer packages.')
         ->expectsOutputToContain('composer require livewire/livewire (livewire/livewire is not installed)')
         ->assertSuccessful();
+});
+
+/** The implementation files gpt-oss:120b-code derived for the RC10 canonical story, in the Livewire 2 layout. */
+function rc10DerivedFiles(): array
+{
+    return ['routes/web.php', 'app/Http/Controllers/AuthController.php', 'app/Http/Livewire/Counter.php', 'resources/views/welcome.blade.php'];
+}
+
+it('moves a derived Livewire component to the installed Livewire 4 layout and adds its view', function () {
+    File::put($this->workspace.'/composer.lock', json_encode(['packages' => [['name' => 'livewire/livewire', 'version' => 'v4.4.7']], 'packages-dev' => []]));
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => rc10DerivedFiles()]])->preventStrayPrompts();
+
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+    $scope = $task->source['scope'];
+
+    expect($scope['files'])->toBe(['routes/web.php', 'app/Http/Controllers/AuthController.php', 'app/Livewire/Counter.php', 'resources/views/welcome.blade.php', 'resources/views/livewire/counter.blade.php'])
+        ->and($scope['rejected'])->toBe([])
+        ->and($scope['adjusted'])->toBe([
+            ['path' => 'app/Livewire/Counter.php', 'from' => 'app/Http/Livewire/Counter.php', 'reason' => 'LIVEWIRE_LAYOUT: Livewire 4.4.7 is installed, which resolves components from App\\Livewire in app/Livewire.'],
+            ['path' => 'resources/views/livewire/counter.blade.php', 'from' => null, 'reason' => 'LIVEWIRE_VIEW: Livewire renders this view for app/Livewire/Counter.php by convention.'],
+        ]);
+
+    AcceptanceWriter::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('"livewire":{"installed_version":"4.4.7","class_namespace":"App\\\\Livewire","class_directory":"app/Livewire","view_directory":"resources/views/livewire"}'));
+});
+
+it('keeps Livewire 2 components in app/Http/Livewire and uses the current layout when Livewire is missing', function () {
+    File::put($this->workspace.'/composer.lock', json_encode(['packages' => [['name' => 'livewire/livewire', 'version' => 'v2.12.6']], 'packages-dev' => []]));
+    AcceptanceWriter::fake([
+        ['criteria' => $this->criteria, 'files' => ['routes/web.php', 'app/Livewire/Counter.php']],
+        ['criteria' => $this->criteria, 'files' => rc10DerivedFiles()],
+    ])->preventStrayPrompts();
+
+    $legacy = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+    File::delete($this->workspace.'/composer.lock');
+    $missing = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/OtherStoryTest.php');
+
+    expect($legacy->source['scope']['files'])->toBe(['routes/web.php', 'app/Http/Livewire/Counter.php', 'resources/views/livewire/counter.blade.php'])
+        ->and($legacy->source['scope']['adjusted'][0]['reason'])->toBe('LIVEWIRE_LAYOUT: Livewire 2.12.6 is installed, which resolves components from App\\Http\\Livewire in app/Http/Livewire.')
+        ->and($missing->source['scope']['files'])->toContain('app/Livewire/Counter.php', 'resources/views/livewire/counter.blade.php')
+        ->and($missing->source['scope']['adjusted'][0]['reason'])->toBe('LIVEWIRE_LAYOUT: Livewire is not installed, so Molly uses the current layout, which resolves components from App\\Livewire in app/Livewire.');
+});
+
+it('does not add a view past the file limit and prints each adjusted path from molly:story', function () {
+    config(['molly.max_files' => 1]);
+    AcceptanceWriter::fake([['criteria' => $this->criteria, 'files' => ['app/Livewire/Counter.php']], ['criteria' => $this->criteria, 'files' => ['app/Http/Livewire/Counter.php']]])->preventStrayPrompts();
+
+    $task = app(CreateTaskFromStory::class)->handle($this->story, $this->workspace, [], 'tests/Feature/StoryTest.php');
+
+    expect($task->source['scope']['files'])->toBe(['app/Livewire/Counter.php'])
+        ->and($task->source['scope']['rejected'])->toBe([['path' => 'resources/views/livewire/counter.blade.php', 'reason' => 'FILES_INVALID: The task already has the maximum of 1 implementation files.']]);
+
+    Artisan::call('molly:story', ['story' => $this->story, '--workspace' => $this->workspace, '--test' => 'tests/Feature/OtherStoryTest.php']);
+    $text = preg_replace('/\s+/', ' ', Artisan::output());
+    expect($text)->toContain('Molly moved app/Http/Livewire/Counter.php to app/Livewire/Counter.php. LIVEWIRE_LAYOUT:');
 });

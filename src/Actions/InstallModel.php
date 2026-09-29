@@ -50,9 +50,14 @@ class InstallModel
         if (in_array('catalogue_unusable', $decision['flags'], true)) {
             return $this->refuse($plan, strtoupper($decision['reasons'][0] ?? 'catalogue_unusable'), $decision['message']);
         }
+        $api = $snapshot['facts']['ollama']['api_version'] ?? null;
+        if (($snapshot['facts']['ollama']['api_url']['status'] ?? null) === 'measured' && ($api['status'] ?? null) !== 'measured') {
+            return $this->refuse($plan, 'RUNTIME_UNREACHABLE', 'Ollama did not answer at '.$this->baseUrl().' ('.rtrim((string) ($api['reason'] ?? 'no version'), '.').'), so Molly cannot read which models are installed or check one. Start Ollama with ollama serve, or open the Ollama app, then run this command again. Molly downloaded nothing.');
+        }
         if ($name === null) {
             return match ($decision['status']) {
                 'unknown' => $this->refuse($plan, 'MODEL_FIT_UNKNOWN', $decision['message']),
+                'memory_unavailable' => $this->refuse($plan, 'MODEL_MEMORY_INSUFFICIENT', $decision['message'].' Molly downloaded nothing.'),
                 'unsupported' => $this->refuse($plan, 'PLATFORM_UNSUPPORTED', $decision['message']),
                 default => $this->refuse($plan, 'NO_FIT', DecideModelFit::NO_FIT_MESSAGE.' Reasons: '.implode(', ', $decision['reasons']).'. Molly downloaded nothing.'),
             };
