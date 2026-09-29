@@ -13,7 +13,7 @@ php artisan molly:start ready-check
 php artisan molly:show RUN_ID
 ```
 
-The report has one row per check, and the `Target` column says `local` for both. Abbreviated, without the table borders:
+With the default parallel checks, the report has one row per check, and the `Target` column says `local` for both. Abbreviated, without the table borders:
 
 ```text
 Execution mode: parallel
