@@ -1,0 +1,21 @@
+{
+  "namespace": "nativephp",
+  "version": "mobile-4",
+  "sources": [
+    {"ref":"documentation:mobile","title":"NativePHP Mobile v4","location":"https://github.com/NativePHP/nativephp.com/blob/0c1da20fc3cc98accef49dab372a57cbf60ad872/resources/views/docs/mobile/4/getting-started/introduction.md","revision":"0c1da20fc3cc98accef49dab372a57cbf60ad872","digest":"e6e68eb5ef0116764f3adfb4974f841390d32930129ecd23ebb6a54a66b8ed1e","metadata":{"path":"sources/nativephp-mobile.md","retrieved_at":"2026-09-17","track":"mobile"}}
+  ],
+  "nodes": [
+    {"ref":"concept:mobile","label":"Mobile","sources":["documentation:mobile"],"metadata":[]},
+    {"ref":"concept:nativephp","label":"NativePHP","sources":["documentation:mobile"],"metadata":[]},
+    {"ref":"documentation_section:docs:mobile#nativephp-mobile-v4","label":"NativePHP Mobile v4","sources":["documentation:mobile"],"metadata":{"heading_level":1}},
+    {"ref":"version:nativephp:mobile-4","label":"NativePHP Mobile 4","sources":["documentation:mobile"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:mobile","relation":"documented_in","to":"documentation_section:docs:mobile#nativephp-mobile-v4","sources":["documentation:mobile"],"metadata":[]},
+    {"from":"concept:nativephp","relation":"documented_in","to":"documentation_section:docs:mobile#nativephp-mobile-v4","sources":["documentation:mobile"],"metadata":[]},
+    {"from":"concept:nativephp","relation":"related_to","to":"concept:mobile","sources":["documentation:mobile"],"metadata":[]},
+    {"from":"version:nativephp:mobile-4","relation":"contains","to":"concept:mobile","sources":["documentation:mobile"],"metadata":[]},
+    {"from":"version:nativephp:mobile-4","relation":"contains","to":"concept:nativephp","sources":["documentation:mobile"],"metadata":[]},
+    {"from":"version:nativephp:mobile-4","relation":"contains","to":"documentation_section:docs:mobile#nativephp-mobile-v4","sources":["documentation:mobile"],"metadata":[]}
+  ]
+}

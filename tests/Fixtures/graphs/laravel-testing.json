@@ -1,0 +1,31 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:testing","title":"Laravel 13 testing","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/testing.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"4686198d94546a41915e5f4ff9ecdb105ef77c7544b9a223709910448f6aecf9","metadata":{"path":"sources/laravel-testing.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Foundation\\Testing\\TestCase","title":"Illuminate\\Foundation\\Testing\\TestCase","location":"vendor/laravel/framework/src/Illuminate/Foundation/Testing/TestCase.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Foundation/Testing/TestCase.php","symbol":"Illuminate\\Foundation\\Testing\\TestCase"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Foundation\\Testing\\TestCase","label":"TestCase","sources":["framework_source:Illuminate\\Foundation\\Testing\\TestCase"],"metadata":{"symbol":"Illuminate\\Foundation\\Testing\\TestCase"}},
+    {"ref":"concept:pest","label":"Pest","sources":["documentation:testing"],"metadata":[]},
+    {"ref":"concept:phpunit","label":"PHPUnit","sources":["documentation:testing"],"metadata":[]},
+    {"ref":"configuration:tests/Feature","label":"tests/Feature","sources":["documentation:testing"],"metadata":[]},
+    {"ref":"documentation_section:docs:testing#creating-tests","label":"Creating Tests","sources":["documentation:testing"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:testing#introduction","label":"Introduction","sources":["documentation:testing"],"metadata":{"heading_level":2}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:testing"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:pest","relation":"documented_in","to":"documentation_section:docs:testing#introduction","sources":["documentation:testing"],"metadata":[]},
+    {"from":"concept:pest","relation":"related_to","to":"concept:phpunit","sources":["documentation:testing"],"metadata":[]},
+    {"from":"concept:pest","relation":"uses","to":"class:Illuminate\\Foundation\\Testing\\TestCase","sources":["framework_source:Illuminate\\Foundation\\Testing\\TestCase"],"metadata":[]},
+    {"from":"concept:phpunit","relation":"documented_in","to":"documentation_section:docs:testing#introduction","sources":["documentation:testing"],"metadata":[]},
+    {"from":"concept:phpunit","relation":"uses","to":"class:Illuminate\\Foundation\\Testing\\TestCase","sources":["framework_source:Illuminate\\Foundation\\Testing\\TestCase"],"metadata":[]},
+    {"from":"configuration:tests/Feature","relation":"documented_in","to":"documentation_section:docs:testing#introduction","sources":["documentation:testing"],"metadata":[]},
+    {"from":"configuration:tests/Feature","relation":"tested_by","to":"concept:pest","sources":["documentation:testing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:pest","sources":["documentation:testing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:phpunit","sources":["documentation:testing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"configuration:tests/Feature","sources":["documentation:testing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:testing#creating-tests","sources":["documentation:testing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:testing#introduction","sources":["documentation:testing"],"metadata":[]}
+  ]
+}

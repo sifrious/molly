@@ -61,7 +61,20 @@
         "skip_reasons": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Keys from manifest.not_applicable that explain counts.skipped."
+          "description": "Keys from manifest.not_applicable declared for this subcase. Every skipped junit test case must be one of the tests a listed key names, where the key's when condition holds for that junit file."
+        },
+        "test_runs": {
+          "type": "array",
+          "description": "The environment each listed junit file ran in. A key with a when condition excuses a skip only in a junit file listed here.",
+          "items": {
+            "type": "object",
+            "required": ["junit", "os_family", "php"],
+            "properties": {
+              "junit": { "type": "string", "description": "A path from files." },
+              "os_family": { "type": "string", "minLength": 1, "description": "PHP_OS_FAMILY on the host that ran the suite, such as Darwin or Linux." },
+              "php": { "type": "string", "pattern": "^\\d+\\.\\d+(\\.\\d+)?$", "description": "PHP version that ran the suite, such as 8.4.23." }
+            }
+          }
         },
         "not_applicable": {
           "type": "string",

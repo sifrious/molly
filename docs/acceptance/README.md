@@ -72,6 +72,29 @@ evidence/
 
 Set `counts` to `null` only when the check ran no tests. Set `intervention` to a sentence when a person had to step in; the gate reports it but does not reject it. Write `timestamp` after the check finishes, and compute every `sha256` after the file is final.
 
+## Declare skipped tests
+
+A record may skip a test only when the manifest declared that skip before the run. Each key in `manifest.not_applicable` names the subcases it applies to in `applies_to` and the tests it excuses in `tests`, written as `tests/Feature/SandboxIsolationTest.php: lets the writer change only the allowed file`. A key whose skip is allowed only on some hosts also carries a `when` condition:
+
+| Condition | Holds when |
+| --- | --- |
+| `os_family` | The run's `os_family` is in the list, such as `["Darwin"]`. |
+| `php_below` | The run's `php` version is lower than the value, such as `"8.4"`. |
+
+The gate reads each `.xml` file a record lists as a junit report when its root element is `testsuites` or `testsuite`. Every skipped test case must match a test named by a key that the record lists in `skip_reasons`, that the manifest declares for the subcase, and whose condition holds for that junit file. Give each junit file its environment in `test_runs`, using PHP's `PHP_OS_FAMILY` value and the PHP version the suite ran on:
+
+```json
+"skip_reasons": ["landlock-linux-only", "laravel-ai-pre-v1-fallback", "sqlite-competing-workers-php84"],
+"test_runs": [
+  { "junit": "M10.3/junit-macos.xml", "os_family": "Darwin", "php": "8.4.23" },
+  { "junit": "M10.3/linux-8.3/junit.xml", "os_family": "Linux", "php": "8.3.35" }
+]
+```
+
+A junit file without a `test_runs` entry has no environment, so only a key without a `when` condition can excuse its skips. A declared test matches the junit test case with the same file and name, the same name with Pest's `it ` prefix, and each dataset row of that test.
+
+When `counts.skipped` is above 0, it must equal the number of skipped test cases in the record's junit files. A record whose counts tally checks rather than tests, such as a negative control that keeps the junit files of its suite runs, keeps `counts.skipped` at 0. The gate still checks each skipped test case in those junit files.
+
 ## Run the gate
 
 ```bash
@@ -81,7 +104,7 @@ bin/molly-acceptance-gate \
   --candidate ~/molly-acceptance/0.2.0-RC1/candidate.json
 ```
 
-The gate prints one row per criterion with accepted and mandatory subcase counts, then one line per rejection. Add `--json` to print the JSON report instead, or `--report gate.json` to also write the report to a file. The gate needs PHP 8.1 or later and no Composer packages, so it runs on a machine that holds only the candidate, the manifest, and the evidence.
+The gate prints one row per criterion with accepted and mandatory subcase counts, then one line per rejection. Add `--json` to print the JSON report instead, or `--report gate.json` to also write the report to a file. The gate needs PHP 8.1 or later and no Composer packages, so it runs on a machine that holds only the candidate, the manifest, and the evidence. It reads junit files with PHP's `dom` extension, which PHP enables by default.
 
 | Exit | Meaning |
 | --- | --- |
@@ -99,7 +122,7 @@ Each rejected subcase lists every code that applies.
 | --- | --- |
 | `MISSING_RECORD` | The subcase has no record. |
 | `DUPLICATE_RECORD` | The subcase has more than one record. |
-| `MALFORMED_RECORD` | A required field is missing or has the wrong type. |
+| `MALFORMED_RECORD` | A required field is missing or has the wrong type, a listed `.xml` file is not well-formed, or `test_runs` names a file the record does not list. |
 | `INVALID_OUTCOME` | `outcome` is not `PASS`, `FAIL`, `BLOCKED`, or `UNVERIFIED`. |
 | `NOT_PASSED` | `outcome` is valid but not `PASS`, and no N/A is declared. |
 | `MODE_MISMATCH` | `mode` differs from the manifest. |
@@ -111,7 +134,8 @@ Each rejected subcase lists every code that applies.
 | `ZERO_TESTS` | `counts.discovered` is 0. |
 | `COUNTS_INCONSISTENT` | `passed + failed + skipped` differs from `discovered`. |
 | `FAILED_BUT_PASS` | `counts.failed` is above 0 and `outcome` is `PASS`. |
-| `UNDECLARED_SKIP` | `counts.skipped` is above 0 and no `skip_reasons` key is declared in `manifest.not_applicable` with this subcase in its `applies_to` list. |
+| `UNDECLARED_SKIP` | A skipped junit test case is not named by a `skip_reasons` key that `manifest.not_applicable` declares for this subcase and whose `when` condition holds for that junit file. Also rejected: `skip_reasons` names a key not declared for this subcase, or `counts.skipped` is higher than the number of skipped test cases in the record's junit files. |
+| `SKIP_COUNT_MISMATCH` | `counts.skipped` is above 0 but lower than the number of skipped test cases in the record's junit files. |
 | `UNDECLARED_NOT_APPLICABLE` | `not_applicable` names a key that `manifest.not_applicable` does not declare for this subcase. |
 | `STALE_EVIDENCE` | `timestamp` is earlier than `candidate.json` `built_at`. |
 | `TIMED_OUT` | `timed_out` is true, or `duration_s` exceeds the manifest `timeout_s`. |
@@ -131,6 +155,7 @@ Gate-level errors reject the whole run:
 
 - A record with `counts: null` skips the test-count checks unless the manifest marks the subcase `test_bearing: true`, in which case counts are required.
 - `lock_sha256` and `intervention` are recorded and reported but not compared against anything.
+- The gate takes each junit file's `os_family` and `php` from `test_runs`. The junit format does not record them, so the gate cannot compare them with the run itself.
 
 ## Tests
 

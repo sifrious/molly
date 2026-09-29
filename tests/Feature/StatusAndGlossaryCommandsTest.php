@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Sifrious\Molly\Journal\JournalRenderer;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Tests\Support\GraphGolden;
 
 beforeEach(function (): void {
     Http::preventStrayRequests();
@@ -100,6 +101,24 @@ it('lists the managed glossary terms with provenance and links', function (): vo
         ->and(array_unique(array_column($glossary['terms'], 'id')))->toHaveCount(count($terms))
         ->and(File::exists($this->workspace.'/.molly'))->toBeFalse();
 });
+
+it('matches the golden glossary terms, provenance, and links', function (): void {
+    Artisan::call('molly:glossary', ['--workspace' => $this->workspace, '--json' => true]);
+    $glossary = json_decode(str_replace($this->workspace, '<workspace>', Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
+
+    foreach ($glossary['terms'] as $term) {
+        expect($term['provenance'])->toBe(['source' => 'package:sifrious/molly/src/Journal/JournalRenderer.php', 'method' => 'JournalRenderer::glossaryTerms'], "{$term['id']} must cite glossaryTerms()")
+            ->and($term['links'])->toBe([
+                ['kind' => 'file', 'ref' => '<workspace>/.molly/GLOSSARY.md'],
+                ['kind' => 'package_source', 'ref' => 'package:sifrious/molly/src/Journal/JournalRenderer.php'],
+            ], "{$term['id']} must link to GLOSSARY.md and its source");
+    }
+    // The definitions are prose that the test above compares with glossaryTerms(); the snapshot
+    // keeps each term's identity, provenance, and links. Rewrite tests/Fixtures/graphs/glossary.json
+    // only with MOLLY_UPDATE_GRAPH_GOLDENS=1 (docs/contributing.md).
+    $terms = array_map(fn (array $term): array => array_diff_key($term, ['definition' => true]), $glossary['terms']);
+    GraphGolden::assertMatchesFile(['workspace' => $glossary['workspace'], 'path' => $glossary['path'], 'terms' => $terms], 'glossary');
+})->group('graph-golden');
 
 it('returns the same terms the journal export writes to GLOSSARY.md', function (): void {
     $renderer = app(JournalRenderer::class);

@@ -1,0 +1,20 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:eloquent","title":"Laravel 13 eloquent","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/eloquent.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"feec7d037fca0ee01f4c6a20f9c6b0552ec6eea90562c8c3e675c9312ad8292d","metadata":{"path":"sources/laravel-eloquent.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Database\\Eloquent\\Model","title":"Illuminate\\Database\\Eloquent\\Model","location":"vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Database/Eloquent/Model.php","symbol":"Illuminate\\Database\\Eloquent\\Model"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Database\\Eloquent\\Model","label":"Model","sources":["framework_source:Illuminate\\Database\\Eloquent\\Model"],"metadata":{"symbol":"Illuminate\\Database\\Eloquent\\Model"}},
+    {"ref":"concept:eloquent","label":"Eloquent","sources":["documentation:eloquent"],"metadata":[]},
+    {"ref":"documentation_section:docs:eloquent#introduction","label":"Introduction","sources":["documentation:eloquent"],"metadata":{"heading_level":2}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:eloquent"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:eloquent","relation":"documented_in","to":"documentation_section:docs:eloquent#introduction","sources":["documentation:eloquent"],"metadata":[]},
+    {"from":"concept:eloquent","relation":"uses","to":"class:Illuminate\\Database\\Eloquent\\Model","sources":["framework_source:Illuminate\\Database\\Eloquent\\Model"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:eloquent","sources":["documentation:eloquent"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:eloquent#introduction","sources":["documentation:eloquent"],"metadata":[]}
+  ]
+}

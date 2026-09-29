@@ -1,0 +1,21 @@
+{
+  "namespace": "nativephp",
+  "version": "desktop-2",
+  "sources": [
+    {"ref":"documentation:desktop","title":"NativePHP Desktop v2","location":"https://github.com/NativePHP/nativephp.com/blob/0c1da20fc3cc98accef49dab372a57cbf60ad872/resources/views/docs/desktop/2/getting-started/introduction.md","revision":"0c1da20fc3cc98accef49dab372a57cbf60ad872","digest":"f609b33101f3ae299ac01cf7dca6adf17762ae969ced510ee0d568d8fd5139f2","metadata":{"path":"sources/nativephp-desktop.md","retrieved_at":"2026-09-17","track":"desktop"}}
+  ],
+  "nodes": [
+    {"ref":"concept:desktop","label":"Desktop","sources":["documentation:desktop"],"metadata":[]},
+    {"ref":"concept:nativephp","label":"NativePHP","sources":["documentation:desktop"],"metadata":[]},
+    {"ref":"documentation_section:docs:desktop#nativephp-desktop-v2","label":"NativePHP Desktop v2","sources":["documentation:desktop"],"metadata":{"heading_level":1}},
+    {"ref":"version:nativephp:desktop-2","label":"NativePHP Desktop 2","sources":["documentation:desktop"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:desktop","relation":"documented_in","to":"documentation_section:docs:desktop#nativephp-desktop-v2","sources":["documentation:desktop"],"metadata":[]},
+    {"from":"concept:nativephp","relation":"documented_in","to":"documentation_section:docs:desktop#nativephp-desktop-v2","sources":["documentation:desktop"],"metadata":[]},
+    {"from":"concept:nativephp","relation":"related_to","to":"concept:desktop","sources":["documentation:desktop"],"metadata":[]},
+    {"from":"version:nativephp:desktop-2","relation":"contains","to":"concept:desktop","sources":["documentation:desktop"],"metadata":[]},
+    {"from":"version:nativephp:desktop-2","relation":"contains","to":"concept:nativephp","sources":["documentation:desktop"],"metadata":[]},
+    {"from":"version:nativephp:desktop-2","relation":"contains","to":"documentation_section:docs:desktop#nativephp-desktop-v2","sources":["documentation:desktop"],"metadata":[]}
+  ]
+}

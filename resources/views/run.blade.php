@@ -16,7 +16,7 @@
 @if(isset($report['error']))<p class="notice errors">{{ is_string($report['error']) ? $report['error'] : json_encode($report['error']) }}</p>@endif
 <div class="evidence-summary">
     <p>Tarpit: {{ count($checks) }} of 7 checks recorded. {{ count($findings) }} {{ count($findings) === 1 ? 'finding' : 'findings' }} recorded, {{ $blocking }} blocking.</p>
-    <p>Clever: before {{ $report['complexity_before']['status'] ?? 'Not run' }}; after {{ $report['complexity_after']['status'] ?? 'Not run' }}.</p>
+    <p>Clever: before {{ $report['complexity_before']['status'] ?? 'not run' }}; after {{ $report['complexity_after']['status'] ?? 'not run' }}.</p>
     <p>Pest: {{ $report['verification']['status'] ?? 'Not run' }}. Tests: {{ $report['verification']['tests'] ?? 'Not recorded' }}. Assertions: {{ $report['verification']['assertions'] ?? 'Not recorded' }}.</p>
 </div>
 <nav class="report-nav" aria-label="Run evidence sections">
