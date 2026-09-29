@@ -248,21 +248,26 @@ function waitUntil(Closure $condition, string $message, float $seconds = 20): vo
 }
 
 /**
- * Start $command through /bin/sh with job control on, so it runs as its own process group the
- * way a terminal runs a foreground command, and Ctrl-C can be sent with posix_kill(-$pid, SIGINT).
- * Its output goes to $base.out and $base.err, and its exit status to $base.exit.
+ * Start $command through /bin/sh as its own process group, the way a terminal runs a foreground
+ * command, so Ctrl-C can be sent with posix_kill(-$pid, SIGINT). The shell uses setsid where it
+ * exists, because dash, the /bin/sh of Linux runners, turns job control off without a terminal,
+ * and job control elsewhere, as on macOS. Its output goes to $base.out and $base.err, and its
+ * exit status to $base.exit.
  *
  * @param  list<string>  $command
  * @return array{shell: Process, pid: int}
  */
 function startInOwnProcessGroup(array $command, string $cwd, string $base): array
 {
-    $script = 'set -m; "$@" >"$0.out" 2>"$0.err" & echo $! >"$0.pid.tmp" && mv "$0.pid.tmp" "$0.pid"; wait $!; echo $? >"$0.exit"';
+    $script = 'if command -v setsid >/dev/null 2>&1; then detach=setsid; else detach=; set -m; fi; $detach "$@" >"$0.out" 2>"$0.err" & echo $! >"$0.pid.tmp" && mv "$0.pid.tmp" "$0.pid"; wait $!; echo $? >"$0.exit"';
     $shell = new Process(['/bin/sh', '-c', $script, $base, ...$command], $cwd, timeout: 120);
     $shell->start();
     waitUntil(fn (): bool => is_file($base.'.pid'), 'the command started');
+    $pid = (int) file_get_contents($base.'.pid');
+    // setsid moves the command into its group after the shell forks it.
+    waitUntil(fn (): bool => posix_getpgid($pid) === $pid || is_file($base.'.exit'), 'the command leads its own process group');
 
-    return ['shell' => $shell, 'pid' => (int) file_get_contents($base.'.pid')];
+    return ['shell' => $shell, 'pid' => $pid];
 }
 
 /** @return list<int> the live processes in process group $pgid */

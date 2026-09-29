@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Sifrious\Molly\Actions\RecoverAbandonedTasks;
 use Sifrious\Molly\Models\Task;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /** A stand-in for php that runs until signalled. With $ignoreTerm it only dies to SIGKILL. */
@@ -194,6 +195,47 @@ it('never signals a reused pid that runs a different command', function (): void
             ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
     } finally {
         $other->stop(0);
+    }
+});
+
+it('uses job control without setsid, and starts nothing when the shell has none', function (): void {
+    // A PATH with only the tools the launch script, the fake worker, and ps need, and no setsid.
+    $bin = $this->workspace.'/bin-without-setsid';
+    File::ensureDirectoryExists($bin);
+    foreach (['ls', 'sleep', 'ps'] as $tool) {
+        symlink((new ExecutableFinder)->find($tool), $bin.'/'.$tool);
+    }
+    $probe = new Process(['/bin/sh', '-c', 'set -m 2>/dev/null; case $- in *m*) echo on ;; esac'], env: ['PATH' => $bin]);
+    $probe->run();
+    $path = ['env' => getenv('PATH'), 'server' => $_SERVER['PATH'] ?? null, 'dotenv' => $_ENV['PATH'] ?? null];
+    putenv('PATH='.$bin);
+    $_SERVER['PATH'] = $_ENV['PATH'] = $bin;
+
+    try {
+        $started = worker('start', $this->workspace);
+    } finally {
+        $path['env'] === false ? putenv('PATH') : putenv('PATH='.$path['env']);
+        foreach (['server' => '_SERVER', 'dotenv' => '_ENV'] as $key => $global) {
+            if ($path[$key] === null) {
+                unset($GLOBALS[$global]['PATH']);
+            } else {
+                $GLOBALS[$global]['PATH'] = $path[$key];
+            }
+        }
+    }
+
+    if (trim($probe->getOutput()) === 'on') {
+        // macOS: /bin/sh turns on job control without a terminal.
+        expect($started['exit'])->toBe(0, (string) ($started['error'] ?? ''))
+            ->and($started['state'])->toBe('running')
+            ->and(posix_getpgid($started['pid']))->toBe($started['pid']);
+        worker('stop', $this->workspace, ['--timeout' => 5]);
+    } else {
+        // dash turns job control off without a terminal, so a worker would share the caller's group.
+        expect($started['exit'])->toBe(1)
+            ->and($started['error'])->toStartWith('WORKER_START_FAILED')
+            ->and(processesRunning(config('molly.worker.php_binary')))->toBe([])
+            ->and(File::exists($this->workspace.'/.molly/worker/worker.json'))->toBeFalse();
     }
 });
 
