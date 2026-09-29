@@ -2111,7 +2111,7 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "No hardware probe exists in Molly or in sifrious/wardrobe (dep-wardrobe); wardrobe takes facts as input."
+          "finding_at_freeze": "No hardware probe exists in Molly."
         },
         {
           "id": "M13.2",
@@ -2140,7 +2140,7 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Approved catalogue (dep-wardrobe 9995ff8, private, proprietary licence) holds one entry: openai/gpt-oss-20b as a Hugging Face safetensors artifact. No Ollama artifact or pinned Ollama runtime is approved. qwen2.5-coder:7b, used by the QuickStart, would be rejected by the origin policy."
+          "finding_at_freeze": "The approved catalogue holds one entry: openai/gpt-oss-20b as a Hugging Face safetensors artifact. No Ollama artifact or pinned Ollama runtime is approved. qwen2.5-coder:7b, used by the QuickStart, would be rejected by the origin policy."
         },
         {
           "id": "M13.4",
@@ -2230,7 +2230,7 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Wardrobe has no unknown state; unknown data maps to unsupported with reason compatibility_unknown. Molly contract must keep unknown distinct.",
+          "finding_at_freeze": "The fit logic has no unknown state; unknown data maps to unsupported with reason compatibility_unknown. Molly contract must keep unknown distinct.",
           "test_bearing": true
         },
         {
@@ -2246,7 +2246,7 @@
           "owner": "B/C/D",
           "outcome": "UNVERIFIED",
           "mandatory": true,
-          "finding_at_freeze": "Wardrobe HardwareSnapshot has no translation or memory-pressure field.",
+          "finding_at_freeze": "The hardware snapshot has no translation or memory-pressure field.",
           "test_bearing": true
         },
         {

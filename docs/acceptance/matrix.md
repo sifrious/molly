@@ -49,7 +49,7 @@ The six measures are separate. None of them is combined into a score.
 
 - Todoist `6hf9xrc83vcg7Mmq`: Grant Screen Recording and Accessibility so the Bloom half can run. Waiting subcases (29): M02.2, M04.1, M04.2, M04.3, M04.4, M04.5, M04.6, M04.7, M04.8, M04.9, M04.10, M04.11, M04.12, M04.13, M04.15, M04.16, M08.1, M08.2, M08.3, M08.4, M08.5, M08.6, M08.8, M08.9, M08.10, M08.11, M08.12, M10.7, M12.1.
 - Todoist `6hfV5qWhFV4wr7xW`: Approve the M06 test lock in ~/molly-acceptance/app. Waiting subcases (21): M06.1, M06.2, M06.3, M06.4, M06.5, M06.6, M06.7, M06.8, M06.9, M06.10, M06.11, M06.12, M06.13, M06.14, M06.15, M06.16, M06.17, M06.18, M06.19, M06.20, M06.21.
-- Todoist `6hf9rCjqgJw4c2pq`: Decide whether Molly may reuse wardrobe model-fit logic. Waiting subcases (13): M13.2, M13.4, M13.5, M13.6, M13.7, M13.8, M13.9, M13.10, M13.11, M13.12, M13.13, M13.14, M13.18.
+- Todoist `6hf9rCjqgJw4c2pq`: Decide how Molly gets its model-fit logic (decided 2026-09-28). Waiting subcases (13): M13.2, M13.4, M13.5, M13.6, M13.7, M13.8, M13.9, M13.10, M13.11, M13.12, M13.13, M13.14, M13.18.
 - Todoist `6hf9rCgPmCVCW5MH`: Approve an Ollama artifact for the model catalogue. Waiting subcases (4): M13.3, M13.15, M13.16, M13.17.
 - Todoist `6hcVRfxjqcp2G7PF`: Provide a TypeSafe API key for the live Jev proof. Waiting subcases (1): M07.4.
 - Todoist `6hfCQvCJcV4CFCmq`: Approve pushing the epic branch so CI runs the package matrix. Waiting subcases (1): M10.1.
