@@ -40,6 +40,18 @@
       "applies_to": [
         "M08.7"
       ]
+    },
+    "sqlite-competing-workers-php84": {
+      "reason": "Four tests run two queue workers on one SQLite database at the same time. Laravel applies SQLite transaction_mode only on PHP 8.4 and later, so on PHP 8.3 the workers fail each other with \"database is locked\", and molly:worker start refuses a second worker with WORKER_CONCURRENCY_UNSUPPORTED. The tests skip below PHP 8.4 and must run and pass on the PHP 8.4 and 8.5 lanes. OrbTargetingTest checks the refusal on PHP 8.3 and the second worker on PHP 8.4 and later without skipping.",
+      "applies_to": [
+        "M10.3"
+      ],
+      "tests": [
+        "tests/Feature/QueuedExecutionTest.php: executes duplicate database jobs in competing workers with exactly one writing attempt",
+        "tests/Feature/OrbExecutionTest.php: runs two queued tasks at the same time on two Orbs, each in its own worktree with its own model",
+        "tests/Feature/OrbExecutionTest.php: keeps both results inspectable after the Orb workers restart",
+        "tests/Feature/OrbExecutionTest.php: runs exactly one attempt when an Orb start is delivered twice"
+      ]
     }
   },
   "budgets": {
@@ -2615,6 +2627,15 @@
       "change": "Added criterion M14, Local Orb execution targeting, with mandatory subcases M14.1 to M14.12.",
       "reason": "Mary's release-scope decision, 2026-09-28: Orb execution is required for the alpha. MME-5211 lists local and Orb execution targeting as an alpha tutorial requirement, and MME-1806 and MME-6145 define the Orb contract these subcases check on the Mac Studio.",
       "invalidates": "none; the subcases are new and no record exists for them"
+    },
+    {
+      "date": "2026-09-29",
+      "subcases": [
+        "M10.3"
+      ],
+      "change": "Added not_applicable key sqlite-competing-workers-php84 for the four tests that run two SQLite queue workers at once. They skip on PHP 8.3 with the reason QueuedExecutionTest already used, which no key declared before.",
+      "reason": "CI run 36515900521 failed these Orb tests on both PHP 8.3 lanes with \"database is locked\", because Laravel ignores SQLite transaction_mode below PHP 8.4. The MME-5885 coordinator decided on 2026-09-29 that Molly refuses a second SQLite worker on PHP 8.3 with WORKER_CONCURRENCY_UNSUPPORTED, and that tests needing two such workers are declared skips on PHP 8.3.",
+      "invalidates": "none; M10.3 has no passing record (NOT_RUN in docs/acceptance/matrix.md)"
     }
   ]
 }
