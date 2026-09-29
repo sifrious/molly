@@ -82,7 +82,7 @@ php artisan molly:task ready-issue --json
 
 ## Todos never pass
 
-Pest reports a todo as incomplete. Molly runs Pest with `--fail-on-skipped` and `--fail-on-incomplete`, and `VerifyChanges` returns `failed` with the reason `tests_skipped_or_incomplete` whenever any test in the file is a todo, skipped, or incomplete. That holds when the other tests pass, too. A file of todos cannot complete a task.
+Pest reports a todo as incomplete. Molly runs Pest with `--fail-on-skipped` and `--fail-on-incomplete`, and `VerifyChanges` returns `failed` with the reason `tests_skipped_or_incomplete` whenever any test in the file is a todo, skipped, or incomplete. That holds when every other test passes, too: the run ends `failed`, `completion_blockers` in the run report lists `pest`, and `molly:start` exits `1`. A todo cannot complete a task.
 
 Locking the todo file fails for the same reason:
 
@@ -91,10 +91,10 @@ php artisan molly:lock-test ready-issue --approve --file=routes/web.php
 ```
 
 ```text
-AUTHORED_TEST_BROKEN: Molly did not lock tests/Feature/ReadyTest.php because it cannot run.
+AUTHORED_TEST_BROKEN: Molly did not lock tests/Feature/ReadyTest.php because it cannot run. Pest skipped the tests or marked them incomplete. (tests_skipped) Have Molly rewrite tests/Feature/ReadyTest.php with guidance for this cause. Run php artisan molly:start ready-issue. After you edit the test yourself, run php artisan molly:lock-test ready-issue --approve again.
 ```
 
-The refusal names the `tests_skipped` cause. The task stays a test-authoring task.
+The command exits `1`, and the task stays a test-authoring task. The lock also refuses a file that still has one todo, skipped, or incomplete test beside tests that fail, because that test could never pass after the lock.
 
 ## Replace the todos
 
@@ -123,13 +123,21 @@ it('criterion 3: A guest\'s request to GET /ready succeeds without signing in.',
 });
 ```
 
-The run exits `1`. That is expected: the tests exist and `/ready` does not. Read the failure to confirm it is a 404 and not a broken test:
+The run exits `1`. That is expected: the tests exist and `/ready` does not. The report ends with Molly's check of the written test:
+
+```text
+Tests: 3, Assertions: 4, Failures: 3.
+Authored test check: missing_behavior (tests_failed)
+Next: Review tests/Feature/ReadyTest.php, then lock it. Run php artisan molly:lock-test ready-issue --approve.
+```
+
+`missing_behavior` means every test failed on an assertion about the missing route, not because the test is broken. Read the failures yourself before you lock:
 
 ```bash
 php artisan molly:show RUN_ID --verbose
 ```
 
-If the model left a todo, retry with `php artisan molly:retry ready-issue`, or edit the file yourself.
+If the model left a todo, the check says `bootstrap_error` with the cause `tests_skipped`, and the next command is `php artisan molly:retry ready-issue`. Run it to have the model rewrite the file, or edit the file yourself and lock it.
 
 ## Lock the test and implement
 
@@ -139,7 +147,21 @@ php artisan molly:lock-test ready-issue --approve --file=routes/web.php \
 php artisan molly:start ready-issue
 ```
 
-The lock runs the test once more, records it as failing for missing behavior, and protects it. From here the task is an ordinary implementation task. The model may change only `routes/web.php`; a proposal that touches `tests/Feature/ReadyTest.php` fails with `PROTECTED_TEST_CHANGED`. The task completes only when all three tests pass and the Tarpit review has no blocking finding.
+The lock runs the test once more, records it as failing for missing behavior, and protects it:
+
+```text
+Locked tests/Feature/ReadyTest.php at DIGEST. The next run cannot edit that file.
+File the implementation may change: routes/web.php
+```
+
+From here the task is an ordinary implementation task. The model may change only `routes/web.php`. A proposal that also touches `tests/Feature/ReadyTest.php` fails with `PROTECTED_TEST_CHANGED`, and Molly writes neither file. When a run fails, `php artisan molly:retry ready-issue` puts `routes/web.php` and the locked test back as they were at the lock before the next attempt.
+
+The task completes only when all three tests pass and the Tarpit review has no blocking finding. A completed run ends with:
+
+```text
+3 tests passed, 4 assertions.
+Task completed. Review the changed files before committing.
+```
 
 After the run completes and you have reviewed it, [From a GitHub issue to a task](tutorials.md#from-a-github-issue-to-a-task) shows the approval, pull request text, and issue comment.
 
@@ -155,7 +177,15 @@ After the run completes and you have reviewed it, [From a GitHub issue to a task
 
 ## Proof
 
-`tests/Feature/GitHubPestTodosTest.php` runs every step on this page against a Laravel-shaped workspace with a real Pest process. Only `gh api` is faked, with the issue fixture. A test there fails if the issue body, the todo file, or the authored tests on this page stop matching `tests/Fixtures/github/`.
+`tests/Feature/GitHubPestTodosTest.php` runs every step on this page against a Laravel-shaped workspace with a real Pest process. Only `gh api`, the model, and the Clever measurements are faked: `gh api` returns the issue fixture, the change writer returns the authored tests and then the route, and the Tarpit reviewer returns a clean review. The tests show that:
+
+- The import writes the documented todo file and saves the criteria, test names, and todo digest on the task.
+- A todo file, and a todo beside passing tests, fails verification with `tests_skipped_or_incomplete`.
+- A run whose required test keeps a todo, a skipped test, or an incomplete test ends `failed` even when the other test passes.
+- The lock refuses the todo file, and a file with one todo left beside failing tests, with `AUTHORED_TEST_BROKEN (tests_skipped)`.
+- After the lock, a proposal that edits the test is rejected and both files stay unchanged, and a retry that adds the route completes with three passing tests.
+
+A test there also fails if the issue body, the todo file, or the authored tests on this page stop matching `tests/Fixtures/github/`.
 
 ## Next
 

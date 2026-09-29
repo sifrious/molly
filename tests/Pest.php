@@ -153,6 +153,12 @@ function laravelShapedWorkspace(): string
     return $workspace;
 }
 
+/** A routes/web.php that adds GET /ready returning exactly {"ready":true}. */
+function readyRoute(): string
+{
+    return File::get(__DIR__.'/Fixtures/docs/ready-route.php');
+}
+
 /** @return array{0: int, 1: array<string, mixed>} */
 function mollyJson(string $command, array $parameters): array
 {

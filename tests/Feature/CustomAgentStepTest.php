@@ -57,11 +57,6 @@ function readyCheckWorkspace(): string
     return $workspace;
 }
 
-function readyRoute(): string
-{
-    return File::get(dirname(__DIR__).'/Fixtures/docs/ready-route.php');
-}
-
 /** Fake the reviewer and measurements so a run depends only on the bound writer and real Pest. */
 function fakeCleanReviewAndMeasurements(): void
 {

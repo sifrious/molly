@@ -115,10 +115,10 @@ class RecordRedBaseline
     /**
      * Classify a Pest run of the required test: missing_behavior,
      * already_passing, or bootstrap_error. Failing tests are classified one
-     * by one from JUnit, and any test that cannot run makes the whole file a
-     * bootstrap_error. test_broken is true when rewriting the test file can
-     * fix every cause; the causes carry the affected tests, a plain
-     * explanation, and guidance for the model.
+     * by one from JUnit, and any test that cannot run, including a todo or
+     * skipped test, makes the whole file a bootstrap_error. test_broken is
+     * true when rewriting the test file can fix every cause; the causes carry
+     * the affected tests, a plain explanation, and guidance for the model.
      *
      * @param  array<string, mixed>  $verification
      * @return array{classification: string, reason: string, test_broken: bool, causes: list<array{cause: string, explanation: string, guidance: string|null, tests: list<string>}>, classified_tests: list<array{name: string, classification: string, cause: string|null}>}
@@ -164,6 +164,10 @@ class RecordRedBaseline
             if ($cause !== null) {
                 $causes[$cause][] = $name;
             }
+        }
+        // A todo or skipped test beside failing ones can never pass, so the file is not a usable baseline.
+        if ((int) ($verification['skipped'] ?? 0) > 0) {
+            $causes['tests_skipped'] = [];
         }
         $tests = array_slice(array_values(array_unique($tests, SORT_REGULAR)), 0, 50);
         if ($causes !== []) {

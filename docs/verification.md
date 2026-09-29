@@ -78,7 +78,7 @@ When you want Molly to write the test itself, create a separate task with `--all
 | Classification | Meaning |
 | --- | --- |
 | `missing_behavior` | Tests failed on assertions, missing routes, or missing application classes. The implementation may start. |
-| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, an unbound `TestCase`, a missing table without `RefreshDatabase`, zero tests, or no JUnit report. |
+| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, an unbound `TestCase`, a missing table without `RefreshDatabase`, a todo, skipped, or incomplete test (even beside failing tests), zero tests, or no JUnit report. |
 | `already_passing` | The test passed before any implementation, so it proves nothing. |
 | `not_recorded` | Molly could not run the test, for example because another run held the workspace. |
 

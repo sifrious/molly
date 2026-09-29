@@ -42,6 +42,28 @@ function importTodos(array $options = []): array
     ]);
 }
 
+/** @return list<array<string, mixed>> */
+function cleanTodoReviews(int $count): array
+{
+    return array_fill(0, $count, ['checks' => array_fill_keys(range('A', 'G'), ['status' => 'clean', 'evidence' => 'No finding in the selected files.']), 'findings' => []]);
+}
+
+/** Import issue 42 with todos, let an authoring run write the documented tests, and lock them. */
+function lockReadyIssue(): void
+{
+    fakeTodoIssue();
+    importTodos();
+    ChangeWriter::fake([['summary' => 'Replace the todos with tests.', 'files' => [
+        ['path' => 'tests/Feature/ReadyTest.php', 'content' => todoFixture('ReadyTest.authored.php')],
+    ]]])->preventStrayPrompts();
+    TarpitReviewer::fake(cleanTodoReviews(3))->preventStrayPrompts();
+    test()->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'skipped', 'probes' => []]);
+    mollyJson('molly:start', ['task' => 'ready-issue']);
+
+    [$exit, $lock] = mollyJson('molly:lock-test', ['task' => 'ready-issue', '--approve' => true, '--file' => ['routes/web.php']]);
+    expect($exit)->toBe(0, json_encode($lock));
+}
+
 beforeEach(function () {
     $this->workspace = laravelShapedWorkspace();
     config(['ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'], 'molly.agent' => 'ollama']);
@@ -217,6 +239,83 @@ it('refuses to lock todos, then locks the executable tests an authoring run writ
         ->and($lock['paths'])->toBe(['routes/web.php'])
         ->and(Task::findOrFail($imported['id'])->allow_test_edits)->toBeFalse();
 });
+
+it('refuses to lock an authored file that keeps a todo beside failing tests', function () {
+    fakeTodoIssue();
+    [, $imported] = importTodos();
+    ChangeWriter::fake([['summary' => 'Write the first test.', 'files' => [
+        ['path' => 'tests/Feature/ReadyTest.php', 'content' => "<?php\n\nit('criterion 1: GET /ready returns HTTP 200.', function () {\n    \$this->get('/ready')->assertOk();\n});\n\nit('criterion 2: The response body is exactly {\"ready\":true}.')->todo();\n"],
+    ]]])->preventStrayPrompts();
+    TarpitReviewer::fake(cleanTodoReviews(1))->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'skipped', 'probes' => []]);
+
+    [, $run] = mollyJson('molly:start', ['task' => 'ready-issue']);
+    [$exit, $refusal] = mollyJson('molly:lock-test', ['task' => 'ready-issue', '--approve' => true, '--file' => ['routes/web.php']]);
+
+    expect($run['report']['verification'])->toMatchArray(['failures' => 1, 'skipped' => 1])
+        ->and($run['report']['authored_test']['test_broken'])->toBeTrue()
+        ->and(array_column($run['report']['authored_test']['causes'], 'cause'))->toBe(['tests_skipped'])
+        ->and($exit)->toBe(1)
+        ->and($refusal['error'])->toStartWith('AUTHORED_TEST_BROKEN')
+        ->and(array_column($refusal['authored_test']['causes'], 'cause'))->toBe(['tests_skipped'])
+        ->and(Task::findOrFail($imported['id'])->allow_test_edits)->toBeTrue();
+});
+
+it('protects the locked test, then completes only when every criterion test passes', function () {
+    lockReadyIssue();
+    ChangeWriter::fake([
+        ['summary' => 'Loosen the tests.', 'files' => [
+            ['path' => 'routes/web.php', 'content' => readyRoute()],
+            ['path' => 'tests/Feature/ReadyTest.php', 'content' => "<?php\n\nit('criterion 1: passes', fn () => expect(true)->toBeTrue());\n"],
+        ]],
+        ['summary' => 'Add the readiness route.', 'files' => [
+            ['path' => 'routes/web.php', 'content' => readyRoute()],
+        ]],
+    ])->preventStrayPrompts();
+
+    [$rejectedExit, $rejected] = mollyJson('molly:start', ['task' => 'ready-issue']);
+
+    expect($rejectedExit)->toBe(1)
+        ->and(json_encode($rejected))->toContain('PROTECTED_TEST_CHANGED')
+        ->and(File::get($this->workspace.'/tests/Feature/ReadyTest.php'))->toBe(todoFixture('ReadyTest.authored.php'))
+        ->and(File::get($this->workspace.'/routes/web.php'))->toBe('<?php');
+
+    [$exit, $run] = mollyJson('molly:retry', ['task' => 'ready-issue']);
+
+    expect($exit)->toBe(0, json_encode($run['report'] ?? $run))
+        ->and($run['status'])->toBe('completed')
+        ->and($run['report']['verification'])->toMatchArray(['status' => 'passed', 'tests' => 3, 'failures' => 0, 'skipped' => 0])
+        ->and(File::get($this->workspace.'/tests/Feature/ReadyTest.php'))->toBe(todoFixture('ReadyTest.authored.php'));
+});
+
+it('never completes a run while the required test keeps a todo, skipped, or incomplete test', function (string $pending) {
+    File::put($this->workspace.'/tests/Feature/ReadyTest.php', "<?php\n\nit('criterion 1: GET /ready returns HTTP 200.', function () {\n    \$this->get('/ready')->assertOk();\n});\n\n".$pending."\n");
+    [$created, $task] = mollyJson('molly:create', [
+        'prompt' => 'Add GET /ready returning exactly {"ready":true}.',
+        '--workspace' => $this->workspace,
+        '--name' => 'ready-pending',
+        '--test' => 'tests/Feature/ReadyTest.php',
+        '--file' => ['routes/web.php'],
+    ]);
+    ChangeWriter::fake([['summary' => 'Add the readiness route.', 'files' => [
+        ['path' => 'routes/web.php', 'content' => readyRoute()],
+    ]]])->preventStrayPrompts();
+    TarpitReviewer::fake(cleanTodoReviews(1))->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->andReturn(['status' => 'skipped', 'probes' => []]);
+
+    [$exit, $run] = mollyJson('molly:start', ['task' => 'ready-pending']);
+
+    expect($created)->toBe(0, json_encode($task))
+        ->and($exit)->toBe(1)
+        ->and($run['status'])->toBe('failed')
+        ->and($run['report']['verification'])->toMatchArray(['status' => 'failed', 'reason' => 'tests_skipped_or_incomplete', 'failures' => 0, 'errors' => 0, 'skipped' => 1])
+        ->and($run['report']['completion_blockers'])->toBe(['pest'])
+        ->and(File::get($this->workspace.'/routes/web.php'))->toBe(readyRoute());
+})->with([
+    'a todo' => ["it('criterion 2: The response body is exactly {\"ready\":true}.')->todo();"],
+    'a skipped test' => ["it('criterion 2: The response body is exactly {\"ready\":true}.', fn () => expect(true)->toBeTrue())->skip('Not written yet.');"],
+    'an incomplete test' => ["it('criterion 2: The response body is exactly {\"ready\":true}.', function () {\n    \$this->markTestIncomplete('Not written yet.');\n});"],
+]);
 
 it('keeps the documented issue, todo file, and authored tests identical to the fixtures', function () {
     $documented = File::get(dirname(__DIR__, 2).'/docs/github-todos.md');
