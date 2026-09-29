@@ -35,6 +35,8 @@ Restart queue workers after configuration changes too.
 | `model_not_local` | Choose an installed local model, not a hosted model name. |
 | `ollama_unreachable` | Start Ollama (`ollama serve`) or fix `OLLAMA_URL`. Unreachable is not the same as a missing model. |
 | `model_missing` | Ollama is up. Pull the model or fix `MOLLY_LOCAL_MODEL`. |
+| `model_exceeds_memory` | The model's size plus `molly.memory.headroom_gb` is more than the available memory `molly:preflight` measures, and Ollama does not hold the model yet. Choose a smaller installed model with `molly:setup`, or free memory. See [Memory](reference/configuration.md#memory). |
+| `memory_headroom_invalid` | Set `molly.memory.headroom_gb` to a number of gigabytes, 0 or more. |
 | `ollama_config_invalid` | Use a loopback HTTP URL, the Ollama driver, and a positive `molly.timeout`. |
 | `amp_unavailable` | Run `amp usage` and log in to Amp. |
 | `clever_disabled` | Use the `local` or `testing` environment, or remove an explicit `false` in `config/molly-complexity.php`. |
@@ -42,7 +44,7 @@ Restart queue workers after configuration changes too.
 | `jev_capability_missing` | Jev is on, but `laravel/ai` cannot classify. Pin the accepted commit or turn Jev off. See [Jev](reference/configuration.md#jev). |
 | `jev_unconfigured` | Jev is on and capable, but `TYPESAFE_API_KEY` is empty or `config/ai.php` predates the TypeSafe provider. |
 
-Informational codes such as `git_repository`, `ollama_endpoint`, `jev_disabled`, and `jev_ready` pass.
+Informational codes such as `git_repository`, `ollama_endpoint`, `model_fits_memory`, `model_loaded`, `jev_disabled`, and `jev_ready` pass. `model_memory_unknown` has the status `unknown`: Molly could not measure the available memory, the model's size, or the loaded models, so it does not refuse the model, and doctor can still be ready. `molly:preflight` shows which fact is unknown and why.
 
 On a full disk or a read-only path, commands fail with a code, the path they could not write, and the reason the system gave, such as `No space left on device` or `Permission denied`:
 
@@ -204,6 +206,8 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
+| `MODEL_MEMORY_INSUFFICIENT` | Ollama does not hold the model yet, and its size plus `molly.memory.headroom_gb` is more than the available memory. The message gives all three numbers. Molly refused before sending the request, so Ollama loaded nothing. | Choose a smaller installed model with `php artisan molly:setup`, or free memory and try again. See [Memory](reference/configuration.md#memory). |
+| `MEMORY_HEADROOM_INVALID` | `molly.memory.headroom_gb` is not a number of gigabytes, 0 or more. | Fix the value in `config/molly.php`, then run `php artisan config:clear`. |
 | `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. Molly never pulls a model. |
 | `PROVIDER_ERROR` | Ollama answered with an HTTP error, such as 500, 503, or 429, or with its own `error` field in place of a chat response. The message gives the HTTP status and the model name, not Ollama's text. | Read the Ollama server log: the terminal running `ollama serve`, or `~/.ollama/logs/server.log` for the macOS app. Fix the cause, then try again. |
 | `PROVIDER_RESPONSE_INVALID` | Ollama answered, but the body was not a chat response: truncated JSON, plain text, an empty object, or fields Laravel AI cannot read. Molly uses none of it. | Check that `OLLAMA_URL` points at Ollama itself, then try again. |

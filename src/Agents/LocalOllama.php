@@ -10,16 +10,20 @@ use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
+use Sifrious\Molly\Hardware\HardwareProbe;
 use Throwable;
 use TypeError;
 
 /**
  * The one place Molly prompts the local Ollama provider. Every model call site
- * sends its agent through prompt(), which checks the configuration first and
- * turns provider failures into coded messages without class names or paths.
+ * sends its agent through prompt(), which checks the configuration and the
+ * model's memory first and turns provider failures into coded messages without
+ * class names or paths.
  */
 class LocalOllama
 {
+    public function __construct(private HardwareProbe $probe) {}
+
     public static function validate(?string $model = null): void
     {
         $model ??= config('molly.model');
@@ -50,6 +54,10 @@ class LocalOllama
     {
         self::validate();
         $model = (string) config('molly.model');
+        $memory = $this->memory($model);
+        if ($memory['status'] === 'exceeds') {
+            throw new RuntimeException('MODEL_MEMORY_INSUFFICIENT: '.$memory['message']);
+        }
 
         try {
             $response = $agent->prompt($input, provider: 'ollama', model: $model, timeout: config('molly.timeout'));
@@ -58,6 +66,75 @@ class LocalOllama
         }
 
         return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+    }
+
+    /**
+     * Compare the model with the memory molly:preflight measures, before Ollama loads it.
+     * A model Ollama already holds needs no more memory. When the available memory, the
+     * model's size, or the list of loaded models is unknown, the status is unknown and
+     * Molly does not refuse. This reads facts only; it never pulls, loads, or unloads a model.
+     *
+     * @return array{status: 'loaded'|'fits'|'exceeds'|'unknown', message: string}
+     */
+    public function memory(string $model): array
+    {
+        $headroom = config('molly.memory.headroom_gb', 11);
+        if (! is_numeric($headroom) || (float) $headroom < 0) {
+            throw new RuntimeException('MEMORY_HEADROOM_INVALID: Set molly.memory.headroom_gb to a number of gigabytes, 0 or more.');
+        }
+
+        $facts = $this->probe->memoryFacts();
+        $loaded = $this->listed($facts['ollama']['loaded_models'], $model);
+        if (is_array($loaded)) {
+            return ['status' => 'loaded', 'message' => 'Ollama already holds '.$model.' in memory, so using it needs no new memory.'];
+        }
+
+        $installed = $this->listed($facts['ollama']['installed_models'], $model);
+        $size = is_array($installed) && is_int($installed['size_bytes'] ?? null) ? $installed['size_bytes'] : null;
+        $available = $facts['memory']['available_bytes'];
+        $available = $available['status'] === 'measured' && is_int($available['value'] ?? null) ? $available['value'] : null;
+        $unknown = match (true) {
+            $available === null => 'the available memory is unknown',
+            $size === null => 'Ollama did not report the size of '.$model,
+            default => null,
+        };
+        if ($unknown !== null) {
+            return ['status' => 'unknown', 'message' => 'Molly could not compare '.$model.' with free memory because '.$unknown.', so it does not refuse the model. php artisan molly:preflight shows each fact and why it is unknown.'];
+        }
+
+        $headroomBytes = (float) $headroom * 1e9;
+        $needs = $model.' needs '.self::gigabytes($size).' plus '.self::gigabytes($headroomBytes).' of headroom';
+        if ($size + $headroomBytes <= $available) {
+            return ['status' => 'fits', 'message' => $needs.', and '.self::gigabytes($available).' is available.'];
+        }
+        if ($loaded === null) {
+            return ['status' => 'unknown', 'message' => $needs.', and only '.self::gigabytes($available).' is available, but Ollama did not say which models it holds, so Molly does not refuse the model.'];
+        }
+
+        return ['status' => 'exceeds', 'message' => $needs.', but only '.self::gigabytes($available).' is available. Molly did not ask Ollama to load it. Choose a smaller installed model with php artisan molly:setup, or free memory and try again.'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $fact  A measured or unknown list of models from HardwareProbe.
+     * @return array<string, mixed>|false|null The model's entry, false when the measured list lacks it, or null when the list is unknown.
+     */
+    private function listed(array $fact, string $model): array|false|null
+    {
+        if ($fact['status'] !== 'measured' || ! is_array($fact['value'] ?? null)) {
+            return null;
+        }
+        foreach ($fact['value'] as $entry) {
+            if (is_array($entry) && in_array($entry['name'] ?? null, [$model, $model.':latest'], true)) {
+                return $entry;
+            }
+        }
+
+        return false;
+    }
+
+    private static function gigabytes(int|float $bytes): string
+    {
+        return rtrim(rtrim(number_format($bytes / 1e9, 1, '.', ''), '0'), '.').' GB';
     }
 
     /**

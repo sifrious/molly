@@ -22,10 +22,7 @@ class HardwareProbe
     {
         $this->runs = [];
         $platform = $this->platform();
-        $macos = $platform['macos']['status'] === 'measured' && $platform['macos']['value'] === true;
-        $skip = $platform['macos']['status'] === 'measured'
-            ? 'Molly measures this fact on macOS only; uname -s reported '.$platform['os']['value'].'.'
-            : 'The operating system is unknown, so Molly did not run macOS probes.';
+        [$macos, $skip] = $this->scope($platform);
 
         return [
             'platform' => $platform,
@@ -36,15 +33,56 @@ class HardwareProbe
         ];
     }
 
+    /**
+     * The memory facts and the installed and loaded Ollama models, measured the way
+     * facts() measures them. A model-load check reads these without waiting on
+     * system_profiler, the ollama binary, or df.
+     *
+     * @return array{memory: array<string, array<string, mixed>>, ollama: array<string, array<string, mixed>>}
+     */
+    public function memoryFacts(): array
+    {
+        $this->runs = [];
+        [$macos, $skip] = $this->scope($this->os());
+        [, $base, $loopback] = $this->endpoint();
+
+        return [
+            'memory' => $this->memory($macos, $skip),
+            'ollama' => $this->modelLists($base, $loopback),
+        ];
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $platform
+     * @return array{0: bool, 1: string} Whether to run macOS probes, and the reason recorded when Molly does not.
+     */
+    private function scope(array $platform): array
+    {
+        $macos = $platform['macos']['status'] === 'measured' && $platform['macos']['value'] === true;
+        $skip = $platform['macos']['status'] === 'measured'
+            ? 'Molly measures this fact on macOS only; uname -s reported '.$platform['os']['value'].'.'
+            : 'The operating system is unknown, so Molly did not run macOS probes.';
+
+        return [$macos, $skip];
+    }
+
+    /** @return array{os: array<string, mixed>, macos: array<string, mixed>} */
+    private function os(): array
+    {
+        $os = $this->run('uname -s');
+
+        return [
+            'os' => $os['ok'] ? $this->measured(trim($os['output']), 'uname -s', $os['output']) : $this->unknown($os['reason'], 'uname -s'),
+            'macos' => $os['ok']
+                ? $this->measured(trim($os['output']) === 'Darwin', 'uname -s', $os['output'])
+                : $this->unknown('uname -s failed, so the operating system is unknown.', 'uname -s'),
+        ];
+    }
+
     /** @return array<string, array<string, mixed>> */
     private function platform(): array
     {
-        $facts = [];
-        $os = $this->run('uname -s');
-        $facts['os'] = $os['ok'] ? $this->measured(trim($os['output']), 'uname -s', $os['output']) : $this->unknown($os['reason'], 'uname -s');
-        $facts['macos'] = $os['ok']
-            ? $this->measured(trim($os['output']) === 'Darwin', 'uname -s', $os['output'])
-            : $this->unknown('uname -s failed, so the operating system is unknown.', 'uname -s');
+        $facts = $this->os();
         $facts['architecture'] = $this->text('uname -m');
 
         $macos = $facts['macos']['status'] === 'measured' && $facts['macos']['value'] === true;
@@ -183,10 +221,7 @@ class HardwareProbe
             ? $this->measured($cli, $versionCommand, $version['output'])
             : $this->unknown($version['ok'] ? 'ollama --version did not print a version.' : $version['reason'], $versionCommand);
 
-        $url = config('ai.providers.ollama.url');
-        $base = is_string($url) && $url !== '' ? rtrim($url, '/') : 'http://localhost:11434';
-        $host = parse_url($base, PHP_URL_HOST);
-        $loopback = in_array($host, ['localhost', '127.0.0.1', '[::1]', '::1'], true) && parse_url($base, PHP_URL_SCHEME) === 'http';
+        [$url, $base, $loopback] = $this->endpoint();
         $facts['api_url'] = $loopback
             ? $this->measured($base, 'config ai.providers.ollama.url', $url)
             : $this->unknown('Molly only calls a loopback Ollama API over http; the configured URL is not loopback.', 'config ai.providers.ollama.url');
@@ -196,19 +231,36 @@ class HardwareProbe
             ? $this->measured($version['body']['version'], "GET {$base}/api/version", $version['raw'])
             : $this->unknown($version['reason'] ?? 'The API response did not include a version.', "GET {$base}/api/version");
 
-        $facts['installed_models'] = $this->models($base, '/api/tags', $loopback, fn (array $model): array => [
-            'name' => $model['name'] ?? null,
-            'digest' => $model['digest'] ?? null,
-            'size_bytes' => $model['size'] ?? null,
-        ]);
-        $facts['loaded_models'] = $this->models($base, '/api/ps', $loopback, fn (array $model): array => [
-            'name' => $model['name'] ?? null,
-            'digest' => $model['digest'] ?? null,
-            'size_bytes' => $model['size'] ?? null,
-            'size_vram_bytes' => $model['size_vram'] ?? null,
-        ]);
+        return $facts + $this->modelLists($base, $loopback);
+    }
 
-        return $facts;
+    /** @return array{0: mixed, 1: string, 2: bool} The configured URL, the base URL Molly calls, and whether that is loopback HTTP. */
+    private function endpoint(): array
+    {
+        $url = config('ai.providers.ollama.url');
+        $base = is_string($url) && $url !== '' ? rtrim($url, '/') : 'http://localhost:11434';
+        $host = parse_url($base, PHP_URL_HOST);
+        $loopback = in_array($host, ['localhost', '127.0.0.1', '[::1]', '::1'], true) && parse_url($base, PHP_URL_SCHEME) === 'http';
+
+        return [$url, $base, $loopback];
+    }
+
+    /** @return array{installed_models: array<string, mixed>, loaded_models: array<string, mixed>} */
+    private function modelLists(string $base, bool $loopback): array
+    {
+        return [
+            'installed_models' => $this->models($base, '/api/tags', $loopback, fn (array $model): array => [
+                'name' => $model['name'] ?? null,
+                'digest' => $model['digest'] ?? null,
+                'size_bytes' => $model['size'] ?? null,
+            ]),
+            'loaded_models' => $this->models($base, '/api/ps', $loopback, fn (array $model): array => [
+                'name' => $model['name'] ?? null,
+                'digest' => $model['digest'] ?? null,
+                'size_bytes' => $model['size'] ?? null,
+                'size_vram_bytes' => $model['size_vram'] ?? null,
+            ]),
+        ];
     }
 
     /** @return array<string, mixed> */
