@@ -188,7 +188,7 @@ Read the finding: file, line, problem, classification, and recommendation. Only 
 
 ## The model is slow or returns bad changes
 
-The proposal and review requests each get `molly.timeout` seconds (180 by default). Try a smaller task before raising it.
+The proposal and review requests each get `molly.timeout` seconds (180 by default). A request that runs longer fails with `PROVIDER_TIMEOUT`, described in [The model request fails](#the-model-request-fails). Try a smaller task before raising it.
 
 | Failure | Meaning |
 | --- | --- |
@@ -207,6 +207,8 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. Molly never pulls a model. |
 | `PROVIDER_ERROR` | Ollama answered with an HTTP error, such as 500, 503, or 429, or with its own `error` field in place of a chat response. The message gives the HTTP status and the model name, not Ollama's text. | Read the Ollama server log: the terminal running `ollama serve`, or `~/.ollama/logs/server.log` for the macOS app. Fix the cause, then try again. |
 | `PROVIDER_RESPONSE_INVALID` | Ollama answered, but the body was not a chat response: truncated JSON, plain text, an empty object, or fields Laravel AI cannot read. Molly uses none of it. | Check that `OLLAMA_URL` points at Ollama itself, then try again. |
+| `PROVIDER_TIMEOUT` | Ollama accepted the request but did not answer within `molly.timeout`. The message names the model and the timeout in seconds. | Try a smaller task or a faster model. If you raise `molly.timeout` in `config/molly.php`, run `php artisan config:clear`. |
+| `PROVIDER_UNREACHABLE` | Molly could not connect to Ollama at the configured URL, for example because the connection was refused. The message names the URL. | Start Ollama with `ollama serve`, or fix `OLLAMA_URL`. `molly:doctor` reports the same condition as `ollama_unreachable`. |
 
 These messages never include a PHP class name, a file path, or the provider's raw reply. A reply that is a valid chat response but holds the wrong answer shape fails later, with `ACCEPTANCE_INVALID`, `GENERATION_INVALID`, or `REVIEW_INVALID`.
 

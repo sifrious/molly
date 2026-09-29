@@ -82,14 +82,15 @@ Doctor never prints API keys or account details.
 
 ## Timeouts
 
-`molly.timeout` in `config/molly.php` allows 180 seconds per model request by default. A slow model hitting that limit fails the run with a timeout rather than waiting. Prefer a smaller task or a faster model before raising it; if you do raise it, clear the configuration cache and run doctor again.
+`molly.timeout` in `config/molly.php` allows 180 seconds per model request by default. A slow model hitting that limit fails with `PROVIDER_TIMEOUT`, which names the model and the timeout, rather than waiting. A refused connection is a different failure, `PROVIDER_UNREACHABLE`. Prefer a smaller task or a faster model before raising the timeout; if you do raise it, clear the configuration cache and run doctor again.
 
 ## Common problems
 
 | Symptom | Likely code | Fix |
 | --- | --- | --- |
-| Connection refused | `ollama_unreachable` | `ollama serve`, then check the URL. |
-| Model name unknown | `model_missing` | `ollama pull NAME`. |
+| Connection refused | `ollama_unreachable` in doctor, `PROVIDER_UNREACHABLE` in a run | `ollama serve`, then check the URL. |
+| The model takes longer than `molly.timeout` | `PROVIDER_TIMEOUT` | A smaller task or a faster model, or a longer timeout. |
+| Model name unknown | `model_missing` in doctor, `MODEL_MISSING` in a run | `ollama pull NAME`. |
 | Out of memory or context errors | none (runtime) | A smaller model or more free memory. |
 | Ollama answers with an HTTP error | `PROVIDER_ERROR` | Read the Ollama server log, fix the cause, and try again. |
 | Ollama's reply is not a chat response | `PROVIDER_RESPONSE_INVALID` | Check that `OLLAMA_URL` points at Ollama itself. |

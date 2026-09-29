@@ -2,7 +2,9 @@
 
 namespace Sifrious\Molly\Agents;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Str;
 use JsonException;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Exceptions\AiException;
@@ -75,6 +77,16 @@ class LocalOllama
             return new RuntimeException('PROVIDER_ERROR: Ollama answered HTTP '.$status.' for model '.$model.'. Molly used none of the reply. Check the Ollama server log, then try again.', 0, $exception);
         }
 
+        if ($this->find($exception, ConnectionException::class) !== null) {
+            if ($this->timedOut($exception)) {
+                $timeout = (int) config('molly.timeout');
+
+                return new RuntimeException('PROVIDER_TIMEOUT: Ollama did not answer for model '.$model.' within molly.timeout, '.$timeout.' '.Str::plural('second', $timeout).'. Molly stopped waiting. Try a smaller task or a faster model, or raise molly.timeout in config/molly.php.', 0, $exception);
+            }
+
+            return new RuntimeException('PROVIDER_UNREACHABLE: Molly could not connect to Ollama at '.rtrim((string) config('ai.providers.ollama.url'), '/').'. Start Ollama with ollama serve, or fix OLLAMA_URL.', 0, $exception);
+        }
+
         $message = $exception instanceof AiException ? $exception->getMessage() : '';
         // Laravel AI passes a body that does not decode to an array straight into a typed
         // parameter, and reports an empty object as an unknown Ollama error.
@@ -104,5 +116,17 @@ class LocalOllama
         }
 
         return null;
+    }
+
+    /** Guzzle reports a curl timeout as "cURL error 28"; PHP streams say "timed out". */
+    private function timedOut(Throwable $exception): bool
+    {
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            if (preg_match('/\bcURL error 28\b|timed out/i', $current->getMessage()) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

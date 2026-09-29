@@ -116,3 +116,66 @@ it('reports an error field in a successful Ollama reply as PROVIDER_ERROR withou
     expectSafeProviderMessage($message);
     expect(Task::count())->toBe(0);
 })->with('model call sites');
+
+/** A loopback port with nothing listening on it, so a connection is refused. */
+function refusedLoopbackPort(): int
+{
+    $socket = stream_socket_server('tcp://127.0.0.1:0');
+    $port = (int) parse_url('tcp://'.stream_socket_get_name($socket, false), PHP_URL_PORT);
+    fclose($socket);
+
+    return $port;
+}
+
+it('reports a slow Ollama as PROVIDER_TIMEOUT and names molly.timeout', function (string $site) {
+    // A loopback server that accepts the connection and never answers.
+    $server = stream_socket_server('tcp://127.0.0.1:0');
+    $port = (int) parse_url('tcp://'.stream_socket_get_name($server, false), PHP_URL_PORT);
+    config(['ai.providers.ollama.url' => 'http://127.0.0.1:'.$port, 'molly.timeout' => 1]);
+    Http::allowStrayRequests(['http://127.0.0.1:'.$port.'/api/chat']);
+
+    try {
+        $started = microtime(true);
+        $message = callProvider($site, $this->workspace);
+        $elapsed = microtime(true) - $started;
+    } finally {
+        fclose($server);
+    }
+
+    expect($message)->toBe('PROVIDER_TIMEOUT: Ollama did not answer for model absent-model:1b within molly.timeout, 1 second. Molly stopped waiting. Try a smaller task or a faster model, or raise molly.timeout in config/molly.php.')
+        ->and($elapsed)->toBeLessThan(10.0);
+    expectSafeProviderMessage($message);
+    expect(Task::count())->toBe(0);
+})->with('model call sites');
+
+it('reports a refused connection as PROVIDER_UNREACHABLE, not as a timeout', function (string $site) {
+    $port = refusedLoopbackPort();
+    config(['ai.providers.ollama.url' => 'http://127.0.0.1:'.$port]);
+    Http::allowStrayRequests(['http://127.0.0.1:'.$port.'/api/chat']);
+
+    $message = callProvider($site, $this->workspace);
+
+    expect($message)->toBe('PROVIDER_UNREACHABLE: Molly could not connect to Ollama at http://127.0.0.1:'.$port.'. Start Ollama with ollama serve, or fix OLLAMA_URL.');
+    expectSafeProviderMessage($message);
+    expect(Task::count())->toBe(0);
+})->with('model call sites');
+
+it('prints a provider failure from molly:story as one coded stderr line and exits 1', function () {
+    $database = sys_get_temp_dir().'/molly-provider-'.Str::uuid().'.sqlite';
+    touch($database);
+    $url = 'http://127.0.0.1:'.refusedLoopbackPort();
+    $environment = ['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => $database, 'MOLLY_AGENT' => 'ollama', 'MOLLY_LOCAL_MODEL' => 'absent-model:1b', 'OLLAMA_URL' => $url];
+
+    try {
+        testbenchProcess(['migrate', '--force'], $environment)->mustRun();
+        $process = testbenchProcess(['molly:story', 'Visitors see a greeting.', '--workspace='.$this->workspace, '--file=routes/web.php', '--test=tests/Feature/GreetingTest.php', '--json', '--no-interaction'], $environment);
+        $process->run();
+    } finally {
+        File::delete($database);
+    }
+
+    $expected = 'PROVIDER_UNREACHABLE: Molly could not connect to Ollama at '.$url.'. Start Ollama with ollama serve, or fix OLLAMA_URL.';
+    expect($process->getExitCode())->toBe(1)
+        ->and(trim($process->getErrorOutput()))->toBe($expected)
+        ->and(json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR))->toBe(['id' => null, 'status' => 'error', 'error' => $expected]);
+});
