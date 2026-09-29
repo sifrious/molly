@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 
 /** Run a Molly command as its own process through Testbench, with a migrated SQLite database. */
@@ -10,7 +9,7 @@ function artisanProcess(array $arguments): Process
     if ($database === null) {
         $database = sys_get_temp_dir().'/molly-diagnostics-'.bin2hex(random_bytes(6)).'.sqlite';
         touch($database);
-        register_shutdown_function(fn () => File::delete($database));
+        register_shutdown_function(fn () => @unlink($database));
         testbenchProcess(['migrate', '--force'], ['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => $database])->mustRun();
     }
 

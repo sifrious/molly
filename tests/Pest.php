@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Process\Factory as ProcessFactory;
 use Illuminate\Support\Arr;
@@ -123,7 +124,8 @@ function testbenchProcess(array $arguments, array $env = [], float $timeout = 60
     if ($cache === null) {
         $cache = sys_get_temp_dir().'/molly-testbench-cache-'.getmypid();
         File::ensureDirectoryExists($cache);
-        register_shutdown_function(fn () => File::deleteDirectory($cache));
+        // No facade here: the last test may leave an application without the files binding.
+        register_shutdown_function(fn () => (new Filesystem)->deleteDirectory($cache));
     }
     $package = dirname(__DIR__);
 
