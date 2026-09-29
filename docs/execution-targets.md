@@ -71,7 +71,7 @@ php artisan molly:start ready --orb=big
 php artisan molly:retry ready --orb-runtime=ollama
 ```
 
-`molly:queue` sends the start, or the retry with `--retry`, to the Orb's own queue, `molly-orb-ORB_ID`, and returns. `molly:start` and `molly:retry` run the attempt in your terminal. MCP `molly_task` takes the same choice for `start` and `retry` as `orb`, `orb_runtime`, and `orb_model`.
+`molly:queue` sends the start, or the retry with `--retry`, to the Orb's own queue, `molly-orb-ORB_ID`, and returns. While a start or retry of the task is still queued or running, `molly:queue` adds no second job and reports `already_queued` instead of `queued`; the Orb that holds the queued job keeps it, and an Orb this call reserved for nothing is freed. `molly:start` and `molly:retry` run the attempt in your terminal. MCP `molly_task` takes the same choice for `start` and `retry` as `orb`, `orb_runtime`, and `orb_model`.
 
 With `--orb-runtime` or `--orb-model`, Molly goes through the active Orbs that match, in order of name and then ID, and takes the first one that passes every check below. The same records always give the same choice. When none passes, the error is `ORB_UNAVAILABLE` and lists each Orb's refusal.
 

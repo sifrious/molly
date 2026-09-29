@@ -1,10 +1,13 @@
 <?php
 
+use Illuminate\Bus\UniqueLock;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Jobs\StartSavedTask;
 
 beforeEach(function (): void {
     $this->workspace = sys_get_temp_dir().'/molly-queue-'.Str::uuid();
@@ -51,4 +54,30 @@ it('prints the queue refusal code on stderr instead of COMMAND_FAILED', function
     expect($process->getExitCode())->toBe(1)
         ->and(trim($process->getErrorOutput()))->toStartWith('QUEUE_RETRY_AFTER_TOO_SHORT: Set the database queue connection retry_after above 3600 seconds')
         ->and($process->getErrorOutput())->not->toContain('COMMAND_FAILED');
+});
+
+it('answers already_queued for a duplicate molly:queue and adds no second job', function (): void {
+    config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 3700]);
+    Queue::fake([StartSavedTask::class]);
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Hello.php'], 'tests/Hello.php', nickname: 'queued');
+    $queue = function (array $options = []): array {
+        expect(Artisan::call('molly:queue', ['task' => 'queued', '--json' => true, ...$options]))->toBe(0);
+
+        return json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    };
+
+    expect($queue()['status'])->toBe('queued')
+        ->and($queue())->toMatchArray(['status' => 'already_queued', 'task_id' => $task->id, 'retry' => false, 'connection' => 'database', 'queue' => 'default', 'orb' => null]);
+    Queue::assertPushed(StartSavedTask::class, 1);
+
+    expect(Artisan::call('molly:queue', ['task' => 'queued']))->toBe(0)
+        ->and(Artisan::output())->toContain('Task queued already has a start queued or running on database / default. Molly added no second job.')
+        ->not->toContain('Queued task');
+    Queue::assertPushed(StartSavedTask::class, 1);
+
+    // A retry is a separate job, and once the worker releases the start's lock, a start can be queued again.
+    expect($queue(['--retry' => true])['status'])->toBe('queued');
+    (new UniqueLock(app(Cache::class)))->release(new StartSavedTask($task->id));
+    expect($queue()['status'])->toBe('queued');
+    Queue::assertPushed(StartSavedTask::class, 3);
 });

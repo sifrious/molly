@@ -394,6 +394,32 @@ it('queues a start or retry on the Orb queue, by name or by required model, and 
     expect(Task::findOrFail($third->id)->status)->toBe('pending');
 });
 
+it('answers already_queued for a duplicate Orb queue and keeps only the Orb of the queued job', function (): void {
+    config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 3700]);
+    Queue::fake([StartSavedTask::class]);
+    $big = registerOrb('big', 'gpt-oss:120b-code');
+    $small = registerOrb('small', 'gpt-oss:20b');
+    $ready = orbTargetingTask(orbTargetingWorktree('ready'), 'ready');
+    $local = orbTargetingTask(orbTargetingWorktree('local'), 'local');
+
+    [, $first] = mollyJson('molly:queue', ['task' => 'ready', '--orb' => 'big']);
+    [$exit, $again] = mollyJson('molly:queue', ['task' => 'ready', '--orb' => 'big']);
+    expect($first['status'])->toBe('queued')
+        ->and($exit)->toBe(0)
+        ->and($again)->toMatchArray(['status' => 'already_queued', 'task' => 'ready', 'queue' => 'molly-orb-'.$big['id'], 'orb' => ['id' => $big['id'], 'name' => 'big', 'runtime' => 'ollama', 'model' => 'gpt-oss:120b-code']])
+        ->and(Orb::findOrFail($big['id'])->current_task_id)->toBe($ready->id);
+
+    // The start already queued for this machine does not run on an Orb, so the Orb is freed again.
+    [, $queuedHere] = mollyJson('molly:queue', ['task' => 'local']);
+    [$orbExit, $onOrb] = mollyJson('molly:queue', ['task' => 'local', '--orb' => 'small']);
+    expect($queuedHere)->toMatchArray(['status' => 'queued', 'queue' => 'default', 'orb' => null])
+        ->and($orbExit)->toBe(0)
+        ->and($onOrb)->toMatchArray(['status' => 'already_queued', 'task' => 'local', 'queue' => 'default', 'orb' => null])
+        ->and(Orb::findOrFail($small['id'])->current_task_id)->toBeNull();
+    Queue::assertPushed(StartSavedTask::class, 2);
+    expect(Task::findOrFail($local->id)->status)->toBe('pending');
+});
+
 it('queues an MCP start or retry on an Orb the same way', function (string $operation): void {
     config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 3700]);
     Queue::fake([StartSavedTask::class]);
