@@ -10,6 +10,7 @@ use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Actions\LockProtectedTest;
 use Sifrious\Molly\Actions\RecordRedBaseline;
 use Sifrious\Molly\Actions\RecordVerificationReceipts;
+use Sifrious\Molly\Actions\RestoreTaskBaseline;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\AuthoredTestBroken;
@@ -129,6 +130,37 @@ it('refuses implementation after a bootstrap error baseline and accepts a repair
     $again = app(LockProtectedTest::class)->handle($task->id, true);
     expect($again['locked'])->toBeFalse()
         ->and($again['red_baseline']['recorded_at'])->toBe($relock['red_baseline']['recorded_at']);
+});
+
+it('restores the locked test, not the pre-authoring files, before a retry', function () {
+    $this->workspace = redBaselineWorkspace();
+    $test = '<?php it("greets", function () { expect(App\\Greeting::hello())->toBe("Hello"); });';
+    [$task] = authoredAndLocked($this->workspace, $test);
+    File::put($this->workspace.'/app/Greeting.php', '<?php // left by a failed attempt');
+
+    app(RestoreTaskBaseline::class)->handle($task);
+
+    expect(File::get($this->workspace.'/tests/GreetingTest.php'))->toBe($test)
+        ->and(hash_file('sha256', $this->workspace.'/tests/GreetingTest.php'))->toBe($task->test_digest)
+        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php');
+});
+
+it('keeps a repaired, relocked test when a retry restores the task baseline', function () {
+    $this->workspace = redBaselineWorkspace();
+    [$task] = authoredAndLocked($this->workspace, '<?php it("greets", function () { expect(App\\Greeting::hello())->toBe("Hello"); });');
+    $source = $task->source;
+    $source['test_lock']['red_baseline'] = ['classification' => 'bootstrap_error', 'reason' => 'parse_error'];
+    $task->update(['source' => $source]);
+    $repaired = '<?php it("greets by name", function () { expect(App\\Greeting::hello())->toBe("Hello"); });';
+    File::put($this->workspace.'/tests/GreetingTest.php', $repaired);
+    $relock = app(LockProtectedTest::class)->handle($task->id, true, reason: 'Name the greeting test.');
+    File::put($this->workspace.'/app/Greeting.php', '<?php // left by a failed attempt');
+
+    app(RestoreTaskBaseline::class)->handle($task->fresh());
+
+    expect($relock['locked'])->toBeTrue()
+        ->and(File::get($this->workspace.'/tests/GreetingTest.php'))->toBe($repaired)
+        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php');
 });
 
 it('marks a locked test that already passes as an invalid RED baseline', function () {
