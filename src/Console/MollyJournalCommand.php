@@ -31,7 +31,9 @@ class MollyJournalCommand extends Command
                 if (is_string($reference) && $reference !== '') {
                     $task = Task::findByReference($reference)
                         ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
-                    $result = ['task_id' => $task->id, ...$refresh->handle($task)->journal_status];
+                    // With a task, --project also writes the task journal that molly:journal TASK writes.
+                    $journal = $action->handle($task->id);
+                    $result = ['task_id' => $task->id, 'path' => $journal['path'], 'attempt_count' => $journal['attempt_count'], ...$refresh->handle($task)->journal_status];
                 } else {
                     $result = ['task_id' => null, ...$refresh->forWorkspace((string) ($this->option('workspace') ?: base_path()))];
                 }
@@ -42,6 +44,9 @@ class MollyJournalCommand extends Command
                 if ($this->option('json')) {
                     $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
                 } else {
+                    if (isset($result['path'])) {
+                        note('Journal saved: '.$result['path']);
+                    }
                     note('Project journal saved: '.$result['journal_path']);
                     note('Project glossary saved: '.$result['glossary_path']);
                 }

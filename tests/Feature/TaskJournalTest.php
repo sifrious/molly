@@ -153,6 +153,36 @@ it('exports a pending task through JSON without creating an attempt', function (
         ->and($task->runs()->count())->toBe(0);
 });
 
+it('writes the task journal and refreshes the project journal and glossary with molly:journal TASK --project', function (): void {
+    $task = journalTask();
+    $journal = $this->journalWorkspace.'/.molly/journal/'.$task->id.'.md';
+
+    $exit = Artisan::call('molly:journal', ['task' => 'health-check', '--project' => true, '--json' => true, '--no-interaction' => true]);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(0)
+        ->and($result)->toMatchArray([
+            'task_id' => $task->id,
+            'path' => $journal,
+            'attempt_count' => 0,
+            'status' => 'written',
+            'journal_path' => $this->journalWorkspace.'/.molly/JOURNAL.md',
+            'glossary_path' => $this->journalWorkspace.'/.molly/GLOSSARY.md',
+        ])
+        ->and(File::get($journal))->toContain('# Task journal', 'No attempts recorded.')
+        ->and(fileperms($journal) & 0777)->toBe(0600)
+        ->and(fileperms(dirname($journal)) & 0777)->toBe(0700)
+        ->and(File::get($result['journal_path']))->toContain('# Project journal')
+        ->and($task->fresh()->journal_status['status'])->toBe('written');
+
+    File::delete($journal);
+    $this->artisan('molly:journal', ['task' => $task->id, '--project' => true])
+        ->expectsOutputToContain('Journal saved: '.$journal)
+        ->expectsOutputToContain('Project journal saved: '.$this->journalWorkspace.'/.molly/JOURNAL.md')
+        ->assertSuccessful();
+    expect(File::exists($journal))->toBeTrue();
+});
+
 it('prints a concise confirmation after saving a journal', function (): void {
     $task = journalTask();
 
