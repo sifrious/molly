@@ -109,11 +109,11 @@ function testbenchProcess(array $arguments, array $env = [], float $timeout = 60
  * A Laravel application in a temporary directory whose artisan boots tests/Fixtures/queued-runtime.php:
  * a SQLite database queue, fake model and review agents, real Pest checks, and one saved task with
  * a queued start job. The task changes app/Flag.php, and tests/QueuedFlagTest.php checks it.
- * $retryAfter is the queue's retry_after in seconds and $testTimeout is molly.test_timeout. With
- * $slowTest the Pest test sleeps 30 seconds first, so a check is still running when a test signals it. Create hold in the root to make the
- * fake model wait, and remove it to let the model answer.
+ * $retryAfter is the queue's retry_after in seconds and $testTimeout is molly.test_timeout. The Pest
+ * test sleeps $testSleep seconds first, so a check can still be running when a test signals it.
+ * Create hold in the root to make the fake model wait, and remove it to let the model answer.
  */
-function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, bool $stop = false, int $retryAfter = 120, bool $slowTest = false, int $testTimeout = 5): string
+function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, bool $stop = false, int $retryAfter = 120, int $testSleep = 0, int $testTimeout = 5): string
 {
     $root = sys_get_temp_dir().'/molly-queue-'.bin2hex(random_bytes(8));
     foreach (['app', 'tests', 'storage/logs', 'storage/framework/views', 'bootstrap/cache'] as $path) {
@@ -126,7 +126,7 @@ function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, boo
     file_put_contents($root.'/app/Flag.php', "<?php\nreturn false;\n");
     file_put_contents($root.'/phpunit.xml', '<phpunit bootstrap="vendor/autoload.php" cacheDirectory="storage/phpunit"><testsuites><testsuite name="Flag"><directory>tests</directory></testsuite></testsuites></phpunit>');
     $assertion = $fail ? 'assertFalse' : 'assertTrue';
-    file_put_contents($root.'/tests/QueuedFlagTest.php', str_replace(['ASSERTION', 'SLOW'], [$assertion, $slowTest ? 'sleep(30);' : ''], <<<'PHPTEST'
+    file_put_contents($root.'/tests/QueuedFlagTest.php', str_replace(['ASSERTION', 'SLOW'], [$assertion, $testSleep > 0 ? 'sleep('.$testSleep.');' : ''], <<<'PHPTEST'
 <?php
 final class QueuedFlagTest extends PHPUnit\Framework\TestCase
 {

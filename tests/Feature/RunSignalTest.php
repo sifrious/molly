@@ -43,7 +43,7 @@ function signalLifecycle(string $root): array
 }
 
 it('stops the run, cancels its Pest check, and exits 130 when Ctrl-C reaches molly:start', function (): void {
-    $this->root = $root = queuedExecutionFixture(slowTest: true, testTimeout: 60);
+    $this->root = $root = queuedExecutionFixture(testSleep: 30, testTimeout: 60);
     $taskId = queuedExecutionState($root)['task']['id'];
     $command = startInOwnProcessGroup([PHP_BINARY, $root.'/artisan', 'molly:start', $taskId, '--json', '--no-interaction'], $root, $root.'/storage/start');
     $this->processes = [$command['shell']];
