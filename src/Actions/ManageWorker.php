@@ -37,10 +37,19 @@ class ManageWorker
      * group. Elsewhere, as on macOS, `set -m` turns on job control, which puts the background
      * job in its own group. dash, the /bin/sh of Debian and Ubuntu, turns job control off
      * without a terminal, so the script exits with an error when neither works rather than
-     * start a worker that stop cannot reach. The shell then closes every descriptor above
-     * stderr that it inherited from the Artisan command, such as the caller's stdout pipe or
-     * worker.lock, and points the worker's stdio at the log. It prints the worker pid and
-     * returns at once, and the worker outlives the command without holding the caller's pipe.
+     * start a worker that stop cannot reach.
+     *
+     * The shell then closes the descriptors above stderr that it inherited from the Artisan
+     * command, such as the copies of the caller's stdout and stderr that the console opens,
+     * and points the worker's stdio at the log. A caller that passes its own descriptors to
+     * Artisan pushes those copies above 9. dash can name only descriptors 0 to 9 in a
+     * redirection: it reads `exec 10>&-` as a command named 10, fails to find it, and exits.
+     * So the script runs in bash where bash exists, in POSIX mode so it reads no startup
+     * file, and in /bin/sh elsewhere, such as BusyBox ash on Alpine. It tries `exec 10>&-`
+     * once in a subshell and closes descriptors above 9 only when the shell can name them.
+     * Under dash without bash, descriptors above 9 stay open in the worker, so Molly opens
+     * worker.lock close-on-exec. The shell prints the worker pid and returns at once, and the
+     * worker outlives the command without holding the caller's pipe.
      */
     private const LAUNCH_SCRIPT = <<<'SH'
         if command -v setsid >/dev/null 2>&1; then
@@ -50,8 +59,13 @@ class ManageWorker
             set -m
             case $- in *m*) ;; *) echo 'Neither setsid nor shell job control is available to give the worker its own process group.' >&2; exit 1 ;; esac
         fi
+        if (exec 10>&-) 2>/dev/null; then high=yes; else high=; fi
         for fd in $(ls /dev/fd); do
-            case "$fd" in 0|1|2) ;; *) eval "exec $fd>&-" 2>/dev/null ;; esac
+            case "$fd" in
+                0|1|2) ;;
+                [3-9]) eval "exec $fd>&-" 2>/dev/null ;;
+                *) if [ -n "$high" ]; then eval "exec $fd>&-" 2>/dev/null; fi ;;
+            esac
         done
         $detach "$@" </dev/null >>"$MOLLY_WORKER_LOG" 2>&1 &
         echo $!
@@ -185,10 +199,11 @@ class ManageWorker
         @touch($log);
         @chmod($log, 0600);
 
+        $bash = (new ExecutableFinder)->find('bash');
         $result = Process::path(base_path())
             ->env(['MOLLY_WORKER_LOG' => $log])
             ->timeout(15)
-            ->run(['/bin/sh', '-c', self::LAUNCH_SCRIPT, 'molly-worker', ...$command]);
+            ->run([...($bash === null ? ['/bin/sh'] : [$bash, '--posix']), '-c', self::LAUNCH_SCRIPT, 'molly-worker', ...$command]);
         $pid = (int) trim($result->output());
         if (! $result->successful() || $pid < 2) {
             throw new RuntimeException('WORKER_START_FAILED: Molly could not launch the queue worker. '.trim($result->errorOutput()));
@@ -394,7 +409,8 @@ class ManageWorker
     private function locked(string $root, int $wait, callable $callback): mixed
     {
         $path = $this->directory($root).'/worker.lock';
-        $handle = @fopen($path, 'c');
+        // Close-on-exec, so a worker started while the lock is held never inherits it.
+        $handle = @fopen($path, 'ce');
         if ($handle === false) {
             throw new RuntimeException('WORKER_LOCK_FAILED: Molly could not open '.$path.'. Make '.dirname($path).' writable by this user.');
         }
