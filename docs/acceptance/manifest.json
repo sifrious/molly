@@ -2367,6 +2367,182 @@
           "mandatory": true
         }
       ]
+    },
+    "M14": {
+      "title": "Local Orb execution targeting",
+      "subcases": [
+        {
+          "id": "M14.1",
+          "requirement": "Two named local Orbs register and list as healthy",
+          "mode": "cli",
+          "starting_state": "installed consumer on the Mac Studio with gpt-oss:120b-code and gpt-oss:20b in Ollama, a database queue with retry_after above 3600, and linked worktrees under ../orbs as in docs/execution-targets.md#run-tasks-on-two-local-orbs",
+          "action": "molly:orb-register big --model=gpt-oss:120b-code --worktree-root=../orbs; molly:orb-register small --model=gpt-oss:20b --worktree-root=../orbs; molly:orbs --check --json",
+          "expected": "two different UUIDs; both availability available and health healthy; runtime ollama with each model, Ollama version and model digest, repository path and Git common directory, worktree root, and no current task",
+          "method": "JSON assertions",
+          "evidence": "orbs.json",
+          "timeout_s": 300,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.2",
+          "requirement": "Explicit Orb placement by name and by ID",
+          "mode": "cli",
+          "starting_state": "two healthy Orbs and pending tasks in their own worktrees",
+          "action": "molly:queue orb-greeting --orb=big --json; molly:start TASK --orb=ORB_UUID --json",
+          "expected": "the job goes to queue molly-orb-ORB_ID; the Orb holds the named task; the run's execution_target.target_id is that Orb's UUID and selection_reason names it",
+          "method": "JSON assertions",
+          "evidence": "orb-explicit.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.3",
+          "requirement": "Capability placement chooses an eligible idle Orb deterministically",
+          "mode": "cli",
+          "starting_state": "two healthy Orbs with different models, one of them busy",
+          "action": "molly:queue orb-ready --orb-model=gpt-oss:20b --json; repeat with the same records",
+          "expected": "the first idle, healthy Orb by name that runs the model is chosen, the same records give the same choice, and no eligible Orb gives ORB_UNAVAILABLE with each Orb's refusal",
+          "method": "JSON assertions",
+          "evidence": "orb-capability.log",
+          "timeout_s": 300,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.4",
+          "requirement": "Two Orb runs overlap in separate canonical worktrees",
+          "mode": "cli",
+          "starting_state": "two healthy Orbs with workers from molly:worker start --orb and one queued task on each",
+          "action": "molly:worker start --orb=big; molly:worker start --orb=small; queue one task per Orb; molly:orbs --json while both run",
+          "expected": "both tasks are running at the same time; the two runs' started_at and finished_at intervals overlap; each run's execution_target.worktree is a different canonical path under the approved root; no file outside each task's worktree changes",
+          "method": "transcript + DB/receipt inspection",
+          "evidence": "orb-overlap.log, orb-runs.json",
+          "timeout_s": 3600,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.5",
+          "requirement": "A busy Orb is refused",
+          "mode": "cli",
+          "starting_state": "Orb big running a task",
+          "action": "molly:queue demo-greeting --orb=big --json",
+          "expected": "ORB_BUSY naming the running task; nothing is queued and the refused task is unchanged",
+          "method": "transcript",
+          "evidence": "orb-busy.log",
+          "timeout_s": 300,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true,
+          "expected_exit_code": 1
+        },
+        {
+          "id": "M14.6",
+          "requirement": "An occupied worktree is refused",
+          "mode": "cli",
+          "starting_state": "a task running in a worktree and a second pending task saved in the same worktree",
+          "action": "molly:queue SECOND --orb=small --json",
+          "expected": "ORB_WORKTREE_OCCUPIED naming the running task and the worktree; no second run writes to that worktree",
+          "method": "transcript",
+          "evidence": "orb-occupied.log",
+          "timeout_s": 300,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true,
+          "expected_exit_code": 1
+        },
+        {
+          "id": "M14.7",
+          "requirement": "Orb worker crash is recovered",
+          "mode": "cli",
+          "starting_state": "an Orb worker running a task",
+          "action": "kill -9 the Orb worker during the run; molly:worker start --orb=big --json",
+          "expected": "the recovery check settles the task as failed with RUN_ABANDONED and a recovery entry; the run keeps its execution_target with result failed; the Orb is available; no duplicate side effect",
+          "method": "transcript + DB/receipt inspection",
+          "evidence": "orb-crash.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.8",
+          "requirement": "Orb run timeout is a failed attempt",
+          "mode": "cli",
+          "starting_state": "an Orb task whose Pest test runs longer than molly.test_timeout",
+          "action": "molly:start TASK --orb=big --json",
+          "expected": "the verification check is timed_out, the run and task are failed, execution_target.result is failed, and the Orb is available",
+          "method": "transcript + DB/receipt inspection",
+          "evidence": "orb-timeout.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true,
+          "expected_exit_code": 1
+        },
+        {
+          "id": "M14.9",
+          "requirement": "Orb run cancellation and Orb revocation stop the run",
+          "mode": "cli",
+          "starting_state": "an Orb running a task",
+          "action": "molly:stop TASK during the run; in a second run, molly:orb-revoke big during the run",
+          "expected": "each run ends stopped at its next step with history kept; the revoked run's stop_reason starts with ORB_REVOKED; the stopped Orb is available and the revoked Orb refuses new work with ORB_REVOKED",
+          "method": "transcript + DB/receipt inspection",
+          "evidence": "orb-cancel.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.10",
+          "requirement": "Duplicate delivery of one Orb start runs once",
+          "mode": "cli",
+          "starting_state": "one pending task",
+          "action": "molly:queue TASK --orb=big twice; run two workers on the Orb queue",
+          "expected": "exactly one run and one model call; the other job fails with WORKSPACE_BUSY or TASK_NOT_PENDING; the Orb is available afterwards",
+          "method": "transcript + DB/receipt inspection",
+          "evidence": "orb-duplicate.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.11",
+          "requirement": "Orb results stay inspectable after a worker restart",
+          "mode": "cli",
+          "starting_state": "both Orb tasks finished",
+          "action": "molly:worker restart --orb=big --json; molly:orbs --json; molly:task TASK --json; molly:show RUN_ID --json; molly:receipt RUN_ID --json",
+          "expected": "the restart reports a new pid and a checked recovery; both Orbs are available; both attempts show the same execution_target, results, and receipts as before the restart",
+          "method": "JSON assertions",
+          "evidence": "orb-restart.log",
+          "timeout_s": 1800,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        },
+        {
+          "id": "M14.12",
+          "requirement": "Each Orb attempt records its evidence",
+          "mode": "cli",
+          "starting_state": "a finished Orb run",
+          "action": "molly:show RUN_ID --json; read .molly/receipts/RUN_ID/*.json and .molly/lifecycle.jsonl in the worktree",
+          "expected": "report.execution_target holds the Orb UUID and capability snapshot, runtime, model and runtime identity, repository, canonical worktree, starting revision, prompt digest, started_at and finished_at, the diff patch path and SHA-256, and the result; the report holds the tests; each receipt context holds the same execution_target; dispatch_requested and the terminal lifecycle event name the Orb",
+          "method": "JSON assertions + digest check",
+          "evidence": "orb-evidence.json",
+          "timeout_s": 300,
+          "owner": "C",
+          "outcome": "UNVERIFIED",
+          "mandatory": true
+        }
+      ]
     }
   },
   "amendments": [
@@ -2419,6 +2595,26 @@
       "change": "expected_exit_code set to 1",
       "reason": "Each of these subcases checks a command that must fail: no provider, a provider outage, a malformed reply, or a memory refusal. The RC9 M07 run showed that the correct behavior exits 1. The expected-result text is unchanged.",
       "invalidates": "none; no PASS was granted under the old value"
+    },
+    {
+      "date": "2026-09-28",
+      "subcases": [
+        "M14.1",
+        "M14.2",
+        "M14.3",
+        "M14.4",
+        "M14.5",
+        "M14.6",
+        "M14.7",
+        "M14.8",
+        "M14.9",
+        "M14.10",
+        "M14.11",
+        "M14.12"
+      ],
+      "change": "Added criterion M14, Local Orb execution targeting, with mandatory subcases M14.1 to M14.12.",
+      "reason": "Mary's release-scope decision, 2026-09-28: Orb execution is required for the alpha. MME-5211 lists local and Orb execution targeting as an alpha tutorial requirement, and MME-1806 and MME-6145 define the Orb contract these subcases check on the Mac Studio.",
+      "invalidates": "none; the subcases are new and no record exists for them"
     }
   ]
 }

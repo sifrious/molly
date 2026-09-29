@@ -1,4 +1,4 @@
-# Human prelaunch cards H01 to H13
+# Human prelaunch cards H01 to H14
 
 Status: draft. These cards stay unusable until machine acceptance for MME-5885 passes on one candidate. Only Mary, or the human reviewer she names, records an outcome here.
 
@@ -134,3 +134,15 @@ Expected: both sessions finish, and any help you gave is written in the interven
 4. Confirm that Bloom shows the same decision for the same snapshot hash.
 
 Expected: facts match the Mac, unknowns are named, and no download happens without your approval.
+
+## H14. Two local Orbs (M14)
+
+Starting state: the tutorial application on the Mac Studio, with `gpt-oss:120b-code` and `gpt-oss:20b` in Ollama. Follow [Run tasks on two local Orbs](../execution-targets.md#run-tasks-on-two-local-orbs).
+
+1. Register `big` and `small`, and confirm that `php artisan molly:orbs --check` lists both as healthy with different IDs.
+2. Start both Orb workers, queue one task on each, and run `php artisan molly:orbs` while both models work. Confirm that both Orbs are busy with their own task.
+3. Queue a third task on `big` and confirm the `ORB_BUSY` refusal.
+4. When both tasks finish, restart the `big` worker. Read each task, run, and receipt, and confirm that each names its own Orb, model, and worktree.
+5. Inspect evidence for the crash, timeout, cancellation, revocation, duplicate delivery, and occupied worktree cases.
+
+Expected: the two runs overlap in separate worktrees, each changes only its own worktree, and both results read the same after the restart.
