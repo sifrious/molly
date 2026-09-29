@@ -79,9 +79,12 @@ it('round-trips molly:preflight --json through a file in its own process with th
     $fixture = replayHardwareFixture('m3-ultra-96gb');
     Artisan::call('molly:preflight', ['--destination' => $fixture['destination'], '--json' => true]);
     File::put($measured = $this->home.'/measured.json', Artisan::output());
+    File::ensureDirectoryExists($this->home.'/cache');
+    // The package manifest goes to a private cache, so this process leaves Testbench's shared bootstrap cache to the other tests.
     $artisan = function (string $snapshot): Process {
         $process = new Process([PHP_BINARY, dirname(__DIR__).'/Fixtures/agent-artisan.php', 'molly:preflight', '--snapshot='.$snapshot, '--json'], dirname(__DIR__, 2), [
             'CLAUDECODE' => '1', 'AI_AGENT' => 'claude-code', 'MOLLY_HOME' => $this->home.'/molly', 'MOLLY_LOCAL_MODEL' => '', 'APP_ENV' => 'local',
+            'APP_PACKAGES_CACHE' => $this->home.'/cache/packages.php', 'APP_SERVICES_CACHE' => $this->home.'/cache/services.php',
         ], timeout: 60);
         $process->run();
 
