@@ -52,7 +52,9 @@ class StartTask
         }
 
         return $workspace->exclusivelyForTask($id, function () use ($id, $progress, $retry, $idempotencyKey): Run {
-            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id));
+            // This process now holds the task lock, so a claim made on this host that is still
+            // marked running belongs to a process that exited, such as one killed with SIGKILL.
+            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id), taskLockHeld: true);
             if (($blocked = $task->redBaselineError()) !== null) {
                 $this->recordRefusal($task, $blocked, $retry);
                 throw new RuntimeException($blocked);

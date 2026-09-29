@@ -213,7 +213,9 @@ php artisan molly:stop TASK
 php artisan molly:task TASK
 ```
 
-`WORKSPACE_BUSY` means another run holds the workspace lock. Check whether it is still working before doing anything else. Do not delete files under `.molly/` to force a retry; an expired lease is recovered on its own.
+`WORKSPACE_BUSY` means another run holds the workspace lock. Check whether it is still working before doing anything else. Do not delete files under `.molly/` to force a retry.
+
+When the process that ran the task was killed or its host restarted, run `php artisan molly:retry TASK`. On the same host, the retry sees that no process holds the task's lock, marks the task and its abandoned run `failed` with `RUN_ABANDONED`, and starts a new attempt. A claim from another host, or from a worker with a fixed `molly.agent_bus.worker_id`, is recovered once its lease expires. See [Recovery after a crash](tasks.md#recovery-after-a-crash).
 
 ## Retry is rejected
 
