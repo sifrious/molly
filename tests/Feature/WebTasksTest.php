@@ -148,6 +148,16 @@ it('shows incomplete evidence and skipped measurements without claiming success'
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertSee('Run status: failed')->assertSee('branch_timeout')->assertSee('timed_out')->assertSee('G. Caches and dependencies')->assertSee('Not run')->assertSee('No Git history')->assertSee('Authorship is not ownership.')->assertSee('clever:lonely-files')->assertDontSee('<script>bad()</script>', false)->assertDontSee('Task completed.');
 });
 
+it('writes a Clever summary that reads as one sentence when a measurement did not run', function () {
+    $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'completed', 'report' => [
+        'complexity_before' => ['status' => 'skipped', 'probes' => []],
+    ]]);
+
+    $this->get('/molly/runs/'.$run->id)->assertOk()
+        ->assertSee('Clever: before skipped; after not run.')
+        ->assertDontSee('after Not run');
+});
+
 it('labels failed Clever scans and probe errors as errors on the run page', function () {
     $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'completed', 'report' => [
         'complexity_before' => ['status' => 'error', 'probes' => [], 'reason' => 'clever_scan_failed', 'detail' => 'The report directory is not writable.'],
@@ -261,7 +271,7 @@ it('returns workspace errors on the project graph without executing a task', fun
 it('keeps absent evidence distinct from zero measurements', function () {
     $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'running', 'report' => ['phase' => 'Reviewing complexity.']]);
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertSee('Reviewing complexity.')
-        ->assertSee('0 of 7 checks recorded.')->assertSee('Tests: Not recorded')->assertSee('No Clever measurements recorded.')->assertSee('No changed files recorded.');
+        ->assertSee('0 of 7 checks recorded.')->assertSee('Clever: before not run; after not run.')->assertSee('Tests: Not recorded')->assertSee('No Clever measurements recorded.')->assertSee('No changed files recorded.');
     $run->update(['status' => 'failed']);
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertDontSee('Run status: failed. Reviewing complexity.');
 });
