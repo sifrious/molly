@@ -25,6 +25,24 @@ class RestoreTaskBaseline
         chmod($path, 0600);
     }
 
+    /**
+     * Replace some files in the recorded baseline and keep the rest. Without
+     * a usable baseline this records nothing, so a retry still stops with
+     * BASELINE_MISSING or BASELINE_INVALID.
+     *
+     * @param  array<string, string|null>  $files
+     */
+    public function merge(Task $task, array $files): void
+    {
+        $path = $this->path($task);
+        $payload = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        if (! is_array($payload) || ($payload['task_id'] ?? null) !== $task->id || ! is_array($payload['files'] ?? null)) {
+            return;
+        }
+
+        $this->store($task, [...$payload['files'], ...$files]);
+    }
+
     public function handle(Task $task): void
     {
         $path = $this->path($task);

@@ -15,6 +15,7 @@ class LockProtectedTest
         private RecordLifecycleEvent $lifecycle,
         private RefreshProjectJournal $journal,
         private RecordRedBaseline $redBaseline,
+        private RestoreTaskBaseline $retryBaseline,
     ) {}
 
     /**
@@ -82,6 +83,9 @@ class LockProtectedTest
             'source' => $source,
         ]);
         $this->lifecycle->handle($task->workspace, LifecycleEventType::TestLocked, $task->id, $task->runs->last()?->id, $source['test_lock']);
+        // A retry restores this baseline. The one saved at creation predates the authored test,
+        // so restoring it would overwrite or delete the test that was just locked.
+        $this->retryBaseline->store($task, [...$workspace->read($paths), ...$workspace->readProtectedTest($task->test_path)]);
         $baseline = $this->redBaseline->record($task->fresh(), $check);
         $this->journal->handle($task->fresh());
 
@@ -146,6 +150,8 @@ class LockProtectedTest
             unset($source['test_lock']['red_baseline']);
             $task->update(['test_digest' => $current, 'source' => $source, 'status' => 'pending']);
             $this->lifecycle->handle($task->workspace, LifecycleEventType::TestLocked, $task->id, $task->runs->last()?->id, $source['test_lock']);
+            // Keep the recorded implementation files, so a retry still drops a failed attempt's edits.
+            $this->retryBaseline->merge($task, (new Workspace($task->workspace))->readProtectedTest($task->test_path));
         }
 
         $baseline = $this->redBaseline->handle($task->fresh());

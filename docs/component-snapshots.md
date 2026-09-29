@@ -34,7 +34,7 @@ A changed hash proves the file changed. It does not prove the screen looks diffe
 
 ## Optional previews
 
-To capture an image before and after, point Molly at a local renderer:
+To capture an image before and after, point Molly at a local renderer. Molly ships no renderer. `your-renderer` below stands for a command you provide that reads the HTML file at `{input}` and writes a PNG to `{output}`, such as a small headless-browser script:
 
 ```dotenv
 MOLLY_PREVIEW_COMMAND="your-renderer {input} {output}"

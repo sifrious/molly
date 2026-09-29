@@ -32,6 +32,7 @@ For a first run, read [Getting started](../getting-started.md) instead of this p
 | `--workspace=PATH` | `create`, `run`, `import` | Another checkout to work in. Defaults to the application. |
 | `--allow-test-edits` | `create`, `import` | Let this task write the required test. Use it for a test-authoring task only. |
 | `--name=NAME` | `create`, `import` | A nickname. |
+| `--todos` | `import` | Write one Pest todo per item under the issue's "Acceptance criteria" heading to the new test file. Needs `--allow-test-edits`. |
 
 `molly:run` always protects the required test and saves no nickname. To let a run write its test, or to name it, save it with `molly:create` and start it with `molly:start`.
 
@@ -113,6 +114,14 @@ php artisan molly:import https://github.com/OWNER/REPO/issues/123 \
 ```
 
 Needs a logged-in `gh`. Saves a pending task and writes nothing to GitHub.
+
+```bash
+php artisan molly:import https://github.com/OWNER/REPO/issues/123 \
+  --name=issue-123 --test=tests/Feature/ExampleTest.php --file=app/Example.php \
+  --allow-test-edits --todos
+```
+
+With `--todos`, Molly also writes the test file with one `->todo()` per acceptance criterion and saves a test-authoring task. It refuses an existing test file with `TODOS_TEST_EXISTS` and an issue without criteria with `ISSUE_CRITERIA_MISSING`. See [Acceptance criteria to Pest todos](../github-todos.md).
 
 ## Laravel knowledge
 

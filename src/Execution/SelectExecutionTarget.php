@@ -11,11 +11,15 @@ final class SelectExecutionTarget
 {
     public function __construct(private SandboxCapability $sandbox) {}
 
+    /**
+     * Remote Orb execution is not shipped. Every Orb request is refused,
+     * whatever target it names; Molly never dispatches remote work.
+     */
     public function handle(?ExecutionTargetRequest $request = null): ExecutionTargetSnapshot
     {
         $request ??= ExecutionTargetRequest::local('Local execution is the default.');
         if ($request->kind === ExecutionTargetKind::Orb) {
-            throw new RuntimeException('ORB_UNVERIFIED: An Amp thread or connected executor is not a verified Orb. Select local execution or supply a capability-checked Orb target.');
+            throw new RuntimeException('ORB_UNVERIFIED: This Molly release runs tasks only on the local machine. An Amp thread or connected executor is not a verified Orb. Select local execution.');
         }
 
         $snapshot = $this->sandbox->snapshot();

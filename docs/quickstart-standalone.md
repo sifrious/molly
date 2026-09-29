@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-dem
 MOLLY_CONSTRAINT='^0.2' bash molly-demo ~/molly-demo
 ```
 
-The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the current one.
+The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the 0.2 series. Until `v0.2.0` is tagged, that constraint does not resolve; [Release status](getting-started.md#release-status) says what to install until then.
 
 ## Install a prelaunch candidate
 

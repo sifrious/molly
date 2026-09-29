@@ -6,13 +6,55 @@ The documentation is plain Markdown under `docs/`, read on GitHub. There is no s
 
 ## Checks
 
-The Documentation workflow runs `bin/molly-docs-check` on every change to `README.md` or `docs/`. It follows every relative link to a file and every `#anchor` to a heading, using GitHub's heading slug rules. Run it locally before pushing:
+The Documentation workflow runs `bin/molly-docs-check` on every change to `README.md`, `docs/`, or the checker. It checks two things:
+
+- Every relative link resolves to a file, and every `#anchor` to a heading, using GitHub's heading slug rules.
+- Every page and heading in its `REQUIRED` list exists. The list maps each alpha tutorial requirement from MME-5211 to the page that meets it, such as `docs/github-todos.md#import-with-todos`. A missing entry prints `required doc missing:` with the requirement and fails the check.
+
+Run it locally before pushing:
 
 ```bash
 python3 bin/molly-docs-check
 ```
 
+It prints `Checked links in N Markdown files and 12 required alpha docs.` and exits `0`, or lists each problem and exits `1`.
+
+A requirement whose behavior has not shipped is also listed in `OPEN`, with the reason. The check prints each one as `open alpha requirement:` and still exits `0`, so documentation changes are not blocked by missing features. With `--release`, an open requirement fails the check:
+
+```bash
+python3 bin/molly-docs-check --release
+```
+
+Today one requirement is open: local and Orb execution targeting. Remote Orb execution is not shipped, and [The Orb requirement is open](execution-targets.md#the-orb-requirement-is-open) says what closes it. `--release` exits `1` with `Release blocked: 1 alpha requirement(s) open.` until that entry is resolved.
+
 `bin/molly-docs-walkthrough` regenerates the web interface screenshots under `docs/v0.1/walkthrough/` from a running application.
+
+## Release gates
+
+Missing required documentation and open alpha requirements block a release. Run the local gates from the package root on the release host:
+
+```bash
+bin/molly-release-gates
+```
+
+To run only the documentation gate, which needs no network and no Composer:
+
+```bash
+bin/molly-release-gates --docs
+```
+
+The script stops at the first failure and exits non-zero. In order, it runs:
+
+1. `python3 bin/molly-docs-check --release`, the documentation check above, including open requirements
+2. `composer validate --strict`
+3. `composer install --no-interaction --prefer-dist` from the lock file
+4. `composer audit --locked`, which needs network access to the advisory database
+5. The full package suite, `vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning`
+6. `composer archive` into a temporary directory, failing if `composer.lock` is inside the zip
+
+It ends with `ALL GATES PASSED on` and the PHP version, or with `DOCUMENTATION GATE PASSED` under `--docs`. While the Orb requirement is open, both stop at step 1. The documentation check cannot tell whether an example still runs. The tests that keep examples in step with fixtures do that: `tests/Feature/CustomAgentStepTest.php`, `tests/Feature/GitHubPestTodosTest.php`, and `tests/Feature/DocsExamplesTest.php`, all part of step 5. `tests/Feature/DocsCheckTest.php`, also in step 5, checks that `--release` fails exactly when a requirement is open.
+
+When a required tutorial is moved or renamed, update `REQUIRED` in `bin/molly-docs-check` in the same commit. Removing an entry from `REQUIRED` or `OPEN` drops a release requirement, so it needs the same review as dropping the feature. Remove an `OPEN` entry only when the behavior ships with its tutorial, or cite the recorded release-scope decision in the commit that removes it.
 
 ## Switching the public install line to v1
 

@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Check that every relative link and heading anchor in the Markdown docs resolves.
+"""Check that every relative link and heading anchor in the Markdown docs resolves,
+and that every required alpha documentation page and heading exists.
 
 The docs are plain Markdown read on GitHub. This walks README.md and docs/**/*.md,
 follows each relative link to a file, and checks fragments against the headings of
 the target file using GitHub's heading slug rules.
+
+With --release, it also fails while any alpha requirement in OPEN is unresolved.
+bin/molly-release-gates runs it that way.
 """
 import re
 import sys
@@ -15,6 +19,31 @@ FILES = [ROOT / 'README.md', *sorted((ROOT / 'docs').rglob('*.md'))]
 LINK = re.compile(r'(?<!\!)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)')
 HEADING = re.compile(r'^(#{1,6})\s+(.*?)\s*#*\s*$', re.M)
 FENCE = re.compile(r'```.*?```', re.S)
+
+# Alpha tutorial requirements from MME-5211. A release is blocked while any
+# of these pages or headings is missing.
+REQUIRED = {
+    'Install Molly in a fresh Laravel app': 'docs/getting-started.md#install-molly',
+    'Ollama QuickStart with molly:doctor': 'docs/ollama-quickstart.md',
+    'Run the first task': 'docs/getting-started.md#run-the-demo-task',
+    'Run a bounded parallel workflow': 'docs/tutorials.md#two-tasks-at-once',
+    'Customize a step with Laravel AI': 'docs/customize-steps.md#write-the-agent',
+    'Local and Orb execution targeting': 'docs/execution-targets.md#the-orb-requirement-is-open',
+    'Import a GitHub issue and generate Pest todos': 'docs/github-todos.md#import-with-todos',
+    'Pest verification and completion evidence': 'docs/verification.md',
+    'Before and after component change set': 'docs/tutorials.md#before-and-after-evidence-for-a-component',
+    'Free Flux and Livewire UI': 'docs/tutorials.md#the-web-interface-with-flux-and-livewire',
+    'Optional TypeSafe evaluation in a loop': 'docs/tutorials.md#jev-in-the-loop',
+    'Ownership of integrations': 'docs/overview.md#ownership-and-support',
+}
+
+# Alpha requirements whose documentation cannot be complete because the behavior
+# is not shipped. Each stays here until the behavior ships with a tutorial or a
+# recorded release-scope decision moves it out of the alpha.
+OPEN = {
+    'Local and Orb execution targeting': 'Remote Orb execution is not shipped and SelectExecutionTarget refuses Orb requests. '
+    'See docs/execution-targets.md#the-orb-requirement-is-open.',
+}
 
 
 def slug(text: str) -> str:
@@ -38,6 +67,7 @@ def headings(path: Path) -> set[str]:
 
 
 def main() -> int:
+    release = '--release' in sys.argv[1:]
     errors = []
     cache: dict[Path, set[str]] = {}
     for path in FILES:
@@ -55,10 +85,25 @@ def main() -> int:
                 ids = cache.setdefault(target, headings(target))
                 if unquote(parts.fragment) not in ids:
                     errors.append(f'{path.relative_to(ROOT)}: missing heading: {link}')
+    for requirement, location in REQUIRED.items():
+        page, _, anchor = location.partition('#')
+        target = ROOT / page
+        if not target.exists():
+            errors.append(f'required doc missing: {requirement}: {location}')
+        elif anchor and anchor not in cache.setdefault(target.resolve(), headings(target)):
+            errors.append(f'required doc missing: {requirement}: {location}')
+    for requirement, reason in OPEN.items():
+        if requirement not in REQUIRED:
+            errors.append(f'open requirement is not in REQUIRED: {requirement}')
     if errors:
         print('\n'.join(errors))
         return 1
-    print(f'Checked links in {len(FILES)} Markdown files.')
+    print(f'Checked links in {len(FILES)} Markdown files and {len(REQUIRED)} required alpha docs.')
+    for requirement, reason in OPEN.items():
+        print(f'open alpha requirement: {requirement}: {reason}')
+    if release and OPEN:
+        print(f'Release blocked: {len(OPEN)} alpha requirement(s) open.')
+        return 1
     return 0
 
 

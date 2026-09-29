@@ -64,7 +64,7 @@ Doctor never prints API keys or account secrets.
 
 Molly talks to Ollama through Laravel AI's Ollama provider. The default endpoint is `http://127.0.0.1:11434`; `localhost` and `[::1]` also count as local. Override it with `OLLAMA_URL` if Ollama listens elsewhere on the same machine.
 
-Molly refuses a non-loopback URL for this path. Pointing Molly at Ollama on another host or an Orb is planned work, described in [Execution targets](execution-targets.md), and is not a supported setting today.
+Molly refuses a non-loopback URL for this path. Pointing Molly at Ollama on another host or an Orb is not a supported setting. Remote execution is not shipped; see [Execution targets](execution-targets.md).
 
 ## Doctor codes
 

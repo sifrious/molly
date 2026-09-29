@@ -48,11 +48,16 @@ class GenerateChanges
         );
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * ChangeWriter::make() resolves through the container, so an application
+     * can bind a ChangeWriter subclass. validateProposal() still applies.
+     *
+     * @return array<string, mixed>
+     */
     private function acquireProposal(string $input): array
     {
         if (config('molly.agent', 'ollama') === 'amp') {
-            return $this->amp->prompt(new ChangeWriter, $input);
+            return $this->amp->prompt(ChangeWriter::make(), $input);
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {

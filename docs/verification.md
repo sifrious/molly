@@ -62,7 +62,7 @@ Any of these keeps the run from completing:
 | `tests_failed` | An assertion failed or a test errored. |
 | `no_tests` | Pest found no test in the required file. A file without `<?php` looks like this. |
 | `no_assertions` | A test ran but asserted nothing. |
-| `tests_skipped_or_incomplete` | A skipped or incomplete test is not passing evidence. |
+| `tests_skipped_or_incomplete` | A skipped or incomplete test, including a Pest `->todo()`, is not passing evidence. |
 | `test_timeout` | Pest ran longer than `molly.test_timeout` (120 seconds by default). |
 | `junit_missing` or `junit_invalid` | Molly cannot trust the report Pest produced. |
 | `false_green` | The report passed but did not name the required file. |
@@ -88,7 +88,7 @@ When you want Molly to write the test itself, create a separate task with `--all
 | Classification | Meaning |
 | --- | --- |
 | `missing_behavior` | Tests failed on assertions, missing routes, or missing application classes. The implementation may start. |
-| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, an unbound `TestCase`, a missing table without `RefreshDatabase`, zero tests, or no JUnit report. |
+| `bootstrap_error` | The test could not run: a parse or fatal error, a missing test framework class, an unbound `TestCase`, a missing table without `RefreshDatabase`, a todo, skipped, or incomplete test (even beside failing tests), zero tests, or no JUnit report. |
 | `already_passing` | The test passed before any implementation, so it proves nothing. |
 | `not_recorded` | Molly could not run the test, for example because another run held the workspace. |
 

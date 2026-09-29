@@ -27,13 +27,14 @@ The fresh-application job installs the checked-out package. It does not run a mo
 ## Installing Pest 4
 
 ```bash
-composer config allow-plugins.pestphp/pest-plugin true
-composer remove --dev phpunit/phpunit
-composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
-vendor/bin/pest --init
+composer remove --dev phpunit/phpunit --no-update
+composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+./vendor/bin/pest --init
 ```
 
-Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin. Skip it when `composer.json` does not list `phpunit/phpunit`.
+New Laravel 12 and 13 applications list `phpunit/phpunit` (12 pins PHPUnit 11, and Pest 4 needs PHPUnit 12), so the first line removes it without resolving, and `-W` lets the second line resolve Pest and PHPUnit together. These applications already allow the `pestphp/pest-plugin` Composer plugin; an older application may need `composer config allow-plugins.pestphp/pest-plugin true` first. `./vendor/bin/pest --init` writes `tests/Pest.php`.
+
+This sequence was run on fresh Laravel 12.69.2 and 13.33.0 applications with PHP 8.4.23 and Composer 2.10.2. It installed Pest 4.7.8 and PHPUnit 12.5.33, and both example tests passed.
 
 ## The sandbox
 
