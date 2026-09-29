@@ -93,6 +93,20 @@ arch('journal rendering stays free of filesystem and Eloquent access')
         'Livewire',
     ]);
 
+arch('model fit decisions do not depend on transport, agents, or presentation')
+    ->expect('Sifrious\Molly\ModelFit')
+    ->not->toUse([
+        'Sifrious\Molly\Actions',
+        'Sifrious\Molly\Agents',
+        'Sifrious\Molly\Console',
+        'Sifrious\Molly\Http',
+        'Sifrious\Molly\Livewire',
+        'Illuminate\Support\Facades\Http',
+        'Illuminate\Support\Facades\Process',
+        'Laravel\Prompts',
+        'Livewire',
+    ]);
+
 arch('console transport does not own run completion decisions')
     ->expect('Sifrious\Molly\Console')
     ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
