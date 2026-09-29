@@ -241,6 +241,18 @@ MOLLY_UI_ENABLED=true
 
 Then `php artisan config:clear`. For runs started from the browser, make sure a worker is running and look at `php artisan queue:failed`. Artisan starts need no worker.
 
+## The port is already in use
+
+Molly binds no port. The web interface is served by your application: `php artisan serve`, Herd, or your own web server. `molly:worker` runs `queue:work`, and `php artisan mcp:start molly` talks over standard input and output.
+
+`php artisan serve` without `--port` starts at 8000. For each port that is taken it prints `Failed to listen on 127.0.0.1:8000 (reason: Address already in use)`, tries the next one, for up to 10 more ports (`--tries`), and then prints the address it is using, such as `http://127.0.0.1:8001`. Open `/molly` at that address.
+
+With `--port`, or with `SERVER_PORT` set in `.env` or the environment, `serve` uses only that port. When the port is taken, it prints the same `Failed to listen` line and exits with status 1. Choose another port, or find the program that holds it:
+
+```bash
+lsof -nP -iTCP:8000 -sTCP:LISTEN
+```
+
 ## Workspace changed during a run
 
 `WORKSPACE_CHANGED` means a selected file no longer matched what Molly expected. Avoid editing selected files while a run is active. A failed verification does not restore the applied proposal; check `git diff` before retrying.
