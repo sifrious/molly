@@ -67,6 +67,7 @@ use Sifrious\Molly\Knowledge\LaravelQueueGraph;
 use Sifrious\Molly\Knowledge\LaravelRoutingGraph;
 use Sifrious\Molly\Knowledge\LaravelTestingGraph;
 use Sifrious\Molly\Knowledge\LaravelValidationGraph;
+use Sifrious\Molly\Livewire\ChangeImpact;
 use Sifrious\Molly\Livewire\RunStatus;
 use Sifrious\Molly\Mcp\MollyServer;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
@@ -121,6 +122,7 @@ class MollyServiceProvider extends ServiceProvider
     {
         if ($this->app->bound('livewire.finder')) {
             Livewire::component('molly-run-status', RunStatus::class);
+            Livewire::component('molly-change-impact', ChangeImpact::class);
         }
     }
 

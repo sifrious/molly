@@ -22,6 +22,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 | [Journals and decisions](journal.md) | You want Markdown views of tasks or a committed decision record. |
 | [Inspecting tasks and runs](inspection.md) | You want to follow a task to its runs and conversations. |
 | [Component snapshots](component-snapshots.md) | You want before-and-after evidence for views and components. |
+| [Change impact](change-impact.md) | You want a graph-backed overlay of what changed and what it affects. |
 | [Amp thread links](connections.md) | You want to tie a task to an Amp conversation. |
 | [Settings](settings.md) | You want global defaults across projects. |
 | [Compatibility](compatibility.md) | You want the tested PHP, Laravel, and Pest versions. |

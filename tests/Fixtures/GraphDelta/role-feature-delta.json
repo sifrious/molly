@@ -1,0 +1,105 @@
+{
+    "version": "graph-delta-view-1",
+    "provenance": {
+        "pack_hash": "abc123def456",
+        "package": "sifrious/molly",
+        "exact_version": "0.1.2",
+        "repository_revision": "a1b2c3d4e5f6",
+        "documentation_revision": null
+    },
+    "sections": {
+        "changed_directly": [
+            {
+                "id": "node-user-model",
+                "type": "model",
+                "key": "App\\Models\\User",
+                "change": "changed",
+                "fields": {
+                    "fillable": ["name", "email", "role"],
+                    "before": {"fillable": ["name", "email"]},
+                    "after": {"fillable": ["name", "email", "role"]}
+                },
+                "freshness": "current",
+                "verification": "verified",
+                "source_path": "app/Models/User.php",
+                "source_url": null
+            },
+            {
+                "id": "node-role-migration",
+                "type": "migration",
+                "key": "2026_09_01_add_role_to_users",
+                "change": "added",
+                "fields": {
+                    "columns": ["role"]
+                },
+                "freshness": "current",
+                "verification": "verified",
+                "source_path": "database/migrations/2026_09_01_000000_add_role_to_users.php",
+                "source_url": null
+            }
+        ],
+        "affected_context": [
+            {
+                "id": "node-auth-middleware",
+                "type": "middleware",
+                "key": "App\\Http\\Middleware\\CheckRole",
+                "change": "changed",
+                "fields": {
+                    "reason": "reads User::role which was added"
+                },
+                "freshness": "stale",
+                "verification": "review_required",
+                "source_path": "app/Http/Middleware/CheckRole.php",
+                "source_url": null
+            }
+        ],
+        "tests_contracts": [
+            {
+                "id": "node-user-test",
+                "type": "test",
+                "key": "tests/Feature/UserRoleTest.php",
+                "change": "added",
+                "fields": {
+                    "assertions": 4,
+                    "covers": ["App\\Models\\User"]
+                },
+                "freshness": "current",
+                "verification": "verified",
+                "source_path": "tests/Feature/UserRoleTest.php",
+                "source_url": null
+            }
+        ],
+        "unknown_impact": [
+            {
+                "id": "node-notification-service",
+                "type": "service",
+                "key": "App\\Services\\NotificationService",
+                "change": "changed",
+                "fields": {
+                    "reason": "references User but relationship to role is unproven"
+                },
+                "freshness": "unknown",
+                "verification": "unresolved",
+                "source_path": "app/Services/NotificationService.php",
+                "source_url": null
+            }
+        ],
+        "visual_changes": [
+            {
+                "id": "node-profile-blade",
+                "type": "blade",
+                "key": "resources/views/profile/show.blade.php",
+                "change": "changed",
+                "fields": {
+                    "reason": "displays User attributes including new role field"
+                },
+                "freshness": "partially_updated",
+                "verification": "review_required",
+                "source_path": "resources/views/profile/show.blade.php",
+                "source_url": null
+            }
+        ]
+    },
+    "before_revision": "a1b2c3d4e5f6",
+    "after_revision": "f6e5d4c3b2a1"
+}
