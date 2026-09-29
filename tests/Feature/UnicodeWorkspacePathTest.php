@@ -121,7 +121,7 @@ it('initializes, creates, runs, shows, journals, and hands off a task in a path 
         ->and($project['journal_path'])->toBe($workspace.'/.molly/JOURNAL.md')
         ->and(File::exists($project['journal_path']))->toBeTrue();
 
-    [$exit, $handoff] = unicodeJson('molly:handoff', ['task' => 'greeting', '--from' => (string) Str::uuid(), '--to' => (string) Str::uuid()]);
+    [$exit, $handoff] = unicodeJson('molly:handoff', ['task' => 'greeting', '--from' => (string) Str::uuid(), '--to' => (string) Str::uuid(), '--approve' => true]);
     expect($exit)->toBe(0)
         ->and($handoff['allowed_paths'])->toBe(['app/Greeting.php'])
         ->and($handoff['prior_diagnostics'])->toContain('pest:passed');

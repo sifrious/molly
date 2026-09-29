@@ -38,7 +38,7 @@ class ReviewChanges
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            return $this->ollama->prompt(new TarpitReviewer, $input);
+            return $this->ollama->prompt(TarpitReviewer::make(), $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');

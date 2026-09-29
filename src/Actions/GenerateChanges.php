@@ -61,7 +61,7 @@ class GenerateChanges
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            return $this->ollama->prompt(new ChangeWriter, $input);
+            return $this->ollama->prompt(ChangeWriter::make(), $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');
