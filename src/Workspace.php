@@ -296,6 +296,7 @@ class Workspace
         if ($this->read(array_keys($before)) !== $before) {
             throw new RuntimeException('WORKSPACE_CHANGED: A selected file changed while the agent was working. No proposal was applied.');
         }
+        $this->assertWritable(array_column($edits, 'path'));
 
         $attempted = [];
         try {
@@ -316,8 +317,47 @@ class Workspace
             if ($failed !== []) {
                 throw new RuntimeException('WORKSPACE_ROLLBACK_FAILED: Review these files before continuing: '.implode(', ', $failed), 0, $exception);
             }
-            throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly could not apply the proposal. Original file contents were restored.', 0, $exception);
+            throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly could not write '.end($attempted).' ('.Directory::reason($exception->getMessage()).'). Original file contents were restored.', 0, $exception);
         }
+    }
+
+    /**
+     * Refuse the write before anything changes when this user cannot write a selected file
+     * or the directory that holds it. File::replace writes a temporary file beside the target
+     * and renames it over the target, so without this check a read-only file in a writable
+     * directory would be replaced, and a failed write could leave the temporary file behind.
+     * The message names the path relative to the workspace and the reason the system gave.
+     *
+     * @param  list<string>  $paths
+     */
+    public function assertWritable(array $paths): void
+    {
+        foreach ($paths as $path) {
+            $absolute = $this->resolve($path);
+            $directory = dirname($absolute);
+            while (! file_exists($directory) && $directory !== $this->path) {
+                $directory = dirname($directory);
+            }
+            if (is_file($absolute) && ($reason = $this->writeBlocker($absolute)) !== null) {
+                throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly cannot write '.$path.' ('.$reason.'). No files were changed. Make '.$path.' writable by this user, then retry the task.');
+            }
+            if (($reason = $this->writeBlocker($directory)) !== null) {
+                $named = $directory === $this->path ? $this->path : substr($directory, strlen($this->path) + 1);
+                throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly cannot write '.$path.' because it cannot write the directory '.$named.' ('.$reason.'). No files were changed. Make '.$named.' writable by this user, then retry the task.');
+            }
+        }
+    }
+
+    /** The reason the system gives for refusing this user a write to $path, or null. */
+    private function writeBlocker(string $path): ?string
+    {
+        if (function_exists('posix_access')) {
+            $mode = is_dir($path) ? POSIX_W_OK | POSIX_X_OK : POSIX_W_OK;
+
+            return posix_access($path, $mode) ? null : posix_strerror(posix_get_last_error());
+        }
+
+        return is_writable($path) ? null : 'not writable by this user';
     }
 
     /**

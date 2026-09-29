@@ -47,7 +47,16 @@ final class Directory
             restore_error_handler();
         }
 
-        return [$result, trim((string) preg_replace('/\A[a-z_]+\(.*\): (?:Failed to open stream: )?/s', '', $error))];
+        return [$result, self::reason($error)];
+    }
+
+    /**
+     * The reason in a PHP filesystem warning, such as "Permission denied", without the
+     * function name and path that start it. Other messages are returned trimmed.
+     */
+    public static function reason(string $message): string
+    {
+        return trim((string) preg_replace('/\A[a-z_]+\(.*\): (?:Failed to open stream: )?/s', '', $message));
     }
 
     /**

@@ -60,6 +60,9 @@ On a full disk or a read-only path, commands fail with a code, the path they cou
 | `JOURNAL_WRITE_FAILED` | `.molly/JOURNAL.md`, `.molly/GLOSSARY.md`, or a file in `.molly/journal`. `molly:journal --project --json` keeps its `status: unavailable` document on stdout and prints the coded line on stderr. |
 | `KNOWLEDGE_MANIFEST_UNWRITABLE` | `.molly/graphs/manifest.json`, from `molly:graphs-bootstrap`. A missing `.molly/graphs` directory fails with `DIRECTORY_UNWRITABLE`. |
 | `SETTINGS_UNWRITABLE` | `settings.json` in `MOLLY_HOME`, from `molly:settings-set`. The file is left unchanged. |
+| `WORKSPACE_WRITE_FAILED` | A selected file, or the directory that holds it, when a run applies the proposal. The path is relative to the workspace. |
+
+Before a run applies the model's proposal, Molly checks that you can write every selected file and the directory that holds it. When one is read-only, the run fails with a message such as `WORKSPACE_WRITE_FAILED: Molly cannot write app/Greeting.php (Permission denied). No files were changed.`, and nothing in the workspace changes. When a write fails partway, for example on a full disk, the message names the file that failed and the reason, and Molly restores the files it had already written. Make the file or directory writable, then run `molly:retry TASK`.
 
 ## Not a Git repository
 
