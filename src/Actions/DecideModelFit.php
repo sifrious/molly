@@ -153,7 +153,8 @@ class DecideModelFit
         $runtime = $catalogue->runtimes()[0] ?? ['minimum_os_version' => '?'];
 
         return match ($selected->status) {
-            ModelFitStatus::RecommendedFit => $selected->modelId.' fits this Mac and leaves '.InstallationHeadroom::gigabytes($headroom->memoryBytes).' of memory headroom.',
+            ModelFitStatus::RecommendedFit => $selected->modelId.' fits this Mac and leaves '.InstallationHeadroom::gigabytes($headroom->memoryBytes).' of memory headroom.'
+                .(in_array('memory_held_by_loaded_model', $selected->constraints, true) ? ' Memory pressure is warning, but Ollama already holds '.$selected->modelId.', and the memory it holds counts as available to it.' : ''),
             ModelFitStatus::MinimumFit => $selected->modelId.' meets its minimum requirements on this Mac, with constraints: '.implode(', ', $selected->constraints).'.',
             ModelFitStatus::AlreadyInstalled => $selected->modelId.' is installed with the approved digest and passed Molly\'s readiness check on this runtime.',
             ModelFitStatus::NoFit => self::NO_FIT_MESSAGE,

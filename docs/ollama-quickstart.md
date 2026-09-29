@@ -28,19 +28,19 @@ curl -s http://127.0.0.1:11434/api/tags
 
 | Status | Meaning |
 | --- | --- |
-| `recommended_fit` | The model fits and leaves `molly.memory.headroom_gb` of memory for macOS, Bloom, and Molly. |
+| `recommended_fit` | The model fits and leaves `molly.memory.headroom_gb` of memory for macOS, Bloom, and Molly. With `memory_held_by_loaded_model`, Ollama already holds the model under warning memory pressure. |
 | `minimum_fit` | The model meets its minimum requirements. The decision lists the constraints, such as `memory_headroom_below_budget`, `memory_pressure_warning`, or `process_translated`. |
 | `already_installed` | Ollama lists the approved artifact with the approved digest, and it passed Molly's readiness check on the pinned runtime. |
 | `no_fit` | The message is `No supported local Ollama configuration fits this Mac.` The decision lists what Molly measured, what each model needs, and the reason codes. |
 | `unsupported` | This is not an Apple silicon Mac running macOS 14.0 or later. The reason is `platform_unsupported:intel`, `platform_unsupported:linux`, or `os_version_unsupported`. |
 | `unknown` | Molly could not measure a fact the decision needs, and the reasons name it. Unknown is not a finding that the Mac is incompatible. Molly downloads nothing until the fact is measured. |
 
-Molly selects the largest approved model that fits with headroom. When none does, it selects the smallest model that meets its minimum. A 96 GB Mac Studio gets `gpt-oss:120b-code`, a 24 GB Mac gets `gpt-oss:20b`, a 16 GB Mac gets `gpt-oss:20b` as a `minimum_fit`, and an 8 GB Mac has no fit.
+Molly selects the largest approved model that fits with headroom. When none does, it selects the smallest model that meets its minimum. A 96 GB Mac Studio gets `gpt-oss:120b-code`, including when Ollama already holds that model and macOS reports warning pressure, a 24 GB Mac gets `gpt-oss:20b`, a 16 GB Mac gets `gpt-oss:20b` as a `minimum_fit`, and an 8 GB Mac has no fit.
 
 The decision applies these rules:
 
 - A model meets its minimum when total memory is at least the catalogue's minimum: 16 GiB for `gpt-oss:20b` and 96 GiB for `gpt-oss:120b-code`. It fits with headroom when total memory is at least its size plus `molly.memory.headroom_gb`, and at least the catalogue's recommended memory. A run uses the same headroom rule against available memory before Ollama loads a model; see [Memory](reference/configuration.md#memory).
-- A `warning` or `critical` memory pressure level downgrades a recommended fit to `minimum_fit`, so a Mac under pressure gets the smaller model. Under `critical` pressure Molly also refuses to install. Pressure is a reading from the moment preflight ran, so the selection can change with load; `molly:install-model MODEL` still installs any approved model that fits.
+- A `warning` or `critical` memory pressure level downgrades a recommended fit to `minimum_fit`, so a Mac under pressure gets the smaller model. One case is different: under `warning` pressure, a model Ollama already holds in memory, with the approved digest, keeps its fit when the available memory plus the memory Ollama holds for it covers its size and `molly.memory.headroom_gb`. Using that model needs no new memory, which is how `molly:doctor` (`model_loaded`) and a run treat it too, and the pressure may come from the model itself. The decision still lists `memory_pressure_warning` and adds `memory_held_by_loaded_model`. A model Ollama does not hold, or one whose available memory is unknown, is still downgraded. Under `critical` pressure every model is downgraded, and Molly also refuses to install. Pressure is a reading from the moment preflight ran, so the selection can change with load; `molly:install-model MODEL` still installs any approved model that fits.
 - When PHP runs under Rosetta translation, `uname -m` reports `x86_64`. Molly reads `hw.optional.arm64` first, so it does not mistake an Apple silicon Mac for an Intel Mac, and it downgrades the fit to `minimum_fit` with `process_translated`, because an Ollama started from the same shell may run translated too.
 - A download must leave 15% of the destination volume free, the models directory must be writable, and its volume must be mounted. A model that is already installed needs no disk space.
 

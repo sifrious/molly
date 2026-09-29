@@ -14,6 +14,7 @@ final readonly class MachineFacts
 {
     /**
      * @param  list<array{name: string, digest: string, size_bytes: int|null}>|null  $installedModels
+     * @param  list<array{name: string, digest: string, size_bytes: int|null}>|null  $loadedModels  the models Ollama holds in memory
      */
     public function __construct(
         public string $snapshotSha256,
@@ -38,6 +39,8 @@ final readonly class MachineFacts
         public ?int $totalDiskBytes,
         public ?string $volumeName,
         public ?string $mountPoint,
+        public ?int $availableMemoryBytes = null,
+        public ?array $loadedModels = null,
     ) {
         if ($totalMemoryBytes !== null && $totalMemoryBytes < 1) {
             throw new InvalidArgumentException('Total memory must be positive when it is known.');
@@ -77,8 +80,7 @@ final readonly class MachineFacts
             };
         };
 
-        $models = $value('ollama', 'installed_models', 'list');
-        $installed = $models === null ? null : array_values(array_filter(array_map(
+        $models = static fn (?array $models): ?array => $models === null ? null : array_values(array_filter(array_map(
             fn (mixed $model): ?array => is_array($model) && is_string($model['name'] ?? null) && is_string($model['digest'] ?? null)
                 ? ['name' => $model['name'], 'digest' => strtolower($model['digest']), 'size_bytes' => is_int($model['size_bytes'] ?? null) ? $model['size_bytes'] : null]
                 : null,
@@ -100,7 +102,7 @@ final readonly class MachineFacts
             metalAvailable: $value('acceleration', 'metal_available', 'bool'),
             runtimeCliVersion: $value('ollama', 'cli_version', 'string'),
             runtimeApiVersion: $value('ollama', 'api_version', 'string'),
-            installedModels: $installed,
+            installedModels: $models($value('ollama', 'installed_models', 'list')),
             destination: $value('disk', 'destination', 'string'),
             volumeMissing: $value('disk', 'volume_missing', 'bool'),
             destinationWritable: $value('disk', 'writable', 'bool'),
@@ -108,6 +110,8 @@ final readonly class MachineFacts
             totalDiskBytes: $value('disk', 'total_bytes', 'int'),
             volumeName: $value('disk', 'volume_name', 'string'),
             mountPoint: $value('disk', 'mount_point', 'string'),
+            availableMemoryBytes: $value('memory', 'available_bytes', 'int'),
+            loadedModels: $models($value('ollama', 'loaded_models', 'list')),
         );
     }
 
@@ -125,6 +129,21 @@ final readonly class MachineFacts
             $this->architecture === 'x86_64' && $this->translated === false => false,
             default => null,
         };
+    }
+
+    /**
+     * The bytes Ollama holds in memory for this exact model, matched by name and digest,
+     * or null when it is not loaded, its size is unknown, or Molly could not read the list.
+     */
+    public function loadedBytes(string $name, string $digest): ?int
+    {
+        foreach ($this->loadedModels ?? [] as $model) {
+            if ($model['name'] === $name && hash_equals(strtolower($digest), $model['digest'])) {
+                return $model['size_bytes'];
+            }
+        }
+
+        return null;
     }
 
     /**

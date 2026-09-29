@@ -1,0 +1,270 @@
+{
+    "simulated": true,
+    "scenario": "m3-ultra-96gb-120b-code-loaded",
+    "label": "Mac Studio M3 Ultra, 96 GB, under warning memory pressure with gpt-oss:120b-code already loaded, as measured by the RC10 acceptance preflight on 2026-09-29",
+    "commands": {
+        "uname -s": {
+            "exit": 0,
+            "stdout": "Darwin\n",
+            "stderr": ""
+        },
+        "uname -m": {
+            "exit": 0,
+            "stdout": "arm64\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.optional.arm64": {
+            "exit": 0,
+            "stdout": "1\n",
+            "stderr": ""
+        },
+        "sysctl -n sysctl.proc_translated": {
+            "exit": 0,
+            "stdout": "0\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.model": {
+            "exit": 0,
+            "stdout": "Mac15,14\n",
+            "stderr": ""
+        },
+        "sysctl -n machdep.cpu.brand_string": {
+            "exit": 0,
+            "stdout": "Apple M3 Ultra\n",
+            "stderr": ""
+        },
+        "sw_vers": {
+            "exit": 0,
+            "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A428\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.memsize": {
+            "exit": 0,
+            "stdout": "103079215104\n",
+            "stderr": ""
+        },
+        "sysctl -n hw.pagesize": {
+            "exit": 0,
+            "stdout": "16384\n",
+            "stderr": ""
+        },
+        "vm_stat": {
+            "exit": 0,
+            "stdout": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 7441.\nPages active: 1420302.\nPages inactive: 1419385.\nPages speculative: 2031.\nPages throttled: 0.\nPages wired down: 524365.\nPages purgeable: 163435.\n\"Translation faults\": 12775840826.\nPages copy-on-write: 992702846.\nPages zero filled: 5508887502.\nPages reactivated: 78532143.\nPages purged: 107699300.\nFile-backed pages: 984393.\nAnonymous pages: 1857325.\nPages stored in compressor: 3546096.\nPages occupied by compressor: 2864459.\nDecompressions: 43146134.\nCompressions: 77616687.\nPageins: 156675036.\nPageouts: 108669.\nSwapins: 3260353.\nSwapouts: 7920926.\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_level": {
+            "exit": 0,
+            "stdout": "45\n",
+            "stderr": ""
+        },
+        "sysctl -n kern.memorystatus_vm_pressure_level": {
+            "exit": 0,
+            "stdout": "2\n",
+            "stderr": ""
+        },
+        "system_profiler SPDisplaysDataType -json": {
+            "exit": 0,
+            "stdout": "{\n    \"SPDisplaysDataType\": [\n        {\n            \"_name\": \"Apple M3 Ultra\",\n            \"spdisplays_mtlgpufamilysupport\": \"spdisplays_metal4\",\n            \"spdisplays_vendor\": \"sppci_vendor_Apple\",\n            \"sppci_bus\": \"spdisplays_builtin\",\n            \"sppci_cores\": \"60\",\n            \"sppci_device_type\": \"spdisplays_gpu\",\n            \"sppci_model\": \"Apple M3 Ultra\"\n        }\n    ]\n}\n",
+            "stderr": ""
+        },
+        "command -v ollama": {
+            "exit": 0,
+            "stdout": "/opt/homebrew/bin/ollama\n",
+            "stderr": ""
+        },
+        "'/opt/homebrew/bin/ollama' --version": {
+            "exit": 0,
+            "stdout": "ollama version is 0.34.4\n",
+            "stderr": ""
+        },
+        "df -kP *": {
+            "exit": 0,
+            "stdout": "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s5 971350180 505763748 465586432 52% /System/Volumes/Data\n",
+            "stderr": ""
+        },
+        "diskutil info -plist *": {
+            "exit": 0,
+            "stdout": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>FilesystemType</key>\n\t<string>apfs</string>\n\t<key>FilesystemName</key>\n\t<string>APFS</string>\n\t<key>VolumeName</key>\n\t<string>Data</string>\n\t<key>Internal</key>\n\t<true/>\n\t<key>RemovableMediaOrExternalDevice</key>\n\t<false/>\n\t<key>Removable</key>\n\t<false/>\n\t<key>Ejectable</key>\n\t<false/>\n\t<key>MountPoint</key>\n\t<string>/System/Volumes/Data</string>\n</dict>\n</plist>\n",
+            "stderr": ""
+        }
+    },
+    "http": {
+        "/api/version": {
+            "status": 200,
+            "json": {
+                "version": "0.34.4"
+            }
+        },
+        "/api/tags": {
+            "status": 200,
+            "json": {
+                "models": [
+                    {
+                        "name": "gpt-oss:20b",
+                        "model": "gpt-oss:20b",
+                        "modified_at": "2026-09-24T12:48:58.704798553-04:00",
+                        "size": 13793441244,
+                        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+                        "details": {
+                            "parent_model": "",
+                            "format": "gguf",
+                            "family": "gptoss",
+                            "families": [
+                                "gptoss"
+                            ],
+                            "parameter_size": "20.9B",
+                            "quantization_level": "MXFP4",
+                            "context_length": 131072,
+                            "embedding_length": 2880
+                        },
+                        "capabilities": [
+                            "completion",
+                            "tools",
+                            "thinking"
+                        ]
+                    },
+                    {
+                        "name": "qwen2.5-coder:7b",
+                        "model": "qwen2.5-coder:7b",
+                        "modified_at": "2026-09-20T17:36:38.775179406-04:00",
+                        "size": 4683087561,
+                        "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+                        "details": {
+                            "parent_model": "",
+                            "format": "gguf",
+                            "family": "qwen2",
+                            "families": [
+                                "qwen2"
+                            ],
+                            "parameter_size": "7.6B",
+                            "quantization_level": "Q4_K_M",
+                            "context_length": 32768,
+                            "embedding_length": 3584
+                        },
+                        "capabilities": [
+                            "completion",
+                            "tools",
+                            "insert"
+                        ]
+                    },
+                    {
+                        "name": "gpt-oss:120b-code",
+                        "model": "gpt-oss:120b-code",
+                        "modified_at": "2026-09-06T21:08:56.193592499-04:00",
+                        "size": 65369818623,
+                        "digest": "4dda6ee4a98ead297f4cdeae389ecdc1963ed4cad90b10c8a11e1cc2a7b0fcaf",
+                        "details": {
+                            "parent_model": "gpt-oss:120b",
+                            "format": "gguf",
+                            "family": "gptoss",
+                            "families": [
+                                "gptoss"
+                            ],
+                            "parameter_size": "116.8B",
+                            "quantization_level": "unknown",
+                            "context_length": 131072,
+                            "embedding_length": 2880
+                        },
+                        "capabilities": [
+                            "completion",
+                            "tools",
+                            "thinking"
+                        ]
+                    },
+                    {
+                        "name": "gpt-oss:120b",
+                        "model": "gpt-oss:120b",
+                        "modified_at": "2026-08-29T17:06:41.951672977-04:00",
+                        "size": 65369818941,
+                        "digest": "a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9",
+                        "details": {
+                            "parent_model": "",
+                            "format": "gguf",
+                            "family": "gptoss",
+                            "families": [
+                                "gptoss"
+                            ],
+                            "parameter_size": "116.8B",
+                            "quantization_level": "MXFP4",
+                            "context_length": 131072,
+                            "embedding_length": 2880
+                        },
+                        "capabilities": [
+                            "completion",
+                            "tools",
+                            "thinking"
+                        ]
+                    }
+                ]
+            }
+        },
+        "/api/ps": {
+            "status": 200,
+            "json": {
+                "models": [
+                    {
+                        "name": "gpt-oss:120b-code",
+                        "model": "gpt-oss:120b-code",
+                        "size": 64485704334,
+                        "digest": "4dda6ee4a98ead297f4cdeae389ecdc1963ed4cad90b10c8a11e1cc2a7b0fcaf",
+                        "details": {
+                            "parent_model": "",
+                            "format": "gguf",
+                            "family": "gptoss",
+                            "families": [
+                                "gptoss"
+                            ],
+                            "parameter_size": "116.8B",
+                            "quantization_level": "unknown"
+                        },
+                        "expires_at": "2319-01-08T18:28:08.179986807-05:00",
+                        "size_vram": 64485704334,
+                        "context_length": 65536
+                    }
+                ]
+            }
+        }
+    },
+    "expect": {
+        "platform.macos": true,
+        "platform.architecture": "arm64",
+        "platform.arm64_capable": true,
+        "platform.translated": false,
+        "platform.model_identifier": "Mac15,14",
+        "platform.cpu_brand": "Apple M3 Ultra",
+        "platform.os_version": "27.0",
+        "memory.total_bytes": 103079215104,
+        "memory.page_size_bytes": 16384,
+        "memory.available_bytes": 23410393088,
+        "memory.compressed_bytes": 46931296256,
+        "memory.free_percentage": 45,
+        "memory.pressure_level": "warning",
+        "acceleration.metal_available": true,
+        "acceleration.metal_support": "metal4",
+        "acceleration.gpu_cores": 60,
+        "acceleration.gpu_vendor": "Apple",
+        "ollama.binary_path": "/opt/homebrew/bin/ollama",
+        "ollama.cli_version": "0.34.4",
+        "ollama.api_version": "0.34.4",
+        "disk.free_bytes": 476760506368,
+        "disk.mount_point": "/System/Volumes/Data",
+        "disk.filesystem": "apfs",
+        "disk.external": false,
+        "disk.removable": false,
+        "disk.volume_missing": false
+    },
+    "expect_models": {
+        "installed": [
+            "gpt-oss:120b",
+            "gpt-oss:120b-code",
+            "gpt-oss:20b",
+            "qwen2.5-coder:7b"
+        ],
+        "loaded": [
+            "gpt-oss:120b-code"
+        ]
+    },
+    "expect_unknown": [],
+    "destination": "{workspace}"
+}

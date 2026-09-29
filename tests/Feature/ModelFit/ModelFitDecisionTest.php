@@ -182,6 +182,62 @@ it('downgrades a recommended fit under warning memory pressure', function () {
         ->and($decision['install_allowed'])->toBeTrue();
 });
 
+/** Ollama's /api/ps response holding these models, each as [name, digest, bytes in memory]. */
+function psResponse(array $models): array
+{
+    return ['status' => 200, 'json' => ['models' => array_map(fn (array $model): array => ['name' => $model[0], 'model' => $model[0], 'digest' => $model[1], 'size' => $model[2], 'size_vram' => $model[2]], $models)]];
+}
+
+it('keeps the loaded gpt-oss:120b-code on the RC10 Mac Studio under warning pressure, as doctor does', function () {
+    // RC10 measured 23.4 GB available and warning pressure while Ollama held 64.5 GB for gpt-oss:120b-code.
+    [$snapshot, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded');
+
+    expect($snapshot['facts']['memory']['pressure_level']['value'])->toBe('warning')
+        ->and($decision['status'])->toBe('recommended_fit')
+        ->and($decision['model_selection']['model'])->toBe('gpt-oss:120b-code')
+        ->and($decision['constraints'])->toBe(['memory_pressure_warning', 'memory_held_by_loaded_model'])
+        ->and($decision['message'])->toBe('gpt-oss:120b-code fits this Mac and leaves 11 GB of memory headroom. Memory pressure is warning, but Ollama already holds gpt-oss:120b-code, and the memory it holds counts as available to it.')
+        ->and($decision['measured']['available_memory_bytes'])->toBe(23410393088)
+        // gpt-oss:20b is not loaded, so the warning still lowers it.
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['fit'])->toBe('minimum_fit')
+        ->and(fitCandidate($decision, 'gpt-oss:20b')['constraints'])->toBe(['memory_pressure_warning'])
+        ->and(app(LocalOllama::class)->memory('gpt-oss:120b-code')['status'])->toBe('loaded');
+});
+
+it('still lowers gpt-oss:120b-code under warning pressure when Ollama does not hold it', function () {
+    [, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded', http: ['/api/ps' => psResponse([])]);
+
+    expect($decision['status'])->toBe('minimum_fit')
+        ->and($decision['model_selection']['model'])->toBe('gpt-oss:20b')
+        ->and(fitCandidate($decision, 'gpt-oss:120b-code')['fit'])->toBe('minimum_fit')
+        ->and(fitCandidate($decision, 'gpt-oss:120b-code')['constraints'])->toBe(['memory_pressure_warning']);
+});
+
+it('counts the memory a loaded model holds only for that exact model, and only under warning pressure', function (array $commands, array $loaded, string $fit) {
+    [, $decision] = decideFixture('m3-ultra-96gb-120b-code-loaded', $commands, ['/api/ps' => psResponse($loaded)]);
+
+    expect(fitCandidate($decision, 'gpt-oss:120b-code')['fit'])->toBe($fit);
+})->with([
+    // 65.4 GB model plus 11 GB headroom is 76.4 GB; 23.4 GB available plus 64.5 GB held covers it.
+    'held with enough memory' => [[], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'recommended_fit'],
+    'held, but available plus held is short' => [['vm_stat' => vmStatWithFreePages(intdiv(76_369_818_623 - 64_485_704_334 - 1, 16384))], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+    'held, exactly enough' => [['vm_stat' => vmStatWithFreePages(intdiv(76_369_818_623 - 64_485_704_334, 16384) + 1)], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'recommended_fit'],
+    'another model held' => [[], [['gpt-oss:120b', 'a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9', 64485704334]], 'minimum_fit'],
+    'same name, another digest' => [[], [['gpt-oss:120b-code', str_repeat('0', 64), 64485704334]], 'minimum_fit'],
+    'critical pressure' => [['sysctl -n kern.memorystatus_vm_pressure_level' => commandOutput("4\n")], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+    'available memory unknown' => [['vm_stat' => commandOutput('', 1, 'vm_stat failed')], [['gpt-oss:120b-code', GPT_OSS_120B_CODE_DIGEST, 64485704334]], 'minimum_fit'],
+]);
+
+it('agrees with the README: a 96 GB Mac gets gpt-oss:120b-code', function () {
+    $readme = File::get(dirname(__DIR__, 3).'/README.md');
+    [, $idle] = decideFixture('m3-ultra-96gb');
+    [, $busy] = decideFixture('m3-ultra-96gb-120b-code-loaded');
+
+    expect($readme)->toContain('`gpt-oss:120b-code` on a 96 GB Mac')
+        ->and($idle['model_selection']['model'])->toBe('gpt-oss:120b-code')
+        ->and($busy['model_selection']['model'])->toBe('gpt-oss:120b-code');
+});
+
 it('refuses installs under critical memory pressure but still reports the fit', function () {
     [, $decision] = decideFixture('high-memory-pressure');
 
