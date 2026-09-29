@@ -40,7 +40,8 @@ class MollyInstallModelCommand extends Command
             if ($bytes > 0 && ! $this->option('approve')) {
                 $prompt = $this->authorization($plan);
                 if ($json || ! $this->input->isInteractive()) {
-                    $rerun = 'php artisan molly:install-model '.$plan['model'].' --approve';
+                    // Keep the model and every option as typed, with the models directory as the full path shown, so the approved run plans the same download.
+                    $rerun = $this->commandLine(['model' => $plan['model'], 'destination' => $destination === null ? null : ($plan['download']['destination'] ?? $destination), 'approve' => true]);
 
                     return $this->reportFailure('DOWNLOAD_AUTHORIZATION_REQUIRED: '.$prompt.' Run: '.$rerun, ['status' => 'authorization_required', 'code' => 'DOWNLOAD_AUTHORIZATION_REQUIRED', 'message' => $prompt, 'rerun' => $rerun] + $this->document($plan));
                 }

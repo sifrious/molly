@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\DecideModelFit;
 use Sifrious\Molly\Actions\InspectHardware;
 use Sifrious\Molly\Actions\InstallModel;
@@ -211,9 +212,46 @@ describe('authorization', function () {
         [$exit, $result] = installModel(['--destination' => $fixture['destination']]);
 
         expect($exit)->toBe(1)
-            ->and($result)->toMatchArray(['status' => 'authorization_required', 'code' => 'DOWNLOAD_AUTHORIZATION_REQUIRED', 'rerun' => 'php artisan molly:install-model gpt-oss:20b --approve'])
+            ->and($result)->toMatchArray(['status' => 'authorization_required', 'code' => 'DOWNLOAD_AUTHORIZATION_REQUIRED', 'rerun' => 'php artisan molly:install-model gpt-oss:20b --destination='.$fixture['destination'].' --approve --json'])
             ->and($result['message'])->toBe('Download 13.8 GB for gpt-oss:20b to '.$fixture['destination'].' on the ModelDisk volume mounted at /Volumes/ModelDisk, which has 1538.3 GB free? Molly measures memory, disk, and the runtime again right before it starts.')
             ->and($result['download'])->toMatchArray(['bytes' => 13793441244, 'volume_name' => 'ModelDisk', 'mount_point' => '/Volumes/ModelDisk'])
+            ->and(downloadRequested())->toBeFalse();
+    });
+
+    it('prints a command that plans the same download when run exactly as printed', function () {
+        $fixture = installHost('m2-pro-16gb-external');
+        $api = fakeOllamaApi();
+        readyModel();
+        $destination = $fixture['destination'].'/Ollama models';
+        File::ensureDirectoryExists($destination);
+
+        [$exit, $refused] = installModel(['--destination' => $destination]);
+
+        expect($exit)->toBe(1)
+            ->and($refused['rerun'])->toBe('php artisan molly:install-model gpt-oss:20b --destination='.escapeshellarg($destination).' --approve --json')
+            ->and($refused['download']['destination'])->toBe($destination)
+            ->and($destination)->not->toBe(getenv('HOME').'/.ollama/models')
+            ->and($api->pulls)->toBe([]);
+
+        $exit = Artisan::call(Str::after($refused['rerun'], 'php artisan '));
+        $installed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($installed['plan']['download'])->toBe($refused['download'])
+            ->and($installed['recheck']['snapshot_sha256'])->toBe($refused['snapshot_sha256'])
+            ->and($installed['recheck']['decision_sha256'])->toBe($refused['decision']['decision_sha256'])
+            ->and($api->pulls)->toBe(['gpt-oss:20b']);
+    });
+
+    it('keeps the models directory in the command it prints without a terminal', function () {
+        $fixture = installHost('m2-pro-16gb-external');
+        fakeOllamaApi();
+
+        $exit = Artisan::call('molly:install-model', ['--destination' => $fixture['destination'], '--no-interaction' => true]);
+
+        expect($exit)->toBe(1)
+            ->and(Artisan::output())->toContain('Run: php artisan molly:install-model gpt-oss:20b --destination='.$fixture['destination'].' --approve')
+            ->not->toContain('--json')
             ->and(downloadRequested())->toBeFalse();
     });
 

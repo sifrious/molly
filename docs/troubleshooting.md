@@ -147,7 +147,7 @@ If you installed with Composer yourself, run the same `composer require` again, 
 | --- | --- |
 | `NO_FIT` | No approved model fits this Mac. `molly:preflight` prints what it measured and what each model needs. |
 | `MODEL_FIT_UNKNOWN` | Molly could not measure a fact the decision needs. `molly:preflight` names the unknown fact and why. Fix the probe, for example start Ollama, then run the install again. |
-| `DOWNLOAD_AUTHORIZATION_REQUIRED` | Run the printed command, which adds `--approve`, after you check the size and the volume. |
+| `DOWNLOAD_AUTHORIZATION_REQUIRED` | Check the size, the models directory, and the volume, then run the printed command. It keeps the model and your options, writes `--destination` as a full path, and adds `--approve`. |
 | `DOWNLOAD_INTERRUPTED` | Run the same command again. Ollama resumes from the part it kept. |
 | `DOWNLOAD_OFFLINE` | Ollama could not reach its registry. Check the network, then run the command again. |
 | `DIGEST_MISMATCH` | Ollama rejected a corrupt part, or lists the model with a digest other than the approved one. Run the command again. When the digest still differs, Molly will not use that model; remove it with `ollama rm NAME` if you do not want it. |

@@ -142,20 +142,25 @@ trait ReportsFailures
         if (! $exception instanceof ChoiceRequired) {
             return [$exception->getMessage(), []];
         }
-        $rerun = $exception->rerun ?? $this->rerunCommand($exception);
+        $first = array_key_first($exception->choices);
+        $rerun = $exception->rerun ?? $this->commandLine($first === null ? [] : [$exception->input => (string) $first]);
 
         return [$exception->getMessage().' Run: '.$rerun, ['choices' => $exception->choiceList(), 'rerun' => $rerun]];
     }
 
-    /** This command as typed, with the first choice filled in. */
-    private function rerunCommand(ChoiceRequired $exception): string
+    /**
+     * This command as typed, with each argument or option named in $replace set to
+     * that value instead. A null or false value leaves it out.
+     *
+     * @param  array<string, string|bool|null>  $replace
+     */
+    protected function commandLine(array $replace = []): string
     {
         $words = ['php', 'artisan', (string) $this->getName()];
-        $first = array_key_first($exception->choices);
         $quote = fn (string $value): string => preg_match('~\A[A-Za-z0-9_/.:=@%+,-]+\z~', $value) === 1 ? $value : escapeshellarg($value);
         $definition = $this->getNativeDefinition();
         foreach ($definition->getArguments() as $name => $argument) {
-            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getArgument($name);
+            $value = array_key_exists($name, $replace) ? $replace[$name] : $this->input->getArgument($name);
             foreach ((array) $value as $item) {
                 if (is_string($item) && $item !== '') {
                     $words[] = $quote($item);
@@ -163,7 +168,7 @@ trait ReportsFailures
             }
         }
         foreach ($definition->getOptions() as $name => $option) {
-            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getOption($name);
+            $value = array_key_exists($name, $replace) ? $replace[$name] : $this->input->getOption($name);
             if ($value === true) {
                 $words[] = '--'.$name;
             }
