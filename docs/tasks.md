@@ -72,7 +72,7 @@ When the model names no usable file, `molly:story` fails with `SCOPE_EMPTY` and 
 php artisan molly:start ready-check
 ```
 
-The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise. No queue worker is needed for Artisan.
+The run happens in your terminal: the model proposes a change, Molly applies it, runs the test, reviews the diff, and records the result. The command prints the run ID and exits `0` when the run completed, `1` otherwise, and `130` or `143` when Ctrl-C or `SIGTERM` stopped it (see [Stop a task](#stop-a-task)). No queue worker is needed for Artisan.
 
 Molly refuses to start a second run in the same workspace while one is active (`WORKSPACE_BUSY`), and refuses to start a task that already completed.
 
@@ -119,6 +119,8 @@ php artisan molly:stop ready-check
 ```
 
 A pending task stops immediately. A running task is asked to stop at its next step, and Molly records the request. Applied edits may already be in the working tree, so check `git status` afterward. A stopped task can be retried.
+
+To stop a run in your own terminal, press Ctrl-C while `molly:start` or `molly:retry` runs. Sending `SIGTERM` to the command does the same. Molly records the stop request, as `molly:stop` does, and sends `SIGTERM` to the processes the run started, such as Pest and the parallel checks. The run ends at its next step as `stopped`, its report gets a `stop_reason` that names the signal, the task becomes `stopped`, and the command exits with `130` for Ctrl-C or `143` for `SIGTERM`. With `--json`, the command still prints the run document. A model request already waiting for an answer finishes or reaches `molly.timeout` first, and Molly then stops before it applies any change. A signal that arrives before the task is claimed leaves the task unchanged. `SIGKILL` cannot be handled; see [Recovery after a crash](#recovery-after-a-crash). `molly:run` does not handle these signals.
 
 ## Name a task
 

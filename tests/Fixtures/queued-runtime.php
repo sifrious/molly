@@ -43,7 +43,7 @@ config([
     'molly.model' => 'queue-fixture-model',
     'molly.parallel_checks' => true,
     'molly.timeout' => 5,
-    'molly.test_timeout' => 5,
+    'molly.test_timeout' => $settings['test_timeout'] ?? 5,
     'molly-complexity.enabled' => true,
     'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
 ]);
@@ -79,6 +79,7 @@ ChangeWriter::fake(function () use ($root, $settings, $waitFor): array {
     $deadline = microtime(true) + 30;
     while (is_file($root.'/hold') && microtime(true) < $deadline) {
         usleep(20000);
+        clearstatcache(true, $root.'/hold');
     }
 
     return ['summary' => 'Return true from the flag.', 'files' => [['path' => 'app/Flag.php', 'content' => "<?php\nreturn true;\n"]]];

@@ -109,11 +109,11 @@ function testbenchProcess(array $arguments, array $env = [], float $timeout = 60
  * A Laravel application in a temporary directory whose artisan boots tests/Fixtures/queued-runtime.php:
  * a SQLite database queue, fake model and review agents, real Pest checks, and one saved task with
  * a queued start job. The task changes app/Flag.php, and tests/QueuedFlagTest.php checks it.
- * $retryAfter is the queue's retry_after in seconds. With $slowTest the Pest test sleeps 30 seconds
- * first, so a check is still running when a test signals it. Create hold in the root to make the
+ * $retryAfter is the queue's retry_after in seconds and $testTimeout is molly.test_timeout. With
+ * $slowTest the Pest test sleeps 30 seconds first, so a check is still running when a test signals it. Create hold in the root to make the
  * fake model wait, and remove it to let the model answer.
  */
-function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, bool $stop = false, int $retryAfter = 120, bool $slowTest = false): string
+function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, bool $stop = false, int $retryAfter = 120, bool $slowTest = false, int $testTimeout = 5): string
 {
     $root = sys_get_temp_dir().'/molly-queue-'.bin2hex(random_bytes(8));
     foreach (['app', 'tests', 'storage/logs', 'storage/framework/views', 'bootstrap/cache'] as $path) {
@@ -121,7 +121,7 @@ function queuedExecutionFixture(bool $duplicate = false, bool $fail = false, boo
     }
     symlink(dirname(__DIR__).'/vendor', $root.'/vendor');
     touch($root.'/database.sqlite');
-    file_put_contents($root.'/runtime.json', json_encode(['duplicate' => $duplicate, 'stop' => $stop, 'retry_after' => $retryAfter], JSON_THROW_ON_ERROR));
+    file_put_contents($root.'/runtime.json', json_encode(['duplicate' => $duplicate, 'stop' => $stop, 'retry_after' => $retryAfter, 'test_timeout' => $testTimeout], JSON_THROW_ON_ERROR));
     file_put_contents($root.'/artisan', '<?php define("MOLLY_QUEUE_TEST_ROOT", __DIR__); require '.var_export(__DIR__.'/Fixtures/queued-runtime.php', true).';');
     file_put_contents($root.'/app/Flag.php', "<?php\nreturn false;\n");
     file_put_contents($root.'/phpunit.xml', '<phpunit bootstrap="vendor/autoload.php" cacheDirectory="storage/phpunit"><testsuites><testsuite name="Flag"><directory>tests</directory></testsuite></testsuites></phpunit>');
@@ -183,4 +183,38 @@ function waitUntil(Closure $condition, string $message, float $seconds = 20): vo
         }
         usleep(20000);
     }
+}
+
+/**
+ * Start $command through /bin/sh with job control on, so it runs as its own process group the
+ * way a terminal runs a foreground command, and Ctrl-C can be sent with posix_kill(-$pid, SIGINT).
+ * Its output goes to $base.out and $base.err, and its exit status to $base.exit.
+ *
+ * @param  list<string>  $command
+ * @return array{shell: Process, pid: int}
+ */
+function startInOwnProcessGroup(array $command, string $cwd, string $base): array
+{
+    $script = 'set -m; "$@" >"$0.out" 2>"$0.err" & echo $! >"$0.pid.tmp" && mv "$0.pid.tmp" "$0.pid"; wait $!; echo $? >"$0.exit"';
+    $shell = new Process(['/bin/sh', '-c', $script, $base, ...$command], $cwd, timeout: 120);
+    $shell->start();
+    waitUntil(fn (): bool => is_file($base.'.pid'), 'the command started');
+
+    return ['shell' => $shell, 'pid' => (int) file_get_contents($base.'.pid')];
+}
+
+/** @return list<int> the live processes in process group $pgid */
+function processGroupMembers(int $pgid): array
+{
+    $listing = new Process(['ps', '-A', '-o', 'pid=,pgid=']);
+    $listing->run();
+    $members = [];
+    foreach (explode("\n", trim($listing->getOutput())) as $line) {
+        [$pid, $group] = array_map(intval(...), preg_split('/\s+/', trim($line)) + [0, 0]);
+        if ($group === $pgid && $pid > 0) {
+            $members[] = $pid;
+        }
+    }
+
+    return $members;
 }

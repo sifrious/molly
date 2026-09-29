@@ -4,13 +4,15 @@ namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\StartTask;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Throwable;
 
 use function Laravel\Prompts\note;
 
-class MollyStartCommand extends Command
+class MollyStartCommand extends Command implements SignalableCommandInterface
 {
     use ReportsFailures;
+    use StopsRunOnSignal;
 
     protected $signature = 'molly:start {task : Saved task name or ID} {--json : Print JSON only}';
 
@@ -18,6 +20,7 @@ class MollyStartCommand extends Command
 
     public function handle(StartTask $action, RunReport $report): int
     {
+        $this->runningAction = $action;
         try {
             $run = $action->handle((string) $this->argument('task'), $this->option('json') ? null : fn (string $message) => note($message));
             if ($this->option('json')) {
@@ -26,9 +29,9 @@ class MollyStartCommand extends Command
                 $report->show($run, $this->output->isVerbose());
             }
 
-            return $run->status === 'completed' ? self::SUCCESS : self::FAILURE;
+            return $this->exitCodeAfterSignal($run->status === 'completed' ? self::SUCCESS : self::FAILURE, $run->status);
         } catch (Throwable $exception) {
-            return $this->reportFailure($exception->getMessage(), ['id' => null, 'task_id' => (string) $this->argument('task'), 'status' => 'error', 'report' => ['error' => $exception->getMessage()]]);
+            return $this->exitCodeAfterSignal($this->reportFailure($exception->getMessage(), ['id' => null, 'task_id' => (string) $this->argument('task'), 'status' => 'error', 'report' => ['error' => $exception->getMessage()]]));
         }
     }
 }
