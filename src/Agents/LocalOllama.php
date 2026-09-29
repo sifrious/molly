@@ -58,18 +58,32 @@ class LocalOllama
         return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
     }
 
+    /**
+     * Name the provider failure with a Molly code. The message keeps the HTTP status and
+     * the model name, never the provider's body, a PHP class name, or a file path.
+     */
     private function translate(Throwable $exception, string $model): Throwable
     {
         $request = $this->find($exception, RequestException::class);
-        if ($request instanceof RequestException && $request->response->status() === 404
-            && str_contains(strtolower((string) $request->response->json('error')), 'not found')) {
-            return new RuntimeException('MODEL_MISSING: Ollama has no model named '.$model.'. Run ollama list, or choose an installed model with php artisan molly:setup.', 0, $exception);
+        if ($request instanceof RequestException) {
+            $status = $request->response->status();
+            $error = $request->response->json('error');
+            if ($status === 404 && is_string($error) && str_contains(strtolower($error), 'not found')) {
+                return new RuntimeException('MODEL_MISSING: Ollama has no model named '.$model.'. Run ollama list, or choose an installed model with php artisan molly:setup.', 0, $exception);
+            }
+
+            return new RuntimeException('PROVIDER_ERROR: Ollama answered HTTP '.$status.' for model '.$model.'. Molly used none of the reply. Check the Ollama server log, then try again.', 0, $exception);
         }
+
+        $message = $exception instanceof AiException ? $exception->getMessage() : '';
         // Laravel AI passes a body that does not decode to an array straight into a typed
         // parameter, and reports an empty object as an unknown Ollama error.
-        if ($exception instanceof TypeError || $exception instanceof JsonException
-            || ($exception instanceof AiException && str_ends_with($exception->getMessage(), 'Unknown Ollama error.'))) {
+        if ($exception instanceof TypeError || $exception instanceof JsonException || str_ends_with($message, 'Unknown Ollama error.')) {
             return new RuntimeException('PROVIDER_RESPONSE_INVALID: Ollama answered, but the body was not a chat response Molly can read. Molly used none of it. Check that OLLAMA_URL points at Ollama and try again.', 0, $exception);
+        }
+        // A successful HTTP reply whose body is Ollama's own error field.
+        if (str_starts_with($message, 'Ollama Error: ')) {
+            return new RuntimeException('PROVIDER_ERROR: Ollama reported an error for model '.$model.' instead of a chat response. Molly used none of the reply. Check the Ollama server log, then try again.', 0, $exception);
         }
 
         return $exception;

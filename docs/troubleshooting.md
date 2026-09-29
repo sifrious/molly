@@ -205,6 +205,7 @@ The proposal and review requests each get `molly.timeout` seconds (180 by defaul
 | Code | Meaning | What to do |
 | --- | --- | --- |
 | `MODEL_MISSING` | Ollama answered HTTP 404 because it has no model with the configured name. | Run `ollama list`, then choose an installed model with `php artisan molly:setup`. Molly never pulls a model. |
+| `PROVIDER_ERROR` | Ollama answered with an HTTP error, such as 500, 503, or 429, or with its own `error` field in place of a chat response. The message gives the HTTP status and the model name, not Ollama's text. | Read the Ollama server log: the terminal running `ollama serve`, or `~/.ollama/logs/server.log` for the macOS app. Fix the cause, then try again. |
 | `PROVIDER_RESPONSE_INVALID` | Ollama answered, but the body was not a chat response: truncated JSON, plain text, an empty object, or fields Laravel AI cannot read. Molly uses none of it. | Check that `OLLAMA_URL` points at Ollama itself, then try again. |
 
 These messages never include a PHP class name, a file path, or the provider's raw reply. A reply that is a valid chat response but holds the wrong answer shape fails later, with `ACCEPTANCE_INVALID`, `GENERATION_INVALID`, or `REVIEW_INVALID`.

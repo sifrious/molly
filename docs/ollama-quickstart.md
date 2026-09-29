@@ -91,6 +91,7 @@ Doctor never prints API keys or account details.
 | Connection refused | `ollama_unreachable` | `ollama serve`, then check the URL. |
 | Model name unknown | `model_missing` | `ollama pull NAME`. |
 | Out of memory or context errors | none (runtime) | A smaller model or more free memory. |
+| Ollama answers with an HTTP error | `PROVIDER_ERROR` | Read the Ollama server log, fix the cause, and try again. |
 | Ollama's reply is not a chat response | `PROVIDER_RESPONSE_INVALID` | Check that `OLLAMA_URL` points at Ollama itself. |
 | The model returns malformed changes | `GENERATION_INVALID` in the run | Retry once; if it repeats, use a larger model. |
 | The review keeps coming back `REVIEW_INVALID` | in the run | Use a larger model. |

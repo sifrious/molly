@@ -88,3 +88,31 @@ it('reports an Ollama body that is not a chat response as PROVIDER_RESPONSE_INVA
     'empty object' => '{}',
     'tool calls that are not a list' => '{"model":"absent-model:1b","message":{"role":"assistant","content":"{}","tool_calls":"none"}}',
 ]);
+
+it('reports an Ollama HTTP error as PROVIDER_ERROR with the status and without the provider body', function (string $site, int $status, string $body) {
+    Http::fake(['127.0.0.1:11434/api/chat' => Http::response($body, $status)]);
+
+    $message = callProvider($site, $this->workspace);
+
+    expect($message)->toBe('PROVIDER_ERROR: Ollama answered HTTP '.$status.' for model absent-model:1b. Molly used none of the reply. Check the Ollama server log, then try again.')
+        ->not->toContain('injected');
+    expectSafeProviderMessage($message);
+    expect(Task::count())->toBe(0);
+})->with('model call sites')->with([
+    'internal error' => [500, '{"error":"injected internal error at /Users/someone/.ollama/models/blobs"}'],
+    'overloaded' => [503, 'injected upstream busy page'],
+    'rate limited' => [429, '{"error":"injected rate limit"}'],
+    'rejected request' => [400, '{"error":"injected invalid options"}'],
+    'unknown route' => [404, 'injected 404 page not from the model API'],
+]);
+
+it('reports an error field in a successful Ollama reply as PROVIDER_ERROR without echoing it', function (string $site) {
+    Http::fake(['127.0.0.1:11434/api/chat' => Http::response(['error' => 'injected failure reading /Users/someone/.ollama/models/blobs/sha256-0'], 200)]);
+
+    $message = callProvider($site, $this->workspace);
+
+    expect($message)->toBe('PROVIDER_ERROR: Ollama reported an error for model absent-model:1b instead of a chat response. Molly used none of the reply. Check the Ollama server log, then try again.')
+        ->not->toContain('injected');
+    expectSafeProviderMessage($message);
+    expect(Task::count())->toBe(0);
+})->with('model call sites');
