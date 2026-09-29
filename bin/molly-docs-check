@@ -40,10 +40,7 @@ REQUIRED = {
 # Alpha requirements whose documentation cannot be complete because the behavior
 # is not shipped. Each stays here until the behavior ships with a tutorial or a
 # recorded release-scope decision moves it out of the alpha.
-OPEN = {
-    'Local and Orb execution targeting': 'Local Orbs are implemented and documented in docs/execution-targets.md#run-tasks-on-two-local-orbs. '
-    'The entry stays until the release commit removes it.',
-}
+OPEN: dict[str, str] = {}
 
 
 def slug(text: str) -> str:

@@ -10,12 +10,14 @@ function docsCheck(string ...$arguments): Process
     return $process;
 }
 
-it('passes the documentation check and lists each open alpha requirement', function () {
+it('passes the documentation check with the Orb tutorial required and no Orb requirement open', function () {
     $check = docsCheck();
+    $source = file_get_contents(dirname(__DIR__, 2).'/bin/molly-docs-check');
 
     expect($check->getExitCode())->toBe(0, $check->getOutput().$check->getErrorOutput())
         ->and($check->getOutput())->toContain('required alpha docs.')
-        ->and($check->getOutput())->toContain('open alpha requirement: Local and Orb execution targeting:');
+        ->and($check->getOutput())->not->toContain('open alpha requirement: Local and Orb execution targeting')
+        ->and($source)->toContain("'Local and Orb execution targeting': 'docs/execution-targets.md#run-tasks-on-two-local-orbs'");
 });
 
 it('blocks a release exactly when an alpha requirement is open', function () {

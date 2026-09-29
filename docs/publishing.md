@@ -25,7 +25,7 @@ A requirement whose behavior has not shipped is also listed in `OPEN`, with the 
 python3 bin/molly-docs-check --release
 ```
 
-Today one requirement is open: local and Orb execution targeting. Local Orbs ship with [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs), and the entry stays until the commit that removes it cites the release-scope decision. `--release` exits `1` with `Release blocked: 1 alpha requirement(s) open.` until that entry is resolved.
+No requirement is open today. Local and Orb execution targeting was the last one: it closed when local Orbs shipped with [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs), following Mary's release-scope decision of 2026-09-28 that Orb execution is required for the alpha. With an open entry, `--release` exits `1` with `Release blocked: N alpha requirement(s) open.`
 
 `bin/molly-docs-walkthrough` regenerates the web interface screenshots under `docs/v0.1/walkthrough/` from a running application.
 
@@ -52,7 +52,7 @@ The script stops at the first failure and exits non-zero. In order, it runs:
 5. The full package suite, `vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning`
 6. `composer archive` into a temporary directory, failing if `composer.lock` is inside the zip
 
-It ends with `ALL GATES PASSED on` and the PHP version, or with `DOCUMENTATION GATE PASSED` under `--docs`. While the Orb requirement is open, both stop at step 1. The documentation check cannot tell whether an example still runs. The tests that keep examples in step with fixtures do that: `tests/Feature/CustomAgentStepTest.php`, `tests/Feature/GitHubPestTodosTest.php`, and `tests/Feature/DocsExamplesTest.php`, all part of step 5. `tests/Feature/DocsCheckTest.php`, also in step 5, checks that `--release` fails exactly when a requirement is open.
+It ends with `ALL GATES PASSED on` and the PHP version, or with `DOCUMENTATION GATE PASSED` under `--docs`. While any requirement is open, both stop at step 1. The documentation check cannot tell whether an example still runs. The tests that keep examples in step with fixtures do that: `tests/Feature/CustomAgentStepTest.php`, `tests/Feature/GitHubPestTodosTest.php`, and `tests/Feature/DocsExamplesTest.php`, all part of step 5. `tests/Feature/DocsCheckTest.php`, also in step 5, checks that `--release` fails exactly when a requirement is open.
 
 When a required tutorial is moved or renamed, update `REQUIRED` in `bin/molly-docs-check` in the same commit. Removing an entry from `REQUIRED` or `OPEN` drops a release requirement, so it needs the same review as dropping the feature. Remove an `OPEN` entry only when the behavior ships with its tutorial, or cite the recorded release-scope decision in the commit that removes it.
 
