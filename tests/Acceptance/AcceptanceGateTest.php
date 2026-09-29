@@ -73,7 +73,10 @@ function gateFixture(): array
             foreach (array_map('trim', explode(',', $subcase['evidence'])) as $name) {
                 $path = $subcase['id'].'/'.(str_ends_with($name, '/') ? $name.'evidence.txt' : $name);
                 is_dir(dirname($root.'/evidence/'.$path)) || mkdir(dirname($root.'/evidence/'.$path), 0755, true);
-                file_put_contents($root.'/evidence/'.$path, "evidence for {$subcase['id']}\n");
+                // The gate reads every listed .xml file as junit, so junit evidence holds three passing tests.
+                file_put_contents($root.'/evidence/'.$path, str_ends_with($name, '.xml')
+                    ? gateJunit(array_map(fn (int $n) => ['tests/Feature/ExampleTest.php', "it passes check {$n} for {$subcase['id']}", false], [1, 2, 3]))
+                    : "evidence for {$subcase['id']}\n");
                 $files[] = ['path' => $path, 'sha256' => hash_file('sha256', $root.'/evidence/'.$path)];
             }
             $records[] = [
@@ -137,6 +140,93 @@ function gateEditRecord(array $fixture, string $subcase, Closure $edit): void
     gateWriteJson($path, $index);
 }
 
+/** Recompute the sha256 of every file a record lists, after a test edits one. */
+function gateRehash(array $fixture, string $subcase): void
+{
+    gateEditRecord($fixture, $subcase, function (array $r) use ($fixture) {
+        foreach ($r['files'] as $i => $file) {
+            $r['files'][$i]['sha256'] = hash_file('sha256', $fixture['evidence'].'/'.$file['path']);
+        }
+
+        return $r;
+    });
+}
+
+/**
+ * A junit report in the shape Pest writes it.
+ *
+ * @param  list<array{0: string, 1: string, 2: bool}>  $cases  [file, name, skipped]
+ */
+function gateJunit(array $cases): string
+{
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n<testsuites>\n  <testsuite name=\"Molly\" tests=\"".count($cases)."\">\n";
+    foreach ($cases as [$file, $name, $skipped]) {
+        $attributes = sprintf('name="%s" file="%s::%s"', htmlspecialchars($name), htmlspecialchars($file), htmlspecialchars($name));
+        $xml .= $skipped ? "    <testcase {$attributes}><skipped/></testcase>\n" : "    <testcase {$attributes}/>\n";
+    }
+
+    return $xml."  </testsuite>\n</testsuites>\n";
+}
+
+/**
+ * The junit cases for the tests a manifest key lists, skipped or run.
+ *
+ * @return list<array{0: string, 1: string, 2: bool}>
+ */
+function gateDeclaredCases(string $key, bool $skipped): array
+{
+    return array_map(function (string $test) use ($skipped): array {
+        [$file, $name] = explode(': ', $test, 2);
+
+        return [$file, 'it '.$name, $skipped];
+    }, gateManifest()['not_applicable'][$key]['tests']);
+}
+
+const GATE_REMOTE_CLIENT_CASE = ['tests/Feature/WebTasksTest.php', 'it rejects remote clients and non-loopback hosts with data set "dataset "remote client""', false];
+
+/**
+ * Give a record the two junit files the RC10 M10.3 runs produced, with every skip
+ * declared: macOS skips the Landlock and fallback tests, and Linux on PHP 8.3 skips
+ * the two-worker and fallback tests.
+ */
+function gateDeclaredSkips(array $fixture, string $subcase = 'M10.3'): void
+{
+    $runs = [
+        $subcase.'/junit-macos.xml' => ['Darwin', '8.4.23', [
+            GATE_REMOTE_CLIENT_CASE,
+            ...gateDeclaredCases('landlock-linux-only', true),
+            ...gateDeclaredCases('laravel-ai-pre-v1-fallback', true),
+            ...gateDeclaredCases('sqlite-competing-workers-php84', false),
+        ]],
+        $subcase.'/linux-8.3/junit.xml' => ['Linux', '8.3.35', [
+            GATE_REMOTE_CLIENT_CASE,
+            ...gateDeclaredCases('landlock-linux-only', false),
+            ...gateDeclaredCases('laravel-ai-pre-v1-fallback', true),
+            ...gateDeclaredCases('sqlite-competing-workers-php84', true),
+        ]],
+    ];
+    $counts = ['discovered' => 0, 'passed' => 0, 'failed' => 0, 'skipped' => 0];
+    foreach ($runs as $path => [, , $cases]) {
+        is_dir(dirname($fixture['evidence'].'/'.$path)) || mkdir(dirname($fixture['evidence'].'/'.$path), 0755, true);
+        file_put_contents($fixture['evidence'].'/'.$path, gateJunit($cases));
+        $skipped = count(array_filter($cases, fn (array $case) => $case[2]));
+        $counts['discovered'] += count($cases);
+        $counts['skipped'] += $skipped;
+        $counts['passed'] += count($cases) - $skipped;
+    }
+    gateEditRecord($fixture, $subcase, function (array $r) use ($runs, $counts) {
+        foreach ($runs as $path => [$os, $php]) {
+            $r['files'][] = ['path' => $path, 'sha256' => ''];
+            $r['test_runs'][] = ['junit' => $path, 'os_family' => $os, 'php' => $php];
+        }
+        $r['counts'] = $counts;
+        $r['skip_reasons'] = ['landlock-linux-only', 'laravel-ai-pre-v1-fallback', 'sqlite-competing-workers-php84'];
+
+        return $r;
+    });
+    gateRehash($fixture, $subcase);
+}
+
 /** @return list<array{subcase: string, code: string}> */
 function gateRejections(array $report): array
 {
@@ -153,13 +243,16 @@ function gateRejections(array $report): array
 }
 
 /**
- * Accept the fixture, apply the mutation, expect exactly the given rejection,
- * restore the saved index and files, and expect acceptance again.
+ * Build the fixture and apply $prepare, accept it, apply the mutation, expect the
+ * given rejection, restore the saved index and files, and expect acceptance again.
  */
-function gateControl(Closure $mutate, string $subcase, string $code, string $criterion): void
+function gateControl(Closure $mutate, string $subcase, string $code, string $criterion, ?Closure $prepare = null): void
 {
     $fixture = gateFixture();
     try {
+        if ($prepare !== null) {
+            $prepare($fixture);
+        }
         $green = gateRun($fixture);
         expect($green['exit'])->toBe(0, $green['output'])
             ->and($green['report']['verdict'])->toBe('ACCEPTED');
@@ -376,18 +469,107 @@ it('rejects an evidence path outside the evidence directory', function () {
 it('accepts a skip whose reason the manifest declared', function () {
     $fixture = gateFixture();
     try {
-        gateEditRecord($fixture, 'M10.3', function (array $r) {
-            $r['counts'] = ['discovered' => 3, 'passed' => 2, 'failed' => 0, 'skipped' => 1];
-            $r['skip_reasons'] = ['landlock-linux-only'];
-
-            return $r;
-        });
+        gateDeclaredSkips($fixture);
         $result = gateRun($fixture);
+        $record = collect(json_decode(file_get_contents($fixture['evidence'].'/index.json'), true)['records'])->firstWhere('subcase', 'M10.3');
 
-        expect($result['exit'])->toBe(0, $result['output']);
+        expect($result['exit'])->toBe(0, $result['output'])
+            ->and($record['counts'])->toBe(['discovered' => 20, 'passed' => 9, 'failed' => 0, 'skipped' => 11])
+            ->and(gateRejections($result['report']))->toBe([]);
     } finally {
         gateRemoveTree($fixture['root']);
     }
+});
+
+test('M11.7 rejects a mandatory test skipped in junit while the declared keys stay listed', function () {
+    // RC10 M11.7 replayed this on the real M10.3 evidence and the gate accepted it.
+    gateControl(function (array $f) {
+        $path = $f['evidence'].'/M10.3/junit-macos.xml';
+        $junit = file_get_contents($path);
+        $case = sprintf('file="%s::%s"/>', GATE_REMOTE_CLIENT_CASE[0], htmlspecialchars(GATE_REMOTE_CLIENT_CASE[1]));
+        expect($junit)->toContain($case);
+        file_put_contents($path, str_replace($case, substr($case, 0, -2).'><skipped/></testcase>', $junit));
+        gateEditRecord($f, 'M10.3', function (array $r) {
+            $r['counts']['passed']--;
+            $r['counts']['skipped']++;
+
+            return $r;
+        });
+        gateRehash($f, 'M10.3');
+    }, 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+test('M11.7 rejects declared skips when the record lists only one of their keys', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['skip_reasons'] = ['landlock-linux-only'];
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects a PHP 8.3 skip in a run recorded on PHP 8.4', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['test_runs'][1]['php'] = '8.4.26';
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects a Landlock skip in a run recorded on Linux', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['test_runs'][0]['os_family'] = 'Linux';
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects a conditional skip in a junit file with no recorded environment', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        unset($r['test_runs']);
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects more skipped tests than the junit files name', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['counts']['passed']--;
+        $r['counts']['skipped']++;
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects fewer skipped tests than the junit files mark', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['counts']['passed']++;
+        $r['counts']['skipped']--;
+
+        return $r;
+    }), 'M10.3', 'SKIP_COUNT_MISMATCH', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects a skip_reasons key the manifest declares for another subcase', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['skip_reasons'][] = 'no-application-source-index';
+
+        return $r;
+    }), 'M10.3', 'UNDECLARED_SKIP', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects test_runs that name a file the record does not list', function () {
+    gateControl(fn (array $f) => gateEditRecord($f, 'M10.3', function (array $r) {
+        $r['test_runs'][] = ['junit' => 'M10.3/linux-8.5/junit.xml', 'os_family' => 'Linux', 'php' => '8.5.10'];
+
+        return $r;
+    }), 'M10.3', 'MALFORMED_RECORD', 'M10', fn (array $f) => gateDeclaredSkips($f));
+});
+
+it('rejects a listed XML file the gate cannot parse for skipped tests', function () {
+    gateControl(function (array $f) {
+        file_put_contents($f['evidence'].'/M10.3/junit-macos.xml', '<testsuites><testsuite>');
+        gateRehash($f, 'M10.3');
+    }, 'M10.3', 'MALFORMED_RECORD', 'M10', fn (array $f) => gateDeclaredSkips($f));
 });
 
 it('rejects a candidate artifact that does not match candidate.json', function () {

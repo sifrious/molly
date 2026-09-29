@@ -23,7 +23,17 @@
       "reason": "SandboxIsolationTest uses Linux Landlock and skips on macOS. The same tests must run and pass on the Linux CI lane recorded under M10.1.",
       "applies_to": [
         "M10.3"
-      ]
+      ],
+      "tests": [
+        "tests/Feature/SandboxIsolationTest.php: lets the writer change only the allowed file",
+        "tests/Feature/SandboxIsolationTest.php: runs Pest inside the sandbox and still produces JUnit evidence",
+        "tests/Feature/SandboxIsolationTest.php: does not inherit removed credentials or default network access"
+      ],
+      "when": {
+        "os_family": [
+          "Darwin"
+        ]
+      }
     },
     "laravel-ai-pre-v1-fallback": {
       "reason": "Two tests cover the fallback when an installed laravel/ai lacks the decide capability. composer.json requires laravel/ai ^1.0, which always has it, so the tests skip. They stay in the suite so a future constraint change re-enables them.",
@@ -51,7 +61,10 @@
         "tests/Feature/OrbExecutionTest.php: runs two queued tasks at the same time on two Orbs, each in its own worktree with its own model",
         "tests/Feature/OrbExecutionTest.php: keeps both results inspectable after the Orb workers restart",
         "tests/Feature/OrbExecutionTest.php: runs exactly one attempt when an Orb start is delivered twice"
-      ]
+      ],
+      "when": {
+        "php_below": "8.4"
+      }
     }
   },
   "budgets": {
@@ -2636,6 +2649,15 @@
       "change": "Added not_applicable key sqlite-competing-workers-php84 for the four tests that run two SQLite queue workers at once. They skip on PHP 8.3 with the reason QueuedExecutionTest already used, which no key declared before.",
       "reason": "CI run 36515900521 failed these Orb tests on both PHP 8.3 lanes with \"database is locked\", because Laravel ignores SQLite transaction_mode below PHP 8.4. The MME-5885 coordinator decided on 2026-09-29 that Molly refuses a second SQLite worker on PHP 8.3 with WORKER_CONCURRENCY_UNSUPPORTED, and that tests needing two such workers are declared skips on PHP 8.3.",
       "invalidates": "none; M10.3 has no passing record (NOT_RUN in docs/acceptance/matrix.md)"
+    },
+    {
+      "date": "2026-09-29",
+      "subcases": [
+        "M10.3"
+      ],
+      "change": "Each declared skip key names the tests it excuses, and a key that holds only on some hosts carries a when condition. landlock-linux-only now lists its three SandboxIsolationTest tests and holds only when os_family is Darwin. sqlite-competing-workers-php84 holds only when php is below 8.4. laravel-ai-pre-v1-fallback keeps its two tests and holds everywhere. The gate matches every skipped junit test case against these lists, using the environment the record gives each junit file in test_runs.",
+      "reason": "The RC10 M11.7 negative control showed that the gate accepted a skipped mandatory test (tests/Feature/WebTasksTest.php: rejects remote clients and non-loopback hosts) and accepted five skips when the record listed only landlock-linux-only. The gate checked only that some declared key applied to the subcase, and landlock-linux-only listed no tests.",
+      "invalidates": "The RC10 M10.3 record: it has no test_runs, so the gate cannot tell which junit file ran on macOS or on PHP 8.3, and it now rejects the Landlock and two-worker skips. Re-record M10.3 with test_runs on the next candidate. The expected result text is unchanged."
     }
   ]
 }

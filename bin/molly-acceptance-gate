@@ -67,6 +67,94 @@ function declaredFor(mixed $key, string $subcaseId, array $notApplicable): bool
     return in_array($subcaseId, (array) ($notApplicable[$key]['applies_to'] ?? []), true);
 }
 
+/**
+ * Whether a key's `when` condition holds for the environment a junit file ran in.
+ * A key without `when` holds everywhere. A condition the gate cannot check never holds.
+ *
+ * @param  array{os_family: string, php: string}|null  $run
+ */
+function conditionHolds(array $key, ?array $run): bool
+{
+    if (! array_key_exists('when', $key)) {
+        return true;
+    }
+    if (! is_array($key['when']) || $key['when'] === [] || $run === null) {
+        return false;
+    }
+    foreach ($key['when'] as $field => $value) {
+        $holds = match ($field) {
+            'os_family' => in_array($run['os_family'], (array) $value, true),
+            'php_below' => is_string($value) && version_compare($run['php'], $value, '<'),
+            default => false,
+        };
+        if (! $holds) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Whether a declared test, written "tests/Path/FileTest.php: test name", names a junit test case.
+ * Pest writes it() tests with an "it " prefix and each dataset row with a " with data set" suffix.
+ *
+ * @param  array{file: string, name: string}  $case
+ */
+function declaresTest(mixed $declared, array $case): bool
+{
+    if (! is_string($declared) || preg_match('/^(\S+\.php): (.+)$/', $declared, $parts) !== 1) {
+        return false;
+    }
+    [, $file, $name] = $parts;
+    if ($case['file'] !== $file && ! str_ends_with($case['file'], '/'.$file)) {
+        return false;
+    }
+    foreach ([$name, 'it '.$name] as $candidate) {
+        if ($case['name'] === $candidate || str_starts_with($case['name'], $candidate.' with data set ')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The skipped test cases in a junit file. Returns null when the XML is not a junit
+ * report and false when the file is not well-formed XML.
+ *
+ * @return list<array{file: string, name: string}>|false|null
+ */
+function junitSkips(string $path): array|false|null
+{
+    if (! class_exists(DOMDocument::class)) {
+        inputError("the dom extension is required to read {$path}");
+    }
+    $document = new DOMDocument;
+    $previous = libxml_use_internal_errors(true);
+    $loaded = $document->loadXML((string) file_get_contents($path), LIBXML_NONET);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+    if (! $loaded || $document->documentElement === null) {
+        return false;
+    }
+    if (! in_array($document->documentElement->nodeName, ['testsuites', 'testsuite'], true)) {
+        return null;
+    }
+    $skips = [];
+    foreach ($document->getElementsByTagName('testcase') as $case) {
+        foreach ($case->childNodes as $child) {
+            if ($child instanceof DOMElement && $child->nodeName === 'skipped') {
+                $skips[] = ['file' => explode('::', $case->getAttribute('file'), 2)[0], 'name' => $case->getAttribute('name')];
+
+                break;
+            }
+        }
+    }
+
+    return $skips;
+}
+
 function isHex(mixed $value, int $length): bool
 {
     return is_string($value) && preg_match('/^[0-9a-f]{'.$length.'}$/', $value) === 1;
@@ -157,6 +245,21 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
     if ($time === null) {
         $reject('MALFORMED_RECORD', 'timestamp must be ISO 8601 with a zone, such as 2026-09-27T18:00:00Z');
     }
+    $skipReasons = $record['skip_reasons'] ?? [];
+    if (! is_array($skipReasons) || ! array_is_list($skipReasons) || array_filter($skipReasons, 'is_string') !== $skipReasons) {
+        $reject('MALFORMED_RECORD', 'skip_reasons must be a list of manifest.not_applicable keys');
+    }
+    $testRuns = $record['test_runs'] ?? [];
+    if (! is_array($testRuns) || ! array_is_list($testRuns)) {
+        $reject('MALFORMED_RECORD', 'test_runs must be a list');
+        $testRuns = [];
+    }
+    foreach ($testRuns as $i => $run) {
+        if (! is_array($run) || ! is_string($run['junit'] ?? null) || ! is_string($run['os_family'] ?? null) || $run['os_family'] === ''
+            || ! is_string($run['php'] ?? null) || preg_match('/^\d+\.\d+(\.\d+)?$/', $run['php']) !== 1) {
+            $reject('MALFORMED_RECORD', "test_runs[{$i}] needs junit, os_family (such as Darwin or Linux), and php (such as 8.4.23)");
+        }
+    }
     if ($reasons !== []) {
         return $reasons;
     }
@@ -208,15 +311,6 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
         if ($counts['failed'] > 0 && $record['outcome'] === 'PASS') {
             $reject('FAILED_BUT_PASS', "outcome PASS with {$counts['failed']} failed");
         }
-        if ($counts['skipped'] > 0) {
-            $declared = array_values(array_filter(
-                (array) ($record['skip_reasons'] ?? []),
-                fn ($key) => declaredFor($key, $subcase['id'], $notApplicable),
-            ));
-            if ($declared === []) {
-                $reject('UNDECLARED_SKIP', "{$counts['skipped']} skipped with no skip_reasons key from manifest.not_applicable");
-            }
-        }
     }
 
     // Protected-test integrity.
@@ -235,6 +329,7 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
     // Files: each listed file must exist inside the evidence directory and match its sha256.
     $root = realpath($evidenceDir);
     $listed = [];
+    $junit = [];
     foreach ($record['files'] as $i => $file) {
         $path = is_array($file) ? ($file['path'] ?? null) : null;
         $sha = is_array($file) ? ($file['sha256'] ?? null) : null;
@@ -265,6 +360,14 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
         if ($actual !== $sha) {
             $reject('CHECKSUM_MISMATCH', "{$path} listed {$sha}, actual {$actual}");
         }
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xml') {
+            $skips = junitSkips($real);
+            if ($skips === false) {
+                $reject('MALFORMED_RECORD', "{$path} is not well-formed XML, so the gate cannot read its skipped tests");
+            } elseif ($skips !== null) {
+                $junit[$path] = $skips;
+            }
+        }
     }
 
     // Each evidence name in the manifest must be listed under <subcase id>/.
@@ -276,6 +379,46 @@ function checkRecord(array $record, array $subcase, array $manifest, array $cand
         if ($found === []) {
             $reject('FILE_MISSING', "manifest evidence {$target} is not listed in the record");
         }
+    }
+
+    // Skipped tests. Every skipped junit test case must be one a key in skip_reasons names,
+    // where the manifest declared that key for this subcase and its condition holds for the
+    // run's environment. A key only excuses the tests it lists.
+    $keys = [];
+    foreach ($skipReasons as $key) {
+        if (declaredFor($key, $id, $notApplicable)) {
+            $keys[$key] = $notApplicable[$key];
+        } else {
+            $reject('UNDECLARED_SKIP', sprintf('skip_reasons names %s, which manifest.not_applicable does not declare for %s', json_encode($key), $id));
+        }
+    }
+    $environments = [];
+    foreach ($testRuns as $run) {
+        if (! in_array($run['junit'], $listed, true)) {
+            $reject('MALFORMED_RECORD', "test_runs names {$run['junit']}, which files does not list");
+        }
+        $environments[$run['junit']] = ['os_family' => $run['os_family'], 'php' => $run['php']];
+    }
+    $skipped = 0;
+    foreach ($junit as $path => $skips) {
+        $environment = $environments[$path] ?? null;
+        foreach ($skips as $case) {
+            $skipped++;
+            $excused = array_filter($keys, fn (array $key) => conditionHolds($key, $environment)
+                && array_filter((array) ($key['tests'] ?? []), fn ($test) => declaresTest($test, $case)) !== []);
+            if ($excused === []) {
+                $reject('UNDECLARED_SKIP', $environment === null
+                    ? "{$path}: {$case['file']}: {$case['name']} is skipped, and no skip_reasons key declared for {$id} excuses it (test_runs gives this junit file no environment)"
+                    : "{$path}: {$case['file']}: {$case['name']} is skipped on {$environment['os_family']} PHP {$environment['php']}, and no skip_reasons key declared for {$id} excuses it there");
+            }
+        }
+    }
+    if ($counts !== null && $counts['skipped'] > $skipped) {
+        $reject('UNDECLARED_SKIP', $skipped === 0
+            ? "{$counts['skipped']} skipped, and no junit file in the record names a skipped test"
+            : "{$counts['skipped']} skipped, but the junit files in the record name only {$skipped}");
+    } elseif ($counts !== null && $counts['skipped'] > 0 && $counts['skipped'] < $skipped) {
+        $reject('SKIP_COUNT_MISMATCH', "{$counts['skipped']} skipped, but the junit files in the record mark {$skipped} tests skipped");
     }
 
     // Outcome. N/A applies only with a key the manifest declared before the run.
