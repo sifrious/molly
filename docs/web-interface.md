@@ -59,7 +59,7 @@ If no run appears, check `php artisan queue:failed` and the worker output before
 
 Web and MCP starts work with the database, Redis, Beanstalkd, and SQS drivers. The reservation time (or the SQS visibility timeout) must be longer than 3600 seconds, Molly's job timeout; `3700` is the documented value for `retry_after`. The sync, deferred, null, and failover drivers are rejected.
 
-With SQLite and more than one worker on PHP 8.4 or later, set `transaction_mode` to `IMMEDIATE` and `busy_timeout` to `10000` on the connection. On PHP 8.3, use one worker. Molly does not change your database settings.
+With SQLite and more than one worker on PHP 8.4 or later, set `transaction_mode` to `IMMEDIATE` and `busy_timeout` to `10000` on the connection. Two workers on a SQLite queue need PHP 8.4 or later: Laravel ignores `transaction_mode` on PHP 8.3, and the workers fail each other with `database is locked`. On PHP 8.3, `molly:worker start` refuses a second worker in the workspace with `WORKER_CONCURRENCY_UNSUPPORTED` and starts nothing. Use one worker there, or a MySQL or PostgreSQL queue database. Molly does not change your database settings.
 
 Starting a task from Artisan needs no worker.
 

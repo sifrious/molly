@@ -44,6 +44,9 @@ function onlyOrbRun(array $state, string $task): array
 }
 
 it('runs two queued tasks at the same time on two Orbs, each in its own worktree with its own model', function (): void {
+    if (PHP_VERSION_ID < 80400) {
+        $this->markTestSkipped('Competing SQLite workers require PHP 8.4 or later. Laravel ignores transaction_mode on PHP 8.3.');
+    }
     $this->root = $root = orbExecutionFixture(barrier: 2);
     $orbs = dirname($root).'/orbs';
     touch($root.'/hold');
@@ -135,6 +138,9 @@ it('runs two queued tasks at the same time on two Orbs, each in its own worktree
 });
 
 it('keeps both results inspectable after the Orb workers restart', function (): void {
+    if (PHP_VERSION_ID < 80400) {
+        $this->markTestSkipped('Competing SQLite workers require PHP 8.4 or later. Laravel ignores transaction_mode on PHP 8.3.');
+    }
     $this->root = $root = orbExecutionFixture(barrier: 2);
 
     $workers = [];
@@ -188,6 +194,9 @@ it('keeps both results inspectable after the Orb workers restart', function (): 
 });
 
 it('runs exactly one attempt when an Orb start is delivered twice', function (): void {
+    if (PHP_VERSION_ID < 80400) {
+        $this->markTestSkipped('Competing SQLite workers require PHP 8.4 or later. Laravel ignores transaction_mode on PHP 8.3.');
+    }
     $this->root = $root = orbExecutionFixture(orbs: ['big' => 'gpt-oss:120b-code'], tasks: ['one'], duplicate: true);
 
     [$first, $queued] = orbArtisan($root, ['molly:queue', 'one', '--orb=big']);

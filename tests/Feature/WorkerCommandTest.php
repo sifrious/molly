@@ -155,10 +155,11 @@ it('restarts the worker with a new process', function (): void {
 });
 
 it('treats a pid file for a process that has exited as stale and starts a new worker', function (): void {
-    $gone = new Process(['true']);
+    // getPid() is null once a process has exited, so read it before stopping a process that waits.
+    $gone = new Process(['sleep', '30']);
     $gone->start();
     $pid = $gone->getPid();
-    $gone->wait();
+    $gone->stop(0);
     File::ensureDirectoryExists($this->workspace.'/.molly/worker');
     File::put($this->workspace.'/.molly/worker/worker.json', json_encode([
         'pid' => $pid, 'pgid' => $pid, 'command' => ['php', base_path('artisan'), 'queue:work', 'sync', '--queue=default'],
@@ -198,31 +199,48 @@ it('never signals a reused pid that runs a different command', function (): void
     }
 });
 
-it('uses job control without setsid, and starts nothing when the shell has none', function (): void {
-    // A PATH with only the tools the launch script, the fake worker, and ps need, and no setsid.
-    $bin = $this->workspace.'/bin-without-setsid';
-    File::ensureDirectoryExists($bin);
-    foreach (['ls', 'sleep', 'ps'] as $tool) {
-        symlink((new ExecutableFinder)->find($tool), $bin.'/'.$tool);
+/** A directory of links to $tools that exist on this machine, to use as a PATH without the others. */
+function pathWith(string $directory, array $tools): string
+{
+    File::ensureDirectoryExists($directory);
+    foreach ($tools as $tool) {
+        $found = (new ExecutableFinder)->find($tool);
+        if ($found !== null) {
+            symlink($found, $directory.'/'.$tool);
+        }
     }
-    $probe = new Process(['/bin/sh', '-c', 'set -m 2>/dev/null; case $- in *m*) echo on ;; esac'], env: ['PATH' => $bin]);
-    $probe->run();
-    $path = ['env' => getenv('PATH'), 'server' => $_SERVER['PATH'] ?? null, 'dotenv' => $_ENV['PATH'] ?? null];
-    putenv('PATH='.$bin);
-    $_SERVER['PATH'] = $_ENV['PATH'] = $bin;
+
+    return $directory;
+}
+
+/** Run $callback with PATH set to $path for this process and the processes it starts. */
+function withPath(string $path, Closure $callback): mixed
+{
+    $saved = ['env' => getenv('PATH'), 'server' => $_SERVER['PATH'] ?? null, 'dotenv' => $_ENV['PATH'] ?? null];
+    putenv('PATH='.$path);
+    $_SERVER['PATH'] = $_ENV['PATH'] = $path;
 
     try {
-        $started = worker('start', $this->workspace);
+        return $callback();
     } finally {
-        $path['env'] === false ? putenv('PATH') : putenv('PATH='.$path['env']);
+        $saved['env'] === false ? putenv('PATH') : putenv('PATH='.$saved['env']);
         foreach (['server' => '_SERVER', 'dotenv' => '_ENV'] as $key => $global) {
-            if ($path[$key] === null) {
+            if ($saved[$key] === null) {
                 unset($GLOBALS[$global]['PATH']);
             } else {
-                $GLOBALS[$global]['PATH'] = $path[$key];
+                $GLOBALS[$global]['PATH'] = $saved[$key];
             }
         }
     }
+}
+
+it('uses job control without setsid, and starts nothing when the shell has none', function (): void {
+    // A PATH with only the tools the launch script, the fake worker, and ps need: no setsid and no bash.
+    $bin = pathWith($this->workspace.'/bin-without-setsid', ['ls', 'sleep', 'ps']);
+    $probe = new Process(['/bin/sh', '-c', 'set -m 2>/dev/null; case $- in *m*) echo on ;; esac'], env: ['PATH' => $bin]);
+    $probe->run();
+
+    $started = withPath($bin, fn (): array => worker('start', $this->workspace));
 
     if (trim($probe->getOutput()) === 'on') {
         // macOS: /bin/sh turns on job control without a terminal.
@@ -270,22 +288,88 @@ it('rejects an unknown action and an invalid timeout', function (): void {
         ->and(worker('stop', $this->workspace, ['--timeout' => '0'])['error'])->toStartWith('WORKER_TIMEOUT_INVALID');
 });
 
-it('closes the caller pipe so a piped molly:worker start returns at once', function (): void {
+it('closes the caller pipe so a piped molly:worker start returns at once', function (int $inherited): void {
+    // Descriptors the caller passes down push Artisan's copies of the pipe above 9, which dash cannot close.
+    $handles = array_map(fn (): mixed => fopen('/dev/null', 'r'), array_fill(0, $inherited, null));
     $command = testbenchProcess(['molly:worker', 'start', '--workspace='.$this->workspace, '--json'])->getCommandLine();
     $pipeline = Process::fromShellCommandline($command.' | cat', dirname(__DIR__, 2), [
         ...testbenchProcess([])->getEnv(),
         'MOLLY_WORKER_PHP_BINARY' => config('molly.worker.php_binary'),
     ], timeout: 15);
 
-    $started = microtime(true);
-    $pipeline->run();
+    try {
+        $started = microtime(true);
+        $pipeline->run();
+    } finally {
+        array_map(fclose(...), $handles);
+    }
     $result = json_decode($pipeline->getOutput(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($pipeline->getExitCode())->toBe(0)
         ->and(microtime(true) - $started)->toBeLessThan(10)
         ->and($result['state'])->toBe('running')
         ->and(processAlive($result['pid']))->toBeTrue();
-});
+})->with(['no inherited descriptors' => 0, 'twelve inherited descriptors' => 12]);
+
+/** @return array<int, string> the open descriptors of process $pid and the path each one names */
+function openDescriptors(int $pid): array
+{
+    $open = [];
+    if (is_dir('/proc/'.$pid.'/fd')) {
+        foreach (scandir('/proc/'.$pid.'/fd') ?: [] as $fd) {
+            if (ctype_digit($fd)) {
+                $open[(int) $fd] = (string) @readlink('/proc/'.$pid.'/fd/'.$fd);
+            }
+        }
+
+        return $open;
+    }
+
+    $lsof = new Process(['lsof', '-a', '-p', (string) $pid, '-Fn']);
+    $lsof->run();
+    $fd = null;
+    foreach (explode("\n", $lsof->getOutput()) as $line) {
+        if (str_starts_with($line, 'f')) {
+            $fd = ctype_digit(substr($line, 1)) ? (int) substr($line, 1) : null;
+        } elseif (str_starts_with($line, 'n') && $fd !== null) {
+            $open[$fd] = substr($line, 1);
+        }
+    }
+
+    return $open;
+}
+
+it('starts the worker when the caller holds descriptors above 9, and never passes it worker.lock', function (bool $bash): void {
+    // dash reads `exec 10>&-` as a command named 10 and exits, so the launch must not try it there.
+    $marker = $this->workspace.'/held';
+    File::put($marker, '');
+    $handles = array_map(fn (): mixed => fopen($marker, 'r'), array_fill(0, 12, null));
+    // Without bash on PATH, the launch runs in /bin/sh: dash on Debian and Ubuntu, bash on macOS.
+    $path = $bash ? (string) getenv('PATH') : pathWith($this->workspace.'/bin-without-bash', ['ls', 'sleep', 'ps', 'setsid']);
+    $probe = new Process(['/bin/sh', '-c', '(exec 10>&-) 2>/dev/null']);
+    $probe->run();
+    $closesAll = $bash || $probe->isSuccessful();
+
+    try {
+        expect(max(array_keys(array_filter(openDescriptors(getmypid()), fn (string $path): bool => $path === $marker))))->toBeGreaterThanOrEqual(10)
+            ->and(withPath($path, fn (): bool => (new ExecutableFinder)->find('bash') !== null))->toBe($bash);
+
+        $started = withPath($path, fn (): array => worker('start', $this->workspace));
+        expect($started['exit'])->toBe(0, (string) ($started['error'] ?? ''))
+            ->and($started['state'])->toBe('running')
+            ->and(posix_getpgid($started['pid']))->toBe($started['pid']);
+
+        $open = openDescriptors($started['pid']);
+        $held = array_keys(array_filter($open, fn (string $path): bool => $path === $marker));
+        expect(array_filter($open, fn (string $path): bool => str_ends_with($path, '/.molly/worker/worker.lock')))->toBe([])
+            // bash, BusyBox ash, and macOS sh close every inherited descriptor; dash closes 3 to 9.
+            ->and($closesAll ? $held : array_filter($held, fn (int $fd): bool => $fd < 10))->toBe([]);
+
+        worker('stop', $this->workspace, ['--timeout' => 5]);
+    } finally {
+        array_map(fclose(...), $handles);
+    }
+})->with(['bash' => true, '/bin/sh' => false]);
 
 /** @return list<int> Live processes whose command line names $binary. */
 function processesRunning(string $binary): array
