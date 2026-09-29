@@ -339,3 +339,19 @@ it('refuses to lock an authored test that calls get() without importing it and r
     expect($retry['report']['authored_test']['classification'])->toBe('missing_behavior')
         ->and($retry['next']['command'])->toBe('php artisan molly:lock-test '.$task->id.' --approve');
 });
+
+it('sends the workspace Livewire layout to the test-authoring run', function () {
+    File::put($this->workspace.'/composer.lock', json_encode(['packages' => [['name' => 'livewire/livewire', 'version' => 'v2.12.6']], 'packages-dev' => []]));
+    $task = authoringTask($this->workspace);
+    ChangeWriter::fake([['summary' => 'Write the counter test.', 'files' => [['path' => 'tests/Feature/CounterTest.php', 'content' => migratedCounterTest()]]]])->preventStrayPrompts();
+    fakeAuthoringCollaborators(1);
+
+    mollyJson('molly:start', ['task' => $task->id]);
+
+    ChangeWriter::assertPrompted(fn ($prompt): bool => (json_decode($prompt->prompt, true, flags: JSON_THROW_ON_ERROR)['livewire'] ?? null) === [
+        'installed_version' => '2.12.6',
+        'class_namespace' => 'App\\Http\\Livewire',
+        'class_directory' => 'app/Http/Livewire',
+        'view_directory' => 'resources/views/livewire',
+    ]);
+});

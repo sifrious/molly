@@ -45,7 +45,7 @@ class PestTestAuthoring
         }
 
         if ($this->registersLivewire($content)) {
-            $issues[] = 'Do not register Livewire components inside the acceptance Pest file; assert against App\\Livewire\\… instead.';
+            $issues[] = 'Do not register Livewire components inside the acceptance Pest file; assert against the application\'s own component classes instead.';
         }
 
         if ($this->registersRoutes($content)) {

@@ -70,6 +70,11 @@ class MollyStoryCommand extends Command
             $scope = $task->source['scope'];
             info('Implementation files');
             $this->line(implode("\n", [...$paths, ...$scope['files']]));
+            foreach ($scope['adjusted'] ?? [] as $adjusted) {
+                note($adjusted['from'] === null
+                    ? 'Molly added '.$adjusted['path'].'. '.$adjusted['reason']
+                    : 'Molly moved '.$adjusted['from'].' to '.$adjusted['path'].'. '.$adjusted['reason']);
+            }
             foreach ($scope['rejected'] as $rejected) {
                 warning('Molly left out '.$rejected['path'].'. '.$rejected['reason']);
             }

@@ -1,5 +1,6 @@
 <?php
 
+use Sifrious\Molly\Agents\AcceptanceWriter;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Verification\PestTestAuthoring;
 
@@ -8,7 +9,7 @@ it('teaches ChangeWriter test-authoring mode for writable Pest paths', function 
 
     expect($instructions)->toContain('protected_test.writable is true')
         ->and($instructions)->toContain('it() or test()')
-        ->and($instructions)->toContain('App\\Livewire\\')
+        ->and($instructions)->toContain('livewire.class_namespace')
         ->and($instructions)->toContain('/login')
         ->and($instructions)->toContain('/logout')
         ->and($instructions)->toContain('Schema::create')
@@ -67,4 +68,13 @@ it('rejects an authored Pest file that omits the opening PHP tag', function (): 
         ->toContain('Start the file with <?php; Pest found no tests in a file without the opening tag.')
         ->and(app(PestTestAuthoring::class)->issues("<?php\n\n".$content))->toBe([])
         ->and(app(PestTestAuthoring::class)->issues("\xEF\xBB\xBF<?php\n".$content))->toBe([]);
+});
+
+it('tells the story and change writers to use the installed Livewire layout and to list views', function (): void {
+    $change = (new ChangeWriter)->instructions();
+    $acceptance = (new AcceptanceWriter)->instructions();
+
+    expect($change)->toContain('livewire.class_namespace', 'livewire.class_directory', 'livewire.view_directory', 'Never use the namespace or directory of another Livewire version.')
+        ->and($change)->not->toContain('App\\Livewire')
+        ->and($acceptance)->toContain('livewire.class_directory', 'livewire.view_directory', 'Include the Blade view for every page, form, and component a criterion shows');
 });

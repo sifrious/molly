@@ -40,6 +40,8 @@ The configured model returns three things, and Molly saves each on the task:
 
 - Numbered acceptance criteria, in `source.acceptance`.
 - The application files the implementation will create or change, in `source.scope.files`. Molly checks each path with the [file scope](#file-scope) rules and keeps the ones that pass. A path it drops, such as `config/app.php`, a migration, or the test itself, is listed in `source.scope.rejected` with the reason. The authoring run cannot write these files; it writes only the test.
+
+  Molly reads the `livewire/livewire` version from `composer.lock`, or from `vendor/composer/installed.json`, and tells the model where that version looks for components: `App\Http\Livewire` in `app/Http/Livewire` for Livewire 2, and `App\Livewire` in `app/Livewire` for Livewire 3 and 4, with views in `resources/views/livewire`. Without Livewire, it uses the Livewire 3 and 4 layout. A component class the model puts in the other layout moves to the installed one, and each component class brings the view Livewire renders for it, such as `resources/views/livewire/user-table.blade.php` for `app/Livewire/UserTable.php`, within the file limit. Both changes are listed in `source.scope.adjusted` with a `LIVEWIRE_LAYOUT` or `LIVEWIRE_VIEW` reason, and `molly:story` prints them. The test-authoring run and the implementation run get the same layout in the model input as `livewire`.
 - The Composer packages the behavior needs, in `source.scope.required_packages`. Molly compares each name with the `require` list in `composer.json` and with `composer.lock`, and marks it `required`, `dev_only`, `transitive`, or `missing`.
 
 The command prints the criteria, the files, and three commands. Run them as printed:

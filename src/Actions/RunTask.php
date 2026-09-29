@@ -8,6 +8,7 @@ use RuntimeException;
 use Sifrious\Molly\Classification\ClassifyRunEvidence;
 use Sifrious\Molly\Contracts\LifecycleEventType;
 use Sifrious\Molly\Execution\Sandbox;
+use Sifrious\Molly\Knowledge\LivewireLayout;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\RunStopped;
@@ -156,7 +157,7 @@ class RunTask
             $this->checkpoint($heartbeat, $shouldStop, $recordProgress, 'Writing the selected files with '.(config('molly.agent', 'ollama') === 'amp' ? 'Amp' : 'Ollama'));
             $generationStarted = hrtime(true);
             try {
-                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest, $allowTestEdits ? $this->pestConfiguration($workspace, $before) : []);
+                $proposal = $this->generate->handle($run->prompt, $before, $testPath, $previousAttempt, $allowTestEdits, $testDigest, $allowTestEdits ? $this->pestConfiguration($workspace, $before) : [], LivewireLayout::forWorkspace($workspace->path)->toArray());
             } finally {
                 $report['model_identity'] = $this->modelIdentity->handle(intdiv(hrtime(true) - $generationStarted, 1_000_000));
                 $run->update(['report' => $report]);
