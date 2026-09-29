@@ -35,9 +35,17 @@ In `.molly/GLOSSARY.md`, each Molly term ends with its source. The Markdown link
 
 A journal write failure never changes a run's result.
 
+## Handoff envelopes
+
+```bash
+php artisan molly:handoff ready-check --from=SENDER_UUID --to=RECIPIENT_UUID --approve
+```
+
+Molly saves the envelope to `.molly/handoffs/HANDOFF_ID.json` and prints it with that path. The envelope names the task, its latest attempt, the files the recipient may change, and the protected test. It also carries the task status, the Pest result, and up to three Tarpit findings from that attempt, and the context you passed with `--context`, with secrets redacted. If Molly cannot save the file, it does not record the handoff. See [Bloom](bloom.md#hand-a-task-to-another-workspace).
+
 ## Keep them out of Git
 
-Journals can contain task descriptions and review text, so read them before sharing. Molly writes them with owner-only permissions and adds an ignore rule inside `.molly/.gitignore`. Keep `.molly/` ignored in your repository as well; Molly does not edit your root `.gitignore`.
+Journals and handoff envelopes can contain task descriptions and review text, so read them before sharing. Molly writes them with owner-only permissions, `0700` for directories and `0600` for files, and adds an ignore rule inside `.molly/.gitignore`. Keep `.molly/` ignored in your repository as well; Molly does not edit your root `.gitignore`.
 
 ## Record a decision
 

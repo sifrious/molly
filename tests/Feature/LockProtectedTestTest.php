@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Illuminate\Testing\Fluent\AssertableJson;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\LockProtectedTest;
 use Sifrious\Molly\Actions\RecordLifecycleEvent;
@@ -77,27 +76,27 @@ it('refuses to lock a missing Pest file', function () {
         ->toThrow(RuntimeException::class, 'PROTECTED_TEST_MISSING');
 });
 
-it('locks a Pest test through MCP without starting an agent', function () {
+it('refuses to lock a Pest test through MCP', function () {
     $task = app(CreateTask::class)->handle('Author the greeting test.', $this->workspace, [], 'tests/GreetingTest.php', allowTestEdits: true);
-    $after = writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+    writeProtectedTest($this->workspace, contents: '<?php it("returns Hello", fn () => expect(true)->toBeTrue());');
+    $before = $task->fresh()->getAttributes();
 
-    MollyServer::tool(MollyTask::class, ['operation' => 'lock_test', 'id' => $task->id])->assertHasErrors(['approve']);
-    MollyServer::tool(MollyTask::class, ['operation' => 'lock_test', 'id' => $task->id, 'approve' => false])
-        ->assertHasErrors()->assertSee('TEST_LOCK_UNCONFIRMED');
     MollyServer::tool(MollyTask::class, [
         'operation' => 'lock_test',
         'id' => $task->id,
         'approve' => true,
         'paths' => ['app/Greeting.php'],
         'reason' => 'Lock the authored greeting test.',
-    ])->assertOk()->assertStructuredContent(fn (AssertableJson $json) => $json
-        ->where('locked', true)
-        ->where('allow_test_edits', false)
-        ->where('after_digest', $after)
-        ->etc());
+    ])->assertHasErrors([
+        'HUMAN_APPROVAL_REQUIRED',
+        "php artisan molly:lock-test {$task->id} --approve --file=app/Greeting.php --reason='Lock the authored greeting test.'",
+    ]);
 
-    expect($task->fresh()->allow_test_edits)->toBeFalse()
-        ->and($task->fresh()->paths)->toBe(['app/Greeting.php']);
+    $task->refresh();
+    expect($task->getAttributes())->toBe($before)
+        ->and($task->allow_test_edits)->toBeTrue()
+        ->and($task->source['test_lock'] ?? null)->toBeNull()
+        ->and(app(RecordLifecycleEvent::class)->load($this->workspace)->latestOf($task->id, LifecycleEventType::TestLocked))->toBeNull();
 });
 
 it('starts the implementation scope with fresh attempts after authoring attempts are exhausted', function () {

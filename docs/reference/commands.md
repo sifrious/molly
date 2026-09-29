@@ -89,11 +89,22 @@ With `--json`, `molly:status` returns `workspace`, `checked_at`, `readiness` (th
 | `molly:comment TASK --approve [--close]` | Posts or updates one GitHub issue comment. |
 | `molly:pr-opened TASK --url URL --approve` | Records a pull request a person opened. |
 | `molly:merged TASK --sha SHA --approve` | Records a merge a person made. |
-| `molly:handoff TASK --from UUID --to UUID` | Prints a handoff envelope for a child Bloom workspace. |
+| `molly:handoff TASK --from UUID --to UUID --approve` | Saves a handoff envelope for a child Bloom workspace to `.molly/handoffs/HANDOFF_ID.json` and prints it with that path. With `--json`, prints only the envelope. |
 | `molly:bloom-contract TASK --workspace-id=… --branch=… --base-sha=…` | Exports the task contract for a Bloom workspace. |
 | `molly:review-commit [REF] [--staged]` | Checks a PHP diff for whitespace problems and, with Jev on, asks for a review. |
 
-Molly never opens, comments on, or merges anything without `--approve`, and it never opens or merges a pull request at all.
+Molly never opens, comments on, or merges anything without `--approve`, and it never opens or merges a pull request at all. Without `--approve`, these commands refuse and change nothing:
+
+| Command | Refused with |
+| --- | --- |
+| `molly:approve` | `APPROVAL_UNCONFIRMED` |
+| `molly:lock-test` | `TEST_LOCK_UNCONFIRMED` |
+| `molly:pr-opened` | `PR_RECORD_UNCONFIRMED` |
+| `molly:merged` | `MERGE_RECORD_UNCONFIRMED` |
+| `molly:handoff` | `HANDOFF_UNCONFIRMED` |
+| `molly:comment` | `GITHUB_WRITEBACK_UNAPPROVED` |
+
+These commands are the only way to record a human decision: the MCP tool refuses the same operations with `HUMAN_APPROVAL_REQUIRED` and returns the command to run. See [Human decisions](../agents.md#human-decisions).
 
 ## Planning
 

@@ -19,6 +19,17 @@ arch('application actions do not depend on transport or presentation')
         'Livewire',
     ]);
 
+arch('MCP tools never call the actions that record a human decision')
+    ->expect('Sifrious\Molly\Mcp')
+    ->not->toUse([
+        'Sifrious\Molly\Actions\ApproveTask',
+        'Sifrious\Molly\Actions\LockProtectedTest',
+        'Sifrious\Molly\Actions\RecordPullRequestOpened',
+        'Sifrious\Molly\Actions\RecordMerged',
+        'Sifrious\Molly\Actions\PublishGitHubIssueStatus',
+        'Sifrious\Molly\Actions\HandOffTask',
+    ]);
+
 arch('bundled measurements do not depend on task execution or agents')
     ->expect('Sifrious\Molly\Complexity')
     ->not->toUse([
