@@ -1,0 +1,26 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:routing","title":"Laravel 13 routing","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/routing.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"ffc4504550cef667c0098177fb9eb33466d8e7154bb35db6bd0f95aead8b8963","metadata":{"path":"sources/laravel-routing.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Support\\Facades\\Route","title":"Illuminate\\Support\\Facades\\Route","location":"vendor/laravel/framework/src/Illuminate/Support/Facades/Route.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Support/Facades/Route.php","symbol":"Illuminate\\Support\\Facades\\Route"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Support\\Facades\\Route","label":"Route","sources":["framework_source:Illuminate\\Support\\Facades\\Route"],"metadata":{"symbol":"Illuminate\\Support\\Facades\\Route"}},
+    {"ref":"concept:route","label":"Route","sources":["documentation:routing"],"metadata":[]},
+    {"ref":"configuration:routes/web.php","label":"routes/web.php","sources":["documentation:routing"],"metadata":[]},
+    {"ref":"documentation_section:docs:routing#basic-routing","label":"Basic Routing","sources":["documentation:routing"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:routing#the-default-route-files","label":"The Default Route Files","sources":["documentation:routing"],"metadata":{"heading_level":3}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:routing"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:route","relation":"configured_by","to":"configuration:routes/web.php","sources":["documentation:routing"],"metadata":[]},
+    {"from":"concept:route","relation":"documented_in","to":"documentation_section:docs:routing#basic-routing","sources":["documentation:routing"],"metadata":[]},
+    {"from":"concept:route","relation":"uses","to":"class:Illuminate\\Support\\Facades\\Route","sources":["framework_source:Illuminate\\Support\\Facades\\Route"],"metadata":[]},
+    {"from":"configuration:routes/web.php","relation":"uses","to":"class:Illuminate\\Support\\Facades\\Route","sources":["framework_source:Illuminate\\Support\\Facades\\Route"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:route","sources":["documentation:routing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"configuration:routes/web.php","sources":["documentation:routing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:routing#basic-routing","sources":["documentation:routing"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:routing#the-default-route-files","sources":["documentation:routing"],"metadata":[]}
+  ]
+}

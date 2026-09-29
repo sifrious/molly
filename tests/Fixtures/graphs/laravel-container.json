@@ -1,0 +1,22 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:container","title":"Laravel 13 container","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/container.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"1a0e1f3917f2df6fc0b60ef9c9c1d187b7c87f22366b25af1ffb3a2dd06d1408","metadata":{"path":"sources/laravel-container.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Container\\Container","title":"Illuminate\\Container\\Container","location":"vendor/laravel/framework/src/Illuminate/Container/Container.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Container/Container.php","symbol":"Illuminate\\Container\\Container"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Container\\Container","label":"Container","sources":["framework_source:Illuminate\\Container\\Container"],"metadata":{"symbol":"Illuminate\\Container\\Container"}},
+    {"ref":"concept:container","label":"Container","sources":["documentation:container"],"metadata":[]},
+    {"ref":"documentation_section:docs:container#when-to-utilize-the-container","label":"When to Utilize the Container","sources":["documentation:container"],"metadata":{"heading_level":3}},
+    {"ref":"documentation_section:docs:container#zero-configuration-resolution","label":"Zero Configuration Resolution","sources":["documentation:container"],"metadata":{"heading_level":3}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:container"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:container","relation":"documented_in","to":"documentation_section:docs:container#zero-configuration-resolution","sources":["documentation:container"],"metadata":[]},
+    {"from":"concept:container","relation":"uses","to":"class:Illuminate\\Container\\Container","sources":["framework_source:Illuminate\\Container\\Container"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:container","sources":["documentation:container"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:container#when-to-utilize-the-container","sources":["documentation:container"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:container#zero-configuration-resolution","sources":["documentation:container"],"metadata":[]}
+  ]
+}

@@ -39,6 +39,27 @@ it('ships a small connected graph with verifiable offline citations for every pl
     expect($size)->toBeLessThanOrEqual(128 * 1024);
 });
 
+it('draws each planning guide edge from the step order and the sources each step cites', function () {
+    $graph = app(PlanningGuide::class)->graph();
+    $steps = array_column($graph['steps'], 'id');
+    $expected = [];
+    foreach (array_slice($steps, 1) as $index => $step) {
+        $expected[] = "step:{$steps[$index]} next step:{$step}";
+    }
+    foreach ($graph['steps'] as $step) {
+        foreach ($step['source_ids'] as $source) {
+            $expected[] = "step:{$step['id']} consult source:{$source}";
+        }
+    }
+    $actual = array_map(fn (array $edge): string => "{$edge['from']} {$edge['relation']} {$edge['to']}", $graph['edges']);
+    sort($expected);
+    sort($actual);
+
+    // The guide page lists these edges, while PlanningGuide::sourcesFor() reads source_ids, so a
+    // wrong edge would show a reader a citation the planner never uses.
+    expect($actual)->toBe($expected, 'resources/planning/guide.json edges must follow the step order and each step\'s source_ids');
+});
+
 it('traverses unanswered questions in order and finishes after all decisions are supplied', function () {
     $guide = app(PlanningGuide::class);
     $answers = [];
