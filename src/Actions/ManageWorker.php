@@ -208,13 +208,27 @@ class ManageWorker
                 : ['state' => 'stale', 'alive' => false, 'stale_reason' => 'process_gone'];
         }
 
-        $line = Process::timeout(5)->run(['ps', '-o', 'command=', '-p', (string) $pid])->output();
         $expected = implode(' ', array_slice($record['command'], 1));
-        $owned = str_contains($line, $expected) && posix_getpgid($pid) === $record['pgid'];
+        $owned = str_contains($this->commandLine($pid), $expected) && posix_getpgid($pid) === $record['pgid'];
 
         return $owned
             ? ['state' => 'running', 'alive' => true, 'stale_reason' => null]
             : ['state' => 'stale', 'alive' => true, 'stale_reason' => 'pid_reused'];
+    }
+
+    /**
+     * The process's arguments joined by spaces. Linux keeps the exact bytes in /proc. Elsewhere ps
+     * prints non-ASCII bytes as escapes unless the locale is UTF-8, and an app opened from the Finder
+     * has no locale set, so ps runs with en_US.UTF-8, which every macOS release ships.
+     */
+    private function commandLine(int $pid): string
+    {
+        $arguments = @file_get_contents('/proc/'.$pid.'/cmdline');
+        if (is_string($arguments) && $arguments !== '') {
+            return str_replace("\0", ' ', rtrim($arguments, "\0"));
+        }
+
+        return Process::timeout(5)->env(['LC_ALL' => 'en_US.UTF-8'])->run(['ps', '-o', 'command=', '-p', (string) $pid])->output();
     }
 
     /**
