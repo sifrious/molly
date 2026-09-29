@@ -25,13 +25,16 @@ composer config repositories.molly vcs https://github.com/sifrious/molly
 composer require --dev sifrious/molly:^0.2
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
-ollama pull qwen2.5-coder:7b
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 php artisan molly:doctor
 php artisan molly:demo
 php artisan molly:start demo-greeting
 ```
+
+`molly:install-model` asks before it downloads and prints the model it installed; use that name for `MODEL`. [Ollama](ollama-quickstart.md#the-fit-decision) explains how Molly chooses it.
 
 On macOS, doctor reports `sandbox_unavailable`. Add `MOLLY_SANDBOX_ALLOW_UNSAFE=true` to `.env` for a checkout you trust, then clear the configuration cache and run doctor again; [Getting started](getting-started.md#macos-and-the-sandbox) says what that trades away.
 

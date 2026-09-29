@@ -99,7 +99,7 @@ use Sifrious\Molly\Actions\GenerateChanges;
 use Sifrious\Molly\Agents\ChangeWriter;
 
 it('uses the team change writer', function () {
-    config(['molly.agent' => 'ollama', 'molly.model' => 'qwen2.5-coder:7b']);
+    config(['molly.agent' => 'ollama', 'molly.model' => 'gpt-oss:20b']);
     TeamChangeWriter::fake([[
         'summary' => 'Add the route.',
         'files' => [['path' => 'routes/web.php', 'content' => '<?php']],

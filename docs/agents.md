@@ -6,15 +6,17 @@ You do not need MCP to run tasks from Artisan. MCP lets an editor or chat client
 
 ## Ollama
 
-Ollama is the default. Pull a model and save its name:
+Ollama is the default. Let Molly decide which approved model fits this Mac, install it, and save its name:
 
 ```bash
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-[Ollama](ollama-quickstart.md) covers choosing a model, the endpoint, and the doctor codes.
+[Ollama](ollama-quickstart.md) covers the fit decision, the approved catalogue, the endpoint, and the doctor codes.
 
 ## Amp
 

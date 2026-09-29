@@ -41,18 +41,19 @@ Molly records the commit each task starts from, so the application must be a Git
 
 ## Run the demo with a local model
 
-You do not need a paid AI account. With [Ollama](https://ollama.com) installed:
+You do not need a paid AI account. With [Ollama](https://ollama.com) 0.34.4 installed:
 
 ```bash
-ollama pull qwen2.5-coder:7b
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 php artisan molly:doctor
 php artisan molly:demo
 php artisan molly:start demo-greeting
 ```
 
-`molly:preflight` reports what this Mac can hold before you download a model; it measures and never downloads. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
+`molly:preflight` measures this Mac and decides which approved model fits: `gpt-oss:120b-code` on a 96 GB Mac, `gpt-oss:20b` on a Mac with 16 GB or more, or no fit. It downloads nothing. `molly:install-model` shows the download size and the volume it goes to, asks before it downloads, verifies the model's digest, and checks that the model can do a Molly task. Replace `MODEL` with the name it prints. [Ollama](docs/ollama-quickstart.md) explains the decision and the approved catalogue. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
 
 On macOS, doctor reports that the writer sandbox is unavailable, because it needs Linux Landlock. Molly refuses to start a task until you opt out of isolation for a trusted checkout. [Getting started](docs/getting-started.md#macos-and-the-sandbox) explains that choice.
 
@@ -89,7 +90,7 @@ The full index is in the [documentation overview](docs/overview.md).
 
 Molly 0.2 is in prelaunch acceptance testing. The latest tag is `v0.1.3`; no 0.2 release is tagged yet, so the `^0.2` install line above resolves only after `v0.2.0` is published. Release candidates, named `0.2.0-RC<n>`, are acceptance builds installed from a local zip, not releases; [docs/acceptance/README.md](docs/acceptance/README.md) describes them. These docs follow `main`, which `v0.2.0` will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, Pest todos from GitHub issue acceptance criteria, local Ollama and Amp agents, agent steps you can replace with your own Laravel AI agent class, local MCP tools, planning, a local web interface, project and Laravel knowledge graphs, journals, and optional Jev advice through Laravel AI.
 
-Molly does not open or merge pull requests. MCP clients cannot approve a change, lock a test, record a pull request or merge, post a GitHub comment, or hand off a task; a person runs those Artisan commands with `--approve`. Remote execution on an Orb is not shipped: Molly refuses Orb requests, and every run executes on the machine where you run Artisan. The Bloom plugin is built against Bloom commit `1599f05f` and is not in the Composer package; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
+Molly does not open or merge pull requests. MCP clients cannot approve a change, lock a test, record a pull request or merge, post a GitHub comment, or hand off a task; a person runs those Artisan commands with `--approve`. Remote execution on an Orb is not shipped: Molly refuses Orb requests, and every run executes on the machine where you run Artisan. The model fit decision and `molly:install-model` support Apple silicon Macs only, approve two Ollama artifacts (`gpt-oss:20b` and `gpt-oss:120b-code`) for Ollama 0.34.4, and do not install Ollama itself. The Bloom plugin is built against Bloom commit `1599f05f` and is not in the Composer package; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
 
 ## Name and license
 
