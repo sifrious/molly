@@ -38,14 +38,15 @@ class MollyInstallModelCommand extends Command
 
             $bytes = $plan['download']['bytes'];
             if ($bytes > 0 && ! $this->option('approve')) {
-                $prompt = $this->authorization($plan);
                 if ($json || ! $this->input->isInteractive()) {
+                    $prompt = $this->authorization($plan);
                     // Keep the model and every option as typed, with the models directory as the full path shown, so the approved run plans the same download.
                     $rerun = $this->commandLine(['model' => $plan['model'], 'destination' => $destination === null ? null : ($plan['download']['destination'] ?? $destination), 'approve' => true]);
 
                     return $this->reportFailure('DOWNLOAD_AUTHORIZATION_REQUIRED: '.$prompt.' Run: '.$rerun, ['status' => 'authorization_required', 'code' => 'DOWNLOAD_AUTHORIZATION_REQUIRED', 'message' => $prompt, 'rerun' => $rerun] + $this->document($plan));
                 }
-                if (! confirm('Download '.InstallationHeadroom::gigabytes($bytes).' for '.$plan['model'].'?', default: false, yes: 'Download', no: 'Cancel', hint: $prompt)) {
+                note($this->downloadFacts($plan));
+                if (! confirm('Download '.InstallationHeadroom::gigabytes($bytes).' for '.$plan['model'].'?', default: false, yes: 'Download', no: 'Cancel')) {
                     return $this->reportFailure('DOWNLOAD_NOT_AUTHORIZED: Molly downloaded nothing.', ['status' => 'refused', 'code' => 'DOWNLOAD_NOT_AUTHORIZED'] + $this->document($plan));
                 }
             }
@@ -101,6 +102,28 @@ class MollyInstallModelCommand extends Command
             .', which has '.($download['free_bytes'] === null ? 'an unknown amount' : InstallationHeadroom::gigabytes($download['free_bytes'])).' free?'
             .($download['partial_download_present'] ? ' Ollama already holds part of this download and resumes it.' : '')
             .' Molly measures memory, disk, and the runtime again right before it starts.';
+    }
+
+    /**
+     * The same facts as authorization(), one to a line, printed in full before the question.
+     * A prompt hint is cut to one line at the terminal width, so the facts are not a hint.
+     *
+     * @param  array<string, mixed>  $plan
+     */
+    private function downloadFacts(array $plan): string
+    {
+        $download = $plan['download'];
+
+        return implode(PHP_EOL, array_filter([
+            'Model: '.$plan['model'],
+            'Size: '.InstallationHeadroom::gigabytes($download['bytes'])
+                .($download['model'] !== $plan['model'] ? ' (Ollama pulls '.$download['model'].' and derives '.$plan['model'].' from it)' : ''),
+            'Destination: '.($download['destination'] ?? 'the Ollama models directory'),
+            'Volume: '.($download['volume_name'] ?? 'unknown').', mounted at '.($download['mount_point'] ?? 'an unknown mount point'),
+            'Free space: '.($download['free_bytes'] === null ? 'unknown' : InstallationHeadroom::gigabytes($download['free_bytes'])),
+            $download['partial_download_present'] ? 'Ollama already holds part of this download and resumes it.' : null,
+            'Molly measures memory, disk, and the runtime again right before it starts.',
+        ]));
     }
 
     /**

@@ -255,6 +255,47 @@ describe('authorization', function () {
             ->and(downloadRequested())->toBeFalse();
     });
 
+    it('shows every fact of the download in full before it asks, in an 80-column terminal', function () {
+        $fixture = installHost('m2-pro-16gb-external');
+        fakeOllamaApi();
+        $destination = $fixture['destination'].'/Shared Models/team/ollama/models';
+        File::ensureDirectoryExists($destination);
+        $columns = getenv('COLUMNS');
+        putenv('COLUMNS=80');
+
+        try {
+            $this->artisan('molly:install-model', ['--destination' => $destination])
+                ->expectsOutputToContain(implode(PHP_EOL.' ', [
+                    'Model: gpt-oss:20b',
+                    'Size: 13.8 GB',
+                    'Destination: '.$destination,
+                    'Volume: ModelDisk, mounted at /Volumes/ModelDisk',
+                    'Free space: 1538.3 GB',
+                    'Molly measures memory, disk, and the runtime again right before it starts.',
+                ]))
+                ->expectsConfirmation('Download 13.8 GB for gpt-oss:20b?', 'no')
+                ->expectsOutputToContain('DOWNLOAD_NOT_AUTHORIZED: Molly downloaded nothing.')
+                ->assertExitCode(1);
+        } finally {
+            putenv($columns === false ? 'COLUMNS' : 'COLUMNS='.$columns);
+        }
+
+        expect(mb_strlen(' Destination: '.$destination))->toBeGreaterThan(80)
+            ->and(downloadRequested())->toBeFalse();
+    });
+
+    it('names the base model Ollama pulls for a derived model before it asks', function () {
+        $fixture = installHost('m3-ultra-96gb');
+        fakeOllamaApi();
+
+        $this->artisan('molly:install-model', ['--destination' => $fixture['destination']])
+            ->expectsOutputToContain('Size: 65.4 GB (Ollama pulls gpt-oss:120b and derives gpt-oss:120b-code from it)')
+            ->expectsConfirmation('Download 65.4 GB for gpt-oss:120b-code?', 'no')
+            ->assertExitCode(1);
+
+        expect(downloadRequested())->toBeFalse();
+    });
+
     it('downloads nothing when the person declines', function () {
         $fixture = installHost('m2-pro-16gb-external');
         fakeOllamaApi();
