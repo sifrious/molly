@@ -28,10 +28,11 @@ afterEach(function (): void {
 /** A pid that belonged to a process that has exited. */
 function exitedPid(): int
 {
-    $gone = new Process(['true']);
+    // Process::getPid() is null once the process has exited, so read it while the process runs.
+    $gone = new Process(['sleep', '30']);
     $gone->start();
     $pid = $gone->getPid();
-    $gone->wait();
+    $gone->stop(0);
 
     return $pid;
 }

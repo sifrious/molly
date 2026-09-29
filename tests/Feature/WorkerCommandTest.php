@@ -290,10 +290,10 @@ it('keeps the worker directory, log, and record private to the user', function (
 });
 
 it('settles tasks a killed worker left running before it starts a new worker', function (): void {
-    $gone = new Process(['true']);
+    $gone = new Process(['sleep', '30']);
     $gone->start();
     $pid = $gone->getPid();
-    $gone->wait();
+    $gone->stop(0);
     $task = Task::create([
         'prompt' => 'Return Hello.', 'workspace' => $this->workspace, 'paths' => ['app/Greeting.php'], 'test_path' => 'tests/GreetingTest.php',
         'status' => 'running', 'attempt_number' => 1, 'worker_id' => gethostname().':'.$pid, 'claimed_at' => now()->subMinute(), 'lease_expires_at' => now()->addMinutes(5),
