@@ -72,7 +72,7 @@ php artisan molly:install-model [MODEL] [--destination=PATH] [--approve]
 
 Without `MODEL`, Molly installs the model the fit decision selected. You may name any approved model that fits, for example `gpt-oss:20b` on a Mac where `gpt-oss:120b-code` is recommended.
 
-Before a download, the command shows the size, the models directory, and the volume that holds it, and asks you to confirm. With `--json` or `--no-interaction`, it stops with `DOWNLOAD_AUTHORIZATION_REQUIRED` and prints the command to run again with `--approve`. When the approved artifact is already installed, or the base of a derived model is, there is nothing to download and nothing to confirm.
+Before a download, the command lists the model, the download size, the models directory, the volume that holds it and its mount point, and the free space on that volume, one to a line, and then asks you to confirm. Nothing is cut to fit the terminal width. With `--json` or `--no-interaction`, it stops with `DOWNLOAD_AUTHORIZATION_REQUIRED` and prints the command to run again. That command names the model, keeps the options you passed, writes `--destination` as a full path, and adds `--approve`, so the approved run measures and rechecks the same models directory you checked. When the approved artifact is already installed, or the base of a derived model is, there is nothing to download and nothing to confirm.
 
 After you confirm, Molly:
 

@@ -31,7 +31,7 @@ class MollyOrbRevokeCommand extends Command
         $released = $result['released_task']?->reference();
         $stopping = $result['stopping_task']?->reference();
         if ($this->option('json')) {
-            $this->line(json_encode(['status' => 'ok', 'orb' => $described, 'already_revoked' => $result['already_revoked'], 'released_task' => $released, 'stopping_task' => $stopping], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson(['status' => 'ok', 'orb' => $described, 'already_revoked' => $result['already_revoked'], 'released_task' => $released, 'stopping_task' => $stopping]);
 
             return self::SUCCESS;
         }

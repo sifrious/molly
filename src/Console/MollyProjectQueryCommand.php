@@ -29,7 +29,7 @@ final class MollyProjectQueryCommand extends Command
                 array_values($this->option('relation')),
             );
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
 
                 return self::SUCCESS;
             }

@@ -25,7 +25,7 @@ class MollyShowCommand extends Command
                 throw new RuntimeException('RUN_NOT_FOUND: No saved run has that ID.');
             }
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $run->id, 'status' => $run->status, 'report' => $run->report], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $run->id, 'status' => $run->status, 'report' => $run->report]);
             } else {
                 intro('Saved Molly run');
                 $report->show($run, $this->output->isVerbose());

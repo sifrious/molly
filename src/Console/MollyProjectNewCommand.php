@@ -54,7 +54,7 @@ class MollyProjectNewCommand extends Command
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } elseif ($result['project'] === null) {
                 note('Laravel application created at '.$result['path'].'.');
                 note((string) $result['reason']);

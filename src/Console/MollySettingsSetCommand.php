@@ -38,7 +38,7 @@ class MollySettingsSetCommand extends Command
 
             $payload = ['status' => 'ok', ...$action->handle($decoded)];
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Updated '.$payload['path']);
                 note('Historical run effective_config values are unchanged.');

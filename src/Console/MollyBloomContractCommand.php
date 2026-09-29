@@ -27,12 +27,12 @@ class MollyBloomContractCommand extends Command
             );
             $payload = $contract->toArray();
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Bloom workspace: '.$contract->bloomWorkspaceId);
                 note('Branch: '.$contract->branch);
                 note('Protected test: '.$contract->protectedPaths[0]);
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+                $this->writeJson($payload, JSON_PRETTY_PRINT);
             }
 
             return self::SUCCESS;

@@ -1,7 +1,10 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\VerifyChanges;
+use Sifrious\Molly\Console\WritesJson;
 use Sifrious\Molly\Contracts\DisplayStatus;
 use Sifrious\Molly\Contracts\JsonDocument;
 use Sifrious\Molly\Contracts\LifecycleEventType;
@@ -122,6 +125,54 @@ arch('livewire transport does not own run completion decisions')
 arch('mcp transport does not own run completion decisions')
     ->expect('Sifrious\Molly\Mcp')
     ->not->toUse(['Sifrious\Molly\Actions\DecideRunCompletion']);
+
+arch('mcp tools answer through the laravel/mcp transport, never the console output')
+    ->expect('Sifrious\Molly\Mcp')
+    ->not->toUse(['Illuminate\Console', 'Symfony\Component\Console', 'Laravel\Prompts']);
+
+it('prints the JSON document of every command with --json through writeJson', function () {
+    $checked = [];
+    $bypassing = [];
+    foreach (Artisan::all() as $name => $command) {
+        $class = new ReflectionClass($command);
+        if (! str_starts_with($class->getName(), 'Sifrious\\Molly\\') || ! $command->getNativeDefinition()->hasOption('json')) {
+            continue;
+        }
+        $source = '';
+        for ($type = $class; $type !== false && str_starts_with($type->getName(), 'Sifrious\\Molly\\'); $type = $type->getParentClass()) {
+            $source .= file_get_contents($type->getFileName());
+        }
+        $checked[] = $name;
+        if (! in_array(WritesJson::class, class_uses_recursive($command), true) || ! str_contains($source, '$this->writeJson(')) {
+            $bypassing[] = $name;
+        }
+    }
+
+    expect(count($checked))->toBeGreaterThan(55)
+        ->and($bypassing)->toBe([]);
+});
+
+it('encodes JSON in console code only for writeJson and for output that is not a --json document', function () {
+    $encoding = [];
+    foreach ([...File::allFiles(dirname(__DIR__).'/src/Console'), ...File::allFiles(dirname(__DIR__).'/src/Complexity/Console')] as $file) {
+        $count = substr_count($file->getContents(), 'json_encode(');
+        if ($count > 0) {
+            $encoding[str_replace(dirname(__DIR__).'/', '', $file->getPathname())] = $count;
+        }
+    }
+    ksort($encoding);
+
+    // Anything else would print a JSON document without writeJson, where an agent session rewrites it.
+    expect($encoding)->toBe([
+        'src/Console/MollyChatCommand.php' => 1, // the --mcp-config argument Amp receives
+        'src/Console/MollyCheckCommand.php' => 1, // the check envelope, written to a file
+        'src/Console/MollyInspectCommand.php' => 1, // a note for people without --json
+        'src/Console/MollyPreflightCommand.php' => 2, // values in the table for people without --json
+        'src/Console/MollySettingsCommand.php' => 1, // a note for people without --json
+        'src/Console/RunReport.php' => 1, // a value in the report for people
+        'src/Console/WritesJson.php' => 1,
+    ]);
+});
 
 it('resolves collaborator-bearing actions from the Laravel container', function () {
     foreach ([CreateTask::class, VerifyChanges::class] as $action) {

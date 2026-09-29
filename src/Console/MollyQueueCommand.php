@@ -37,7 +37,7 @@ class MollyQueueCommand extends Command
         $connection = (string) config('queue.default');
         $queueName = $orb?->queue() ?? (string) (config('queue.connections.'.$connection.'.queue') ?? 'default');
         if ($this->option('json')) {
-            $this->line(json_encode([
+            $this->writeJson([
                 'status' => 'queued',
                 'task_id' => $task->id,
                 'task' => $task->reference(),
@@ -45,7 +45,7 @@ class MollyQueueCommand extends Command
                 'connection' => $connection,
                 'queue' => $queueName,
                 'orb' => $orb === null ? null : ['id' => $orb->id, 'name' => $orb->name, 'runtime' => $orb->runtime, 'model' => $orb->model],
-            ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            ]);
 
             return self::SUCCESS;
         }

@@ -19,7 +19,7 @@ class MollyPrBodyCommand extends Command
         try {
             $result = $compose->handle((string) $this->argument('task'), (bool) $this->option('close'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 $this->line($result['body']);
             }

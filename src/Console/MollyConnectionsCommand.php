@@ -22,7 +22,7 @@ class MollyConnectionsCommand extends Command
         try {
             $result = $find->handle((string) $this->argument('task'), ! $this->option('stored'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note($result['reason'] ?? 'Amp connection status observed.');
                 if ($result['matches'] !== []) {

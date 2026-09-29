@@ -50,11 +50,11 @@ class MollyReceiptCommand extends Command
             }
 
             if ($this->option('json')) {
-                $this->line(json_encode([
+                $this->writeJson([
                     'run' => $runId,
                     'workspace' => (new Workspace($workspace))->path,
                     'receipts' => $receipts,
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                ]);
             } else {
                 intro('Molly verification receipts');
                 note('Run: '.$runId);

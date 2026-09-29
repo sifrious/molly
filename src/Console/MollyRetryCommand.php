@@ -34,7 +34,7 @@ class MollyRetryCommand extends Command implements SignalableCommandInterface
                 ? $action->handle((string) $this->argument('task'), $progress)
                 : $action->handle((string) $this->argument('task'), $progress, $target);
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $run->id, 'task_id' => $run->task_id, 'status' => $run->status, 'report' => $run->report, ...array_filter(['next' => $report->next($run)])], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $run->id, 'task_id' => $run->task_id, 'status' => $run->status, 'report' => $run->report, ...array_filter(['next' => $report->next($run)])]);
             } else {
                 $report->show($run, $this->output->isVerbose());
             }

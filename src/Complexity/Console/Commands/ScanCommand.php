@@ -40,10 +40,7 @@ final class ScanCommand extends Command
         $results = $clever->scan();
 
         if ((bool) $this->option('json')) {
-            $this->line((string) json_encode(
-                $reports->read(),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-            ));
+            $this->writeJson($reports->read(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
             return $this->exitCode($results);
         }

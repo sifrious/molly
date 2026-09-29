@@ -21,7 +21,7 @@ class MollyCommentCommand extends Command
         try {
             $result = $publish->handle((string) $this->argument('task'), (bool) $this->option('approve'), (bool) $this->option('close'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note(($result['updated'] ? 'Updated' : 'Unchanged').' GitHub comment '.$result['comment_id'].'.');
             }

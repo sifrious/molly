@@ -22,10 +22,12 @@ use function Laravel\Prompts\warning;
  * Keep diagnostics on stderr. A failed Molly command prints its message on stderr; with
  * --json it still prints its JSON document on stdout and adds one `CODE: message` line
  * on stderr. When the command runs through Artisan::call there is no stderr, so the
- * message stays in the command output as before.
+ * message stays in the command output as before. JSON documents go through writeJson().
  */
 trait ReportsFailures
 {
+    use WritesJson;
+
     /**
      * Invalid arguments and options fail the same way instead of reaching Laravel's
      * exception renderer, which writes them to stdout.
@@ -41,7 +43,7 @@ trait ReportsFailures
 
             $message = 'ARGUMENTS_INVALID: '.$exception->getMessage().' Run php artisan '.$this->getName().' --help for usage.';
             if ($input->hasParameterOption('--json', true) && $this->getDefinition()->hasOption('json')) {
-                $output->writeln(json_encode(['status' => 'error', 'error' => $message], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES), OutputInterface::OUTPUT_RAW);
+                $this->writeJson(['status' => 'error', 'error' => $message]);
             }
             $output->getErrorOutput()->writeln(self::diagnosticLine($message), OutputInterface::OUTPUT_RAW);
 
@@ -60,7 +62,7 @@ trait ReportsFailures
         $stderr = $console instanceof ConsoleOutputInterface ? $console->getErrorOutput() : null;
 
         if ($json) {
-            $this->line(json_encode($document ?? ['status' => 'error', 'error' => $message], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson($document ?? ['status' => 'error', 'error' => $message]);
             $stderr?->writeln(self::diagnosticLine($message), OutputInterface::OUTPUT_RAW);
 
             return self::FAILURE;
@@ -140,20 +142,25 @@ trait ReportsFailures
         if (! $exception instanceof ChoiceRequired) {
             return [$exception->getMessage(), []];
         }
-        $rerun = $exception->rerun ?? $this->rerunCommand($exception);
+        $first = array_key_first($exception->choices);
+        $rerun = $exception->rerun ?? $this->commandLine($first === null ? [] : [$exception->input => (string) $first]);
 
         return [$exception->getMessage().' Run: '.$rerun, ['choices' => $exception->choiceList(), 'rerun' => $rerun]];
     }
 
-    /** This command as typed, with the first choice filled in. */
-    private function rerunCommand(ChoiceRequired $exception): string
+    /**
+     * This command as typed, with each argument or option named in $replace set to
+     * that value instead. A null or false value leaves it out.
+     *
+     * @param  array<string, string|bool|null>  $replace
+     */
+    protected function commandLine(array $replace = []): string
     {
         $words = ['php', 'artisan', (string) $this->getName()];
-        $first = array_key_first($exception->choices);
         $quote = fn (string $value): string => preg_match('~\A[A-Za-z0-9_/.:=@%+,-]+\z~', $value) === 1 ? $value : escapeshellarg($value);
         $definition = $this->getNativeDefinition();
         foreach ($definition->getArguments() as $name => $argument) {
-            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getArgument($name);
+            $value = array_key_exists($name, $replace) ? $replace[$name] : $this->input->getArgument($name);
             foreach ((array) $value as $item) {
                 if (is_string($item) && $item !== '') {
                     $words[] = $quote($item);
@@ -161,7 +168,7 @@ trait ReportsFailures
             }
         }
         foreach ($definition->getOptions() as $name => $option) {
-            $value = $name === $exception->input && $first !== null ? (string) $first : $this->input->getOption($name);
+            $value = array_key_exists($name, $replace) ? $replace[$name] : $this->input->getOption($name);
             if ($value === true) {
                 $words[] = '--'.$name;
             }

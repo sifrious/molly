@@ -29,7 +29,7 @@ class MollyDoctorCommand extends Command
         $run = fn (): array => $check->handle($workspace);
         if ($this->option('json')) {
             $result = $run();
-            $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson($result);
         } else {
             intro('Check Molly');
             $result = spin($run, 'Checking local requirements');

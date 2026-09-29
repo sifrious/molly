@@ -21,7 +21,7 @@ class MollyPrOpenedCommand extends Command
         try {
             $result = $record->handle((string) $this->argument('task'), (bool) $this->option('approve'), (string) $this->option('url'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Recorded pull request '.$result['pull_request_url'].' for '.$result['task_id'].'. Molly did not open it.');
             }

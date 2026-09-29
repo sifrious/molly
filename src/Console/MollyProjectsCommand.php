@@ -21,7 +21,7 @@ class MollyProjectsCommand extends Command
         try {
             $projects = array_map(fn ($project) => $project->toArray(), $action->handle());
             if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'ok', 'projects' => $projects], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['status' => 'ok', 'projects' => $projects]);
             } else {
                 if ($projects === []) {
                     note('No Molly projects registered yet.');

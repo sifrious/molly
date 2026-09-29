@@ -32,7 +32,7 @@ final class MollyKnowledgeQueryCommand extends Command
                 $this->option('workspace') ? (string) $this->option('workspace') : null,
             );
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
 
                 return self::SUCCESS;
             }

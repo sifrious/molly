@@ -21,7 +21,7 @@ class MollyApproveCommand extends Command
         try {
             $result = $approve->handle((string) $this->argument('task'), (bool) $this->option('approve'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note('Recorded human approval for '.$result['task_id'].'. Molly did not open a pull request.');
             }

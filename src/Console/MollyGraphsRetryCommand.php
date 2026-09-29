@@ -43,7 +43,7 @@ class MollyGraphsRetryCommand extends Command
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Retried '.$result['retried_unit']);
                 note('Graph manifest: '.$result['manifest_path']);
