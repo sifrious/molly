@@ -56,6 +56,46 @@ It ends with `ALL GATES PASSED on` and the PHP version, or with `DOCUMENTATION G
 
 When a required tutorial is moved or renamed, update `REQUIRED` in `bin/molly-docs-check` in the same commit. Removing an entry from `REQUIRED` or `OPEN` drops a release requirement, so it needs the same review as dropping the feature. Remove an `OPEN` entry only when the behavior ships with its tutorial, or cite the recorded release-scope decision in the commit that removes it.
 
+## Download size
+
+The Fresh Laravel jobs run "Check the download contents and size" from `.github/workflows/tests.yml`. That step is separate from `bin/molly-release-gates`. The release script only checks that `composer.lock` is absent from `composer archive`.
+
+The job builds `molly.zip` with `git archive` and `molly-composer.zip` with `composer archive`. Both must be at most 400 KiB (409600 bytes). The archives must omit `tests/`, `.github/`, and `.git`. They must include `resources/planning/guide.json`, `resources/planning/LARAVEL-LICENSE.md`, and `src/Complexity/LICENSE.md`. Uncompressed files under `resources/planning/` must total at most 128 KiB.
+
+`git archive` follows `export-ignore` in `.gitattributes`. `composer archive` follows the `archive.exclude` list in `composer.json`. `bloom-plugin/Surfaces.bundle` is already excluded from both. Commit the tree you want `git archive` to measure. `composer archive` reads the worktree.
+
+From the package root, with `git`, `python3`, and `composer` on `PATH`:
+
+```bash
+set -euo pipefail
+archive_dir="$(mktemp -d)"
+trap 'rm -rf "$archive_dir"' EXIT
+git archive --format=zip --output="$archive_dir/molly.zip" HEAD
+composer archive --format=zip --dir="$archive_dir" --file=molly-composer --no-interaction
+RUNNER_TEMP="$archive_dir" python3 - <<'PY'
+import os
+from pathlib import Path
+from zipfile import ZipFile
+for filename in ['molly.zip', 'molly-composer.zip']:
+    archive = Path(os.environ['RUNNER_TEMP']) / filename
+    with ZipFile(archive) as package:
+        names = package.namelist()
+        assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
+        assert not any(name == '.git' or name.startswith('.git/') for name in names)
+        assert 'resources/planning/guide.json' in names
+        assert 'resources/planning/LARAVEL-LICENSE.md' in names
+        assert 'src/Complexity/LICENSE.md' in names
+        assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
+        size = archive.stat().st_size
+        print(f'{filename}: {size} bytes')
+        assert size <= 400 * 1024
+PY
+```
+
+A pass prints both sizes and exits 0. A failed `assert` exits 1. `set -e` stops the shell on that failure. The `trap` removes the temporary directory either way.
+
+Shipped PHP under `src/` counts toward the 400 KiB cap. The cap is the literal `400 * 1024` in that workflow step. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`.
+
 ## Switching the public install line to v1
 
 The install lines stay on the `^0.2` constraint until all of these are true:

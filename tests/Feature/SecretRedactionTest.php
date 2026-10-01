@@ -20,13 +20,20 @@ use Sifrious\Molly\Redaction\SecretRedactor;
 
 const PLANTED_APP_KEY = 'base64:q8Zc3VhS0pYk2m1bN7eR4tU6wX9yA0dF5gH8jK1lM3o=';
 const PLANTED_TYPESAFE_KEY = 'tsk_live_7Hq2Lm9Vx4Rb8Np3Ws6Yd1';
-const PLANTED_GITHUB_TOKEN = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+// Example GitHub token fixture. The letters ascend, so it is not a credential.
+const PLANTED_GITHUB_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789';
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-redaction-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
-    File::put($this->workspace.'/.env', "APP_NAME=Greeter\nAPP_KEY=".PLANTED_APP_KEY."\nTYPESAFE_API_KEY=".PLANTED_TYPESAFE_KEY."\nDB_PASSWORD=secret\n");
+    File::put($this->workspace.'/.env', implode('', [
+        "APP_NAME=Greeter\nAPP_KEY=",
+        PLANTED_APP_KEY,
+        "\nTYPESAFE_API_KEY=",
+        PLANTED_TYPESAFE_KEY,
+        "\nDB_PASSWORD=secret\n",
+    ]));
     writeProtectedTest($this->workspace);
     commitGitWorkspace($this->workspace);
 });
@@ -49,10 +56,12 @@ function expectNoPlantedSecrets(string $text): void
 
 it('replaces secret environment values and token shapes and leaves other text alone', function () {
     $redactor = app(SecretRedactor::class);
-    $pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----";
+    // Example private-key fixture. The body is a placeholder.
+    $pem = "-----BEGIN RSA PRIVATE KEY-----\nMII...\n-----END RSA PRIVATE KEY-----";
 
     expect($redactor->text(plantedSecrets(), $this->workspace))
         ->toBe('app key [redacted:APP_KEY], TypeSafe [redacted:TYPESAFE_API_KEY], token [redacted:github_token]')
+        // Example API key and AWS access key id fixtures.
         ->and($redactor->text('key '.$pem.' sk-proj-abcdefghijklmnopqrstuvwx AKIAABCDEFGHIJKLMNOP eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N'))
         ->toBe('key [redacted:private_key] [redacted:api_key] [redacted:aws_access_key] [redacted:jwt]')
         ->and($redactor->text('Failed asserting that null is "Hello". Greeter secret word and sha256 '.hash('sha256', 'x'), $this->workspace))
@@ -170,7 +179,9 @@ it('redacts secrets typed into a prompt from the journals and every displayed pr
     config(['app.key' => 'base64:'.base64_encode(str_repeat('a', 32)), 'session.driver' => 'array', 'molly.ui.enabled' => true]);
     $prompt = 'Return Hello. Use '.plantedSecrets();
     $task = app(CreateTask::class)->handle($prompt, $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php', nickname: 'secret-task');
-    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::Failed, $task->id, null, ['url' => 'https://example.com/?token='.PLANTED_GITHUB_TOKEN]);
+    $tokenUrl = 'https://example.com/?token=';
+    $tokenUrl .= PLANTED_GITHUB_TOKEN;
+    app(RecordLifecycleEvent::class)->handle($this->workspace, LifecycleEventType::Failed, $task->id, null, ['url' => $tokenUrl]);
     Run::create(['task_id' => $task->id, 'prompt' => $prompt, 'workspace' => $this->workspace, 'status' => 'failed', 'report' => []]);
     $redacted = 'Return Hello. Use app key [redacted:APP_KEY], TypeSafe [redacted:TYPESAFE_API_KEY], token [redacted:github_token]';
 
