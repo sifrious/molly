@@ -86,7 +86,7 @@ it('finishes php artisan migrate after it was stopped between any two statements
     freshInterruptedDatabase($this->directory);
     $statements = recordMigrationStatements($this->migrations);
     $expected = interruptedSchema();
-    expect($statements)->toHaveCount(12)
+    expect($statements)->toHaveCount(13)
         ->and(collect($statements)->flatten()->filter(fn (string $sql): bool => str_contains($sql, '__temp__molly_runs')))->not->toBeEmpty();
 
     $names = array_keys($statements);
