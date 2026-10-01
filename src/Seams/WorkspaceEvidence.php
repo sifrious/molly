@@ -36,6 +36,13 @@ final class WorkspaceEvidence
             if (str_contains($path, '..') || str_starts_with($path, '/') || is_link($absolute)) {
                 throw new SeamError('PATH_OUTSIDE_WORKSPACE', 'Baseline files must be regular files within the application.', $path);
             }
+            $parent = $workspace;
+            foreach (explode('/', $path) as $segment) {
+                $parent .= '/'.$segment;
+                if (is_link($parent)) {
+                    throw new SeamError('PATH_OUTSIDE_WORKSPACE', 'Baseline files cannot pass through linked directories.', $path);
+                }
+            }
             $hashes[$path] = is_file($absolute) ? hash_file('sha256', $absolute) : null;
         }
         ksort($hashes, SORT_STRING);

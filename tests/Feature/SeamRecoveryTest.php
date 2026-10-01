@@ -12,6 +12,7 @@ use Sifrious\Molly\Actions\RequestSeamStep;
 use Sifrious\Molly\Actions\WriteSeamTests;
 use Sifrious\Molly\Seams\InstructionPacks;
 use Sifrious\Molly\Seams\SeamError;
+use Sifrious\Molly\Seams\WorkspaceEvidence;
 
 require_once __DIR__.'/../Support/SeamFixtures.php';
 
@@ -83,4 +84,21 @@ it('freezes local instruction edits in a new revision while preserving earlier e
         ->and($next->snapshot['pack']['local_changes'])->toBe(['instructions.md'])
         ->and($this->revision->fresh()->status)->toBe('superseded')
         ->and($this->revision->fresh()->snapshot['pack']['files']['instructions.md']['contents'])->not->toContain('remain independent');
+});
+
+it('refuses tracked files whose parent directory was replaced with a symbolic link', function () {
+    $path = $this->seamWorkspace.'/app/Nested';
+    $outside = $this->seamWorkspace.'-linked';
+    File::ensureDirectoryExists($path);
+    File::put($path.'/Example.php', '<?php return true;');
+    commitGitWorkspace($this->seamWorkspace, 'Track the nested fixture');
+    rename($path, $outside);
+    symlink($outside, $path);
+    try {
+        expect(fn () => app(WorkspaceEvidence::class)->capture($this->seamWorkspace))
+            ->toThrow(SeamError::class, 'PATH_OUTSIDE_WORKSPACE');
+    } finally {
+        unlink($path);
+        File::deleteDirectory($outside);
+    }
 });
