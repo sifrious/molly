@@ -22,6 +22,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
     $this->prUrl = 'https://github.com/sifrious/molly/pull/12';
     $this->mergeSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 });

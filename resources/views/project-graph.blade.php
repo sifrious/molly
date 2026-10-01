@@ -53,13 +53,15 @@
     <caption>Typed edges in this snapshot</caption>
     <thead><tr><th scope="col">Relationship</th><th scope="col">From</th><th scope="col">To</th></tr></thead>
     <tbody>
-    @foreach($edges as $edge)
+    @forelse($edges as $edge)
         <tr>
             <th scope="row">{{ $edge['relation'] }}</th>
             <td>{{ $labels[$edge['from']] ?? $edge['from'] }}</td>
             <td>{{ $labels[$edge['to']] ?? $edge['to'] }}</td>
         </tr>
-    @endforeach
+    @empty
+        <tr><td colspan="3">This snapshot has no relationships yet.</td></tr>
+    @endforelse
     </tbody>
 </table></div>
 <p>Tarpit findings and required verifier failures stay evidence. They are not rewritten as vague labels.</p>

@@ -11,12 +11,14 @@ use Sifrious\Molly\Knowledge\Graph;
 use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSchema;
 use Sifrious\Molly\Knowledge\GraphSource;
+use Sifrious\Molly\Tests\Support\GraphGolden;
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-project-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
     $this->knowledgeDatabase = sys_get_temp_dir().'/molly-project-'.Str::uuid().'.sqlite';
     config()->set('molly.knowledge.database', $this->knowledgeDatabase);
     $this->task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
@@ -143,3 +145,73 @@ it('indexes and queries the project graph through Artisan', function () {
     $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
     expect($exit)->toBe(0)->and(array_column($result['nodes'], 'type'))->toContain('task');
 });
+
+/*
+ * Golden snapshot of the project graph for a fixture project that uses every node and
+ * edge kind IndexProjectGraph writes. Rewrite tests/Fixtures/graphs/project.json only
+ * with MOLLY_UPDATE_GRAPH_GOLDENS=1 (docs/contributing.md).
+ *
+ * RC10 negative control M11.4 pointed the task's verified_by edge at the workspace node,
+ * and all 1773 tests still passed:
+ *
+ *   -            $this->edge($edges, 'verified_by', $taskNode, $testNode, $source, $this->targetMetadata($root, $task->test_path));
+ *   +            $this->edge($edges, 'verified_by', $taskNode, $workspaceNode, $source, $this->targetMetadata($root, $task->test_path));
+ *
+ * With that change, this test fails with:
+ *
+ *   Wrong verified_by edge: task:<task> must point at acceptance_test:<task>:tests/GreetingTest.php,
+ *   but the graph points it at workspace:<workspace>.
+ */
+it('matches the golden project graph and its key relationships', function () {
+    $this->task->update([
+        'nickname' => 'greeting',
+        'paths' => ['app/Greeting.php', 'app/Removed.php'],
+        'source' => [
+            'repository' => 'sifrious/molly',
+            'issue_number' => 42,
+            'issue_url' => 'https://github.com/sifrious/molly/issues/42',
+            'test_lock' => [
+                'after_digest' => $this->task->test_digest,
+                'before_digest' => str_repeat('b', 64),
+                'approved_by' => 'human',
+                'reason' => 'The greeting test now names the required Hello return.',
+            ],
+            'linked_pr' => [
+                'url' => 'https://github.com/sifrious/molly/pull/12',
+                'number' => 12,
+                'repository' => 'sifrious/molly',
+                'merge_sha' => str_repeat('a', 40),
+            ],
+        ],
+    ]);
+    $this->run->update(['report' => [
+        ...$this->run->report,
+        'changes' => [['path' => 'app/Greeting.php', 'status' => 'modified'], ['path' => 'app/Removed.php', 'status' => 'deleted']],
+        'protected_test' => ['digest' => str_repeat('c', 64)],
+    ]]);
+
+    $indexed = app(IndexProjectGraph::class)->handle($this->workspace);
+    $graph = GraphGolden::fromDatabase($this->knowledgeDatabase, 'project', $indexed['version'], [
+        hash('sha256', $indexed['workspace']) => '<workspace sha256>',
+        $indexed['workspace'] => '<workspace>',
+        $indexed['version'] => '<version>',
+        $this->task->id => '<task>',
+        $this->run->id => '<run>',
+    ]);
+    $test = 'acceptance_test:<task>:tests/GreetingTest.php';
+    $pullRequest = 'pull_request:https://github.com/sifrious/molly/pull/12';
+
+    GraphGolden::assertEdges($graph, 'task:<task>', 'verified_by', [$test]);
+    GraphGolden::assertEdges($graph, 'run:<run>', 'verified_by', [$test]);
+    GraphGolden::assertEdges($graph, 'task:<task>', 'runs_in', ['workspace:<workspace>']);
+    GraphGolden::assertEdges($graph, 'task:<task>', 'changes', ['file:app/Greeting.php', 'file:app/Removed.php']);
+    GraphGolden::assertEdges($graph, 'task:<task>', 'implements', ['github_issue:https://github.com/sifrious/molly/issues/42']);
+    GraphGolden::assertEdges($graph, 'task:<task>', 'approved_by', ['approval:<task>:pull_request']);
+    GraphGolden::assertEdges($graph, 'task:<task>', 'produced', [$pullRequest, 'run:<run>']);
+    GraphGolden::assertEdges($graph, $test, 'approved_by', ['approval:<task>:test_lock']);
+    GraphGolden::assertEdges($graph, $pullRequest, 'produced', ['commit:'.str_repeat('a', 40)]);
+    GraphGolden::assertEdges($graph, 'run:<run>', 'produced', ['verifier_evidence:<run>:pest', 'verifier_evidence:<run>:tarpit']);
+    GraphGolden::assertEdges($graph, 'run:<run>', 'blocked_by', ['blocker:<run>:pest', 'blocker:<run>:protected_test']);
+    GraphGolden::assertEdges($graph, 'run:<run>', 'changes', ['file:app/Greeting.php', 'file:app/Removed.php']);
+    GraphGolden::assertMatchesFile($graph, 'project');
+})->group('graph-golden');

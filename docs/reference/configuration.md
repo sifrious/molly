@@ -21,9 +21,12 @@ Restart queue workers after configuration changes.
 | --- | --- | --- |
 | `molly.agent` | `ollama` | `ollama` or `amp`. Environment: `MOLLY_AGENT`. |
 | `molly.model` | `null` | The exact local Ollama model name. Environment: `MOLLY_LOCAL_MODEL`. |
-| `molly.timeout` | `180` | Seconds allowed for each model request. |
+| `molly.timeout` | `180` | Seconds allowed for each model request. A request that runs longer fails with `PROVIDER_TIMEOUT`. |
+| `molly.memory.headroom_gb` | `11` | Gigabytes (10^9 bytes) that must stay free beyond an Ollama model's size, both when the fit decision checks total memory and before Molly lets Ollama load the model. See [Memory](#memory). |
 | `molly.test_timeout` | `120` | Seconds allowed for the required Pest test. |
 | `molly.max_attempts` | `3` | Runs a task may make, from 1 to 10. |
+| `molly.repair.per_failure` | `3` | Failed runs with the same failure fingerprint before Molly refuses another attempt with `REPAIR_BUDGET_EXHAUSTED`, from 1 to 10. `molly.max_attempts` still caps the total. |
+| `molly.agent_bus.lease_seconds` | `120` | Seconds a claim lasts without renewal, from 30 to 3600. A running task renews its lease at every run step for the longer of this value and the model or Pest timeout plus 30 seconds, so a live run keeps its claim and a crashed one expires. |
 | `molly.parallel_checks` | `true` | Run Pest and Tarpit at the same time. Set `false` without POSIX process groups. |
 | `molly.max_files` | `8` | Writable files per task. The protected test is not counted. |
 | `molly.max_file_bytes` | `65536` | Largest selected file or replacement. |
@@ -71,6 +74,32 @@ Molly uses Laravel AI's Ollama provider, configured in `config/ai.php`:
 
 The model name must match `ollama list` and must not look like a hosted model.
 
+### Memory
+
+Before each model request from `molly:story`, `molly:start`, and the Tarpit review, Molly compares the configured model with the memory that `molly:preflight` measures, using the same probe. The model's size is the size Ollama reports in `/api/tags`, the number `ollama list` shows. Available memory is the free, inactive, and speculative pages from `vm_stat`.
+
+- When Ollama already holds the model, according to `/api/ps`, the request goes ahead. Loading it again needs no more memory.
+- When the model's size plus `molly.memory.headroom_gb` is more than the available memory, Molly refuses with `MODEL_MEMORY_INSUFFICIENT` and never asks Ollama to load the model. `molly:doctor` reports the same comparison as `model_exceeds_memory`.
+- When the available memory, the model's size, or the list of loaded models is unknown, Molly does not refuse. Doctor reports `model_memory_unknown` with the status `unknown`, which does not fail doctor.
+
+`molly.memory.headroom_gb` takes a number of gigabytes, 0 or more; 11 is the default, which covers 8 GB for macOS and other applications, 2 GB for Bloom, and 1 GB for Molly. Any other value fails with `MEMORY_HEADROOM_INVALID`, and doctor reports `memory_headroom_invalid`.
+
+The fit decision in `molly:preflight` uses the same rule with total memory in place of available memory: a model fits with headroom when its size plus `molly.memory.headroom_gb` is no more than the Mac's total memory. `Sifrious\Molly\ModelFit\InstallationHeadroom` holds the rule for both. A download must also leave 15% of the destination volume free; that fraction is fixed. See [The fit decision](../ollama-quickstart.md#the-fit-decision).
+
+Molly measures memory on macOS only, so on other systems the check is always unknown. Memory held by another model that Ollama has loaded counts as used. A run never pulls, deletes, unloads, or switches a model to make room; choose a smaller installed model with `php artisan molly:setup` or free memory yourself. `molly:install-model` is the only command that asks Ollama to download a model, and only after you authorize it.
+
+### Local model records
+
+The approved catalogue ships with Molly in `resources/models/catalogue.v1.json` and is not a setting. Molly keeps machine-level model records under `MOLLY_HOME/models`:
+
+| File | Contents |
+| --- | --- |
+| `readiness.json` | The last readiness check of each model: digest, runtime version, both steps, latency, and memory. A passed record for the approved digest and the pinned runtime makes the fit decision `already_installed`. |
+| `install-journal.json` | The last install state of each model, such as `downloading`, `interrupted`, `failed`, `installed`, `ready`, or `not_ready`, with the code of a failure. |
+| `install.lock` | Held while `molly:install-model` runs, so a second install stops with `INSTALL_IN_PROGRESS`. |
+
+Molly writes each JSON file to a temporary file and renames it into place. When `MOLLY_HOME` is not writable, the install fails with `MODEL_RECORDS_UNWRITABLE`.
+
 ## Amp
 
 Amp has no Molly settings beyond `molly.agent`. The Amp CLI keeps its login and model. `amp` must be on the `PATH` of the process running Molly.
@@ -89,18 +118,21 @@ Jev is off unless `MOLLY_JEV_ENABLED=true`. When it is off, Molly makes no class
 
 The credential belongs to Laravel AI: `ai.providers.typesafe.key`, from `TYPESAFE_API_KEY`. Molly has no TypeSafe client of its own.
 
-### Installing a Laravel AI with classification
+### Laravel AI version
 
-Molly's normal install stays on the stable `laravel/ai` release, which has no classification API, so enabling Jev there reports `capability_missing`. Until Laravel tags a release with the classification API, opt your application into the accepted commit (Laravel AI pull request #1049):
+Molly requires `laravel/ai ^1.0` and locks `v1.0.0` for its own tests. Laravel AI v1.0.0 (tag commit `101c7ea33cd8569d82570f753fbf38e48b7d3d95`, released 2026-09-23) contains commit `f0a5d4f3c5bddda7c8975eb79e92d62811197484` from Laravel AI pull request #1049, the classification API that Molly previously pinned by commit. No development branch or inline alias is needed.
+
+If your application still pins the old commit or a `0.11.99` alias, replace it with the stable constraint:
 
 ```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
-php artisan vendor:publish --tag=ai-config --force
+composer require 'laravel/ai:^1.0' --with-all-dependencies
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-The `as 0.11.99` alias is needed because Molly requires `laravel/ai ^0.11.2` and a bare `1.x-dev` pin does not satisfy that constraint. Republishing `config/ai.php` matters when it was published from the stable release, which has no `typesafe` provider entry; a published file replaces the package's provider list. Once a compatible Laravel AI tag exists, replace the pin with that constraint.
+If you published `config/ai.php` under 0.11, merge the `typesafe` provider from `vendor/laravel/ai/config/ai.php` into your file and keep your other providers. A published file replaces the package's provider list, so the gate reports `jev_unconfigured` until the `typesafe` entry exists. The key comes from `TYPESAFE_API_KEY`; Molly never stores a second credential.
+
+Every CI lane, including the lowest-dependency lane, resolves at least `laravel/ai` 1.0.0 and runs the classification tests without skipping them. See [AI ownership](ai-ownership.md) for the boundary between Laravel AI and Molly's own policy.
 
 ### Jev states
 
@@ -120,18 +152,6 @@ One class decides whether a request may classify, and every transport reports th
 `molly:doctor` reports the gate as `jev_disabled`, `jev_capability_missing`, `jev_unconfigured`, or `jev_ready`. Jev never changes the provider, model, or execution target on its own, and a Jev answer is advice: it cannot start, retry, or complete a task.
 
 ## Knowledge and previews
-```bash
-composer require 'laravel/ai:1.x-dev#f0a5d4f3c5bddda7c8975eb79e92d62811197484 as 0.11.99' --with-all-dependencies
-php artisan vendor:publish --tag=ai-config --force
-php artisan config:clear
-php artisan molly:doctor
-```
-
-The `as 0.11.99` inline alias is required: Molly itself requires `laravel/ai ^0.11.2`, and a bare `1.x-dev` pin does not satisfy that constraint in a consumer, so Composer refuses it. The alias tells Composer to treat the accepted commit as a 0.11 release for constraint resolution only. Republishing `config/ai.php` matters when the file was published from the stable baseline, which has no `typesafe` provider; a published config replaces the package's provider list, so the gate would report `jev_unconfigured` until the provider entry exists.
-
-`molly:doctor` reports the gate as one check: `jev_disabled` (passed, the default), `jev_capability_missing` (failed: enabled on a laravel/ai without the classification surface), `jev_unconfigured` (failed: enabled and capable, but `ai.providers.typesafe.key` is empty), or `jev_ready`. Keys come from the TypeSafe console (`https://console.typesafe.ai/keys`) and are read only through `TYPESAFE_API_KEY`.
-
-Molly's release CI runs a separate Jev lane that resolves exactly that commit, records the resolved commit in the workflow summary, fails (never skips) the live-capability proofs, and then runs the complete package suite. The ordinary PHP/Laravel package matrix stays on stable dependencies. A floating `1.x-dev` branch is not release evidence. Once Laravel publishes a compatible tag, replace the exact commit with that stable constraint and rerun the complete matrix.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -165,6 +185,14 @@ Molly's release CI runs a separate Jev lane that resolves exactly that commit, r
 
 Molly uses the application's database and queue. It has no connection settings of its own. Starts from the web interface or MCP need the database, Redis, Beanstalkd, or SQS driver with a reservation or visibility timeout above 3600 seconds; [Web interface](../web-interface.md#queue-requirements) has the details. Artisan starts need no worker.
 
+`php artisan molly:worker start` runs one `php artisan queue:work {connection} --queue={queue}` process for you, using the default queue connection and that connection's `queue` value. Molly jobs are dispatched to the same place, so the worker and the jobs always agree.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `molly.worker.php_binary` | `null` | The PHP binary used to run the worker. `null` uses the binary running the Artisan command. A bare name such as `php` is looked up on `PATH`. Environment: `MOLLY_WORKER_PHP_BINARY`. |
+
+The worker's record, `.molly/worker/worker.json`, holds its pid, process group, command line, queue, and start time. Its output goes to `.molly/worker/worker.log`. Molly signals the recorded process only while it is alive, still leads the recorded process group, and still runs the recorded command line. Stopping sends `SIGTERM` to the process group and `SIGKILL` after `--timeout` seconds (30 by default). `queue:work` finishes its current job before it exits on `SIGTERM`, so a `SIGKILL` can interrupt a running task; the task's agent-bus lease then expires and the task can be recovered.
+
 ## Environment variables
 
 | Variable | Meaning |
@@ -172,6 +200,7 @@ Molly uses the application's database and queue. It has no connection settings o
 | `MOLLY_AGENT` | `ollama` or `amp` |
 | `MOLLY_LOCAL_MODEL` | Installed Ollama model name |
 | `OLLAMA_URL` | Local Ollama endpoint |
+| `OLLAMA_MODELS` | The models directory `molly:preflight` and `molly:install-model` measure when `--destination` is not given |
 | `MOLLY_SANDBOX_ALLOW_UNSAFE` | Run without the Linux sandbox |
 | `MOLLY_UI_ENABLED` | Enable the web interface |
 | `MOLLY_FALSE_GREEN` | Enable false-green detection |
@@ -180,10 +209,11 @@ Molly uses the application's database and queue. It has no connection settings o
 | `MOLLY_KNOWLEDGE_DATABASE` | Graph file path |
 | `MOLLY_COMPLEXITY_ENABLED` | Force Clever on or off |
 | `MOLLY_PREVIEW_COMMAND`, `MOLLY_PREVIEW_URL`, `MOLLY_PREVIEW_VIEWPORT` | Component previews |
-| `MOLLY_HOME` | Where global settings, conversations, and the graph cache live. Defaults to `~/.molly`. |
+| `MOLLY_WORKER_PHP_BINARY` | PHP binary for `molly:worker` |
+| `MOLLY_HOME` | Where global settings, conversations, the graph cache, and local model records live. Defaults to `~/.molly`. |
 | `APP_ENV`, `QUEUE_CONNECTION` | The application's environment and queue |
 
-Timeouts, size limits, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.
+Timeouts, size limits, the memory headroom, the attempt limit, parallel checks, and the route prefix are set in the published PHP files, not through environment variables.
 
 ## Next
 

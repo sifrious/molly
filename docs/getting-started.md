@@ -7,55 +7,77 @@ This page takes you from an empty terminal to a completed Molly task. You will i
 - PHP 8.3 or later with the DOM, PDO, and PDO SQLite extensions
 - Laravel 12 or 13
 - Pest 4 in the application
-- Git, because Molly records which revision each run started from
+- Git, with the application committed to a repository, because Molly records which commit each run started from
 - A working database connection
 - [Ollama](https://ollama.com) running locally, or the Amp CLI
 
-To check the application:
+To check each requirement from the application root:
 
 ```bash
 php --version
+php -m | grep -Ei '^(dom|pdo_sqlite)$'
 composer show laravel/framework
 vendor/bin/pest --version
+git rev-parse HEAD
+php artisan migrate:status
+ollama list
 ```
+
+`php -m` should print `dom` and `pdo_sqlite`. `git rev-parse HEAD` prints a commit SHA once the application has one commit; [Install Molly](#install-molly) shows how to make it. `php artisan migrate:status` fails when the database connection does not work. `ollama list` fails when Ollama is not running; start it with `ollama serve` or the Ollama app. With Amp instead, `command -v amp` must print a path; `molly:doctor` checks the Amp login later.
 
 If the application does not have Pest yet, install it:
 
 ```bash
-composer config allow-plugins.pestphp/pest-plugin true
-composer remove --dev phpunit/phpunit
-composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
-vendor/bin/pest --init
+composer remove --dev phpunit/phpunit --no-update
+composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+./vendor/bin/pest --init
 ```
 
-Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin first. Skip it if `composer.json` does not list `phpunit/phpunit`.
+New Laravel 12 and 13 applications list `phpunit/phpunit` (12 pins PHPUnit 11, and Pest 4 needs PHPUnit 12), so the first line removes it without resolving, and `-W` lets the second line resolve Pest and PHPUnit together. These applications already allow the `pestphp/pest-plugin` Composer plugin; an older application may need `composer config allow-plugins.pestphp/pest-plugin true` first. `./vendor/bin/pest --init` writes `tests/Pest.php`.
 
-Feature tests need the application test case. Check that `tests/Pest.php` contains:
+Feature tests need the application test case. Check that `tests/Pest.php` applies `Tests\TestCase` to the `Feature` directory. The file `./vendor/bin/pest --init` writes does it with these lines:
 
 ```php
-pest()->extend(Tests\TestCase::class)->in('Feature');
+use Tests\TestCase;
+
+pest()->extend(TestCase::class)
+ // ->use(RefreshDatabase::class)
+    ->in('Feature');
 ```
 
 [Compatibility](compatibility.md) lists the tested versions.
 
 ### No Laravel application yet?
 
-The demo installer creates a fresh application, installs Pest and the tagged Molly release, and scaffolds the demo task:
+The demo installer creates a fresh application, commits it once with your own Git identity, installs Pest and the tagged Molly release, and scaffolds the demo task:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
-bash molly-demo ~/molly-demo
+MOLLY_CONSTRAINT='^0.2' bash molly-demo ~/molly-demo
 ```
+
+The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the 0.2 series. Until `v0.2.0` is tagged, that constraint does not resolve and the installer stops at `composer require`; use `MOLLY_CONSTRAINT='^0.1'` for the tagged release, or see [Release status](#release-status).
 
 It writes only under the directory you name and refuses a non-empty directory unless you pass `--force`. When it finishes, continue from [Choose a model](#choose-a-model).
 
 ## Install Molly
 
+### Release status
+
+The latest tag is `v0.1.3`. Molly 0.2 is in prelaunch acceptance testing, and no 0.2 release is tagged yet, so `composer require --dev sifrious/molly:^0.2` fails until `v0.2.0` is published. Until then you have two choices:
+
+- Install an acceptance candidate, named `0.2.0-RC<n>`, from the zip you were given. [Install a prelaunch candidate](quickstart-standalone.md#install-a-prelaunch-candidate) has the commands.
+- Install the tagged release with `composer require --dev sifrious/molly:^0.1`. It lacks the behavior that [Molly documentation](overview.md) lists as arriving after `v0.1.3`.
+
+These pages describe `main`, which `v0.2.0` will publish.
+
+### Install from GitHub
+
 From the application root:
 
 ```bash
 composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.1.1
+composer require --dev sifrious/molly:^0.2
 php artisan vendor:publish --tag=molly-config
 php artisan migrate
 ```
@@ -69,21 +91,34 @@ Add Molly's local files to `.gitignore`:
 /storage/molly/
 ```
 
+`molly:project-init` adds both lines when they are missing.
+
+Molly never creates a repository or a commit in your application. `composer create-project` does not create one either, so if `git status` says the directory is not a Git repository, commit the application yourself before you create a task:
+
+```bash
+git init
+git add -A
+git commit -m "Start"
+```
+
+Without a repository, `molly:demo` and `molly:create` stop with `WORKSPACE_NOT_GIT` and write nothing. See [Not a Git repository](troubleshooting.md#not-a-git-repository).
+
 Molly is a development dependency. A production `composer install --no-dev` does not include it, and its commands do not register in production.
 
 ## Choose a model
 
-Molly sends the change request to a local Ollama model by default. Pull a model and tell Molly its exact name:
+Molly sends the change request to a local Ollama model by default. Install Ollama 0.34.4, then let Molly decide which approved model fits this Mac and install it:
 
 ```bash
-ollama pull qwen2.5-coder:7b
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 ```
 
-`molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. It stores no secrets. Any model from `ollama list` works; `qwen2.5-coder:7b` is a starting point that needs about 8 GB of free memory. If Ollama is unreachable, Molly stops rather than falling back to a hosted service.
+`molly:preflight` prints the fit decision and downloads nothing. On a 96 GB Mac it selects `gpt-oss:120b-code`, on a Mac with 16 GB or more `gpt-oss:20b`, and on a smaller Mac it prints `No supported local Ollama configuration fits this Mac.` When a run would refuse to load an installed model with the memory available now, it reports `memory_unavailable` and selects nothing. `molly:install-model` shows the download size and the volume, asks before it downloads, verifies the model, and runs a readiness check that includes a small Molly task. It prints the `molly:setup` line to run; replace `MODEL` with that name. `molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. It stores no secrets. If Ollama is unreachable, Molly stops rather than falling back to a hosted service.
 
-Small models handle the demo. They often cannot write a Pest test file or answer Molly's review questions on their own, so a larger model is worth the download for real work. [Ollama](ollama-quickstart.md) has the details and the doctor codes.
+You can still select any installed model with `molly:setup --model=NAME`. Small models often cannot write a Pest test file or answer Molly's review questions, which is why the readiness check includes both a change and a review. [Ollama](ollama-quickstart.md) has the details and the doctor codes.
 
 To use Amp instead, see [Agents](agents.md#amp).
 
@@ -93,7 +128,7 @@ To use Amp instead, see [Agents](agents.md#amp).
 php artisan molly:doctor
 ```
 
-Doctor checks the database tables, Pest, the sandbox, the model, and the Clever measurements. When everything passes it prints:
+Doctor checks the database tables, Pest, Git and the application's repository, the sandbox, the model, and the Clever measurements. When everything passes it prints:
 
 ```text
 Molly is ready.
@@ -166,6 +201,24 @@ Molly keeps the earlier run and starts a new one. A task may make three attempts
 
 ## Create your own task
 
+A task needs a Pest test that fails until the change exists. Create `tests/Feature/ReadyTest.php`:
+
+```php
+<?php
+
+it('reports that the application is ready', function () {
+    $this->get('/ready')->assertOk()->assertExactJson(['ready' => true]);
+});
+```
+
+Run it and confirm it fails with a 404, not an error in the test:
+
+```bash
+vendor/bin/pest tests/Feature/ReadyTest.php
+```
+
+Then create the task:
+
 ```bash
 php artisan molly:create
 ```
@@ -177,7 +230,16 @@ Molly asks four questions:
 | What should Molly work on? | `Add GET /ready returning exactly {"ready":true}. Preserve existing routes.` |
 | Task nickname | `ready-check` |
 | Which Pest test should pass? | `tests/Feature/ReadyTest.php` |
-| Which other files may Molly change? | `routes/web.php` |
+| Which files may Molly change? | `routes/web.php` |
+
+The same task without prompts:
+
+```bash
+php artisan molly:create 'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
+  --name=ready-check \
+  --test=tests/Feature/ReadyTest.php \
+  --file=routes/web.php
+```
 
 The Pest test must exist before you create the task, and Molly locks its content. The model may change the files you listed, never the test. Creating a task saves it without calling the model.
 

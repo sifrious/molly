@@ -6,23 +6,40 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Contracts\HandoffEnvelope;
 use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Journal\JournalWriter;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Redaction\SecretRedactor;
+use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 class HandOffTask
 {
-    public function __construct(private RecordLifecycleEvent $lifecycle) {}
+    public function __construct(
+        private RecordLifecycleEvent $lifecycle,
+        private JournalWriter $journal,
+        private SecretRedactor $redactor,
+    ) {}
 
     /**
+     * Save the envelope under .molly/handoffs with owner-only permissions, then record the
+     * handoff. A failed write records nothing.
+     *
      * @param  array<string, mixed>  $overrides
+     * @return array{envelope: HandoffEnvelope, path: string}
      */
     public function handle(
         string $reference,
+        bool $approved,
         string $senderWorkspaceId,
         string $recipientWorkspaceId,
         string $requestedNextAction,
         string $boundedContext,
         array $overrides = [],
-    ): HandoffEnvelope {
+    ): array {
+        if (! $approved) {
+            throw new RuntimeException('HANDOFF_UNCONFIRMED: Molly hands a task to another workspace only after --approve. It still does not merge or open a pull request.');
+        }
+
         $task = app(ShowTask::class)->handle($reference)
             ?? throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
         if ($task->allow_test_edits) {
@@ -46,7 +63,7 @@ class HandOffTask
             $sourceRunId,
             $senderWorkspaceId,
             $recipientWorkspaceId,
-            $boundedContext,
+            $this->redactor->text($boundedContext, $task->workspace),
             $task->paths,
             [$task->test_path],
             $this->diagnostics($task, $run),
@@ -54,6 +71,7 @@ class HandOffTask
             $requestedNextAction,
             'molly.task:'.$task->id.'; sender:'.$senderWorkspaceId.'; recipient:'.$recipientWorkspaceId,
         );
+        $path = $this->write($task, $envelope);
 
         $this->lifecycle->handle(
             $task->workspace,
@@ -68,7 +86,17 @@ class HandOffTask
             $envelope->handoffId,
         );
 
-        return $envelope;
+        return ['envelope' => $envelope, 'path' => $path];
+    }
+
+    private function write(Task $task, HandoffEnvelope $envelope): string
+    {
+        $root = (new Workspace($task->workspace))->path;
+        $path = Directory::molly($root, 'handoffs/'.$envelope->handoffId.'.json');
+        $this->journal->prepareMollyDirectory($root);
+        $this->journal->replaceFile($path, json_encode($envelope->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+
+        return $path;
     }
 
     /**

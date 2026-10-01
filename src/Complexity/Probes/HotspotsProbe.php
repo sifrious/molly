@@ -45,7 +45,7 @@ final class HotspotsProbe extends BaseProbe
         $limit = $this->config->churnLimit();
 
         return <<<CMD
-        git log --no-merges{$sinceFlag} --pretty=format: --name-only -- '*.php' \\
+        git log --no-merges --relative{$sinceFlag} --pretty=format: --name-only -- '*.php' \\
           | awk 'NF {ch[\$0]++} END {for (f in ch) print ch[f], f}' \\
           | sort -rn | head -{$limit}
         CMD;
@@ -148,7 +148,7 @@ final class HotspotsProbe extends BaseProbe
                 $since ?? 'the beginning of history',
             ),
             notes: [
-                'The probe includes only files within molly-complexity.owned_diff.paths. The shell command lists PHP files throughout the repository.',
+                'The probe includes only files within molly-complexity.owned_diff.paths. The shell command lists every PHP file under the measured root.',
                 'Runs git with -c core.quotepath=off so non-ASCII paths arrive unescaped; the one-liner does not pass that flag.',
             ],
             warnings: $warnings,

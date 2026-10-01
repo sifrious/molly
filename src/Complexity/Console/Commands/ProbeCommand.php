@@ -11,6 +11,7 @@ use Sifrious\Molly\Complexity\Probes\Probe;
 use Sifrious\Molly\Complexity\Probes\ProbeStatus;
 use Sifrious\Molly\Complexity\Report\ReportRepository;
 use Sifrious\Molly\Complexity\Report\ReportWriter;
+use Sifrious\Molly\Console\ReportsFailures;
 
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\warning;
@@ -22,6 +23,7 @@ use function Laravel\Prompts\warning;
 abstract class ProbeCommand extends Command
 {
     use RendersProbeResults;
+    use ReportsFailures;
 
     /**
      * @return class-string<Probe>
@@ -42,10 +44,7 @@ abstract class ProbeCommand extends Command
         $writer->mergeOne($result);
 
         if ((bool) $this->option('json')) {
-            $this->line((string) json_encode(
-                $result->toArray(),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-            ));
+            $this->writeJson($result->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
             return $result->status === ProbeStatus::Error ? self::FAILURE : self::SUCCESS;
         }

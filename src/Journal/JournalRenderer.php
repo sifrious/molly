@@ -70,6 +70,7 @@ final class JournalRenderer
 
         return [...$lines,
             ...$this->verification(is_array($report['verification'] ?? null) ? $report['verification'] : []),
+            ...$this->authoredTest(is_array($report['authored_test'] ?? null) ? $report['authored_test'] : []),
             ...$this->receipts(is_array($report['verification_receipts'] ?? null) ? $report['verification_receipts'] : []),
             ...$this->review(is_array($report['review'] ?? null) ? $report['review'] : []),
             ...$this->measurements($report),
@@ -89,6 +90,36 @@ final class JournalRenderer
         foreach (['reason', 'error'] as $key) {
             if (is_string($verification[$key] ?? null)) {
                 $lines = [...$lines, '', $this->quote($verification[$key])];
+            }
+        }
+
+        return [...$lines, ''];
+    }
+
+    /**
+     * The check of a test an authoring run wrote: its classification and each
+     * cause with the tests it affects.
+     *
+     * @param  array<string, mixed>  $check
+     * @return list<string>
+     */
+    public function authoredTest(array $check): array
+    {
+        if ($check === []) {
+            return [];
+        }
+
+        $lines = ['#### Authored test check', '',
+            '- Classification: '.$this->escape($check['classification'] ?? null),
+            '- Reason: '.$this->escape($check['reason'] ?? null),
+        ];
+        foreach ($check['causes'] ?? [] as $cause) {
+            if (! is_array($cause)) {
+                continue;
+            }
+            $lines[] = '- Cause '.$this->escape($cause['cause'] ?? null).': '.$this->escape($cause['explanation'] ?? null);
+            foreach ($cause['tests'] ?? [] as $test) {
+                $lines[] = '  - '.$this->escape($test);
             }
         }
 
@@ -160,26 +191,39 @@ final class JournalRenderer
     public function measurements(array $report): array
     {
         $lines = ['#### Clever measurements', '', 'Measurements are separate from Tarpit findings. Lower counts alone do not prove a simpler design.', ''];
+        $limitations = [];
         foreach (['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label) {
             $measurement = is_array($report[$key] ?? null) ? $report[$key] : [];
             $lines[] = '- '.$label.': '.$this->escape($measurement['status'] ?? null);
-            if (is_string($measurement['reason'] ?? null)) {
-                $lines = [...$lines, '', $this->quote($measurement['reason']), ''];
+            foreach (['reason', 'detail'] as $field) {
+                if (is_string($measurement[$field] ?? null)) {
+                    $lines = [...$lines, '', $this->quote($measurement[$field]), ''];
+                }
             }
             foreach ($measurement['probes'] ?? [] as $probe) {
                 if (! is_array($probe)) {
                     continue;
                 }
-                $lines[] = '- '.$this->escape($probe['name'] ?? $probe['key'] ?? null).': '.$this->escape($probe['status'] ?? null);
-                foreach ($probe['metrics'] ?? [] as $name => $value) {
+                $name = $this->escape($probe['name'] ?? $probe['key'] ?? null);
+                $lines[] = '- '.$name.': '.$this->escape($probe['status'] ?? null);
+                foreach ($probe['metrics'] ?? [] as $metric => $value) {
                     if (is_numeric($value) || is_bool($value)) {
-                        $lines[] = '  - '.$this->escape(str_replace('_', ' ', (string) $name)).': '.$this->escape($value);
+                        $lines[] = '  - '.$this->escape(str_replace('_', ' ', (string) $metric)).': '.$this->escape($value);
                     }
+                }
+                foreach (is_array($probe['warnings'] ?? null) ? $probe['warnings'] : [] as $warning) {
+                    $lines[] = '  - Warning: '.$this->escape($warning);
                 }
                 if (is_string($probe['skip_reason'] ?? null)) {
                     $lines = [...$lines, '', $this->quote($probe['skip_reason']), ''];
                 }
+                foreach (is_array($probe['caveats'] ?? null) ? $probe['caveats'] : [] as $caveat) {
+                    $limitations[$name.': '.$this->escape($caveat)] = true;
+                }
             }
+        }
+        if ($limitations !== []) {
+            $lines = [...$lines, '', 'Limitations of these measurements:', '', ...array_map(fn (string $limitation): string => '- '.$limitation, array_keys($limitations))];
         }
 
         return [...$lines, ''];
@@ -250,39 +294,89 @@ final class JournalRenderer
         ];
     }
 
-    public function glossaryCopy(): string
+    /** The file that defines glossaryTerms(), relative to the Molly package root. */
+    public const GLOSSARY_SOURCE = 'src/Journal/JournalRenderer.php';
+
+    /**
+     * A link to the glossary source that resolves from the workspace where it is shown.
+     *
+     * Inside a Laravel app that installed Molly with Composer the link is
+     * `vendor/sifrious/molly/src/...`; inside a Molly checkout it is `src/...`. When
+     * neither exists under the workspace, the link is scoped to the package as
+     * `package:sifrious/molly/src/...` with kind `package_source`, so nobody reads it as a
+     * workspace path.
+     *
+     * @return array{kind: string, ref: string}
+     */
+    public function glossarySourceLink(string $workspace): array
     {
-        return <<<'MARKDOWN'
-## Molly terms
+        $root = rtrim($workspace, '/');
+        if (is_file($root.'/vendor/sifrious/molly/'.self::GLOSSARY_SOURCE)) {
+            return ['kind' => 'source', 'ref' => 'vendor/sifrious/molly/'.self::GLOSSARY_SOURCE];
+        }
 
-Molly updates this marked section with the project journal. Add project-specific definitions outside the section.
+        $composer = is_file($root.'/composer.json') ? json_decode((string) file_get_contents($root.'/composer.json'), true) : null;
+        if (is_array($composer) && ($composer['name'] ?? null) === 'sifrious/molly' && is_file($root.'/'.self::GLOSSARY_SOURCE)) {
+            return ['kind' => 'source', 'ref' => self::GLOSSARY_SOURCE];
+        }
 
-- Task: A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.
-- Nickname: An optional readable task reference. Commands also accept the task UUID.
-- Attempt: One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.
-- Verification: The recorded Pest result and counts. A skipped or missing check is not a pass.
-- Tarpit review: Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.
-- Accidental complexity: A finding whose removal preserves the required behavior. A blocking finding prevents completion.
-- Clever measurements: Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.
-- Project journal: A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.
-- Recorded pull request: A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.
-- Recorded merge: A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.
-- Handoff: A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.
+        return ['kind' => 'package_source', 'ref' => 'package:sifrious/molly/'.self::GLOSSARY_SOURCE];
+    }
 
-The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.
+    /**
+     * The terms Molly writes into the managed section of .molly/GLOSSARY.md.
+     *
+     * @return list<array{term: string, definition: string}>
+     */
+    public function glossaryTerms(): array
+    {
+        return [
+            ['term' => 'Task', 'definition' => 'A saved request, editable file scope, and required Pest test. The UUID stays the same when its nickname changes. The required test is protected unless the task explicitly allows test edits.'],
+            ['term' => 'Nickname', 'definition' => 'An optional readable task reference. Commands also accept the task UUID.'],
+            ['term' => 'Attempt', 'definition' => 'One saved run linked to a task. Retrying creates another attempt without replacing earlier evidence.'],
+            ['term' => 'Verification', 'definition' => 'The recorded Pest result and counts. A skipped or missing check is not a pass.'],
+            ['term' => 'Tarpit review', 'definition' => 'Seven checks, A through G, with evidence and findings for the supplied files. A clean review is not a full repository audit.'],
+            ['term' => 'Accidental complexity', 'definition' => 'A finding whose removal preserves the required behavior. A blocking finding prevents completion.'],
+            ['term' => 'Clever measurements', 'definition' => 'Recorded code-structure measurements before and after changes. They remain separate from Tarpit findings.'],
+            ['term' => 'Project journal', 'definition' => 'A generated view of saved tasks and attempts in creation order. Stable task and run UUIDs identify the entries. Task journals also list recorded lifecycle events from `.molly/lifecycle.jsonl`.'],
+            ['term' => 'Recorded pull request', 'definition' => 'A human-opened GitHub pull request URL stored after molly:pr-opened --approve. Molly does not open the pull request.'],
+            ['term' => 'Recorded merge', 'definition' => 'A 40-character merge commit SHA stored after molly:merged --approve. Molly does not merge.'],
+            ['term' => 'Handoff', 'definition' => 'A bounded envelope for a child Bloom workspace. The recipient cannot widen file scope, edit the protected test, or merge.'],
+        ];
+    }
 
-MARKDOWN;
+    /**
+     * @param  array{kind: string, ref: string}|null  $source  glossarySourceLink() for the workspace; a
+     *                                                         `source` ref is linked relative to `.molly/GLOSSARY.md`
+     */
+    public function glossaryCopy(?array $source = null): string
+    {
+        $link = match ($source['kind'] ?? null) {
+            'source' => ' Source: ['.$source['ref'].'](../'.$source['ref'].')',
+            'package_source' => ' Source: `'.$source['ref'].'`',
+            default => '',
+        };
+        $terms = array_map(fn (array $entry): string => '- '.$entry['term'].': '.$entry['definition'].$link, $this->glossaryTerms());
+
+        return implode("\n", [
+            '## Molly terms', '',
+            'Molly updates this marked section with the project journal. Add project-specific definitions outside the section.', '',
+            ...$terms, '',
+            'The database records remain the source of truth. Editing this file or JOURNAL.md does not change a task or its attempts.', '',
+        ]);
     }
 
     /**
      * Replace the managed glossary section; preserve user-authored content outside markers.
      * Pure string transform — no filesystem.
+     *
+     * @param  array{kind: string, ref: string}|null  $source
      */
-    public function replaceManagedGlossary(string $existing): string
+    public function replaceManagedGlossary(string $existing, ?array $source = null): string
     {
         $start = self::GLOSSARY_START;
         $end = self::GLOSSARY_END;
-        $section = $start."\n".$this->glossaryCopy().$end;
+        $section = $start."\n".$this->glossaryCopy($source).$end;
         $contents = $existing !== '' ? $existing : "# Project glossary\n";
 
         if (str_contains($contents, $start) || str_contains($contents, $end)) {

@@ -1,0 +1,22 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:events","title":"Laravel 13 events","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/events.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"388575b04efe50c73b3f3c6fed9975067302af49563e71c71a2bf80f0798c752","metadata":{"path":"sources/laravel-events.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Events\\Dispatcher","title":"Illuminate\\Events\\Dispatcher","location":"vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Events/Dispatcher.php","symbol":"Illuminate\\Events\\Dispatcher"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Events\\Dispatcher","label":"Dispatcher","sources":["framework_source:Illuminate\\Events\\Dispatcher"],"metadata":{"symbol":"Illuminate\\Events\\Dispatcher"}},
+    {"ref":"concept:events","label":"Events","sources":["documentation:events"],"metadata":[]},
+    {"ref":"documentation_section:docs:events#introduction","label":"Introduction","sources":["documentation:events"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:events#testing","label":"Testing","sources":["documentation:events"],"metadata":{"heading_level":2}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:events"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:events","relation":"documented_in","to":"documentation_section:docs:events#introduction","sources":["documentation:events"],"metadata":[]},
+    {"from":"concept:events","relation":"uses","to":"class:Illuminate\\Events\\Dispatcher","sources":["framework_source:Illuminate\\Events\\Dispatcher"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:events","sources":["documentation:events"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:events#introduction","sources":["documentation:events"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:events#testing","sources":["documentation:events"],"metadata":[]}
+  ]
+}

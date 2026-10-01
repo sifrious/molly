@@ -3,11 +3,13 @@
 namespace Sifrious\Molly\Console;
 
 use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Models\Task;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\outro;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 class RunReport
 {
@@ -16,6 +18,7 @@ class RunReport
         $report = $run->report ?? [];
         note('Run '.$run->id.' / '.$run->status);
         note('Workspace: '.$run->workspace);
+        $this->showExecutionTarget($report);
         if (! empty($report['summary'])) {
             note($report['summary']);
         }
@@ -24,6 +27,7 @@ class RunReport
         $this->showChanges($report);
         $this->showSnapshots($report, $verbose);
         $this->showVerification($report, $verbose);
+        $this->showAuthoredTest($run, $report);
         $this->showTarpit($report);
         $this->showMeasurements($report, $verbose);
         $this->showAdvice($report);
@@ -32,13 +36,31 @@ class RunReport
     }
 
     /** @param array<string, mixed> $report */
+    private function showExecutionTarget(array $report): void
+    {
+        $target = $report['execution_target'] ?? null;
+        if (! is_array($target) || ($target['kind'] ?? null) !== 'orb') {
+            return;
+        }
+        $orb = $target['orb'] ?? [];
+        note('Execution target: Orb '.($orb['name'] ?? 'unknown').' ('.($target['target_id'] ?? 'no ID').'), '
+            .($orb['runtime'] ?? 'unknown runtime').' / '.($orb['model'] ?? 'chosen by Amp').', worktree '.($target['worktree'] ?? 'not recorded')
+            .', starting revision '.($target['starting_revision'] ?? 'not recorded').'.');
+        if (($target['diff']['status'] ?? null) === 'captured') {
+            note('Worktree diff: '.$target['diff']['path'].' ('.$target['diff']['bytes'].' bytes, sha256 '.$target['diff']['sha256'].').');
+        } elseif (isset($target['diff']['reason'])) {
+            note('Worktree diff: '.$target['diff']['reason']);
+        }
+    }
+
+    /** @param array<string, mixed> $report */
     private function showRequiredChecks(array $report): void
     {
         table(['Required check', 'Result'], [
             ['Pest', $report['verification']['status'] ?? 'Not run'],
             ['Tarpit review', $report['review']['status'] ?? (isset($report['review']['checks']) ? 'See findings below' : 'Not run')],
-            ['Clever before changes', $report['complexity_before']['status'] ?? 'Not run'],
-            ['Clever after changes', $report['complexity_after']['status'] ?? 'Not run'],
+            ['Clever before changes (advisory)', $report['complexity_before']['status'] ?? 'Not run'],
+            ['Clever after changes (advisory)', $report['complexity_after']['status'] ?? 'Not run'],
         ]);
         foreach (['verification' => 'Pest', 'review' => 'Tarpit review'] as $key => $label) {
             foreach (['reason', 'error'] as $detail) {
@@ -71,6 +93,40 @@ class RunReport
         if (! empty($verification['output']) && (($verification['status'] ?? null) !== 'passed' || $verbose)) {
             note($verification['output']);
         }
+    }
+
+    /** @param array<string, mixed> $report */
+    private function showAuthoredTest(Run $run, array $report): void
+    {
+        $check = $report['authored_test'] ?? null;
+        if (! is_array($check) || ! is_string($check['classification'] ?? null)) {
+            return;
+        }
+
+        note('Authored test check: '.$check['classification'].' ('.($check['reason'] ?? 'no reason recorded').')');
+        foreach (Task::authoredTestProblems($check) as $problem) {
+            warning($problem);
+        }
+        $next = $this->next($run);
+        if ($next !== null) {
+            note('Next: '.$next['reason'].' Run '.$next['command'].'.');
+        }
+    }
+
+    /**
+     * The next step after a test-authoring run whose test Molly checked, or null.
+     *
+     * @return array{command: string, reason: string}|null
+     */
+    public function next(Run $run): ?array
+    {
+        $check = $run->report['authored_test'] ?? null;
+        $task = $run->task;
+        if (! is_array($check) || ! $task instanceof Task || ! $task->allow_test_edits) {
+            return null;
+        }
+
+        return $task->authoringNextStep($check);
     }
 
     /** @param array<string, mixed> $report */
@@ -180,7 +236,11 @@ class RunReport
             if ($kind === 'verification' && empty($branch['provider']) && empty($branch['model'])) {
                 $model = 'Pest';
             }
-            $row = [$kind, $branch['status'] ?? 'Not reported', $branch['execution_target'] ?? 'Not recorded', $model];
+            $target = $branch['execution_target'] ?? 'Not recorded';
+            if ($target === ($report['execution_target']['target_id'] ?? null) && isset($report['execution_target']['orb']['name'])) {
+                $target = 'orb '.$report['execution_target']['orb']['name'];
+            }
+            $row = [$kind, $branch['status'] ?? 'Not reported', $target, $model];
             if ($verbose) {
                 $row[] = $branch['started_at'] ?? 'Not recorded';
                 $row[] = $branch['finished_at'] ?? 'Not recorded';
@@ -226,6 +286,9 @@ class RunReport
             if (! empty($measurement['reason'])) {
                 note($label.': '.$measurement['reason']);
             }
+            if (! empty($measurement['detail'])) {
+                note($label.' detail: '.$this->describe($measurement['detail']));
+            }
             if (! empty($measurement['report'])) {
                 note($label.' full measurements: '.$measurement['report']);
             }
@@ -259,7 +322,10 @@ class RunReport
         }
         foreach (['Before' => $before, 'After' => $after] as $label => $value) {
             if (! empty($value['skip_reason'])) {
-                note($label.' skipped: '.$this->describe($value['skip_reason']));
+                note($label.' '.(($value['status'] ?? null) === 'error' ? 'error' : 'skipped').': '.$this->describe($value['skip_reason']));
+            }
+            foreach ($value['warnings'] ?? [] as $warning) {
+                note($label.' warning: '.$this->describe($warning));
             }
             if ($verbose && $value !== []) {
                 $this->showProbeDetails($value, $label);
@@ -279,7 +345,7 @@ class RunReport
                 note(str_replace('_', ' ', $name).': '.$value);
             }
         }
-        foreach (['caveats', 'warnings', 'notes'] as $key) {
+        foreach (['caveats', 'notes'] as $key) {
             foreach ($probe[$key] ?? [] as $detail) {
                 note($this->describe($detail));
             }

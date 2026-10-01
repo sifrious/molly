@@ -7,6 +7,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Sifrious\Molly\Actions\RetryTask;
 use Sifrious\Molly\Actions\StartTask;
+use Sifrious\Molly\Contracts\ExecutionTargetKind;
+use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 
 class StartSavedTask implements ShouldQueue, ShouldBeUnique
 {
@@ -18,8 +20,13 @@ class StartSavedTask implements ShouldQueue, ShouldBeUnique
 
     public int $uniqueFor = 3600;
 
+    /** The Orb this start runs on, or null for the machine that runs the queue worker. */
+    public ?string $orbId = null;
 
-    public function __construct(public string $taskId, public bool $retry = false) {}
+    public function __construct(public string $taskId, public bool $retry = false, ?string $orbId = null)
+    {
+        $this->orbId = $orbId;
+    }
 
     public function uniqueId(): string
     {
@@ -28,10 +35,13 @@ class StartSavedTask implements ShouldQueue, ShouldBeUnique
 
     public function handle(StartTask $start, RetryTask $retry): void
     {
-        if ($this->retry) {
-            $retry->handle($this->taskId);
-        } else {
-            $start->handle($this->taskId);
+        if ($this->orbId === null) {
+            $this->retry ? $retry->handle($this->taskId) : $start->handle($this->taskId);
+
+            return;
         }
+
+        $target = new ExecutionTargetRequest(ExecutionTargetKind::Orb, $this->orbId, 'The start was queued for this Orb.');
+        $this->retry ? $retry->handle($this->taskId, target: $target) : $start->handle($this->taskId, target: $target);
     }
 }

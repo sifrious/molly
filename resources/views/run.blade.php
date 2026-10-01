@@ -16,7 +16,7 @@
 @if(isset($report['error']))<p class="notice errors">{{ is_string($report['error']) ? $report['error'] : json_encode($report['error']) }}</p>@endif
 <div class="evidence-summary">
     <p>Tarpit: {{ count($checks) }} of 7 checks recorded. {{ count($findings) }} {{ count($findings) === 1 ? 'finding' : 'findings' }} recorded, {{ $blocking }} blocking.</p>
-    <p>Clever: before {{ $report['complexity_before']['status'] ?? 'Not run' }}; after {{ $report['complexity_after']['status'] ?? 'Not run' }}.</p>
+    <p>Clever: before {{ $report['complexity_before']['status'] ?? 'not run' }}; after {{ $report['complexity_after']['status'] ?? 'not run' }}.</p>
     <p>Pest: {{ $report['verification']['status'] ?? 'Not run' }}. Tests: {{ $report['verification']['tests'] ?? 'Not recorded' }}. Assertions: {{ $report['verification']['assertions'] ?? 'Not recorded' }}.</p>
 </div>
 <nav class="report-nav" aria-label="Run evidence sections">
@@ -45,6 +45,7 @@
 @endphp
 @foreach(['complexity_before' => 'Before changes', 'complexity_after' => 'After changes'] as $key => $label)
     @if(isset($report[$key]['reason']))<p>{{ $label }}: {{ $report[$key]['reason'] }}</p>@endif
+    @if(isset($report[$key]['detail']))<p>{{ $label }} detail: {{ is_string($report[$key]['detail']) ? $report[$key]['detail'] : json_encode($report[$key]['detail']) }}</p>@endif
 @endforeach
 @if($probeKeys->isEmpty())<p>No Clever measurements recorded.</p>@endif
 @foreach($probeKeys as $key)
@@ -99,7 +100,15 @@
 </section>
 @endif
 <h2>Run details</h2>
-<details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd></dl></details>
+<details><summary>Run ID and workspace</summary><dl><dt>Run ID</dt><dd>{{ $run->id }}</dd><dt>Workspace</dt><dd>{{ $run->workspace }}</dd>
+@if(($report['execution_target']['kind'] ?? null) === 'orb')
+@php($target = $report['execution_target'])
+<dt>Execution target</dt><dd>Orb {{ $target['orb']['name'] ?? 'unknown' }} (<code>{{ $target['target_id'] ?? 'no ID' }}</code>), {{ $target['orb']['runtime'] ?? 'unknown runtime' }} / {{ $target['orb']['model'] ?? 'chosen by Amp' }}</dd>
+<dt>Starting revision</dt><dd><code>{{ $target['starting_revision'] ?? 'Not recorded' }}</code></dd>
+<dt>Worktree diff</dt><dd>{{ ($target['diff']['status'] ?? null) === 'captured' ? 'sha256 '.$target['diff']['sha256'].', '.$target['diff']['bytes'].' bytes' : ($target['diff']['reason'] ?? 'Not recorded') }}</dd>
+<dt>Result</dt><dd>{{ $target['result'] ?? 'Not recorded' }}</dd>
+@endif
+</dl></details>
 @if(!empty($report['branches']))
 <details><summary>Execution branch details</summary>
 <p>Execution mode: {{ $report['mode'] ?? 'Not recorded' }}. A branch result is separate from the run's completion decision.</p>

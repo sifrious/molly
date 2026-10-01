@@ -20,6 +20,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {
@@ -211,6 +212,7 @@ it('does not mistake an invalid lock for an active writer', function () {
 it('keeps the task claim locked before workspace execution and through finalization', function (bool $beforeExecution) {
     $task = createMollyRecord();
     $executor = Mockery::mock(RunTask::class);
+    $executor->shouldReceive('refuseUnready')->andReturn([[], null]);
     $executor->shouldReceive('handle')->once()->andReturnUsing(function (string $prompt, string $workspace, array $paths, string $testPath, ?Closure $progress, string $taskId, Closure $shouldStop) use ($task, $beforeExecution): Run {
         $run = null;
         if (! $beforeExecution) {
@@ -259,13 +261,15 @@ it('rejects unsafe task lock names without creating files', function () {
 it('releases the task lock when execution throws', function () {
     $task = createMollyRecord();
     $executor = Mockery::mock(RunTask::class);
+    $executor->shouldReceive('refuseUnready')->andReturn([[], null]);
     $executor->shouldReceive('handle')->once()->andThrow(new RuntimeException('WORKSPACE_BUSY: Another Molly run is using this project.'));
     $this->app->instance(RunTask::class, $executor);
 
     expect(fn () => app(StartTask::class)->handle($task->id))
         ->toThrow(RuntimeException::class, 'WORKSPACE_BUSY');
 
-    expect($task->fresh()->status)->toBe('failed')
+    // No run was saved, so the refused start leaves the task pending.
+    expect($task->fresh()->status)->toBe('pending')
         ->and((new Workspace($this->workspace))->exclusivelyForTask($task->id, fn (): string => 'released'))->toBe('released');
 });
 

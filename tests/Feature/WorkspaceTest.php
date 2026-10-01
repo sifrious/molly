@@ -167,7 +167,8 @@ it('rejects symlinked lock files and lock directories', function (bool $director
     }
     $workspace = new Workspace($this->workspaceDirectory);
 
-    expect(fn () => $workspace->exclusively(fn () => 'unexpected'))->toThrow(RuntimeException::class, 'WORKSPACE_LOCK_INVALID');
+    // A linked .molly is reported as a workspace escape; a linked lock file below it stays WORKSPACE_LOCK_INVALID.
+    expect(fn () => $workspace->exclusively(fn () => 'unexpected'))->toThrow(RuntimeException::class, $directory ? 'WORKSPACE_PATH_ESCAPE: '.$this->workspaceDirectory.'/.molly is a symbolic link' : 'WORKSPACE_LOCK_INVALID');
 })->with([false, true]);
 
 it('rejects invalid lock locations without invoking the callback', function (bool $directoryIsFile): void {

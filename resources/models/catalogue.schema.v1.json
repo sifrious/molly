@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sifrious:molly:model-catalogue:v1",
+  "title": "Molly approved local model catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["catalogue_version", "policy_version", "reviewed_at", "review_by", "runtimes", "entries"],
+  "properties": {
+    "catalogue_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "policy_version": {"const": "1.0.0"},
+    "reviewed_at": {"type": "string", "format": "date"},
+    "review_by": {"type": "string", "format": "date"},
+    "runtimes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/runtime"}
+    },
+    "entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/model"}
+    }
+  },
+  "$defs": {
+    "permission": {"enum": ["permitted", "prohibited", "unknown"]},
+    "nonEmptyString": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "observed": {
+      "type": "object",
+      "description": "What the reviewer measured on a real machine, recorded as evidence. Molly does not decide anything from this object.",
+      "required": ["date", "host"],
+      "properties": {
+        "date": {"type": "string", "format": "date"},
+        "host": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "version", "platforms", "minimum_os_version", "source"],
+      "properties": {
+        "runtime": {"$ref": "#/$defs/nonEmptyString"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/nonEmptyString"}
+        },
+        "minimum_os_version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)*$"},
+        "source": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "upstream_revision": {"$ref": "#/$defs/nonEmptyString"},
+        "observed": {"$ref": "#/$defs/observed"}
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "developer",
+        "artifact",
+        "license",
+        "runtime_compatibility",
+        "hardware",
+        "capabilities",
+        "execution_modes",
+        "review",
+        "admission"
+      ],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model_id", "model_version", "upstream_revision"],
+          "properties": {
+            "model_id": {"$ref": "#/$defs/nonEmptyString"},
+            "model_version": {"$ref": "#/$defs/nonEmptyString"},
+            "upstream_revision": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        },
+        "developer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["organization", "organization_country", "origin", "origin_evidence"],
+          "properties": {
+            "organization": {"$ref": "#/$defs/nonEmptyString"},
+            "organization_country": {"type": "string", "pattern": "^[A-Z]{2}$"},
+            "origin": {"enum": ["us-developed", "non-us-developed", "unknown"]},
+            "origin_evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "format": "uri"}
+            }
+          }
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "source", "digest_algorithm", "digest", "size_bytes", "weights", "install"],
+          "properties": {
+            "kind": {"const": "ollama-model"},
+            "name": {"$ref": "#/$defs/nonEmptyString"},
+            "source": {"type": "string", "format": "uri", "pattern": "^https://"},
+            "digest_algorithm": {"const": "sha256"},
+            "digest": {"$ref": "#/$defs/sha256"},
+            "size_bytes": {"type": "integer", "minimum": 1},
+            "weights": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["digest", "size_bytes"],
+              "properties": {
+                "digest": {"$ref": "#/$defs/sha256"},
+                "size_bytes": {"type": "integer", "minimum": 1}
+              }
+            },
+            "install": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["method"],
+                  "properties": {"method": {"const": "pull"}}
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["method", "from", "parameters"],
+                  "properties": {
+                    "method": {"const": "derive"},
+                    "from": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name", "digest", "size_bytes"],
+                      "properties": {
+                        "name": {"$ref": "#/$defs/nonEmptyString"},
+                        "digest": {"$ref": "#/$defs/sha256"},
+                        "size_bytes": {"type": "integer", "minimum": 1}
+                      }
+                    },
+                    "parameters": {"type": "object", "minProperties": 1}
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spdx_id",
+            "version",
+            "source",
+            "usage_policy_source",
+            "commercial_use",
+            "local_use",
+            "redistribution",
+            "hosted_commercial_use",
+            "notice_requirements",
+            "constraints"
+          ],
+          "properties": {
+            "spdx_id": {"$ref": "#/$defs/nonEmptyString"},
+            "version": {"$ref": "#/$defs/nonEmptyString"},
+            "source": {"type": "string", "format": "uri"},
+            "usage_policy_source": {"type": "string", "format": "uri"},
+            "commercial_use": {"$ref": "#/$defs/permission"},
+            "local_use": {"$ref": "#/$defs/permission"},
+            "redistribution": {"$ref": "#/$defs/permission"},
+            "hosted_commercial_use": {"$ref": "#/$defs/permission"},
+            "notice_requirements": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/nonEmptyString"}
+            },
+            "constraints": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/nonEmptyString"}
+            }
+          }
+        },
+        "runtime_compatibility": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["runtime", "version_constraint", "platforms", "requirements"],
+            "properties": {
+              "runtime": {"$ref": "#/$defs/nonEmptyString"},
+              "version_constraint": {"$ref": "#/$defs/nonEmptyString"},
+              "platforms": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"$ref": "#/$defs/nonEmptyString"}
+              },
+              "requirements": {
+                "type": "array",
+                "items": {"enum": ["metal"]}
+              }
+            }
+          }
+        },
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimum_memory_bytes", "recommended_memory_bytes", "requirements", "recommended"],
+          "properties": {
+            "minimum_memory_bytes": {"type": "integer", "minimum": 1},
+            "recommended_memory_bytes": {"type": "integer", "minimum": 1},
+            "requirements": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/nonEmptyString"}
+            },
+            "recommended": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/nonEmptyString"}
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context_window_tokens",
+            "harmony_format",
+            "tool_calling",
+            "function_calling",
+            "structured_outputs"
+          ],
+          "properties": {
+            "context_window_tokens": {"type": "integer", "minimum": 1},
+            "harmony_format": {"type": "boolean"},
+            "tool_calling": {"type": "boolean"},
+            "function_calling": {"type": "boolean"},
+            "structured_outputs": {"type": "boolean"}
+          }
+        },
+        "execution_modes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["local", "byo_cloud", "harness_managed_cloud"],
+          "properties": {
+            "local": {"$ref": "#/$defs/permission"},
+            "byo_cloud": {"$ref": "#/$defs/permission"},
+            "harness_managed_cloud": {"$ref": "#/$defs/permission"}
+          }
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reviewed_at", "evidence"],
+          "properties": {
+            "reviewed_at": {"type": "string", "format": "date"},
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "format": "uri"}
+            },
+            "observed": {"$ref": "#/$defs/observed"}
+          }
+        },
+        "admission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision", "rejection_reasons"],
+          "properties": {
+            "decision": {"enum": ["approved", "rejected"]},
+            "rejection_reasons": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/nonEmptyString"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

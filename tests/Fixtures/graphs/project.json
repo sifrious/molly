@@ -1,0 +1,43 @@
+{
+  "namespace": "project",
+  "version": "<version>",
+  "sources": [
+    {"ref":"workspace:<workspace>","title":"Molly project graph","location":"<workspace>","revision":null,"digest":"<workspace sha256>","metadata":{"workspace":"<workspace>"}}
+  ],
+  "nodes": [
+    {"ref":"acceptance_test:<task>:tests/GreetingTest.php","label":"tests/GreetingTest.php","sources":["workspace:<workspace>"],"metadata":{"digest":"dd31fd9e849ef9a942b78c9ea24cea5287ba0253da07c21257dd7aeda57e4b95","writable":false}},
+    {"ref":"approval:<task>:pull_request","label":"Recorded pull request","sources":["workspace:<workspace>"],"metadata":{"merge_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","url":"https://github.com/sifrious/molly/pull/12"}},
+    {"ref":"approval:<task>:test_lock","label":"Locked Pest test","sources":["workspace:<workspace>"],"metadata":{"after_digest":"dd31fd9e849ef9a942b78c9ea24cea5287ba0253da07c21257dd7aeda57e4b95","approved_by":"human","before_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","reason":"The greeting test now names the required Hello return."}},
+    {"ref":"blocker:<run>:pest","label":"pest blocked completion","sources":["workspace:<workspace>"],"metadata":{"verifier":"pest"}},
+    {"ref":"blocker:<run>:protected_test","label":"Protected test digest changed","sources":["workspace:<workspace>"],"metadata":[]},
+    {"ref":"commit:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","label":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sources":["workspace:<workspace>"],"metadata":[]},
+    {"ref":"file:app/Greeting.php","label":"app/Greeting.php","sources":["workspace:<workspace>"],"metadata":[]},
+    {"ref":"file:app/Removed.php","label":"app/Removed.php","sources":["workspace:<workspace>"],"metadata":{"exists":false}},
+    {"ref":"github_issue:https://github.com/sifrious/molly/issues/42","label":"https://github.com/sifrious/molly/issues/42","sources":["workspace:<workspace>"],"metadata":{"issue_number":42,"repository":"sifrious/molly"}},
+    {"ref":"pull_request:https://github.com/sifrious/molly/pull/12","label":"https://github.com/sifrious/molly/pull/12","sources":["workspace:<workspace>"],"metadata":{"merge_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","number":12,"repository":"sifrious/molly"}},
+    {"ref":"run:<run>","label":"Attempt <run>","sources":["workspace:<workspace>"],"metadata":{"status":"failed"}},
+    {"ref":"task:<task>","label":"greeting","sources":["workspace:<workspace>"],"metadata":{"nickname":"greeting","status":"pending"}},
+    {"ref":"verifier_evidence:<run>:pest","label":"pest","sources":["workspace:<workspace>"],"metadata":{"failure_action":"retry","policy":"required","state":"FAIL"}},
+    {"ref":"verifier_evidence:<run>:tarpit","label":"tarpit","sources":["workspace:<workspace>"],"metadata":{"failure_action":"retry","policy":"required","state":"PASS"}},
+    {"ref":"workspace:<workspace>","label":"Workspace","sources":["workspace:<workspace>"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"acceptance_test:<task>:tests/GreetingTest.php","relation":"approved_by","to":"approval:<task>:test_lock","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"pull_request:https://github.com/sifrious/molly/pull/12","relation":"produced","to":"commit:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"blocked_by","to":"blocker:<run>:pest","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"blocked_by","to":"blocker:<run>:protected_test","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"changes","to":"file:app/Greeting.php","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"changes","to":"file:app/Removed.php","sources":["workspace:<workspace>"],"metadata":{"path":"app/Removed.php","reason":"target_missing","status":"unresolved"}},
+    {"from":"run:<run>","relation":"produced","to":"verifier_evidence:<run>:pest","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"produced","to":"verifier_evidence:<run>:tarpit","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"run:<run>","relation":"verified_by","to":"acceptance_test:<task>:tests/GreetingTest.php","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"approved_by","to":"approval:<task>:pull_request","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"changes","to":"file:app/Greeting.php","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"changes","to":"file:app/Removed.php","sources":["workspace:<workspace>"],"metadata":{"path":"app/Removed.php","reason":"target_missing","status":"unresolved"}},
+    {"from":"task:<task>","relation":"implements","to":"github_issue:https://github.com/sifrious/molly/issues/42","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"produced","to":"pull_request:https://github.com/sifrious/molly/pull/12","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"produced","to":"run:<run>","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"runs_in","to":"workspace:<workspace>","sources":["workspace:<workspace>"],"metadata":[]},
+    {"from":"task:<task>","relation":"verified_by","to":"acceptance_test:<task>:tests/GreetingTest.php","sources":["workspace:<workspace>"],"metadata":[]}
+  ]
+}

@@ -25,7 +25,7 @@ php artisan molly:show RUN_ID --verbose
 cat tests/Feature/ReadyTest.php
 ```
 
-Molly checks the written file before running it and rejects a PHPUnit class or a file without `<?php` with `TEST_AUTHORING_INVALID`. Small local models trip on this; see [Choosing a model](ollama-quickstart.md#choosing-a-model).
+Molly checks the written file before running it and rejects a PHPUnit class, a file without `<?php`, or an `assertSee()` of one character with `TEST_AUTHORING_INVALID`. Small local models trip on this; see [Choosing a model](ollama-quickstart.md#choosing-a-model).
 
 When the test says what you meant, lock it. This records its digest, marks the lock as your approval, and turns the same task into the implementation task with a fresh attempt budget:
 
@@ -49,6 +49,8 @@ php artisan molly:import https://github.com/OWNER/REPO/issues/42 \
 ```
 
 Molly reads the issue title and body and saves them with the task. It does not start the task or write anything to GitHub. Write the test (or use the [test-first flow](#write-the-test-first) with `--allow-test-edits`), then start the task as usual.
+
+When the issue lists acceptance criteria, add `--allow-test-edits --todos` and Molly writes one Pest todo per criterion to the new test file. [Acceptance criteria to Pest todos](github-todos.md) follows that flow from the issue to a locked test.
 
 After a completed run and your review, record the approval and let Molly write the pull request text:
 
@@ -78,17 +80,39 @@ The report labels each file `added`, `removed`, `modified`, or `unchanged`. A ch
 
 ## Two tasks at once
 
-Pest and the Tarpit review already run in parallel inside one run. Two runs cannot share a workspace: the second start reports `WORKSPACE_BUSY` and does nothing. To run tasks side by side, give each its own checkout:
+Pest and the Tarpit review already run in parallel inside one run. Two runs cannot share a workspace: the second start reports `WORKSPACE_BUSY` and does nothing. To run tasks side by side, give each its own checkout.
+
+This example uses the `demo-greeting` task and the `tests/Feature/ReadyTest.php` file from [Getting started](getting-started.md). From the application root, create a second checkout on a new branch and give it the files Git does not track:
 
 ```bash
-git worktree add ../app-ready main
+git worktree add -b ready ../app-ready
 composer install --working-dir=../app-ready
-php artisan molly:create 'Add GET /ready ...' --workspace=../app-ready --name=ready \
+cp .env ../app-ready/.env
+mkdir -p ../app-ready/tests/Feature
+cp tests/Feature/ReadyTest.php ../app-ready/tests/Feature/ReadyTest.php
+```
+
+The second checkout needs its own `vendor` directory, because Pest runs there, and its own `.env`, because the application's tests read `APP_KEY` from it. Save a task for it:
+
+```bash
+php artisan molly:create 'Add GET /ready returning exactly {"ready":true}. Preserve existing routes.' \
+  --workspace=../app-ready --name=ready \
   --test=tests/Feature/ReadyTest.php --file=routes/web.php
+```
+
+Then start one task in each of two terminals, both from the application root:
+
+```bash
+php artisan molly:start demo-greeting
+```
+
+```bash
 php artisan molly:start ready
 ```
 
-The other checkout needs its own `vendor` directory, because Pest runs there. Each workspace keeps its own `.molly/` directory, receipts, and lock. The tasks still share the application database, so `molly:tasks` lists both.
+Each workspace keeps its own `.molly/` directory, receipts, and lock, so neither start sees `WORKSPACE_BUSY`. The tasks share the application database, so `php artisan molly:tasks` lists both. Review and merge the `ready` branch as you would any other, then remove the checkout with `git worktree remove ../app-ready`.
+
+To queue tasks side by side with a queue worker and a model for each, register a local Orb for each; [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs) shows how.
 
 ## Tune Laravel AI
 
@@ -110,6 +134,16 @@ TYPESAFE_API_KEY=...
 ```
 
 `molly.jev.confidence_threshold` (0.8) decides when Molly keeps its own guidance instead of Jev's.
+
+## Replace a step with your own agent
+
+Settings change where a request goes. To change what the change writer, the Tarpit reviewer, or the story step asks the model, bind a subclass of the Molly agent class in your service provider:
+
+```php
+$this->app->bind(ChangeWriter::class, TeamChangeWriter::class);
+```
+
+[Customize a step](customize-steps.md) builds `TeamChangeWriter`, runs a task with it, and lists what Molly still rejects: files outside the task, edits to the protected test, and claims of success without a passing Pest run.
 
 ## Jev in the loop
 
@@ -142,6 +176,6 @@ Open `http://127.0.0.1:8000/molly`. Creating a task from the form saves it exact
 
 The two setups share every record. [Molly on its own](standalone.md) tours Artisan and the web interface. [Molly with Bloom](bloom.md) explains what Bloom adds and what still runs outside it.
 
-## Not yet: running on an Orb
+## Local execution and local Orbs
 
-Molly can save a link between a task and an Amp thread and read Amp's reported connection state, but it cannot send a task to a remote machine or verify that an executor is an Orb. That work is planned and described in [Execution targets](execution-targets.md). Until it ships, every run executes on the machine where you run Artisan.
+A run executes on the machine where you run Artisan unless you place it on a local Orb. With the default parallel checks, `molly:show RUN_ID` lists `local` in the `Target` column for Pest and the review, or the Orb for a run on an Orb. An Amp thread link does not change where a run executes. [Run tasks on two local Orbs](execution-targets.md#run-tasks-on-two-local-orbs) registers two Orbs and runs a task on each at the same time. Hosted Orbs are not shipped.

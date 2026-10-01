@@ -36,7 +36,11 @@ php artisan config:clear
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/molly`. The pages are the task list, a task page with its attempts and an advice button, the run evidence page, plans, the project graph, and a create form. The web interface accepts loopback connections in the `local` and `testing` environments only, and it has no login. Starting a task from the browser needs a queue worker; [Web interface](web-interface.md) explains the queue requirements.
+Open `/molly` at the address `php artisan serve` prints, usually `http://127.0.0.1:8000/molly`. When port 8000 is taken, `serve` prints `Failed to listen on 127.0.0.1:8000 (reason: Address already in use)`, moves to the next free port, such as 8001, and prints that address instead. To choose the port, run `php artisan serve --port=8080` and open `http://127.0.0.1:8080/molly`. With `--port`, or with `SERVER_PORT` set, `serve` uses only that port: when it is taken, `serve` prints the same `Failed to listen` line and exits with status 1.
+
+Molly binds no port of its own. The web interface is part of your application and is served by `php artisan serve`, Herd, or your own web server. `molly:worker` runs `queue:work`, and `php artisan mcp:start molly` talks over standard input and output, so neither listens on a port. [The port is already in use](troubleshooting.md#the-port-is-already-in-use) covers the messages.
+
+The pages are the task list, a task page with its attempts and an advice button, the run evidence page, plans, the project graph, and a create form. The web interface accepts loopback connections in the `local` and `testing` environments only, and it has no login. Starting a task from the browser needs a queue worker; [Web interface](web-interface.md) explains the queue requirements.
 
 ## Plans
 

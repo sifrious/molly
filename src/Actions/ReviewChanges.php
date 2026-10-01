@@ -3,7 +3,6 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Validator;
-use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\LocalOllama;
@@ -11,7 +10,7 @@ use Sifrious\Molly\Agents\TarpitReviewer;
 
 class ReviewChanges
 {
-    public function __construct(private AmpResponse $ampResponse) {}
+    public function __construct(private AmpResponse $ampResponse, private LocalOllama $ollama) {}
 
     /**
      * @param  array<string, string|null>  $before
@@ -35,16 +34,11 @@ class ReviewChanges
     private function acquireReviewResult(string $input): array
     {
         if (config('molly.agent', 'ollama') === 'amp') {
-            return $this->ampResponse->prompt(new TarpitReviewer, $input);
+            return $this->ampResponse->prompt(TarpitReviewer::make(), $input);
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            LocalOllama::validate();
-            $response = TarpitReviewer::make()->prompt(
-                $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
-            );
-
-            return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+            return $this->ollama->prompt(TarpitReviewer::make(), $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');

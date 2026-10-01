@@ -5,11 +5,13 @@ on:
     paths:
       - 'README.md'
       - 'docs/**'
+      - 'bin/molly-docs-check'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'README.md'
       - 'docs/**'
+      - 'bin/molly-docs-check'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 

@@ -18,6 +18,7 @@ beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-mcp-reference-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/tests');
     writeProtectedTest($this->workspace, 'tests/HealthTest.php');
+    commitGitWorkspace($this->workspace);
     $this->scope = ['workspace' => $this->workspace, 'paths' => [], 'test_path' => 'tests/HealthTest.php', 'allow_test_edits' => true];
     Queue::fake();
 });

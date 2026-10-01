@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\CreateMollyProject;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyProjectNewCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:project-new
         {path? : Directory for the new Laravel + Molly project}
         {--name= : Display name}
@@ -43,14 +44,24 @@ class MollyProjectNewCommand extends Command
             );
 
             $payload = [
-                'status' => 'created',
-                'project' => $result['project']->toArray(),
+                'status' => $result['status'],
+                'path' => $result['path'],
+                'project' => $result['project']?->toArray(),
                 'created' => $result['created'],
                 'steps' => $result['steps'],
+                'reason' => $result['reason'],
+                'next' => $result['next'],
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
+            } elseif ($result['project'] === null) {
+                note('Laravel application created at '.$result['path'].'.');
+                note((string) $result['reason']);
+                note('Molly has not attached it yet. Molly records the commit each task starts from and never creates a repository or a commit for you. Commit the application with your own Git identity, then attach Molly:');
+                foreach ($result['next'] as $command) {
+                    $this->line('  '.$command);
+                }
             } else {
                 note('Molly project ready: '.$result['project']->path);
                 note('List projects: php artisan molly:projects');
@@ -58,13 +69,7 @@ class MollyProjectNewCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

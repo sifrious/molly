@@ -20,11 +20,11 @@ it('keeps deterministic follow-up authoritative', function () {
         ->and($passed->deterministicFollowUp)->toBe('complete_if_required_gates_pass');
 });
 
-it('uses fallback capability detection on the stable Laravel AI baseline', function () {
+it('uses fallback capability detection when Laravel AI lacks the decide capability', function () {
     $detect = new DetectLaravelAiClassification;
 
     if ($detect->supportsDecide()) {
-        $this->markTestSkipped('This lane has the optional Laravel AI 1.x decide capability.');
+        $this->markTestSkipped('This lane has the Laravel AI 1.x decide capability.');
     }
 
     expect($detect->supportsChoice())->toBeFalse()
@@ -32,10 +32,10 @@ it('uses fallback capability detection on the stable Laravel AI baseline', funct
         ->and($detect->version())->not->toBeNull();
 });
 
-it('detects the live Laravel AI Jev capabilities when 1.x is installed', function () {
+it('requires the stable Laravel AI Jev capabilities', function () {
     $detect = new DetectLaravelAiClassification;
 
-    skipWithoutJevCapability($detect->supportsDecide(), 'Laravel AI decide capability is not installed in this lane.');
+    expect($detect->supportsDecide())->toBeTrue();
 
     expect($detect->supportsChoice())->toBeTrue()
         ->and($detect->adapter())->toBe('laravel-ai.decide')
@@ -51,7 +51,7 @@ it('uses deterministic fallback when Jev is globally disabled', function () {
 
 it('uses Laravel AI decide when Jev is enabled but never upgrades a failed run', function () {
     $detect = new DetectLaravelAiClassification;
-    skipWithoutJevCapability($detect->supportsDecide(), 'Laravel AI decide capability is not installed in this lane.');
+    expect($detect->supportsDecide())->toBeTrue();
 
     config(['molly.jev.enabled' => true]);
 

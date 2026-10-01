@@ -44,7 +44,7 @@ class IndexProjectGraph
                 'digest' => $task->test_digest,
                 'writable' => (bool) $task->allow_test_edits,
             ]);
-            $this->edge($edges, 'verified_by', $taskNode, $testNode, $source);
+            $this->edge($edges, 'verified_by', $taskNode, $testNode, $source, $this->targetMetadata($root, $task->test_path));
             $lock = $task->source['test_lock'] ?? null;
             if (is_array($lock) && is_string($lock['after_digest'] ?? null)) {
                 $lockNode = $this->node($nodes, 'approval', $task->id.':test_lock', 'Locked Pest test', $source, [
@@ -56,8 +56,8 @@ class IndexProjectGraph
                 $this->edge($edges, 'approved_by', $testNode, $lockNode, $source);
             }
             foreach ($task->paths as $path) {
-                $fileNode = $this->node($nodes, 'file', $path, $path, $source);
-                $this->edge($edges, 'changes', $taskNode, $fileNode, $source);
+                $fileNode = $this->fileNode($nodes, $root, $path, $source);
+                $this->edge($edges, 'changes', $taskNode, $fileNode, $source, $this->targetMetadata($root, $path));
             }
             if (is_string($task->source['issue_url'] ?? null)) {
                 $issueNode = $this->node($nodes, 'github_issue', $task->source['issue_url'], $task->source['issue_url'], $source, [
@@ -85,7 +85,7 @@ class IndexProjectGraph
                 }
             }
             foreach ($task->runs as $run) {
-                $this->indexRun($nodes, $edges, $source, $taskNode, $testNode, $run);
+                $this->indexRun($nodes, $edges, $source, $taskNode, $testNode, $run, $root);
             }
         }
 
@@ -107,7 +107,7 @@ class IndexProjectGraph
      * @param  array<string, GraphNode>  $nodes
      * @param  list<GraphEdge>  $edges
      */
-    private function indexRun(array &$nodes, array &$edges, GraphSource $source, GraphNode $taskNode, GraphNode $testNode, Run $run): void
+    private function indexRun(array &$nodes, array &$edges, GraphSource $source, GraphNode $taskNode, GraphNode $testNode, Run $run, string $root): void
     {
         $runNode = $this->node($nodes, 'run', $run->id, 'Attempt '.$run->id, $source, ['status' => $run->status]);
         $this->edge($edges, 'produced', $taskNode, $runNode, $source);
@@ -137,13 +137,14 @@ class IndexProjectGraph
             $blocker = $this->node($nodes, 'blocker', $run->id.':'.$name, $name.' blocked completion', $source, ['verifier' => $name]);
             $this->edge($edges, 'blocked_by', $runNode, $blocker, $source);
         }
-        $this->edge($edges, 'verified_by', $runNode, $testNode, $source);
+        $testPath = $testNode->label;
+        $this->edge($edges, 'verified_by', $runNode, $testNode, $source, $this->targetMetadata($root, $testPath));
         foreach ($report['changes'] ?? [] as $change) {
             if (! is_array($change) || ! is_string($change['path'] ?? null)) {
                 continue;
             }
-            $fileNode = $this->node($nodes, 'file', $change['path'], $change['path'], $source);
-            $this->edge($edges, 'changes', $runNode, $fileNode, $source);
+            $fileNode = $this->fileNode($nodes, $root, $change['path'], $source);
+            $this->edge($edges, 'changes', $runNode, $fileNode, $source, $this->targetMetadata($root, $change['path']));
         }
         if (is_string($report['protected_test']['digest'] ?? null) && $report['protected_test']['digest'] !== ($testNode->metadata['digest'] ?? null)) {
             $blocker = $this->node($nodes, 'blocker', $run->id.':protected_test', 'Protected test digest changed', $source);
@@ -165,9 +166,36 @@ class IndexProjectGraph
 
     /**
      * @param  list<GraphEdge>  $edges
+     * @param  array<string, mixed>  $metadata
      */
-    private function edge(array &$edges, string $relation, GraphNode $from, GraphNode $to, GraphSource $source): void
+    private function edge(array &$edges, string $relation, GraphNode $from, GraphNode $to, GraphSource $source, array $metadata = []): void
     {
-        $edges[] = new GraphEdge('project', $from->version, $relation, $from->id(), $to->id(), [$source->id()]);
+        $edges[] = new GraphEdge('project', $from->version, $relation, $from->id(), $to->id(), [$source->id()], $metadata);
+    }
+
+    /**
+     * A file node for a workspace path. A path that no longer exists keeps its node
+     * and is marked, so the history stays readable without guessing where it went.
+     *
+     * @param  array<string, GraphNode>  $nodes
+     */
+    private function fileNode(array &$nodes, string $root, string $path, GraphSource $source): GraphNode
+    {
+        return $this->node($nodes, 'file', $path, $path, $source, $this->exists($root, $path) ? [] : ['exists' => false]);
+    }
+
+    /**
+     * Edge metadata for a relationship whose target is a workspace file.
+     *
+     * @return array<string, string>
+     */
+    private function targetMetadata(string $root, string $path): array
+    {
+        return $this->exists($root, $path) ? [] : ['status' => 'unresolved', 'reason' => 'target_missing', 'path' => $path];
+    }
+
+    private function exists(string $root, string $path): bool
+    {
+        return is_file(rtrim($root, '/').'/'.ltrim($path, '/'));
     }
 }

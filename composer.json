@@ -14,7 +14,7 @@
         "illuminate/process": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
         "illuminate/validation": "^12.0|^13.0",
-        "laravel/ai": "^0.11.2",
+        "laravel/ai": "^1.0",
         "laravel/mcp": "^1.0",
         "laravel/prompts": "^0.3.24",
         "livewire/flux": "^2.20",
@@ -78,7 +78,16 @@
             "/pint.json",
             "/testbench.yaml",
             "/bloom-plugin/Surfaces.bundle",
-            "/bloom-plugin/Surfaces/.build"
+            "/bloom-plugin/Surfaces/.build",
+            "/bin/molly-acceptance-gate",
+            "/bin/molly-candidate",
+            "/bin/molly-docs-check",
+            "/bin/molly-docs-walkthrough",
+            "/bin/molly-release-gates",
+            "/bloom-plugin/Surfaces/Tests",
+            "/bloom-plugin/Surfaces/.gitignore",
+            "/.gitattributes",
+            "/.gitignore"
         ]
     },
     "bin": [

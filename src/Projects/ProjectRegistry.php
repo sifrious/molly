@@ -5,11 +5,14 @@ namespace Sifrious\Molly\Projects;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
+use Throwable;
 
 /**
  * Shared Molly project index for CLI and Bloom.
  *
  * Per-project: `<path>/.molly/project.json`
+ * Per-checkout identity: `<path>/.molly/identity.json`
  * Global: `~/.molly/projects.json` (JSON array of absolute paths)
  */
 final class ProjectRegistry
@@ -47,6 +50,34 @@ final class ProjectRegistry
         return (string) Str::uuid();
     }
 
+    public function identityFile(string $path): string
+    {
+        return rtrim(str_replace('\\', '/', $path), '/').'/.molly/identity.json';
+    }
+
+    /**
+     * Canonical Molly identities for one checkout root.
+     *
+     * The IDs are minted once, stored in `.molly/identity.json`, and read back by every
+     * later call and process. The path is never the ID. When the checkout is a registered
+     * project, `project_id` is the registry ID from `.molly/project.json`.
+     *
+     * @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}
+     */
+    public function checkoutIdentity(string $path): array
+    {
+        $root = $this->normalizePath($path);
+        $file = $this->identityFile($root);
+        $identity = $this->readIdentity($file) ?? $this->createIdentity($file);
+
+        $project = $this->readProject($root);
+        if ($project instanceof MollyProject) {
+            $identity['project_id'] = $project->id;
+        }
+
+        return $identity;
+    }
+
     public function readProject(string $path): ?MollyProject
     {
         $file = $this->projectFile($path);
@@ -76,17 +107,9 @@ final class ProjectRegistry
             createdAt: $project->createdAt,
         );
 
-        $directory = dirname($this->projectFile($normalized->path));
-        File::ensureDirectoryExists($directory, 0700);
-        $mask = umask(0077);
-        try {
-            File::put(
-                $this->projectFile($normalized->path),
-                json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
-            );
-        } finally {
-            umask($mask);
-        }
+        $file = Directory::molly($normalized->path, 'project.json');
+        Directory::ensure(dirname($file), 0700);
+        $this->replace($file, json_encode($normalized->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
 
         $this->registerPath($normalized->path);
     }
@@ -162,16 +185,108 @@ final class ProjectRegistry
     /** @param  list<string>  $paths */
     private function writeIndex(array $paths): void
     {
-        File::ensureDirectoryExists($this->home(), 0700);
+        Directory::ensure($this->home(), 0700);
+        $this->replace($this->globalIndexPath(), json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_INDEX_UNWRITABLE');
+    }
+
+    /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string}|null */
+    private function readIdentity(string $file): ?array
+    {
+        if (is_link(dirname($file))) {
+            // A linked .molly is reported as the escape it is, naming the link and its target.
+            Directory::molly(dirname($file, 2));
+        }
+        if (is_link($file)) {
+            throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' must not be a symbolic link.');
+        }
+        if (! is_file($file)) {
+            return null;
+        }
+
+        try {
+            $data = json_decode(File::get($file), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' is not valid JSON.');
+        }
+
+        $identity = [];
+        foreach (['project_id', 'workspace_id', 'repository_id', 'checkout_id'] as $key) {
+            if (! is_array($data) || ! is_string($data[$key] ?? null) || ! Str::isUuid($data[$key])) {
+                throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: '.$file.' needs a UUID '.$key.'. Molly does not replace a damaged identity file.');
+            }
+            $identity[$key] = strtolower($data[$key]);
+        }
+
+        return $identity;
+    }
+
+    /** @return array{project_id: string, workspace_id: string, repository_id: string, checkout_id: string} */
+    private function createIdentity(string $file): array
+    {
+        $identity = [
+            'project_id' => $this->makeId(),
+            'workspace_id' => $this->makeId(),
+            'repository_id' => $this->makeId(),
+            'checkout_id' => $this->makeId(),
+        ];
+
+        Directory::molly(dirname($file, 2), basename($file));
+        Directory::ensure(dirname($file), 0700);
+        $staged = dirname($file).'/.identity-'.bin2hex(random_bytes(8)).'.tmp';
+        $this->put($staged, json_encode(['schema' => 'molly.checkout-identity.v1', ...$identity], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n", 'WORKSPACE_IDENTITY_UNWRITABLE', $file);
+
+        try {
+            // link() fails when another process already wrote the file; that file wins.
+            if (! @link($staged, $file)) {
+                return $this->readIdentity($file)
+                    ?? throw new RuntimeException('WORKSPACE_IDENTITY_INVALID: Molly could not write '.$file.'.');
+            }
+        } finally {
+            @unlink($staged);
+        }
+
+        return $identity;
+    }
+
+    /**
+     * Replace a file through a private staged copy beside it. rename() swaps the whole file, so a
+     * killed or failed write leaves the previous file instead of a truncated one a rerun cannot read.
+     */
+    private function replace(string $path, string $contents, string $code): void
+    {
+        $staged = dirname($path).'/.'.basename($path).'-'.bin2hex(random_bytes(8)).'.tmp';
+        try {
+            $this->put($staged, $contents, $code, $path);
+            [$renamed, $reason] = Directory::attempt(fn (): bool => rename($staged, $path));
+            if (! $renamed) {
+                throw new RuntimeException($code.': Molly could not write '.$path.($reason !== '' ? ' ('.$reason.')' : '').'. Check free disk space and that the directory is writable.');
+            }
+        } finally {
+            if (is_file($staged)) {
+                @unlink($staged);
+            }
+        }
+    }
+
+    /** Write a private file, or fail with a code that names the path and the reason. */
+    private function put(string $path, string $contents, string $code, ?string $named = null): void
+    {
         $mask = umask(0077);
         try {
-            File::put(
-                $this->globalIndexPath(),
-                json_encode(array_values($paths), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
-            );
+            $written = File::put($path, $contents);
+        } catch (Throwable $exception) {
+            $written = false;
+            $error = $exception->getMessage();
         } finally {
             umask($mask);
         }
+        if ($written === strlen($contents)) {
+            return;
+        }
+
+        $reason = isset($error) && preg_match('/\): (?:Failed to open stream: )?(.+)\z/', $error, $match) === 1 ? ' ('.$match[1].')' : '';
+
+        throw new RuntimeException($code.': Molly could not write '.($named ?? $path).$reason.'. Check free disk space and that the directory is writable.');
     }
 
     private function normalizePath(string $path): string

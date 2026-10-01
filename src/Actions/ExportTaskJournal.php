@@ -9,6 +9,7 @@ use Sifrious\Molly\Journal\JournalRenderer;
 use Sifrious\Molly\Journal\JournalWriter;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
@@ -19,6 +20,7 @@ class ExportTaskJournal
         private RecordLifecycleEvent $lifecycleEvents,
         private JournalRenderer $journalRenderer,
         private JournalWriter $journalWriter,
+        private SecretRedactor $redactor,
     ) {}
 
     /** @return array{path: string, task_id: string, attempt_count: int} */
@@ -35,7 +37,9 @@ class ExportTaskJournal
         $root = (new Workspace($task->workspace))->path;
         $directory = $root.'/.molly/journal';
         $path = $directory.'/'.$task->id.'.md';
-        $markdown = $this->journalRenderer->renderTask($this->taskPayload($task));
+        // Redact before rendering: Markdown escaping changes a secret such as sk-... into sk\-...,
+        // which the redactor no longer recognizes.
+        $markdown = $this->journalRenderer->renderTask($this->redactor->value($this->taskPayload($task), $root));
         $this->prepareDirectory($root);
         $this->write($root, $path, $markdown);
 
@@ -69,7 +73,7 @@ class ExportTaskJournal
         $glossaryPath = $root.'/.molly/GLOSSARY.md';
         $this->prepareDirectory($root);
         $this->updateGlossary($root, $glossaryPath);
-        $this->write($root, $journalPath, $this->journalRenderer->renderProject($payloads));
+        $this->write($root, $journalPath, $this->journalRenderer->renderProject($this->redactor->value($payloads, $root)));
 
         return ['journal_path' => $journalPath, 'glossary_path' => $glossaryPath, 'task_count' => $tasks->count(), 'attempt_count' => count($entries) - $tasks->count()];
     }
@@ -146,7 +150,7 @@ class ExportTaskJournal
             return [];
         }
 
-        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $escape = fn (mixed $value): string => $this->escapeRedacted($value, $task->workspace);
         $lines = ['- Locked test digest: '.$escape($lock['after_digest'])];
         if (is_string($lock['before_digest'] ?? null)) {
             $lines[] = '- Previous test digest: '.$escape($lock['before_digest']);
@@ -169,7 +173,7 @@ class ExportTaskJournal
             return [];
         }
 
-        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $escape = fn (mixed $value): string => $this->escapeRedacted($value, $task->workspace);
         $lines = ['- GitHub issue: '.$escape($source['issue_url'])];
         if (is_string($source['issue_digest'] ?? null)) {
             $lines[] = '- Issue digest: '.$escape($source['issue_digest']);
@@ -197,13 +201,19 @@ class ExportTaskJournal
             return [];
         }
 
-        $escape = fn (mixed $value): string => $this->journalRenderer->escape($value);
+        $escape = fn (mixed $value): string => $this->escapeRedacted($value, $task->workspace);
         $lines = ['- Display status: '.$escape($log->displayStatus($task->id)->value)];
         foreach ($events as $event) {
             $lines[] = '- Lifecycle: '.$escape($this->lifecycleLine($event));
         }
 
         return $lines;
+    }
+
+    /** Lines built here are escaped before rendering, so their values are redacted first. */
+    private function escapeRedacted(mixed $value, string $workspace): string
+    {
+        return $this->journalRenderer->escape(is_string($value) ? $this->redactor->text($value, $workspace) : $value);
     }
 
     private function lifecycleLine(LifecycleEvent $event): string
@@ -224,7 +234,7 @@ class ExportTaskJournal
     private function updateGlossary(string $root, string $path): void
     {
         $existing = $this->readExisting($path);
-        $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '');
+        $contents = $this->journalRenderer->replaceManagedGlossary($existing ?? '', $this->journalRenderer->glossarySourceLink($root));
         if ($contents !== ($existing ?? '')) {
             $this->journalWriter->replaceFile($path, $contents, $existing === null ? false : hash('sha256', $existing));
         }
@@ -259,6 +269,6 @@ class ExportTaskJournal
     private function write(string $root, string $path, string $markdown, string|false|null $expectedHash = null): void
     {
         $this->journalWriter->ensureDirectory($root.'/.molly');
-        $this->journalWriter->replaceFile($path, $markdown, $expectedHash);
+        $this->journalWriter->replaceFile($path, $this->redactor->text($markdown, $root), $expectedHash);
     }
 }

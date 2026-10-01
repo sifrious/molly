@@ -146,6 +146,70 @@ it('measures source without external Clever and refreshes Git observations betwe
     }
 });
 
+it('measures a committed workspace in the local environment at the repository root or in a subdirectory', function (string $prefix): void {
+    $repository = sys_get_temp_dir().'/molly-local-clever-'.bin2hex(random_bytes(8));
+    $workspace = rtrim($repository.'/'.$prefix, '/');
+    $write = function (string $path, string $contents) use ($repository): void {
+        (new Filesystem)->ensureDirectoryExists(dirname($repository.'/'.$path));
+        file_put_contents($repository.'/'.$path, $contents);
+    };
+    $commit = function (string $author, string $message) use ($repository): void {
+        foreach ([['git', 'add', '-A'], ['git', '-c', 'user.name='.$author, '-c', 'user.email='.strtolower($author).'@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', $message]] as $command) {
+            Process::path($repository)->run($command)->throw();
+        }
+    };
+    $inWorkspace = fn (string $path): string => ltrim($prefix.'/'.$path, '/');
+
+    mkdir($repository, 0755, true);
+    Process::path($repository)->run(['git', 'init', '--quiet'])->throw();
+    $write($inWorkspace('app/Models/Invoice.php'), "<?php\n\nnamespace App\\Models;\n\nclass Invoice\n{\n    public int \$total = 0;\n}\n");
+    $write($inWorkspace('app/Http/Controllers/InvoiceController.php'), "<?php\n\nnamespace App\\Http\\Controllers;\n\nuse App\\Models\\Invoice;\n\nclass InvoiceController\n{\n    public function show(): Invoice\n    {\n        return new Invoice();\n    }\n}\n");
+    $write($inWorkspace('app/Support/Clock.php'), "<?php\n\nnamespace App\\Support;\n\nclass Clock\n{\n    public function now(): string\n    {\n        return date('c');\n    }\n}\n");
+    $write($inWorkspace('routes/web.php'), "<?php\n\n\$routes = [];\n");
+    if ($prefix !== '') {
+        $write('tools/outside.php', "<?php\n\n\$outside = 1;\n");
+    }
+    $commit('Ada', 'Start the application');
+    foreach (['Grace', 'Ada'] as $round => $author) {
+        $write($inWorkspace('app/Support/Clock.php'), "<?php\n\nnamespace App\\Support;\n\nuse Illuminate\\Support\\Carbon;\n\nclass Clock\n{\n    public function now(): string\n    {\n        return Carbon::now()->format('c').'{$round}';\n    }\n}\n");
+        if ($prefix !== '') {
+            $write('tools/outside.php', "<?php\n\n\$outside = {$round};\n");
+        }
+        $commit($author, 'Change the clock');
+    }
+    config(['molly-complexity.lonely.min_lines' => 1]);
+    app()->instance('env', 'local');
+
+    try {
+        $result = app(MeasureComplexity::class)->handle((string) realpath($workspace), $repository.'-evidence');
+        $probes = collect($result['probes'])->keyBy('key');
+        $hotspots = $probes['c4']['metrics'];
+        $lonely = $probes['c3']['metrics'];
+
+        expect($result['status'])->toBe('ok')
+            ->and($probes->pluck('status')->all())->toBe(['ok', 'ok', 'ok', 'ok'])
+            ->and($probes['c1']['metrics']['files'])->toBe(4)
+            ->and($probes['c2']['metrics']['welded_new'])->toBe(1)
+            ->and($probes['c2']['metrics']['bare_static_total'])->toBe(1)
+            ->and($hotspots['commits_scanned'])->toBe(3)
+            ->and($hotspots['files_missing_on_disk'])->toBe(0)
+            ->and($hotspots['points'][0])->toMatchArray(['path' => 'app/Support/Clock.php', 'churn' => 3])
+            ->and(collect($hotspots['points'])->pluck('path')->sort()->values()->all())->toBe(['app/Http/Controllers/InvoiceController.php', 'app/Models/Invoice.php', 'app/Support/Clock.php', 'routes/web.php'])
+            ->and($lonely['lonely_total'])->toBe(3)
+            ->and($lonely['filtered_missing'])->toBe(0)
+            ->and(collect($lonely['top'])->pluck('path')->sort()->values()->all())->toBe(['app/Http/Controllers/InvoiceController.php', 'app/Models/Invoice.php', 'routes/web.php'])
+            ->and(collect($lonely['top'])->pluck('author')->unique()->all())->toBe(['Ada']);
+        $report = json_decode(file_get_contents($result['report']), true, flags: JSON_THROW_ON_ERROR);
+        expect($report['environment'])->toBe('local')
+            ->and($report['git']['available'])->toBeTrue()
+            ->and(array_keys($report['probes']))->toBe(['c1', 'c2', 'c3', 'c4']);
+    } finally {
+        app()->instance('env', 'testing');
+        (new Filesystem)->deleteDirectory($repository);
+        (new Filesystem)->deleteDirectory($repository.'-evidence');
+    }
+})->with(['repository root' => [''], 'Laravel application in a subdirectory' => ['backend']]);
+
 it('runs each bundled Clever command and writes its report', function (string $command, ?string $key): void {
     $directory = sys_get_temp_dir().'/molly-command-'.bin2hex(random_bytes(8));
     mkdir($directory.'/app', 0755, true);

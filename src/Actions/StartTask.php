@@ -3,17 +3,33 @@
 namespace Sifrious\Molly\Actions;
 
 use Closure;
+use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\AgentBus\LocalAgentBus;
+use Sifrious\Molly\Contracts\ExecutionTargetKind;
+use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 use Sifrious\Molly\Contracts\LifecycleEventType;
+use Sifrious\Molly\Execution\LocalOrbProvider;
+use Sifrious\Molly\Execution\SelectExecutionTarget;
+use Sifrious\Molly\Models\Orb;
 use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\RunStopped;
 use Sifrious\Molly\Verification\PestAssertionHints;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
 class StartTask
 {
+    /** Columns a claim changes. A refused start writes these back exactly. */
+    private const CLAIM_COLUMNS = ['status', 'attempt_number', 'idempotency_key', 'stop_requested_at', 'worker_id', 'claimed_at', 'heartbeat_at', 'lease_expires_at'];
+
+    /** The signal that interrupted this start, set by interrupt(). */
+    private ?int $interruptedBy = null;
+
+    /** The task this start has claimed, while its attempt runs. */
+    private ?string $claimed = null;
+
     public function __construct(
         private RunTask $runTask,
         private RefreshProjectJournal $journal,
@@ -21,60 +37,233 @@ class StartTask
         private RecordLifecycleEvent $lifecycle,
         private LocalAgentBus $bus,
         private PestAssertionHints $pestAssertionHints,
+        private SelectExecutionTarget $targets,
+        private LocalOrbProvider $orbs,
     ) {}
 
-    public function handle(string $id, ?Closure $progress = null, bool $retry = false): Run
+    /**
+     * Stop the attempt this start is running because the process received $signal, such as
+     * SIGINT from Ctrl-C. Like molly:stop, this records a stop request, so the run ends as
+     * stopped at its next step, and it sends SIGTERM to the processes the run started, such as
+     * Pest and the parallel checks. A model request that is waiting for an answer finishes or
+     * times out first. A signal that arrives before the claim leaves the task unclaimed.
+     * Commands call this from a signal handler, so it does not wait for anything: the run
+     * itself records the stopped result when it reaches its next step.
+     */
+    public function interrupt(int $signal): void
+    {
+        $this->interruptedBy ??= $signal;
+        if ($this->claimed !== null) {
+            Task::whereKey($this->claimed)->where('status', 'running')->whereNull('stop_requested_at')->update(['stop_requested_at' => now()]);
+        }
+        $this->terminateChildren();
+    }
+
+    /**
+     * Run one attempt of the task. With an Orb request, the attempt runs on the Orb that
+     * SelectExecutionTarget chooses, with that Orb's runtime and model, in the task's worktree;
+     * a refused Orb start leaves the task as it was and frees the Orb.
+     */
+    public function handle(string $id, ?Closure $progress = null, bool $retry = false, ?ExecutionTargetRequest $target = null): Run
     {
         $task = Task::findByReference($id);
         if ($task === null) {
             throw new RuntimeException('TASK_NOT_FOUND: Molly could not find that task.');
         }
+        $orbTarget = $target?->kind === ExecutionTargetKind::Orb ? $target : null;
+        $placed = null;
+        if ($orbTarget === null) {
+            return $this->start($task, $progress, $retry, null, $placed);
+        }
+
+        try {
+            return $this->start($task, $progress, $retry, $orbTarget, $placed);
+        } catch (Throwable $exception) {
+            // Free the Orb this start placed the task on, or the Orb it named, such as the Orb a
+            // queued job was sent to. A reservation on another Orb stays for that Orb's own job.
+            $named = $orbTarget->targetId === null ? null : Orb::findByReference($orbTarget->targetId)?->id;
+            $this->orbs->releaseUnlessRunning($task->id, array_values(array_unique(array_filter([$placed, $named]))));
+            throw $exception;
+        }
+    }
+
+    private function start(Task $task, ?Closure $progress, bool $retry, ?ExecutionTargetRequest $orbTarget, ?string &$placed): Run
+    {
         $id = $task->id;
+        $workspace = new Workspace($task->workspace);
+        $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
 
-        return (new Workspace($task->workspace))->exclusivelyForTask($id, function () use ($id, $progress, $retry): Run {
-            $task = Task::findOrFail($id);
+        // Before taking the task lock, which creates .molly/, check what needs no write: the task's
+        // state, its inputs, including a named Orb, Git, a committed checkout, and the sandbox, in
+        // that order. A task that is still running goes straight to the lock, which reports
+        // WORKSPACE_BUSY while its run holds it and TASK_NOT_PENDING otherwise.
+        $task = $this->bus->recoverIfAbandoned($task);
+        if ($task->status !== 'running') {
+            $this->bus->refuseUnclaimable($task, $retry, $idempotencyKey);
+            try {
+                if (($orbTarget?->targetId ?? '') !== '') {
+                    $this->orbs->find($orbTarget->targetId);
+                }
+                $this->runTask->refuseUnready($task->prompt, $workspace, $task->paths, $task->test_path, $task);
+            } catch (RuntimeException $exception) {
+                $this->recordRefusal($task, $exception->getMessage(), $retry);
+                throw $exception;
+            }
+        }
+
+        if ($orbTarget !== null) {
+            // No lock, lifecycle event, or other write goes through a worktree path that moved.
+            $this->orbs->assertCanonicalWorkspace($task);
+        }
+
+        return $workspace->exclusivelyForTask($id, function () use ($id, $progress, $retry, $idempotencyKey, $orbTarget, &$placed): Run {
+            // This process now holds the task lock, so a claim made on this host that is still
+            // marked running belongs to a process that exited, such as one killed with SIGKILL.
+            $task = $this->bus->recoverIfAbandoned(Task::findOrFail($id), taskLockHeld: true);
+            if (($blocked = $task->redBaselineError()) !== null) {
+                $this->recordRefusal($task, $blocked, $retry);
+                throw new RuntimeException($blocked);
+            }
+            if ($this->interruptedBy !== null) {
+                throw new RunStopped('RUN_STOPPED: Molly received '.$this->signalName().' before the attempt began. The task was not claimed.');
+            }
             $workerId = $this->workerId();
-            $idempotencyKey = $task->id.':'.($retry ? 'retry' : 'start');
-            $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey);
-            $this->journal->handle($task->refresh());
+            // Snapshot after recovering an abandoned claim, so a refusal restores the recovered state.
+            $unclaimed = $task->only(self::CLAIM_COLUMNS);
+            $placement = null;
+            try {
+                if ($orbTarget !== null) {
+                    $snapshot = $this->targets->handle($orbTarget, $task);
+                    $placed = $snapshot->targetId;
+                    $placement = $this->orbs->evidence($snapshot, $task);
+                }
+                $this->bus->claim($task->id, $workerId, $retry, $idempotencyKey, $placement['target_id'] ?? null);
+            } catch (RuntimeException $exception) {
+                if ($orbTarget !== null) {
+                    $this->recordRefusal($task, $exception->getMessage(), $retry);
+                }
+                throw $exception;
+            }
+            $this->claimed = $task->id;
+            try {
+                if ($this->interruptedBy !== null) {
+                    $this->interrupt($this->interruptedBy);
+                }
+                $this->journal->handle($task->refresh());
 
-            return $this->execute($task->refresh(), $progress, $retry, $workerId);
+                return $this->execute($task->refresh(), $progress, $retry, $workerId, $unclaimed, $placement);
+            } finally {
+                $this->claimed = null;
+            }
         });
     }
 
-    private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId): Run
+    /**
+     * Send SIGTERM to each child process of this one, and to its whole process group when it
+     * leads one, which each parallel check does. The run then sees each check or Pest process end.
+     */
+    private function terminateChildren(): void
+    {
+        if (! function_exists('posix_kill') || ! function_exists('posix_getpgid')) {
+            return;
+        }
+        try {
+            $children = Process::timeout(5)->run(['pgrep', '-P', (string) getmypid()])->output();
+        } catch (Throwable) {
+            return;
+        }
+        foreach (preg_split('/\s+/', trim($children)) ?: [] as $pid) {
+            $pid = (int) $pid;
+            if ($pid > 1) {
+                posix_kill(posix_getpgid($pid) === $pid ? -$pid : $pid, SIGTERM);
+            }
+        }
+    }
+
+    private function signalName(): string
+    {
+        return match ($this->interruptedBy) {
+            SIGINT => 'SIGINT',
+            SIGTERM => 'SIGTERM',
+            default => 'signal '.$this->interruptedBy,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $unclaimed  The task's claim columns before this claim.
+     * @param  array<string, mixed>|null  $placement  The Orb evidence, when the attempt runs on an Orb.
+     */
+    private function execute(Task $task, ?Closure $progress, bool $retry, string $workerId, array $unclaimed, ?array $placement = null): Run
     {
         $id = $task->id;
+        $runCreated = false;
+        $released = false;
+        // An Orb attempt uses the Orb's runtime and model for the writer, the review, and the
+        // parallel checks, and puts the process's own settings back when the attempt ends.
+        $settings = $placement === null ? null : ['molly.agent' => config('molly.agent'), 'molly.model' => config('molly.model')];
+        if ($placement !== null) {
+            config(['molly.agent' => $placement['orb']['runtime'], 'molly.model' => $placement['orb']['model']]);
+        }
         try {
-            $this->bus->heartbeat($id, $workerId);
+            $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds());
+            if ($placement !== null) {
+                // Canonicalize the worktree again right before the first write, which is the
+                // baseline restore of a retry, so a path swapped since placement is refused.
+                $this->orbs->revalidate($task, $placement);
+            }
 
             if ($retry) {
                 $this->baseline->handle($task);
-                $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
             }
-            $this->lifecycle->handle($task->workspace, LifecycleEventType::WorkspacePrepared, $task->id, payload: [
-                'workspace' => $task->workspace,
-                'created_worktree' => false,
-            ]);
             $previousAttempt = $retry ? $this->previousAttempt($task) : null;
+            // Record preparation only once RunTask has passed its preconditions and saved a run.
+            $prepared = function () use ($task, $retry, &$runCreated): void {
+                $runCreated = true;
+                if ($retry) {
+                    $this->lifecycle->handle($task->workspace, LifecycleEventType::RetryScheduled, $task->id);
+                }
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::WorkspacePrepared, $task->id, payload: [
+                    'workspace' => $task->workspace,
+                    'created_worktree' => false,
+                ]);
+            };
             $run = $this->runTask->handle(
                 $task->prompt, $task->workspace, $task->paths, $task->test_path, $progress,
                 ...[
                     'taskId' => $id,
-                    'shouldStop' => fn (): bool => Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                    'shouldStop' => fn (): bool => $this->interruptedBy !== null || Task::whereKey($id)->whereNotNull('stop_requested_at')->exists(),
+                    'heartbeat' => function () use ($id, $workerId, $placement): void {
+                        $this->bus->heartbeat($id, $workerId, $this->bus->runLeaseSeconds());
+                        if ($placement !== null) {
+                            $this->orbs->heartbeat($placement['target_id']);
+                        }
+                    },
+                    'prepared' => $prepared,
                     ...($previousAttempt === null ? [] : ['previousAttempt' => $previousAttempt]),
+                    ...($placement === null ? [] : ['executionTarget' => $placement]),
                 ],
             );
             $finished = Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')
                 ->update(['status' => $run->status]);
             if ($finished === 0 && $task->fresh()->stop_requested_at !== null) {
-                $run->update(['status' => 'stopped', 'report' => [...$run->report, 'stop_reason' => 'The task received a stop request.']]);
+                $reason = match (true) {
+                    $this->interruptedBy !== null => 'Molly received '.$this->signalName().' and stopped at the next step.',
+                    $placement !== null && Orb::whereKey($placement['target_id'])->whereNotNull('revoked_at')->exists() => 'ORB_REVOKED: Orb '.$placement['orb']['name'].' was revoked during the run, so Molly stopped at the next step.',
+                    default => 'The task received a stop request.',
+                };
+                $run->update(['status' => 'stopped', 'report' => [...$run->report, 'stop_reason' => $reason]]);
                 Task::whereKey($id)->where('status', 'running')->update(['status' => 'stopped']);
             }
 
             $finished = $run->fresh();
+            if ($placement !== null) {
+                $report = $finished->report;
+                $report['execution_target'] = [...($report['execution_target'] ?? $placement), 'finished_at' => now()->toIso8601String(), 'result' => $finished->status];
+                $finished->update(['report' => $report]);
+            }
+            $outcome = [...$this->authoredTestSummary($finished->report ?? []), ...$this->orbSummary($finished->report ?? [])];
             if ($finished->status === 'completed') {
-                $this->lifecycle->handle($task->workspace, LifecycleEventType::VerificationFinished, $task->id, $finished->id);
+                $this->lifecycle->handle($task->workspace, LifecycleEventType::VerificationFinished, $task->id, $finished->id, $outcome);
                 $this->lifecycle->handle($task->workspace, LifecycleEventType::ApprovalRequested, $task->id, $finished->id, [
                     'before_pull_request' => true,
                     'before_merge' => true,
@@ -85,11 +274,20 @@ class StartTask
                     $finished->status === 'stopped' ? LifecycleEventType::Stopped : LifecycleEventType::Failed,
                     $task->id,
                     $finished->id,
+                    $outcome,
                 );
             }
 
             return $finished;
         } catch (Throwable $exception) {
+            // A start refused before any run was saved, such as WORKSPACE_BUSY or BASELINE_MISSING,
+            // writes back the task's claim columns exactly as they were instead of failing it.
+            $released = ! $runCreated && Task::whereKey($id)->where('status', 'running')->where('worker_id', $workerId)
+                ->whereNull('stop_requested_at')->update($unclaimed) === 1;
+            if ($released) {
+                $this->recordRefusal($task, $exception->getMessage(), $retry);
+                throw $exception;
+            }
             Task::whereKey($id)->where('status', 'running')->whereNull('stop_requested_at')->update(['status' => 'failed']);
             Task::whereKey($id)->where('status', 'running')->whereNotNull('stop_requested_at')->update(['status' => 'stopped']);
             $current = $task->fresh();
@@ -100,9 +298,78 @@ class StartTask
             );
             throw $exception;
         } finally {
-            $this->bus->clearClaim($task->refresh());
+            if ($settings !== null) {
+                config($settings);
+            }
+            if (! $released) {
+                $this->bus->clearClaim($task->refresh());
+            }
             $this->journal->handle($task->refresh());
         }
+    }
+
+    /**
+     * The Orb an attempt ran on, for the lifecycle event that ends it.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    private function orbSummary(array $report): array
+    {
+        $target = $report['execution_target'] ?? null;
+        if (! is_array($target) || ($target['kind'] ?? null) !== 'orb') {
+            return [];
+        }
+
+        return ['execution_target' => [
+            'kind' => 'orb',
+            'orb_id' => $target['target_id'] ?? null,
+            'orb_name' => $target['orb']['name'] ?? null,
+            'worktree' => $target['worktree'] ?? null,
+            'result' => $target['result'] ?? null,
+            'diff_sha256' => $target['diff']['sha256'] ?? null,
+        ]];
+    }
+
+    /**
+     * Append start_refused to an existing .molly/lifecycle.jsonl. A refusal never creates
+     * .molly/, so a workspace without a lifecycle log only gets the error.
+     */
+    private function recordRefusal(Task $task, string $message, bool $retry): void
+    {
+        if (! is_file(rtrim($task->workspace, '/').'/.molly/lifecycle.jsonl')) {
+            return;
+        }
+        $this->lifecycle->handle($task->workspace, LifecycleEventType::StartRefused, $task->id, payload: [
+            'code' => preg_match('/\A([A-Z][A-Z0-9_]+):/', $message, $match) === 1 ? $match[1] : 'COMMAND_FAILED',
+            'message' => $this->boundedText($message, 512),
+            'retry' => $retry,
+        ]);
+    }
+
+    /**
+     * The authored test check of a test-authoring run for its lifecycle event:
+     * the classification, reason, and each cause with its affected tests.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>
+     */
+    private function authoredTestSummary(array $report): array
+    {
+        $check = $report['authored_test'] ?? null;
+        if (! is_array($check) || ! is_string($check['classification'] ?? null)) {
+            return [];
+        }
+
+        return ['authored_test' => [
+            'classification' => $check['classification'],
+            'reason' => is_string($check['reason'] ?? null) ? $this->boundedText($check['reason'], 128) : null,
+            'test_broken' => ($check['test_broken'] ?? false) === true,
+            'causes' => array_values(array_map(fn (array $cause): array => [
+                'cause' => (string) ($cause['cause'] ?? ''),
+                'tests' => array_values(array_map(fn (mixed $name): string => $this->boundedText((string) $name, 128), array_slice($cause['tests'] ?? [], 0, 20))),
+            ], array_filter($check['causes'] ?? [], is_array(...)))),
+        ]];
     }
 
     private function workerId(): string
@@ -136,12 +403,42 @@ class StartTask
         $output = is_string($report['verification']['output'] ?? null)
             ? $report['verification']['output']
             : null;
+        $authored = $this->authoredTestGuidance($report['authored_test'] ?? null);
+        if ($authored !== null) {
+            $evidence['authored_test'] = $authored;
+        }
         $hints = $this->boundedAssertionHints($output);
         if ($hints !== []) {
             $evidence['assertion_hints'] = $hints;
         }
 
         return $evidence;
+    }
+
+    /**
+     * Molly's guidance for rewriting an authored test that could not run: the
+     * classification and, per cause, the guidance and up to five affected tests.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function authoredTestGuidance(mixed $check): ?array
+    {
+        if (! is_array($check) || ($check['classification'] ?? null) !== 'bootstrap_error') {
+            return null;
+        }
+        $causes = [];
+        foreach (array_slice(array_filter($check['causes'] ?? [], is_array(...)), 0, 4) as $cause) {
+            if (! is_string($cause['guidance'] ?? null)) {
+                continue;
+            }
+            $causes[] = [
+                'cause' => $this->boundedText((string) ($cause['cause'] ?? ''), 64),
+                'guidance' => $this->boundedText($cause['guidance'], 512),
+                'tests' => array_map(fn (mixed $name): string => $this->boundedText((string) $name, 128), array_slice($cause['tests'] ?? [], 0, 5)),
+            ];
+        }
+
+        return $causes === [] ? null : ['classification' => 'bootstrap_error', 'causes' => $causes];
     }
 
     /** @param  array<string, mixed>  $verification

@@ -2,13 +2,18 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use RuntimeException;
 use Sifrious\Molly\Agents\LocalOllama;
 use Sifrious\Molly\Classification\JevGate;
 use Sifrious\Molly\Complexity\Clever;
 use Sifrious\Molly\Execution\Sandbox;
+use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
 class CheckEnvironment
@@ -17,19 +22,32 @@ class CheckEnvironment
         private Sandbox $sandbox,
         private Clever $clever,
         private JevGate $jev,
+        private ObserveCheckout $observe,
+        private LocalOllama $ollama,
     ) {}
 
-    /** @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>} */
+    /**
+     * A check passes, fails, or, when Molly could not measure what it checks, is unknown.
+     * Only a failed check makes the environment not ready.
+     *
+     * @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>}
+     */
     public function handle(string $workspace): array
     {
         $checks = [];
-        $add = static function (string $name, bool $passed, string $code, string $message) use (&$checks): void {
-            $checks[] = ['name' => $name, 'status' => $passed ? 'passed' : 'failed', 'code' => $code, 'message' => $message];
+        $add = static function (string $name, ?bool $passed, string $code, string $message) use (&$checks): void {
+            $checks[] = ['name' => $name, 'status' => match ($passed) {
+                true => 'passed',
+                false => 'failed',
+                null => 'unknown',
+            }, 'code' => $code, 'message' => $message];
         };
 
         $this->checkDatabase($add);
         $workspace = realpath($workspace);
         $this->checkPest($workspace, $add);
+        $this->checkGit($add);
+        $this->checkGitRepository($workspace, $add);
         $this->checkSandbox($add);
         $this->checkParallel($add);
         $this->checkAgent($add);
@@ -50,9 +68,47 @@ class CheckEnvironment
             $ready = $ready
                 && Schema::hasColumn('molly_tasks', 'test_digest')
                 && Schema::hasColumn('molly_tasks', 'allow_test_edits');
-            $add('Run history', $ready, $ready ? 'database_ready' : 'migration_missing', $ready ? 'Task and run history are ready.' : 'Run php artisan migrate to update Molly task and run history.');
+            if (! $ready) {
+                $add('Run history', false, 'migration_missing', 'Run php artisan migrate to update Molly task and run history.');
+
+                return;
+            }
+            $unwritable = $this->probeDatabaseWrite();
+            $add('Run history', $unwritable === null, $unwritable === null ? 'database_ready' : 'database_unwritable', $unwritable === null
+                ? 'Task and run history are ready.'
+                : 'Molly could not write to the configured database: '.$unwritable.' Check free disk space and that the database file and its directory are writable.');
         } catch (Throwable) {
             $add('Run history', false, 'database_unavailable', 'Molly could not connect to the configured database.');
+        }
+    }
+
+    /**
+     * Insert one plan inside a transaction and roll it back, so a full disk or a read-only
+     * database fails here instead of on the first saved task.
+     */
+    private function probeDatabaseWrite(): ?string
+    {
+        $connection = DB::connection();
+        try {
+            $connection->beginTransaction();
+        } catch (Throwable $exception) {
+            return $exception->getMessage();
+        }
+
+        try {
+            $connection->table('molly_plans')->insert([
+                'id' => (string) Str::uuid(),
+                'description' => 'molly:doctor write check',
+                'review_mode' => 'doctor',
+                'answers' => '[]',
+                'guide_version' => 'doctor',
+            ]);
+
+            return null;
+        } catch (Throwable $exception) {
+            return $exception->getMessage();
+        } finally {
+            $connection->rollBack();
         }
     }
 
@@ -61,6 +117,51 @@ class CheckEnvironment
     {
         $pest = $workspace !== false && is_file($workspace.'/vendor/bin/pest');
         $add('Pest', $pest, $pest ? 'pest_ready' : 'pest_missing', $pest ? 'Pest is installed in the workspace.' : 'Install Pest in the workspace before running a task.');
+    }
+
+    /** @param  callable(string, bool, string, string): void  $add */
+    private function checkGit(callable $add): void
+    {
+        $git = GitBinary::find();
+        $add('Git', $git !== null, $git !== null ? 'git_ready' : 'git_missing', $git !== null
+            ? 'Git is available at '.$git.'.'
+            : 'Molly needs the git executable to create, run, and review tasks, and no git was found on PATH. Install Git or add it to PATH.');
+    }
+
+    /**
+     * Reads only: a workspace without a repository is reported, never initialized.
+     *
+     * @param  callable(string, bool, string, string): void  $add
+     */
+    private function checkGitRepository(string|false $workspace, callable $add): void
+    {
+        if (GitBinary::find() === null) {
+            // Without git, HEAD cannot be read, which is not the same as a repository with no commit.
+            $add('Git repository', null, 'git_missing', 'Molly cannot read the repository without the git executable (GIT_MISSING). Install Git or add it to PATH, then run doctor again.');
+
+            return;
+        }
+        $location = $workspace === false ? ['root' => null, 'ignored_by' => null] : ObserveCheckout::locate($workspace);
+        if ($location['ignored_by'] !== null) {
+            $add('Git repository', false, 'workspace_not_git', $workspace.' is ignored by the Git repository at '.$location['ignored_by'].', so its files are not in any commit. Stop ignoring it and commit it before creating a task.');
+
+            return;
+        }
+        if ($location['root'] === null) {
+            $add('Git repository', false, 'workspace_not_git', ($workspace === false ? 'The workspace' : $workspace).' is not a Git repository. Molly records the commit each task runs against and never creates a repository for you. Run git init and commit your work before creating a task.');
+
+            return;
+        }
+
+        $head = $this->observe->head($workspace);
+        if ($head !== null && ! $this->observe->headContainsFiles($workspace)) {
+            $add('Git repository', false, 'workspace_revision_missing', ObserveCheckout::untrackedMessage($location['root'], $workspace).' Then create the task.');
+
+            return;
+        }
+        $add('Git repository', $head !== null, $head !== null ? 'git_repository' : 'workspace_revision_missing', $head !== null
+            ? 'The workspace is a Git checkout at commit '.$head.($location['root'] !== $workspace ? ' in the repository at '.$location['root'] : '').'.'
+            : $workspace.' is a Git repository with no commit yet. Commit your work before creating a task.');
     }
 
     /** @param  callable(string, bool, string, string): void  $add */
@@ -94,7 +195,7 @@ class CheckEnvironment
             : 'Parallel checks require posix_setsid and posix_kill. Enable these PHP functions or set molly.parallel_checks to false to run checks serially.');
     }
 
-    /** @param  callable(string, bool, string, string): void  $add */
+    /** @param  callable(string, ?bool, string, string): void  $add */
     private function checkAgent(callable $add): void
     {
         if (config('molly.agent', 'ollama') === 'amp') {
@@ -125,7 +226,7 @@ class CheckEnvironment
         }
     }
 
-    /** @param  callable(string, bool, string, string): void  $add */
+    /** @param  callable(string, ?bool, string, string): void  $add */
     private function checkOllama(callable $add): void
     {
         $url = (string) config('ai.providers.ollama.url', '');
@@ -150,6 +251,7 @@ class CheckEnvironment
             return;
         }
 
+        $installed = false;
         try {
             $response = Http::timeout(5)->withoutRedirecting()->get(rtrim($url, '/').'/api/tags');
             $models = $response->json('models');
@@ -178,6 +280,36 @@ class CheckEnvironment
                 'Could not reach Ollama at '.$url.'. Start Ollama (`ollama serve`) or fix ai.providers.ollama.url / OLLAMA_URL. Unreachable is different from a missing model.',
             );
         }
+
+        if ($installed) {
+            $this->checkMemory($model, $add);
+        }
+    }
+
+    /**
+     * Compare the installed model with the memory molly:preflight measures, as a run does
+     * before Ollama loads the model. A fact Molly could not measure makes the check
+     * unknown, never failed.
+     *
+     * @param  callable(string, ?bool, string, string): void  $add
+     */
+    private function checkMemory(string $model, callable $add): void
+    {
+        try {
+            $memory = $this->ollama->memory($model);
+        } catch (RuntimeException $exception) {
+            $add('Model memory', false, 'memory_headroom_invalid', (string) preg_replace('/\A[A-Z_]+: /', '', $exception->getMessage()));
+
+            return;
+        }
+
+        [$passed, $code] = match ($memory['status']) {
+            'loaded' => [true, 'model_loaded'],
+            'fits' => [true, 'model_fits_memory'],
+            'exceeds' => [false, 'model_exceeds_memory'],
+            default => [null, 'model_memory_unknown'],
+        };
+        $add('Model memory', $passed, $code, $memory['message']);
     }
 
     /** @param  callable(string, bool, string, string): void  $add */

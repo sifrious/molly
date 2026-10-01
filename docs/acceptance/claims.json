@@ -1,0 +1,3328 @@
+{
+ "schema": "molly.acceptance-claims/1",
+ "subcase": "M01.5",
+ "generated_at_commit": "2835b93725b971171450e170fc413cee701deb7e",
+ "sources": [
+  "README.md",
+  "docs/getting-started.md",
+  "docs/quickstart-standalone.md",
+  "docs/quickstart-bloom.md",
+  "docs/compatibility.md",
+  "docs/standalone.md",
+  "docs/bloom.md",
+  "docs/index.html"
+ ],
+ "rule": "A claim maps to a Pest test (file and exact test name) whose body checks the claim, or to a manifest subcase whose requirement covers it. Unmapped claims are gaps.",
+ "counts": {
+  "test": 39,
+  "both": 31,
+  "subcase": 18,
+  "unmapped": 23
+ },
+ "unmapped": [
+  "C009",
+  "C023",
+  "C030",
+  "C035",
+  "C042",
+  "C059",
+  "C073",
+  "C086",
+  "C088",
+  "C089",
+  "C092",
+  "C093",
+  "C094",
+  "C096",
+  "C097",
+  "C098",
+  "C099",
+  "C100",
+  "C102",
+  "C103",
+  "C106",
+  "C107",
+  "C111"
+ ],
+ "claims": [
+  {
+   "id": "C001",
+   "text": "A task completes only when the required Pest test passes and the Tarpit review finds nothing blocking",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 6
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 146
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 22
+    },
+    {
+     "file": "docs/index.html",
+     "line": 68
+    },
+    {
+     "file": "docs/index.html",
+     "line": 83
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/DecideRunCompletionTest.php",
+     "name": "completes when required Pest and Tarpit checks pass"
+    },
+    {
+     "file": "tests/Feature/DecideRunCompletionTest.php",
+     "name": "does not let a clean Tarpit review override failed Pest"
+    },
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "persists completion only after tests and the complete review pass"
+    },
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "keeps blocking complexity findings visible even when tests pass"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C002",
+   "text": "A task names the change, the files an agent may edit, and the Pest test that must pass; molly:create asks what should change, a nickname, which Pest test must pass, and which files Molly may change",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 6
+    },
+    {
+     "file": "README.md",
+     "line": 75
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 185
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 187
+    },
+    {
+     "file": "docs/index.html",
+     "line": 81
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskRecordsTest.php",
+     "name": "guides task creation and uses the nickname in the start command"
+    },
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "creates a saved task and returns JSON without starting a run"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "The prompt the test asserts is 'Which files may Molly change?'; docs/getting-started.md line 192 says 'Which other files may Molly change?'."
+  },
+  {
+   "id": "C003",
+   "text": "molly:start asks the model for a change, checks scope, applies it, runs the required Pest test, runs the seven Tarpit checks, and records Clever measurements before and after",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 6
+    },
+    {
+     "file": "README.md",
+     "line": 55
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 137
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 139
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 144
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 18
+    },
+    {
+     "file": "docs/index.html",
+     "line": 82
+    },
+    {
+     "file": "docs/index.html",
+     "line": 83
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "proves RunTask phase order and failure semantics"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C004",
+   "text": "The model never decides whether its own work passed; a model saying its work is correct cannot turn failed test evidence into a pass",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 6
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 22
+    },
+    {
+     "file": "docs/index.html",
+     "line": 33
+    },
+    {
+     "file": "docs/index.html",
+     "line": 51
+    },
+    {
+     "file": "docs/index.html",
+     "line": 61
+    },
+    {
+     "file": "docs/index.html",
+     "line": 245
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Unit/ClassificationAdapterTest.php",
+     "name": "uses Laravel AI decide when Jev is enabled but never upgrades a failed run"
+    },
+    {
+     "file": "tests/Feature/JevContractTest.php",
+     "name": "keeps a failed deterministic gate authoritative over an evaluated continue"
+    },
+    {
+     "file": "tests/Unit/FailureActionTableTest.php",
+     "name": "never lets an advisory warn convert a required Pest failure into completion"
+    },
+    {
+     "file": "tests/Feature/DecideRunCompletionTest.php",
+     "name": "does not let a clean Tarpit review override failed Pest"
+    }
+   ],
+   "subcases": [
+    "M07.13"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C005",
+   "text": "Molly runs from Artisan and a local web page and every workflow works without Bloom; Bloom is optional",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 8
+    },
+    {
+     "file": "README.md",
+     "line": 92
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 3
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 3
+    },
+    {
+     "file": "docs/index.html",
+     "line": 115
+    },
+    {
+     "file": "docs/index.html",
+     "line": 119
+    }
+   ],
+   "category": "capability",
+   "tests": [],
+   "subcases": [
+    "M05.3",
+    "M03.12",
+    "M12.2"
+   ],
+   "mapping": "subcase",
+   "note": "No Pest test runs a full workflow with Bloom absent; covered only by acceptance subcases."
+  },
+  {
+   "id": "C006",
+   "text": "Molly needs PHP 8.3 or later; PHP 8.3, 8.4, and 8.5 are supported",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 12
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 7
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 9
+    },
+    {
+     "file": "docs/index.html",
+     "line": 219
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M10.1",
+    "M01.6"
+   ],
+   "mapping": "subcase",
+   "note": "Evidence is the CI matrix in .github/workflows/tests.yml, not a test in tests/."
+  },
+  {
+   "id": "C007",
+   "text": "Molly supports Laravel 12 and 13",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 12
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 8
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 10
+    },
+    {
+     "file": "docs/index.html",
+     "line": 219
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M10.1",
+    "M10.2",
+    "M01.6"
+   ],
+   "mapping": "subcase",
+   "note": "Evidence is the fresh-install CI job in .github/workflows/tests.yml."
+  },
+  {
+   "id": "C008",
+   "text": "Molly needs the DOM, PDO, and PDO SQLite PHP extensions",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 7
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 11
+    }
+   ],
+   "category": "requirement",
+   "tests": [],
+   "subcases": [
+    "M02.5"
+   ],
+   "mapping": "subcase",
+   "note": "No test checks extension detection; M02.5 covers reporting a missing extension."
+  },
+  {
+   "id": "C009",
+   "text": "Any working Laravel database connection is supported",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 12
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 11
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 12
+    },
+    {
+     "file": "docs/index.html",
+     "line": 219
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Tests run only on the Testbench SQLite connection; CommandsTest 'requires every task history migration before declaring the database ready' checks migrations, not driver coverage. M01.6 reviews this kind of claim but does not verify it."
+  },
+  {
+   "id": "C010",
+   "text": "Pest 4 with pest-plugin-laravel 4 is tested; Pest 5 is accepted by doctor but not part of release testing",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 12
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 9
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 14
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M10.2"
+   ],
+   "mapping": "subcase",
+   "note": "Doctor tests cover pest_missing only (CommandsTest 'prints doctor checks as JSON and fails when requirements are missing'); no test covers Pest 5 acceptance."
+  },
+  {
+   "id": "C011",
+   "text": "The application must be in a Git repository with at least one commit, at the root or in a subdirectory; otherwise molly:demo and molly:create stop with WORKSPACE_NOT_GIT and write nothing",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 40
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 10
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 82
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 13
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 13
+    }
+   ],
+   "category": "requirement",
+   "tests": [
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "refuses a workspace that is not a Git repository and creates no repository, file, or commit"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "reports WORKSPACE_NOT_GIT from molly:create before saving a task"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "refuses molly:demo before writing the demo files"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "refuses molly:demo in a repository with no commit before writing the demo files"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "accepts an app in a subdirectory of a repository in create, doctor, and status"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C012",
+   "text": "Molly never runs git init, creates a repository, or commits for you",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 40
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 74
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 13
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 13
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "refuses a repository with no commit without committing for the user"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "reports a missing repository in molly:doctor without creating one"
+    },
+    {
+     "file": "tests/Feature/GraphFreshnessTest.php",
+     "name": "records no-git for a project without a Git checkout and does not create one"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C013",
+   "text": "Molly records the commit each task and run started from",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 40
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 10
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 13
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 13
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/CanonicalWorkspaceIdentityTest.php",
+     "name": "records the HEAD revision each task was created at"
+    },
+    {
+     "file": "tests/Feature/CanonicalWorkspaceIdentityTest.php",
+     "name": "records the HEAD revision a run started at and keeps the stored task IDs"
+    }
+   ],
+   "subcases": [
+    "M08.11"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C014",
+   "text": "Molly does not commit the change after a run; a person reads the diff, runs the wider suite, and decides whether to integrate",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 67
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 159
+    },
+    {
+     "file": "docs/index.html",
+     "line": 78
+    },
+    {
+     "file": "docs/index.html",
+     "line": 85
+    },
+    {
+     "file": "docs/index.html",
+     "line": 208
+    }
+   ],
+   "category": "safety",
+   "tests": [],
+   "subcases": [
+    "M06.8"
+   ],
+   "mapping": "subcase",
+   "note": "No test asserts that a completed run leaves no new commit in the application."
+  },
+  {
+   "id": "C015",
+   "text": "Molly is not on Packagist; it installs from the public GitHub VCS repository with composer require --dev sifrious/molly:^0.2, then vendor:publish --tag=molly-config and migrate",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 14
+    },
+    {
+     "file": "README.md",
+     "line": 21
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 58
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 65
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 24
+    },
+    {
+     "file": "docs/index.html",
+     "line": 219
+    },
+    {
+     "file": "docs/index.html",
+     "line": 225
+    }
+   ],
+   "category": "install",
+   "tests": [
+    {
+     "file": "tests/Feature/StableReleaseInstallTest.php",
+     "name": "requires the tagged release and adds the public repository when it is missing"
+    }
+   ],
+   "subcases": [
+    "M01.2",
+    "M01.7",
+    "M02.1"
+   ],
+   "mapping": "both",
+   "note": "The test covers the molly:project-init installer adding the same VCS repository and tagged constraint, not the documented shell commands."
+  },
+  {
+   "id": "C016",
+   "text": "Publishing adds config/molly.php and the migration adds the tables that hold tasks and runs",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 65
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M02.1"
+   ],
+   "mapping": "subcase",
+   "note": "CommandsTest 'requires every task history migration before declaring the database ready' checks doctor's migration check, not the publish step."
+  },
+  {
+   "id": "C017",
+   "text": "Molly is a development dependency: composer install --no-dev leaves it out and its commands do not register in production",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 21
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 84
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 21
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M10.2"
+   ],
+   "mapping": "subcase",
+   "note": "Checked by the fresh-install CI job, not by a test in tests/. MollyServiceProvider registers commands only when running in console; no test covers production registration."
+  },
+  {
+   "id": "C018",
+   "text": "New Laravel 12 and 13 applications ship PHPUnit; the documented commands replace it with Pest 4 (Laravel 12 pins PHPUnit 11, Pest 4 needs PHPUnit 12)",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 23
+    },
+    {
+     "file": "README.md",
+     "line": 31
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 5
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 22
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 31
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 27
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 36
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M01.2"
+   ],
+   "mapping": "subcase",
+   "note": "README.md and quickstart-standalone.md use pest:^4.7 with --no-update; getting-started.md and compatibility.md use pest:^4 with allow-plugins. Both sets need M01.2 runs."
+  },
+  {
+   "id": "C019",
+   "text": "Pest Feature tests need tests/Pest.php to extend Tests\\TestCase in Feature",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 33
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 36
+    }
+   ],
+   "category": "requirement",
+   "tests": [
+    {
+     "file": "tests/Feature/AuthoredTestCheckTest.php",
+     "name": "classifies an authored test outside the bound TestCase as a bootstrap error"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "The test verifies Molly detects the missing binding for authored tests, not the requirement itself."
+  },
+  {
+   "id": "C020",
+   "text": "No paid AI account is needed; the QuickStart talks to a local Ollama model on loopback",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 44
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 3
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 3
+    },
+    {
+     "file": "docs/index.html",
+     "line": 174
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/AiActionsTest.php",
+     "name": "refuses remote providers before a model request"
+    },
+    {
+     "file": "tests/Feature/AgentSetupTest.php",
+     "name": "rejects a remote Ollama endpoint before making a request"
+    },
+    {
+     "file": "tests/Feature/ModelIdentityTest.php",
+     "name": "does not call a non-loopback URL or a different agent"
+    },
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "does not contact a nonlocal Ollama endpoint"
+    }
+   ],
+   "subcases": [
+    "M07.1"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C021",
+   "text": "Molly uses local Ollama by default and supports the Amp CLI as an explicit alternative agent",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 12
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 88
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 100
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 83
+    },
+    {
+     "file": "docs/index.html",
+     "line": 120
+    },
+    {
+     "file": "docs/index.html",
+     "line": 197
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/MollySettingsTest.php",
+     "name": "exposes documented defaults including graph storage"
+    },
+    {
+     "file": "tests/Feature/AmpResponseTest.php",
+     "name": "uses isolated tool-free Amp settings and validates the returned proposal"
+    },
+    {
+     "file": "tests/Feature/AgentSetupTest.php",
+     "name": "configures workspace Amp MCP with argument boundaries and never logs in from JSON"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C022",
+   "text": "molly:setup writes MOLLY_AGENT and MOLLY_LOCAL_MODEL to .env, stores no secrets, and accepts any installed Ollama model",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 48
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 92
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 96
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/AgentSetupTest.php",
+     "name": "saves an installed local model without changing unrelated environment settings"
+    },
+    {
+     "file": "tests/Feature/AgentSetupTest.php",
+     "name": "rejects uninstalled or injected models without writing configuration"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C023",
+   "text": "qwen2.5-coder:7b needs about 8 GB of free memory",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 96
+    }
+   ],
+   "category": "requirement",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test or subcase checks this figure."
+  },
+  {
+   "id": "C024",
+   "text": "If Ollama is unreachable, Molly stops instead of falling back to a hosted service; hosted providers are explicit settings",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 96
+    },
+    {
+     "file": "docs/index.html",
+     "line": 175
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "classifies an unreachable Ollama server"
+    },
+    {
+     "file": "tests/Feature/AiActionsTest.php",
+     "name": "refuses remote providers before a model request"
+    }
+   ],
+   "subcases": [
+    "M07.2"
+   ],
+   "mapping": "both",
+   "note": "Tests cover doctor classification and refusal of remote providers; no test drives a run against an unreachable Ollama."
+  },
+  {
+   "id": "C025",
+   "text": "molly:preflight reports what this Mac can hold before a model download; it measures and never downloads",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 55
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/Hardware/InspectHardwareTest.php",
+     "name": "prints the snapshot as JSON and exits 0 with unknowns"
+    },
+    {
+     "file": "tests/Feature/Hardware/InspectHardwareTest.php",
+     "name": "only calls the Ollama API on loopback"
+    }
+   ],
+   "subcases": [
+    "M13.1",
+    "M13.14"
+   ],
+   "mapping": "both",
+   "note": "'Never downloads' is asserted only indirectly (no HTTP sent for a non-loopback URL); M13.14 covers it."
+  },
+  {
+   "id": "C026",
+   "text": "molly:doctor prints 'Molly is ready.' when the database, Pest, the model, and the sandbox check out",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 55
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 108
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 111
+    }
+   ],
+   "category": "output",
+   "tests": [],
+   "subcases": [
+    "M02.1"
+   ],
+   "mapping": "subcase",
+   "note": "No test asserts the 'Molly is ready.' string or a fully passing doctor."
+  },
+  {
+   "id": "C027",
+   "text": "Doctor checks the database tables, Pest, Git and the repository, the sandbox, the model, and Clever; a failed check prints a code and what to do",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 108
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 114
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "prints doctor checks as JSON and fails when requirements are missing"
+    },
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "distinguishes missing model from unreachable Ollama in doctor messages"
+    },
+    {
+     "file": "tests/Feature/GitMissingTest.php",
+     "name": "names missing git in molly:doctor with git_missing"
+    },
+    {
+     "file": "tests/Feature/WorkspaceGitBindTest.php",
+     "name": "reports a missing repository in molly:doctor without creating one"
+    },
+    {
+     "file": "tests/Feature/SandboxCapabilityTest.php",
+     "name": "includes sandbox availability in doctor checks"
+    }
+   ],
+   "subcases": [
+    "M03.2"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C028",
+   "text": "molly:demo writes app/Greeting.php and a failing Pest test at tests/Feature/GreetingTest.php, saves a task named demo-greeting, and does not call the model",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 55
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 135
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/MollyDemoCommandTest.php",
+     "name": "scaffolds the greeting demo and saves a reusable demo-greeting task"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "The test checks files, task, and locked digest; it does not assert the test fails against the scaffold or that no model call occurs."
+  },
+  {
+   "id": "C029",
+   "text": "On macOS doctor reports sandbox_unavailable because the sandbox needs Linux Landlock, and molly:start refuses to run until isolation is turned off",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 57
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 118
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 40
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 36
+    },
+    {
+     "file": "docs/index.html",
+     "line": 176
+    }
+   ],
+   "category": "platform",
+   "tests": [
+    {
+     "file": "tests/Feature/SandboxCapabilityTest.php",
+     "name": "includes sandbox availability in doctor checks"
+    },
+    {
+     "file": "tests/Feature/SandboxCapabilityTest.php",
+     "name": "refuses the safe workflow when this host cannot isolate writer and verifier processes"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "Host-conditional: the refusal branch runs only on a host without the sandbox."
+  },
+  {
+   "id": "C030",
+   "text": "MOLLY_SANDBOX_ALLOW_UNSAFE=true turns isolation off and doctor then reports sandbox_unsafe_override; the writer and Pest run with the user's permissions",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 120
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 123
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 126
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 36
+    }
+   ],
+   "category": "safety",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "SandboxCapabilityTest 'includes sandbox availability in doctor checks' accepts any of three codes, so it does not verify the override code. Unit/WalkthroughAssetsTest only checks the docs mention the variable."
+  },
+  {
+   "id": "C031",
+   "text": "Molly checks every proposed path against the allowed files before it applies anything, even without the sandbox; the agent may change only the files the task names",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 126
+    },
+    {
+     "file": "docs/index.html",
+     "line": 65
+    },
+    {
+     "file": "docs/index.html",
+     "line": 82
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "rejects a proposal outside the selected paths without writing any files"
+    },
+    {
+     "file": "tests/Feature/WorkspaceTest.php",
+     "name": "rejects traversal and unselected directory paths"
+    },
+    {
+     "file": "tests/Feature/WorkspaceTest.php",
+     "name": "validates every proposal before applying the first edit"
+    },
+    {
+     "file": "tests/Feature/AiActionsTest.php",
+     "name": "rejects malformed proposals and undeclared file changes"
+    }
+   ],
+   "subcases": [
+    "M09.13"
+   ],
+   "mapping": "both",
+   "note": "tests/TestCase.php sets molly.sandbox.allow_unsafe=true, so these run in the unsandboxed mode the claim describes."
+  },
+  {
+   "id": "C032",
+   "text": "On Linux, Molly isolates the writer and the Pest process with Landlock and user and network namespaces so a proposal can touch only the allowed files",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 118
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 40
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/SandboxIsolationTest.php",
+     "name": "lets the writer change only the allowed file"
+    },
+    {
+     "file": "tests/Feature/SandboxIsolationTest.php",
+     "name": "runs Pest inside the sandbox and still produces JUnit evidence"
+    },
+    {
+     "file": "tests/Feature/SandboxIsolationTest.php",
+     "name": "does not inherit removed credentials or default network access"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C033",
+   "text": "The Landlock sandbox tests run on Linux and skip on macOS",
+   "sources": [
+    {
+     "file": "docs/compatibility.md",
+     "line": 23
+    }
+   ],
+   "category": "platform",
+   "tests": [
+    {
+     "file": "tests/Feature/SandboxIsolationTest.php",
+     "name": "lets the writer change only the allowed file"
+    }
+   ],
+   "subcases": [
+    "M10.3"
+   ],
+   "mapping": "both",
+   "note": "Skip comes from the SandboxIsolationTest beforeEach markTestSkipped when the sandbox is unavailable; M10.3 checks skips are declared."
+  },
+  {
+   "id": "C034",
+   "text": "molly:retry starts a new attempt and keeps the earlier run; a task may make three attempts by default",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 67
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 177
+    },
+    {
+     "file": "docs/index.html",
+     "line": 84
+    },
+    {
+     "file": "docs/index.html",
+     "line": 126
+    },
+    {
+     "file": "docs/index.html",
+     "line": 196
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskExecutionTest.php",
+     "name": "keeps failed run evidence when a later retry passes"
+    },
+    {
+     "file": "tests/Feature/TaskExecutionTest.php",
+     "name": "limits retries without starting another model call"
+    },
+    {
+     "file": "tests/Feature/RepairBudgetTest.php",
+     "name": "refuses a fourth attempt at the same failure even after the task is renamed"
+    },
+    {
+     "file": "tests/Feature/MollySettingsTest.php",
+     "name": "exposes documented defaults including graph storage"
+    }
+   ],
+   "subcases": [
+    "M09.1",
+    "M09.3"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C035",
+   "text": "Molly never retries on its own",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 177
+    }
+   ],
+   "category": "safety",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test asserts that a failed run does not trigger another attempt automatically."
+  },
+  {
+   "id": "C036",
+   "text": "molly:advice explains which action is allowed next",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 177
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskAdviceTest.php",
+     "name": "returns deterministic state guidance without consulting Jev"
+    },
+    {
+     "file": "tests/Feature/TaskAdviceTest.php",
+     "name": "returns JSON advice and readable terminal guidance without executing the recommendation"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C037",
+   "text": "Creating a task saves it without calling the model",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 75
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 194
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 18
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "creates a saved task and returns JSON without starting a run"
+    },
+    {
+     "file": "tests/Feature/TaskRecordsTest.php",
+     "name": "guides task creation and uses the nickname in the start command"
+    },
+    {
+     "file": "tests/Feature/TaskRecordsTest.php",
+     "name": "stores a pending task without editing files or starting a run"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C038",
+   "text": "The Pest test must exist before the task is created and Molly locks its content; the model may change the listed files but never the test",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 194
+    },
+    {
+     "file": "docs/index.html",
+     "line": 67
+    },
+    {
+     "file": "docs/index.html",
+     "line": 192
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/ProtectedTestTest.php",
+     "name": "keeps the required Pest test out of the writer scope by default"
+    },
+    {
+     "file": "tests/Feature/ProtectedTestTest.php",
+     "name": "rejects a proposal that changes the protected test before applying it"
+    },
+    {
+     "file": "tests/Feature/ProtectedTestTest.php",
+     "name": "fails when the protected test changes on disk during the run"
+    },
+    {
+     "file": "tests/Feature/ProtectedTestTest.php",
+     "name": "requires an existing approved test before implementation starts"
+    },
+    {
+     "file": "tests/Feature/InvalidTaskInputTest.php",
+     "name": "names the missing test in a Laravel application"
+    }
+   ],
+   "subcases": [
+    "M06.3",
+    "M06.21",
+    "M11.10"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C039",
+   "text": "molly:start prints the run ID and exits 0 on completion and 1 otherwise",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 55
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 146
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "returns run evidence and exit status for a saved task attempt"
+    },
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "renders progress and run evidence when starting or retrying a task"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C040",
+   "text": "molly:task shows the task and every attempt",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 153
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 159
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 16
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "reads task history without starting another attempt"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C041",
+   "text": "molly:show --verbose shows the Pest output, the Tarpit findings, and the measurements, and names the failing assertion, Tarpit finding, or process error",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 62
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 159
+    },
+    {
+     "file": "docs/getting-started.md",
+     "line": 171
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "compares compact measurements and keeps full caveats behind verbose output"
+    },
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "keeps failed test output visible without verbose mode"
+    },
+    {
+     "file": "tests/Feature/CommandsTest.php",
+     "name": "shows tests and complexity findings beside changed files"
+    },
+    {
+     "file": "tests/Unit/Console/RunReportEvidenceWordingTest.php",
+     "name": "keeps all seven Tarpit checks visible when recorded"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C042",
+   "text": "A completed run means the required test passed and the review found nothing blocking; it does not mean the whole application is correct",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 161
+    },
+    {
+     "file": "docs/index.html",
+     "line": 78
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Scope limitation statement; no behavior to test."
+  },
+  {
+   "id": "C043",
+   "text": "Tarpit runs seven complexity checks, is a blocking gate separate from Pest, is not a score, and a model cannot override it",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 143
+    },
+    {
+     "file": "docs/index.html",
+     "line": 68
+    },
+    {
+     "file": "docs/index.html",
+     "line": 124
+    },
+    {
+     "file": "docs/index.html",
+     "line": 149
+    },
+    {
+     "file": "docs/index.html",
+     "line": 194
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/AiActionsTest.php",
+     "name": "returns all seven checks and scoped accidental complexity findings"
+    },
+    {
+     "file": "tests/Feature/AmpResponseTest.php",
+     "name": "keeps all seven review checks required after Amp succeeds"
+    },
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "keeps blocking complexity findings visible even when tests pass"
+    },
+    {
+     "file": "tests/Feature/ReviewAcceptanceTest.php",
+     "name": "rejects blocking or incomplete review evidence"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C044",
+   "text": "Clever records measurements before and after as advisory evidence: never one score and never a verdict",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 144
+    },
+    {
+     "file": "docs/index.html",
+     "line": 50
+    },
+    {
+     "file": "docs/index.html",
+     "line": 83
+    },
+    {
+     "file": "docs/index.html",
+     "line": 150
+    },
+    {
+     "file": "docs/index.html",
+     "line": 195
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/ComplexityTest.php",
+     "name": "preserves Clever measurements and restores host configuration"
+    },
+    {
+     "file": "tests/Unit/CompletionGateTest.php",
+     "name": "keeps advisory outcomes visible without making them completion blockers"
+    },
+    {
+     "file": "tests/Feature/ComplexityTest.php",
+     "name": "does not treat an empty Clever scan as passing measurements"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "RunTaskTest 'does not edit files or call the model when Clever is unavailable' shows an unavailable Clever fails the run with CLEVER_UNAVAILABLE, which qualifies 'advisory'."
+  },
+  {
+   "id": "C045",
+   "text": "A run completes only when both checks produced valid evidence; real Pest runs and the JUnit evidence must name the required test file",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 22
+    },
+    {
+     "file": "docs/index.html",
+     "line": 66
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/VerificationTest.php",
+     "name": "fails when JUnit records a pass that did not run the required test file"
+    },
+    {
+     "file": "tests/Feature/VerificationTest.php",
+     "name": "fails without usable complete JUnit evidence"
+    },
+    {
+     "file": "tests/Feature/VerificationTest.php",
+     "name": "runs the actual Pest binary and records real verification evidence"
+    },
+    {
+     "file": "tests/Feature/DecideRunCompletionTest.php",
+     "name": "blocks when a required verifier did not run"
+    },
+    {
+     "file": "tests/Feature/DecideRunCompletionTest.php",
+     "name": "does not complete when Pest reports a pass without the required test file"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C046",
+   "text": "Every attempt, output, and receipt is saved for review; receipts are written under .molly/receipts/",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 22
+    },
+    {
+     "file": "docs/index.html",
+     "line": 69
+    },
+    {
+     "file": "docs/index.html",
+     "line": 84
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Feature/VerificationReceiptsTest.php",
+     "name": "writes immutable verification receipts with evidence digests"
+    },
+    {
+     "file": "tests/Feature/VerificationReceiptsTest.php",
+     "name": "writes a new receipt directory for a new run id instead of rewriting the prior run"
+    },
+    {
+     "file": "tests/Feature/RunTaskTest.php",
+     "name": "finalizes NOT_RUN receipts when a run stops before verification"
+    }
+   ],
+   "subcases": [
+    "M06.7"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C047",
+   "text": "molly:receipt RUN_ID prints each verifier's state with its policy, such as 'pest - PASS (required, retry)'",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 44
+    },
+    {
+     "file": "docs/index.html",
+     "line": 46
+    },
+    {
+     "file": "docs/index.html",
+     "line": 48
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Feature/VerificationReceiptsTest.php",
+     "name": "prints human-readable receipts through molly:receipt"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C048",
+   "text": "Pest verification includes false-green protection",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 193
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/FalseGreenDetectionTest.php",
+     "name": "reports a weak test that stays green after protected behavior is broken"
+    },
+    {
+     "file": "tests/Feature/FalseGreenDetectionTest.php",
+     "name": "treats inconclusive false-green as a completion blocker when required"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C049",
+   "text": "molly:story has Molly write the Pest test from a story, then lock it with molly:lock-test and implement it; it prints those commands with the task name filled in",
+   "sources": [
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 46
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 49
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/StoryFlowTest.php",
+     "name": "prints the criteria and the next commands from molly:story"
+    },
+    {
+     "file": "tests/Feature/StoryPrintedCommandsTest.php",
+     "name": "runs the commands molly:story prints, in order, and locks with the derived files"
+    }
+   ],
+   "subcases": [
+    "M06.1",
+    "M06.2",
+    "M06.3"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C050",
+   "text": "molly:story prints any composer require command the story needs",
+   "sources": [
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 55
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Feature/StoryFlowTest.php",
+     "name": "tells the user to install a missing package before the implementation run"
+    },
+    {
+     "file": "tests/Feature/StoryFlowTest.php",
+     "name": "checks the packages the story needs against composer.json and composer.lock"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C051",
+   "text": "The demo installer creates a fresh Laravel app, commits it once with your Git identity, installs Pest and the tagged Molly release, and scaffolds the demo task",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 43
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 57
+    }
+   ],
+   "category": "install",
+   "tests": [
+    {
+     "file": "tests/Feature/StableReleaseInstallTest.php",
+     "name": "keeps the demo installer on the same tagged release line"
+    }
+   ],
+   "subcases": [
+    "M01.2"
+   ],
+   "mapping": "both",
+   "note": "The test reads bin/molly-demo for its constraint only; no test runs the full installer."
+  },
+  {
+   "id": "C052",
+   "text": "The v0.1.3 demo installer defaults to the 0.1 series, and MOLLY_CONSTRAINT='^0.2' selects the current one",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 50
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 64
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M01.7"
+   ],
+   "mapping": "subcase",
+   "note": "StableReleaseInstallTest 'keeps the demo installer on the same tagged release line' checks bin/molly-demo on this commit (default ^0.2), not the v0.1.3 script the docs download."
+  },
+  {
+   "id": "C053",
+   "text": "The demo installer writes only under the named directory and refuses a non-empty directory unless --force is passed",
+   "sources": [
+    {
+     "file": "docs/getting-started.md",
+     "line": 52
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/MollyDemoDownloadScriptTest.php",
+     "name": "refuses a non-empty target directory without --force"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": "The --force path is not tested."
+  },
+  {
+   "id": "C054",
+   "text": "Molly 0.2 is prelaunch: the latest tag is v0.1.3, no 0.2 release is tagged, and ^0.2 resolves only after v0.2.0 is published",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 90
+    },
+    {
+     "file": "docs/index.html",
+     "line": 221
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M01.7"
+   ],
+   "mapping": "subcase",
+   "note": "docs/index.html line 221 says 'v1 is not tagged yet' while its install line uses ^0.2 and README.md names 0.2; the two pages disagree on the release name."
+  },
+  {
+   "id": "C055",
+   "text": "Acceptance testers install a candidate build 0.2.0-RC<n> from a local zip through a Composer artifact repository holding the zip and candidate.json",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 90
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 66
+    },
+    {
+     "file": "docs/quickstart-standalone.md",
+     "line": 71
+    }
+   ],
+   "category": "install",
+   "tests": [
+    {
+     "file": "tests/Acceptance/CandidateBuildTest.php",
+     "name": "builds the same sha256 twice for the same commit"
+    },
+    {
+     "file": "tests/Acceptance/CandidateBuildTest.php",
+     "name": "injects version and commit into composer.json and honors export-ignore"
+    },
+    {
+     "file": "tests/Acceptance/AcceptanceGateTest.php",
+     "name": "rejects a candidate artifact that does not match candidate.json"
+    }
+   ],
+   "subcases": [
+    "M01.2",
+    "M01.7",
+    "M02.1"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C056",
+   "text": "Molly does not open or merge pull requests; molly:pr-opened and molly:merged record what a person did",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 92
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 38
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 92
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 95
+    },
+    {
+     "file": "docs/index.html",
+     "line": 207
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/ApproveTaskTest.php",
+     "name": "records human approval without opening a pull request"
+    },
+    {
+     "file": "tests/Feature/RecordPullRequestLifecycleTest.php",
+     "name": "records an opened pull request without calling GitHub"
+    },
+    {
+     "file": "tests/Feature/RecordPullRequestLifecycleTest.php",
+     "name": "records a merge SHA only after an opened pull request"
+    },
+    {
+     "file": "tests/Feature/McpToolsTest.php",
+     "name": "records an opened pull request and merge through MCP without opening GitHub"
+    }
+   ],
+   "subcases": [
+    "M06.8"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C057",
+   "text": "Human approval is recorded with molly:approve TASK --approve after required checks pass; Bloom's pull request and merge controls wait for it",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 9
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 26
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 89
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 92
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 25
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 38
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/ApproveTaskTest.php",
+     "name": "refuses approval before required checks pass"
+    },
+    {
+     "file": "tests/Feature/ApproveTaskTest.php",
+     "name": "records human approval without opening a pull request"
+    },
+    {
+     "file": "tests/Feature/RecordPullRequestLifecycleTest.php",
+     "name": "refuses to record a pull request before human approval"
+    }
+   ],
+   "subcases": [
+    "M05.5",
+    "M09.14"
+   ],
+   "mapping": "both",
+   "note": "The Bloom confirmation dialog and control unlocking are not covered by Pest; the action-level APPROVAL_UNCONFIRMED check is."
+  },
+  {
+   "id": "C058",
+   "text": "Remote execution on an Orb and verified Orb identity are not shipped; execution is local",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 92
+    },
+    {
+     "file": "docs/index.html",
+     "line": 207
+    }
+   ],
+   "category": "other",
+   "tests": [
+    {
+     "file": "tests/Feature/SelectExecutionTargetTest.php",
+     "name": "selects local execution by default"
+    },
+    {
+     "file": "tests/Feature/SelectExecutionTargetTest.php",
+     "name": "refuses an Orb request that is only an Amp thread observation"
+    },
+    {
+     "file": "tests/Unit/Contracts/ExecutionTargetSnapshotTest.php",
+     "name": "rejects an Orb snapshot that claims the local target"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C059",
+   "text": "The Bloom desktop integration is unfinished: the Bloom adapter has not shipped as a compiled Bloom release, and visual previews inside Bloom are not available",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 92
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 48
+    },
+    {
+     "file": "docs/index.html",
+     "line": 207
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Negative status claim; no test. M02.2 and M04.x assume a compiled host exists, so the subcases and this claim should be reconciled."
+  },
+  {
+   "id": "C060",
+   "text": "The local web interface is enabled with MOLLY_UI_ENABLED=true and served at /molly; it is hidden by default and in production",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 26
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 29
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 39
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "hides the UI by default and in production"
+    },
+    {
+     "file": "tests/Feature/LocalUiBoundaryTest.php",
+     "name": "requires an explicit boolean opt in even on a local connection"
+    },
+    {
+     "file": "tests/Feature/LocalUiBoundaryTest.php",
+     "name": "serves the local interface for supported loopback clients and hosts"
+    }
+   ],
+   "subcases": [
+    "M10.4"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C061",
+   "text": "The web interface accepts loopback connections in the local and testing environments only, and has no login",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 39
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/LocalUiBoundaryTest.php",
+     "name": "hides the interface outside the supported application environments"
+    },
+    {
+     "file": "tests/Feature/LocalUiBoundaryTest.php",
+     "name": "rejects a forged local address or host before rendering task data"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "rejects remote clients and non-loopback hosts"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C062",
+   "text": "The web pages are the task list, a task page with attempts and an advice button, the run evidence page, plans, the project graph, and a create form",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 39
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "renders labeled server forms and saves a task without execution"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "renders task history and escapes saved context"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "summarizes review evidence and compares recorded measurements before process details"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "renders the project graph from saved records without starting a run"
+    },
+    {
+     "file": "tests/Feature/TaskAdviceInterfacesTest.php",
+     "name": "does not call Jev when reading the task page and exposes a protected native advice form"
+    },
+    {
+     "file": "tests/Feature/PlanningInterfacesTest.php",
+     "name": "lists saved plans and links back to their review"
+    }
+   ],
+   "subcases": [
+    "M10.4"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C063",
+   "text": "Starting a task from the browser needs a queue worker",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 39
+    }
+   ],
+   "category": "requirement",
+   "tests": [
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "queues start and retry by ID without running the task in HTTP"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "rejects queue drivers that can execute during the request"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C064",
+   "text": "Starting a task from the terminal runs the model, the test, and the review in the terminal and exits when they finish; no queue worker is needed",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 18
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "renders progress and run evidence when starting or retrying a task"
+    }
+   ],
+   "subcases": [
+    "M03.12"
+   ],
+   "mapping": "both",
+   "note": "The command test mocks StartTask; M03.12 covers running without a global worker."
+  },
+  {
+   "id": "C065",
+   "text": "TASK can be a nickname or the task's UUID",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 16
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskNicknamesTest.php",
+     "name": "keeps unnamed tasks addressable by UUID"
+    },
+    {
+     "file": "tests/Feature/TaskNicknamesTest.php",
+     "name": "starts and retries by nickname while retaining UUID locks and run relationships"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C066",
+   "text": "molly:tasks lists saved tasks",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 16
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "lists task JSON using the requested limit"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C067",
+   "text": "molly:stop stops a pending task or asks a running one to stop at its next step",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 16
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskRecordsTest.php",
+     "name": "stops pending tasks without creating an attempt"
+    },
+    {
+     "file": "tests/Feature/TaskRecordsTest.php",
+     "name": "requests a running task stop only once without changing the attempt"
+    },
+    {
+     "file": "tests/Feature/TaskCommandsTest.php",
+     "name": "explains that a running task stops at an execution boundary"
+    }
+   ],
+   "subcases": [
+    "M09.2",
+    "M03.10"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C068",
+   "text": "molly:plan saves a plan and asks five questions (outcome, data, what Laravel gives, boundaries, verification); a plan stores decisions and writes no code",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 43
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 46
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 49
+    },
+    {
+     "file": "README.md",
+     "line": 90
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/PlanningActionsTest.php",
+     "name": "saves a resumable planning draft without invoking a model or creating executable work"
+    },
+    {
+     "file": "tests/Feature/McpToolsTest.php",
+     "name": "saves a plan and advances through persisted decisions with citations"
+    },
+    {
+     "file": "tests/Feature/PlanningGuideTest.php",
+     "name": "traverses unanswered questions in order and finishes after all decisions are supplied"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C069",
+   "text": "Molly builds a project graph of saved tasks, tests, runs, files, and blockers, answers why a task is blocked through molly:project:index and molly:project:query, and shows it at /molly/graph",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 53
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 56
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 60
+    },
+    {
+     "file": "docs/index.html",
+     "line": 199
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/ProjectGraphTest.php",
+     "name": "indexes saved tasks, attempts, and verification blockers with provenance"
+    },
+    {
+     "file": "tests/Feature/ProjectGraphTest.php",
+     "name": "indexes and queries the project graph through Artisan"
+    },
+    {
+     "file": "tests/Feature/ProjectGraphTest.php",
+     "name": "lists blockers before other nodes in a bounded workspace overview"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "renders the project graph from saved records without starting a run"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C070",
+   "text": "Molly ships small Laravel documentation excerpts and indexes them with the installed framework source through molly:knowledge:index and molly:knowledge:query",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 64
+    },
+    {
+     "file": "docs/standalone.md",
+     "line": 67
+    },
+    {
+     "file": "README.md",
+     "line": 90
+    },
+    {
+     "file": "docs/index.html",
+     "line": 199
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/KnowledgeGraphTest.php",
+     "name": "indexes the bundled queue guide and installed Laravel source"
+    },
+    {
+     "file": "tests/Feature/KnowledgeGraphTest.php",
+     "name": "indexes and queries through Artisan with JSON output"
+    },
+    {
+     "file": "tests/Feature/GraphBootstrapTest.php",
+     "name": "bootstraps a mandatory laravel graph and writes provenance"
+    }
+   ],
+   "subcases": [
+    "M08.1"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C071",
+   "text": "Laravel knowledge covers queues, routing, testing, validation, the container, Eloquent, and events, and nothing beyond those areas yet",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 177
+    },
+    {
+     "file": "docs/index.html",
+     "line": 207
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Unit/Knowledge/LaravelQueueGraphTest.php",
+     "name": "proves queue graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelRoutingGraphTest.php",
+     "name": "proves routing graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelTestingGraphTest.php",
+     "name": "proves testing graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelValidationGraphTest.php",
+     "name": "proves validation graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelContainerGraphTest.php",
+     "name": "proves container graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelEloquentGraphTest.php",
+     "name": "proves eloquent graph compatibility after LaravelGraphBuilder migration"
+    },
+    {
+     "file": "tests/Unit/Knowledge/LaravelEventsGraphTest.php",
+     "name": "proves events graph compatibility after LaravelGraphBuilder migration"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C072",
+   "text": "NativePHP knowledge and Tarpit notes live in their own namespaces",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 177
+    },
+    {
+     "file": "docs/index.html",
+     "line": 200
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/KnowledgeGraphTest.php",
+     "name": "indexes NativePHP desktop and mobile as separate versions"
+    },
+    {
+     "file": "tests/Feature/KnowledgeGraphTest.php",
+     "name": "indexes tarpit notes without mixing Laravel or NativePHP"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C073",
+   "text": "Knowledge is advisory: it cannot widen files, touch a protected test, or declare a task complete",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 177
+    }
+   ],
+   "category": "safety",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "KnowledgeGraphTest 'collects bounded advisory knowledge for a run without requiring an index' only asserts an advisory status; no test checks that knowledge cannot change scope or completion."
+  },
+  {
+   "id": "C074",
+   "text": "molly:journal TASK exports a task's evidence to Markdown under .molly/journal/",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 75
+    },
+    {
+     "file": "docs/index.html",
+     "line": 201
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/TaskJournalTest.php",
+     "name": "replaces one journal by UUID and retains attempts after a task rename"
+    },
+    {
+     "file": "tests/Feature/TaskJournalTest.php",
+     "name": "prints a concise confirmation after saving a journal"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C075",
+   "text": "molly:decide writes a short decision record under docs/decisions/",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 75
+    },
+    {
+     "file": "docs/index.html",
+     "line": 201
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/ProjectDecisionTest.php",
+     "name": "writes a Git-tracked decision without starting a task"
+    },
+    {
+     "file": "tests/Feature/ProjectDecisionTest.php",
+     "name": "records a decision through Artisan without creating a Molly task"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C076",
+   "text": "Project settings live in config/molly.php; global defaults live in ~/.molly/settings.json and are read and written by molly:settings and molly:settings-set",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 79
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/MollySettingsTest.php",
+     "name": "persists global settings under MOLLY_HOME without touching run snapshots"
+    }
+   ],
+   "subcases": [
+    "M04.9"
+   ],
+   "mapping": "both",
+   "note": "The test uses the actions behind the commands, not the Artisan commands."
+  },
+  {
+   "id": "C077",
+   "text": "Every run saves the configuration it used, so later settings changes do not rewrite history",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 79
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/MollySettingsTest.php",
+     "name": "freezes effective config on a run and ignores later global changes"
+    }
+   ],
+   "subcases": [
+    "M09.9"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C078",
+   "text": "Local MCP tools let an editor or chat client create and read tasks",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 84
+    },
+    {
+     "file": "README.md",
+     "line": 90
+    },
+    {
+     "file": "docs/index.html",
+     "line": 127
+    },
+    {
+     "file": "docs/index.html",
+     "line": 198
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/McpToolsTest.php",
+     "name": "publishes local MCP tools and reads offline citations"
+    },
+    {
+     "file": "tests/Feature/McpToolsTest.php",
+     "name": "creates reads lists and stops a saved task without running it"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C079",
+   "text": "Jev advice through Laravel AI is optional and off by default",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 85
+    },
+    {
+     "file": "README.md",
+     "line": 90
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Unit/Classification/JevGateTest.php",
+     "name": "is closed by default and reports jev_disabled"
+    },
+    {
+     "file": "tests/Feature/JevContractTest.php",
+     "name": "performs no classification while the gate is closed"
+    }
+   ],
+   "subcases": [
+    "M07.3"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C080",
+   "text": "GitHub issues can be task sources, with comments and pull request records that a person approves",
+   "sources": [
+    {
+     "file": "docs/standalone.md",
+     "line": 86
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/GitHubImportTest.php",
+     "name": "imports issue context and provenance without starting work or writing to GitHub"
+    },
+    {
+     "file": "tests/Feature/GitHubWritebackTest.php",
+     "name": "refuses a GitHub comment without explicit approval"
+    },
+    {
+     "file": "tests/Feature/GitHubWritebackTest.php",
+     "name": "refuses a pull request body before a human approves the verified change"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C081",
+   "text": "Molly records component snapshots",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 201
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/ComponentSnapshotsTest.php",
+     "name": "freezes selected file hashes at task creation without saving source contents"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C082",
+   "text": "Component previews are optional",
+   "sources": [
+    {
+     "file": "docs/index.html",
+     "line": 202
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/ComponentPreviewTest.php",
+     "name": "reports unavailable when no preview renderer is configured"
+    },
+    {
+     "file": "tests/Feature/ComponentPreviewTest.php",
+     "name": "records a local preview digest when a renderer command produces an image"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C083",
+   "text": "Bloom plugin 0.2.0 is built and checked against Bloom commit 1599f05f (plugin API version 1)",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 7
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 105
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M02.2",
+    "M04.13"
+   ],
+   "mapping": "subcase",
+   "note": "No Pest test checks the plugin build or API version."
+  },
+  {
+   "id": "C084",
+   "text": "The plugin adds eight screens to Bloom's sidebar: Molly, Tasks, Runs, Conversations, Graph, Glossary, Molly Settings, and Worker",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 17
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 11
+    }
+   ],
+   "category": "capability",
+   "tests": [],
+   "subcases": [
+    "M04.1"
+   ],
+   "mapping": "subcase",
+   "note": null
+  },
+  {
+   "id": "C085",
+   "text": "Each plugin screen runs the listed Artisan commands with --json in the selected Laravel app",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 11
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 13
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 22
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/BloomPluginCommandsTest.php",
+     "name": "only calls Artisan commands and options that exist"
+    }
+   ],
+   "subcases": [
+    "M04.2",
+    "M04.4",
+    "M04.5",
+    "M04.6",
+    "M04.7",
+    "M04.8",
+    "M04.9",
+    "M04.10"
+   ],
+   "mapping": "both",
+   "note": "The test checks the Swift sources call only existing commands and options; screen behavior is covered by M04 subcases."
+  },
+  {
+   "id": "C086",
+   "text": "When a command fails, the plugin screen shows the command line, working directory, exit code, and stderr",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 11
+    }
+   ],
+   "category": "output",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test or subcase covers failure display."
+  },
+  {
+   "id": "C087",
+   "text": "The Molly screen picks a project from ~/.molly/projects.json or runs molly:project-init through Add Existing, and other screens run commands in that app",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 21
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 15
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 30
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/MollyProjectFlowsTest.php",
+     "name": "exposes init and list over artisan with shared registry state"
+    }
+   ],
+   "subcases": [
+    "M04.2",
+    "M04.3"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C088",
+   "text": "Without a pick, the plugin uses MOLLY_ARTISAN_HOST, then the first project in ~/.molly/projects.json with an artisan file; MOLLY_HOME selects a different index",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 30
+    }
+   ],
+   "category": "capability",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Plugin-side resolution; no test or subcase."
+  },
+  {
+   "id": "C089",
+   "text": "The plugin looks for PHP at MOLLY_PHP_BINARY, Herd, /opt/homebrew/bin/php, /usr/local/bin/php, then /usr/bin/env php, and each screen says PHP was not found and names those paths if none starts",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 21
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 32
+    }
+   ],
+   "category": "capability",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test or subcase covers PHP lookup."
+  },
+  {
+   "id": "C090",
+   "text": "The run page shows every Tarpit check with its recorded status, the unresolved findings, and Clever probes before and after; a skipped check is never shown as passing",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 25
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 24
+    }
+   ],
+   "category": "output",
+   "tests": [
+    {
+     "file": "tests/Unit/Console/RunReportEvidenceWordingTest.php",
+     "name": "never presents skipped Tarpit Clever or verification evidence as passing"
+    },
+    {
+     "file": "tests/Feature/WebTasksTest.php",
+     "name": "shows incomplete evidence and skipped measurements without claiming success"
+    },
+    {
+     "file": "tests/Feature/McpToolsTest.php",
+     "name": "returns actual run evidence without upgrading failed or skipped checks"
+    }
+   ],
+   "subcases": [
+    "M04.5"
+   ],
+   "mapping": "both",
+   "note": "Tests cover CLI, web, and MCP output; the Bloom run page itself is covered only by M04.5."
+  },
+  {
+   "id": "C091",
+   "text": "Records link by ID: a task lists its runs and conversations, and a run links to its task, conversation, diff, and receipts",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 24
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 25
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/MollyInspectionTest.php",
+     "name": "inspects a task with run and conversation links both ways"
+    }
+   ],
+   "subcases": [
+    "M04.11"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C092",
+   "text": "Molly has no command that lists runs across tasks; the Runs screen lists one task's attempts or opens a run by ID",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 36
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Limitation; no test."
+  },
+  {
+   "id": "C093",
+   "text": "The Runs diff is the live git diff of the run's workspace, not a snapshot saved with the run",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 37
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Limitation; no test."
+  },
+  {
+   "id": "C094",
+   "text": "When the installed Molly lacks molly:glossary, molly:status, or molly:worker, the screen says so instead of showing data",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 38
+    }
+   ],
+   "category": "output",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test or subcase."
+  },
+  {
+   "id": "C095",
+   "text": "The Glossary screen is read only; Molly has no command that writes glossary terms, and project terms go in .molly/GLOSSARY.md outside the Molly section",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 20
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 39
+    }
+   ],
+   "category": "capability",
+   "tests": [
+    {
+     "file": "tests/Feature/BloomPluginCommandsTest.php",
+     "name": "keeps the glossary screen read-only"
+    },
+    {
+     "file": "tests/Feature/TaskJournalTest.php",
+     "name": "updates only the Molly glossary section and preserves custom ignore rules"
+    }
+   ],
+   "subcases": [
+    "M04.8"
+   ],
+   "mapping": "both",
+   "note": null
+  },
+  {
+   "id": "C096",
+   "text": "Plugin commands run to completion; Start and Retry cannot be cancelled from the screen",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 40
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Limitation; no test."
+  },
+  {
+   "id": "C097",
+   "text": "The plugin cannot switch Bloom's sidebar selection; links open inside the current Molly screen",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 41
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Limitation; no test."
+  },
+  {
+   "id": "C098",
+   "text": "The plugin logs its own registration under the subsystem app.sifrious.molly.surfaces",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 42
+    }
+   ],
+   "category": "output",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test or subcase."
+  },
+  {
+   "id": "C099",
+   "text": "Plans, Laravel knowledge queries, task advice, locking a written test, and exporting the Bloom contract stay in the terminal or local web interface",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 46
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Limitation; no test."
+  },
+  {
+   "id": "C100",
+   "text": "The plugin bundle is not in the Composer package; you build it from a Bloom checkout",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 48
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": ".gitattributes export-ignores /bloom-plugin/Surfaces.bundle, but CandidateBuildTest 'packages the current HEAD without development paths or absolute user paths' does not check for it."
+  },
+  {
+   "id": "C101",
+   "text": "molly:bloom-contract prints the versioned contract and writes it to .molly/bloom-contract.json; --json prints only JSON; the contract requires approval before a pull request and merge",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 32
+    },
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 38
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 9
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 55
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 63
+    }
+   ],
+   "category": "command",
+   "tests": [
+    {
+     "file": "tests/Feature/ExportBloomContractTest.php",
+     "name": "exports a versioned task contract Bloom can bind to an existing workspace"
+    }
+   ],
+   "subcases": [],
+   "mapping": "test",
+   "note": null
+  },
+  {
+   "id": "C102",
+   "text": "molly:bloom-contract fails with TASK_NOT_FOUND, PROTECTED_TEST_MISSING (no locked test digest), or TEST_PROTECTED (task allows test edits)",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 65
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 67
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 68
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 69
+    }
+   ],
+   "category": "output",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "src/Actions/ExportBloomContract.php throws these codes, but no test drives the command into them. TaskContractTest 'rejects an acceptance test that is also writable' checks the contract value only."
+  },
+  {
+   "id": "C103",
+   "text": "Molly never creates a worktree; it attaches to the one Bloom already has",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 71
+    },
+    {
+     "file": "docs/index.html",
+     "line": 134
+    }
+   ],
+   "category": "safety",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "ExportBloomContractTest records the existing workspace path but does not assert that no worktree is created."
+  },
+  {
+   "id": "C104",
+   "text": "molly:handoff TASK --from UUID --to UUID prints an envelope; the recipient gets the same file scope and protected test and cannot widen either or merge",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 101
+    }
+   ],
+   "category": "safety",
+   "tests": [
+    {
+     "file": "tests/Feature/HandoffTest.php",
+     "name": "hands a locked implementation envelope to a different Bloom workspace"
+    },
+    {
+     "file": "tests/Feature/HandoffTest.php",
+     "name": "rejects a recipient that widens file scope"
+    },
+    {
+     "file": "tests/Feature/HandoffTest.php",
+     "name": "rejects a handoff that would merge or edit the protected test"
+    }
+   ],
+   "subcases": [
+    "M05.8"
+   ],
+   "mapping": "both",
+   "note": "Tests use the HandOffTask action; the molly:handoff command output is not asserted."
+  },
+  {
+   "id": "C105",
+   "text": "bin/molly-bloom-plugin-register checks Bloom is installed, copies plugin.json and Surfaces.bundle into Plugins/sifrious.molly, adds sifrious.molly to enabled.json, prints each step and both Bloom commits, replaces the copy on rerun, and exits with an error when Bloom, BLOOM_APP, or the bundle is missing",
+   "sources": [
+    {
+     "file": "docs/quickstart-bloom.md",
+     "line": 14
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 115
+    }
+   ],
+   "category": "install",
+   "tests": [],
+   "subcases": [
+    "M02.2"
+   ],
+   "mapping": "subcase",
+   "note": null
+  },
+  {
+   "id": "C106",
+   "text": "A plugin bundle only loads in a Bloom that exports the same BloomPluginAPI symbols it was linked against",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 119
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "No test; M04.13 covers apiVersion mismatch, not symbol mismatch."
+  },
+  {
+   "id": "C107",
+   "text": "Bloom owns the worktree, branch, diff, agent session screens, and pull request controls; Molly owns the task and allowed files, the protected test, attempts, Pest/Tarpit/Clever evidence, completion, approval, and receipts",
+   "sources": [
+    {
+     "file": "docs/bloom.md",
+     "line": 3
+    },
+    {
+     "file": "docs/bloom.md",
+     "line": 123
+    },
+    {
+     "file": "docs/index.html",
+     "line": 132
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "Ownership statement; no single test or subcase."
+  },
+  {
+   "id": "C108",
+   "text": "Release tests run the package suite on PHP 8.3, 8.4, and 8.5 with locked dependencies plus the lowest and highest dependency sets",
+   "sources": [
+    {
+     "file": "docs/compatibility.md",
+     "line": 20
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M10.1"
+   ],
+   "mapping": "subcase",
+   "note": "Evidence is .github/workflows/tests.yml."
+  },
+  {
+   "id": "C109",
+   "text": "The fresh-application job installs Molly into new Laravel 12 and 13 apps, publishes config, migrates, creates and reads a task, indexes Laravel knowledge, confirms --no-dev leaves Molly out, and does not run a model",
+   "sources": [
+    {
+     "file": "docs/compatibility.md",
+     "line": 21
+    },
+    {
+     "file": "docs/compatibility.md",
+     "line": 25
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M10.2"
+   ],
+   "mapping": "subcase",
+   "note": "Evidence is .github/workflows/tests.yml."
+  },
+  {
+   "id": "C110",
+   "text": "The Jev job runs the package suite against the accepted Laravel AI classification commit with the live-capability tests required",
+   "sources": [
+    {
+     "file": "docs/compatibility.md",
+     "line": 22
+    }
+   ],
+   "category": "platform",
+   "tests": [],
+   "subcases": [
+    "M07.4"
+   ],
+   "mapping": "subcase",
+   "note": "Unit/ClassificationAdapterTest 'requires the stable Laravel AI Jev capabilities' checks capability detection, not the CI job."
+  },
+  {
+   "id": "C111",
+   "text": "Molly is available under the MIT license",
+   "sources": [
+    {
+     "file": "README.md",
+     "line": 98
+    }
+   ],
+   "category": "other",
+   "tests": [],
+   "subcases": [],
+   "mapping": "unmapped",
+   "note": "composer.json declares MIT; no test or subcase."
+  }
+ ]
+}

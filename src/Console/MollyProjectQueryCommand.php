@@ -6,12 +6,14 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\QueryProjectGraph;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
 
 final class MollyProjectQueryCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:project:query {concept : Task, test, file, run, or blocker to find} {--workspace= : Workspace path} {--depth=2 : Relationship depth from 0 through 3} {--limit=20 : Node limit from 1 through 40} {--relation=* : Include only these relationships} {--json : Print JSON only}';
 
     protected $description = 'Read a bounded project graph neighborhood';
@@ -27,9 +29,13 @@ final class MollyProjectQueryCommand extends Command
                 array_values($this->option('relation')),
             );
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
 
                 return self::SUCCESS;
+            }
+
+            if (($result['freshness']['stale'] ?? false) === true) {
+                warning('This graph is stale ('.implode(', ', $result['freshness']['reasons']).'). Run '.$result['freshness']['fix'].' to rebuild it.');
             }
 
             if ($result['nodes'] === []) {
@@ -49,13 +55,7 @@ final class MollyProjectQueryCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage());
         }
     }
 }

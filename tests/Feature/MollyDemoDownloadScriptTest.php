@@ -12,6 +12,8 @@ it('refuses a non-empty target directory without --force', function () {
     File::ensureDirectoryExists($dir);
     File::put($dir.'/marker.txt', 'keep');
 
+    // The script checks for a Git identity before the target directory. tests/Pest.php gives
+    // every process a test identity, so the directory check is the one that refuses.
     $process = new Process(['bash', $script, $dir]);
     $process->setTimeout(30);
     $process->run();

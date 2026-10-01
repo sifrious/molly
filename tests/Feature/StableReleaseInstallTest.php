@@ -4,6 +4,7 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 use Sifrious\Molly\Actions\InitializeMollyInExistingProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
 
@@ -16,6 +17,7 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->laravelRoot.'/config');
     File::put($this->laravelRoot.'/artisan', "#!/usr/bin/env php\n<?php\n");
     File::put($this->laravelRoot.'/.gitignore', "/vendor\n");
+    commitGitWorkspace($this->laravelRoot);
 });
 
 afterEach(function (): void {
@@ -33,7 +35,7 @@ function writeComposerJson(string $root, array $extra = []): void
 
 function initializeWithComposer(ProjectRegistry $registry, string $root): void
 {
-    (new InitializeMollyInExistingProject($registry))->handle(
+    (new InitializeMollyInExistingProject($registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
         path: $root,
         runComposerRequire: true,
         runMigrations: false,
@@ -79,6 +81,43 @@ it('reports a failed Composer require without continuing', function (): void {
     expect(fn () => initializeWithComposer($this->registry, $this->laravelRoot))
         ->toThrow(RuntimeException::class, 'COMPOSER_REQUIRE_FAILED');
 });
+
+it('restores composer.json and composer.lock byte for byte after a failed Composer require', function (bool $withLock): void {
+    writeComposerJson($this->laravelRoot);
+    File::append($this->laravelRoot.'/composer.json', "\n");
+    if ($withLock) {
+        File::put($this->laravelRoot.'/composer.lock', "{\n    \"packages\": []\n}\n");
+    }
+    $json = File::get($this->laravelRoot.'/composer.json');
+    $root = $this->laravelRoot;
+    // Behave like Composer: config writes the repository entry, then require touches the lock and fails.
+    Process::fake(function (PendingProcess $process) use ($root) {
+        if (($process->command[1] ?? null) === 'config') {
+            $composer = json_decode(File::get($root.'/composer.json'), true);
+            $composer['repositories'] = ['molly' => ['type' => 'vcs', 'url' => InitializeMollyInExistingProject::REPOSITORY_URL]];
+            File::put($root.'/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+
+            return Process::result();
+        }
+        File::put($root.'/composer.lock', '{"packages": ["partial"]}');
+
+        return Process::result(errorOutput: 'Could not authenticate against github.com', exitCode: 1);
+    });
+
+    expect(fn () => initializeWithComposer($this->registry, $this->laravelRoot))
+        ->toThrow(RuntimeException::class, 'COMPOSER_REQUIRE_FAILED: Could not authenticate against github.com');
+
+    expect(File::get($this->laravelRoot.'/composer.json'))->toBe($json)
+        ->and(File::get($this->laravelRoot.'/composer.json'))->not->toContain('repositories')
+        ->and(is_file($this->laravelRoot.'/composer.lock'))->toBe($withLock)
+        ->and(file_exists($this->laravelRoot.'/.molly'))->toBeFalse();
+    if ($withLock) {
+        expect(File::get($this->laravelRoot.'/composer.lock'))->toBe("{\n    \"packages\": []\n}\n");
+    }
+})->with([
+    'with a lock file' => [true],
+    'without a lock file' => [false],
+]);
 
 it('keeps the demo installer on the same tagged release line', function (): void {
     $script = File::get(dirname(__DIR__, 2).'/bin/molly-demo');

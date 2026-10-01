@@ -6,11 +6,12 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\RetryProjectKnowledgeGraphUnit;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyGraphsRetryCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:graphs-retry
         {unit : Unit id from .molly/graphs/manifest.json}
         {path? : Laravel project root (default: current app)}
@@ -42,7 +43,7 @@ class MollyGraphsRetryCommand extends Command
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Retried '.$result['retried_unit']);
                 note('Graph manifest: '.$result['manifest_path']);
@@ -50,13 +51,7 @@ class MollyGraphsRetryCommand extends Command
 
             return $result['ok'] ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage());
         }
     }
 }

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Sifrious\Molly\Actions\CreateTask;
+use Sifrious\Molly\Actions\InspectProjectGraph;
 use Sifrious\Molly\Actions\RetryTask;
 use Sifrious\Molly\Actions\StartTask;
 use Sifrious\Molly\Jobs\StartSavedTask;
@@ -23,6 +24,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Hello.php', '<?php');
     writeProtectedTest($this->workspace, 'tests/Hello.php');
+    commitGitWorkspace($this->workspace);
 });
 
 afterEach(function () {
@@ -146,6 +148,31 @@ it('shows incomplete evidence and skipped measurements without claiming success'
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertSee('Run status: failed')->assertSee('branch_timeout')->assertSee('timed_out')->assertSee('G. Caches and dependencies')->assertSee('Not run')->assertSee('No Git history')->assertSee('Authorship is not ownership.')->assertSee('clever:lonely-files')->assertDontSee('<script>bad()</script>', false)->assertDontSee('Task completed.');
 });
 
+it('writes a Clever summary that reads as one sentence when a measurement did not run', function () {
+    $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'completed', 'report' => [
+        'complexity_before' => ['status' => 'skipped', 'probes' => []],
+    ]]);
+
+    $this->get('/molly/runs/'.$run->id)->assertOk()
+        ->assertSee('Clever: before skipped; after not run.')
+        ->assertDontSee('after Not run');
+});
+
+it('labels failed Clever scans and probe errors as errors on the run page', function () {
+    $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'completed', 'report' => [
+        'complexity_before' => ['status' => 'error', 'probes' => [], 'reason' => 'clever_scan_failed', 'detail' => 'The report directory is not writable.'],
+        'complexity_after' => ['status' => 'error', 'probes' => [['key' => 'c4', 'name' => 'The hotspots', 'status' => 'error', 'skip_reason' => 'Git log failed after the repository checks passed.', 'caveats' => ['Churn counts commits that touch a path.']]]],
+    ]]);
+
+    $this->get('/molly/runs/'.$run->id)->assertOk()
+        ->assertSee('Clever: before error; after error.')
+        ->assertSee('Before changes: clever_scan_failed')
+        ->assertSee('Before changes detail: The report directory is not writable.')
+        ->assertSee('After error: Git log failed after the repository checks passed.')
+        ->assertDontSee('After skipped: Git log failed')
+        ->assertSee('Churn counts commits that touch a path.');
+});
+
 it('calls the shared start or retry action from a serialized queue job', function (bool $retry) {
     $task = webMollyTask();
     $start = Mockery::mock(StartTask::class);
@@ -244,7 +271,27 @@ it('returns workspace errors on the project graph without executing a task', fun
 it('keeps absent evidence distinct from zero measurements', function () {
     $run = Run::create(['prompt' => 'Hello', 'workspace' => $this->workspace, 'status' => 'running', 'report' => ['phase' => 'Reviewing complexity.']]);
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertSee('Reviewing complexity.')
-        ->assertSee('0 of 7 checks recorded.')->assertSee('Tests: Not recorded')->assertSee('No Clever measurements recorded.')->assertSee('No changed files recorded.');
+        ->assertSee('0 of 7 checks recorded.')->assertSee('Clever: before not run; after not run.')->assertSee('Tests: Not recorded')->assertSee('No Clever measurements recorded.')->assertSee('No changed files recorded.');
     $run->update(['status' => 'failed']);
     $this->get('/molly/runs/'.$run->id)->assertOk()->assertDontSee('Run status: failed. Reviewing complexity.');
+});
+
+it('says the relationships table is empty when a snapshot has no edges', function () {
+    $this->mock(InspectProjectGraph::class)
+        ->shouldReceive('handle')
+        ->andReturn([
+            'workspace' => $this->workspace, 'namespace' => 'project', 'version' => '1', 'database' => 'db',
+            'sources' => 0, 'nodes' => [], 'edges' => [], 'blockers' => [], 'truncated' => false,
+        ]);
+
+    $this->get('/molly/graph?workspace='.urlencode($this->workspace))
+        ->assertOk()
+        ->assertSeeText('This snapshot has no relationships yet.');
+});
+
+it('keeps checkbox inputs inline and table text wrapping at word boundaries', function () {
+    $css = File::get(dirname(__DIR__, 2).'/resources/views/layout.blade.php');
+
+    expect($css)->toContain('input[type="checkbox"] { display: inline-block')
+        ->and($css)->not->toContain('border-bottom: 1px solid #bac2ba; overflow-wrap: anywhere;');
 });

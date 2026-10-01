@@ -8,12 +8,13 @@ use Sifrious\Molly\Actions\ListTasks;
 use Sifrious\Molly\Models\Task;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyTasksCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:tasks {--limit=20 : Maximum tasks to show} {--json : Print JSON only}';
 
     protected $description = 'List saved tasks with the newest first';
@@ -27,22 +28,16 @@ class MollyTasksCommand extends Command
             }
             $tasks = $action->handle($limit);
             if ($this->option('json')) {
-                $this->line(json_encode(['tasks' => $tasks->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['tasks' => $tasks->toArray()]);
             } elseif ($tasks->isEmpty()) {
                 note('No tasks yet. Create a task with php artisan molly:create.');
             } else {
-                table(['Name', 'Task ID', 'Status', 'Prompt'], $tasks->map(fn (Task $task): array => [$task->nickname ?? 'Unnamed', $task->id, $task->status, $task->prompt])->all());
+                table(['Name', 'Task ID', 'Status', 'Prompt'], $tasks->map(fn (Task $task): array => [$task->nickname ?? 'Unnamed', $task->id, $task->status, $task->redactedPrompt()])->all());
             }
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['tasks' => [], 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['tasks' => [], 'error' => $exception->getMessage()]);
         }
     }
 }

@@ -4,14 +4,33 @@ return [
     'agent' => env('MOLLY_AGENT', 'ollama'),
     'model' => env('MOLLY_LOCAL_MODEL'),
     'timeout' => 180,
+    /*
+     | Before Ollama loads a model it does not already hold, Molly refuses with
+     | MODEL_MEMORY_INSUFFICIENT when the model's size plus this headroom, in
+     | gigabytes of 10^9 bytes, is more than the available memory that
+     | molly:preflight measures. Unknown memory never causes a refusal.
+     */
+    'memory' => [
+        'headroom_gb' => 11,
+    ],
     'test_timeout' => 120,
     'max_files' => 8,
     'max_file_bytes' => 65536,
     'max_attempts' => 3,
+    'repair' => [
+        'per_failure' => 3,
+    ],
 
     'agent_bus' => [
         'lease_seconds' => 120,
         'worker_id' => null,
+    ],
+    /*
+     | molly:worker runs `php artisan queue:work` with this binary.
+     | Null uses the PHP binary running the Artisan command.
+     */
+    'worker' => [
+        'php_binary' => env('MOLLY_WORKER_PHP_BINARY'),
     ],
     'parallel_checks' => true,
     'verification' => [

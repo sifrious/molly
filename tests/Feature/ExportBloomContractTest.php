@@ -12,6 +12,7 @@ it('exports a versioned task contract Bloom can bind to an existing workspace', 
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($workspace);
+    commitGitWorkspace($workspace);
     $task = app(CreateTask::class)->handle('Return Hello.', $workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
     $bloomWorkspaceId = (string) Str::uuid();
     $baseSha = str_repeat('a', 40);

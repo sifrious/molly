@@ -251,7 +251,8 @@ it('stops a process that exceeds the output limit before waiting for its timeout
     try {
         $report = (new ReadAmpConnections($binary))->handle([ampThreadId()]);
 
-        expect(microtime(true) - $start)->toBeLessThan(2)
+        // The stream read times out after 3 seconds; stopping on the output limit must end it sooner.
+        expect(microtime(true) - $start)->toBeLessThan(3)
             ->and($report['reason'])->toStartWith('AMP_OUTPUT_LIMIT:')
             ->and($report['threads'][0]['executor_connected'])->toBeNull();
     } finally {

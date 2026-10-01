@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\CheckEnvironment;
 use Sifrious\Molly\Actions\RunTask;
 use Sifrious\Molly\Models\Run;
@@ -15,7 +17,7 @@ it('requires a prompt for unattended execution and emits only JSON', function ()
         ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe([
             'id' => null,
             'status' => 'failed',
-            'report' => ['error' => 'Provide a prompt when using --json or --no-interaction.'],
+            'report' => ['error' => 'PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction, for example php artisan molly:run "Return Hello".'],
         ]);
 });
 
@@ -25,8 +27,8 @@ it('requires a test before starting work', function (array $options, string $mes
     expect($exit)->toBe(1)
         ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['report']['error'])->toBe($message);
 })->with([
-    [[], 'Use --test to name the Pest test file that must pass.'],
-    [['--file' => ['app/Greeting.php']], 'Use --test to name the Pest test file that must pass.'],
+    [[], 'TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.'],
+    [['--file' => ['app/Greeting.php']], 'TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.'],
 ]);
 
 it('returns the complete run report with the correct exit code', function (string $status, int $exit): void {
@@ -57,12 +59,16 @@ it('prints doctor checks as JSON and fails when requirements are missing', funct
     Http::fake(['localhost:11434/api/tags' => Http::response(['models' => [['name' => 'different-model']]])]);
     config()->set('molly.model', 'required-model');
     Schema::rename('molly_runs', 'molly_runs_unavailable');
+    // An existing workspace without Pest; a missing workspace fails earlier with WORKSPACE_INVALID.
+    $workspace = sys_get_temp_dir().'/molly-no-pest-'.Str::uuid();
+    File::ensureDirectoryExists($workspace);
 
     try {
-        $exit = Artisan::call('molly:doctor', ['--workspace' => '/missing-workspace', '--json' => true]);
+        $exit = Artisan::call('molly:doctor', ['--workspace' => $workspace, '--json' => true]);
         $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
     } finally {
         Schema::rename('molly_runs_unavailable', 'molly_runs');
+        File::deleteDirectory($workspace);
     }
 
     expect($exit)->toBe(1)->and($result['ready'])->toBeFalse()

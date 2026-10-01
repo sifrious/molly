@@ -12,6 +12,7 @@ use Sifrious\Molly\Knowledge\GraphNode;
 use Sifrious\Molly\Knowledge\GraphSnapshot;
 use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Knowledge\NativePhpGraph;
+use Sifrious\Molly\Workspace\Directory;
 
 /**
  * Build version-pinned knowledge graphs during project initialization.
@@ -39,6 +40,7 @@ final class BootstrapProjectKnowledgeGraphs
         private Graph $graph,
         private NativePhpGraph $nativePhpGraph,
         private IndexProjectGraph $indexProjectGraph,
+        private CheckGraphFreshness $freshness,
         private array $laravelGraphs,
     ) {}
 
@@ -54,6 +56,9 @@ final class BootstrapProjectKnowledgeGraphs
         if (is_string($resolved)) {
             $root = $resolved;
         }
+        // Refuse a linked .molly, graph directory, or database before any graph is written.
+        Directory::molly($root, 'graphs/manifest.json');
+        $this->graph->path();
         $lock = $this->lock->read($root);
 
         if ($lock['laravel'] === null || $lock['laravel_major'] === null) {
@@ -62,12 +67,13 @@ final class BootstrapProjectKnowledgeGraphs
 
         $progress('lockfile', 'Read laravel/framework '.$lock['laravel'].' (major '.$lock['laravel_major'].')');
 
+        $revision = $this->freshness->revision($root);
         $units = [];
-        $laravelUnit = $this->bootstrapLaravel($lock, $progress, $onlyUnit);
+        $laravelUnit = $this->stamp($this->bootstrapLaravel($lock, $progress, $onlyUnit), $revision, $lock);
         $units[] = $laravelUnit;
 
         if ($laravelUnit['status'] === 'failed') {
-            $this->writeManifest($root, $lock, $units);
+            $this->writeManifest($root, $lock, $units, $revision);
             throw new RuntimeException('LARAVEL_GRAPH_REQUIRED: '.$laravelUnit['error']);
         }
 
@@ -79,23 +85,23 @@ final class BootstrapProjectKnowledgeGraphs
             if ($onlyUnit !== null && $onlyUnit !== $unitId) {
                 continue;
             }
-            $units[] = $this->bootstrapSupportedDependency(
+            $units[] = $this->stamp($this->bootstrapSupportedDependency(
                 $namespace,
                 $package,
                 $lock['packages'][$package],
                 $progress,
-            );
+            ), $revision, $lock);
         }
 
         if ($onlyUnit === null || $onlyUnit === 'project:workspace') {
-            $units[] = $this->bootstrapProjectGraph($root, $progress);
+            $units[] = $this->stamp($this->bootstrapProjectGraph($root, $progress), $revision, $lock);
         }
 
         if ($onlyUnit !== null) {
             $units = $this->mergeUnits($root, $units);
         }
 
-        $manifestPath = $this->writeManifest($root, $lock, $units);
+        $manifestPath = $this->writeManifest($root, $lock, $units, $revision);
         $progress('manifest', 'Wrote graph provenance to '.$manifestPath);
 
         return [
@@ -104,6 +110,33 @@ final class BootstrapProjectKnowledgeGraphs
             'units' => $units,
             'laravel_exact' => $lock['laravel'],
         ];
+    }
+
+    /**
+     * Unit IDs this project can build or retry: the Laravel graph, each supported
+     * dependency present in composer.lock, the project graph, and any unit already
+     * recorded in the manifest.
+     *
+     * @return list<string>
+     */
+    public function unitIds(string $projectRoot): array
+    {
+        $root = rtrim(str_replace('\\', '/', $projectRoot), '/');
+        $lock = $this->lock->read($root);
+        $ids = ['laravel:laravel/framework'];
+        foreach (self::SUPPORTED_DEPENDENCIES as $package => $namespace) {
+            if (isset($lock['packages'][$package])) {
+                $ids[] = $namespace.':'.$package;
+            }
+        }
+        $ids[] = 'project:workspace';
+        foreach (GraphManifest::load($root)->units as $unit) {
+            if (is_string($unit['id'] ?? null)) {
+                $ids[] = $unit['id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -417,9 +450,26 @@ final class BootstrapProjectKnowledgeGraphs
      * @param  array{packages: array<string, string>, laravel: string, laravel_major: string, lock_path: string, lock_hash: ?string}  $lock
      * @param  list<array<string, mixed>>  $units
      */
-    private function writeManifest(string $root, array $lock, array $units): string
+    private function writeManifest(string $root, array $lock, array $units, string $revision): string
     {
-        return $this->manifest($root, $lock, $units)->write($root);
+        return $this->manifest($root, $lock, $units, $revision)->write($root);
+    }
+
+    /**
+     * Record the Git revision and composer.lock digest a unit was built against,
+     * so later reads can report the graph as stale.
+     *
+     * @param  array<string, mixed>  $unit
+     * @param  array{lock_hash: ?string}  $lock
+     * @return array<string, mixed>
+     */
+    private function stamp(array $unit, string $revision, array $lock): array
+    {
+        if (($unit['status'] ?? null) === 'skipped') {
+            return $unit;
+        }
+
+        return $unit + ['revision' => $revision, 'lock_hash' => $lock['lock_hash']];
     }
 
     /**
@@ -460,7 +510,7 @@ final class BootstrapProjectKnowledgeGraphs
      * @param  array{packages: array<string, string>, laravel: string, laravel_major: string, lock_path: string, lock_hash: ?string}  $lock
      * @param  list<array<string, mixed>>  $units
      */
-    private function manifest(string $root, array $lock, array $units): GraphManifest
+    private function manifest(string $root, array $lock, array $units, string $revision): GraphManifest
     {
         return new GraphManifest(
             schemaVersion: GraphManifest::SCHEMA_VERSION,
@@ -473,6 +523,7 @@ final class BootstrapProjectKnowledgeGraphs
             units: $units,
             updatedAt: gmdate('c'),
             path: GraphManifest::pathFor($root),
+            revision: $revision,
         );
     }
 }

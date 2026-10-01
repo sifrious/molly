@@ -6,20 +6,22 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\HandOffTask;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyHandoffCommand extends Command
 {
-    protected $signature = 'molly:handoff {task : Saved task name or ID} {--from= : Sender Bloom workspace UUID} {--to= : Recipient Bloom workspace UUID} {--action=implement : Requested next action} {--context= : Bounded context for the recipient} {--json : Print JSON only}';
+    use ReportsFailures;
 
-    protected $description = 'Print a handoff envelope for a child Bloom workspace without widening scope';
+    protected $signature = 'molly:handoff {task : Saved task name or ID} {--from= : Sender Bloom workspace UUID} {--to= : Recipient Bloom workspace UUID} {--action=implement : Requested next action} {--context= : Bounded context for the recipient} {--approve : Confirm handing the task to the recipient workspace} {--json : Print JSON only}';
+
+    protected $description = 'Save and print a handoff envelope for a child Bloom workspace without widening scope';
 
     public function handle(HandOffTask $handoff): int
     {
         try {
-            $envelope = $handoff->handle(
+            ['envelope' => $envelope, 'path' => $path] = $handoff->handle(
                 (string) $this->argument('task'),
+                (bool) $this->option('approve'),
                 (string) $this->option('from'),
                 (string) $this->option('to'),
                 (string) $this->option('action'),
@@ -27,21 +29,16 @@ class MollyHandoffCommand extends Command
             );
             $payload = $envelope->toArray();
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Handoff '.$envelope->handoffId.' to '.$envelope->recipientWorkspaceId.'.');
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+                note('Saved handoff envelope: '.$path);
+                $this->writeJson($payload, JSON_PRETTY_PRINT);
             }
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

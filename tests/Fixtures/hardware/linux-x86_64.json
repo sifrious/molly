@@ -1,0 +1,104 @@
+{
+    "simulated": true,
+    "scenario": "linux-x86_64",
+    "label": "Non-macOS host: Linux x86_64 with Ollama installed",
+    "commands": {
+        "uname -s": {
+            "exit": 0,
+            "stdout": "Linux\n",
+            "stderr": ""
+        },
+        "uname -m": {
+            "exit": 0,
+            "stdout": "x86_64\n",
+            "stderr": ""
+        },
+        "command -v ollama": {
+            "exit": 0,
+            "stdout": "/usr/local/bin/ollama\n",
+            "stderr": ""
+        },
+        "'/usr/local/bin/ollama' --version": {
+            "exit": 0,
+            "stdout": "ollama version is 0.34.4\n",
+            "stderr": ""
+        },
+        "df -kP *": {
+            "exit": 0,
+            "stdout": "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/nvme0n1p2 976284672 476172672 500112000 49% /\n",
+            "stderr": ""
+        },
+        "*": {
+            "exit": 127,
+            "stdout": "",
+            "stderr": "command not found\n"
+        }
+    },
+    "http": {
+        "/api/version": {
+            "status": 200,
+            "json": {
+                "version": "0.34.4"
+            }
+        },
+        "/api/tags": {
+            "status": 200,
+            "json": {
+                "models": [
+                    {
+                        "name": "qwen2.5-coder:7b",
+                        "model": "qwen2.5-coder:7b",
+                        "size": 4683087561,
+                        "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+                        "details": {
+                            "parameter_size": "7.6B",
+                            "quantization_level": "Q4_K_M"
+                        }
+                    },
+                    {
+                        "name": "gpt-oss:20b",
+                        "model": "gpt-oss:20b",
+                        "size": 13793441244,
+                        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+                        "details": {
+                            "parameter_size": "20.9B",
+                            "quantization_level": "MXFP4"
+                        }
+                    }
+                ]
+            }
+        },
+        "/api/ps": {
+            "status": 200,
+            "json": {
+                "models": []
+            }
+        }
+    },
+    "expect": {
+        "platform.os": "Linux",
+        "platform.macos": false,
+        "platform.architecture": "x86_64",
+        "disk.free_bytes": 512114688000,
+        "disk.mount_point": "/",
+        "ollama.api_version": "0.34.4"
+    },
+    "expect_unknown": [
+        "platform.arm64_capable",
+        "platform.translated",
+        "platform.model_identifier",
+        "platform.cpu_brand",
+        "platform.os_name",
+        "platform.os_version",
+        "platform.os_build",
+        "memory.total_bytes",
+        "memory.available_bytes",
+        "memory.pressure_level",
+        "acceleration.metal_available",
+        "acceleration.gpu_cores",
+        "disk.filesystem",
+        "disk.external",
+        "disk.removable"
+    ],
+    "destination": "{workspace}"
+}

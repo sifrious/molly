@@ -22,7 +22,7 @@ class PestAssertionHints
         if ($this->looksLikeForbiddenMismatch($haystack)) {
             $hints[] = [
                 'pattern' => 'livewire_assert_forbidden',
-                'hint' => 'A Pest/Livewire assertForbidden() (or Expected 403, got 200) on a component action means the action itself must deny the caller with HTTP 403 via abort(403), abort_unless(...), or authorize — not a silent no-op, and not by returning 403 from the whole page GET.',
+                'hint' => 'A Pest or Livewire assertForbidden(), or Expected 403 but received 200, on an action means the action itself must deny the caller with HTTP 403 through abort(403), abort_unless(...), or authorize(). It must not be a silent no-op, and the whole page GET must not return 403 instead.',
             ];
         }
 

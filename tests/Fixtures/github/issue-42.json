@@ -1,0 +1,11 @@
+{
+    "html_url": "https://github.com/sifrious/molly-demo/issues/42",
+    "number": 42,
+    "title": "Add a readiness route",
+    "body": "Load balancers need a route that says the application is up.\n\n## Acceptance criteria\n\n- [ ] GET /ready returns HTTP 200.\n- [ ] The response body is exactly {\"ready\":true}.\n- [ ] A guest's request to GET /ready succeeds without signing in.\n\n## Notes\n\n- Keep the existing routes.\n",
+    "state": "open",
+    "updated_at": "2026-09-17T12:00:00Z",
+    "labels": [
+        {"name": "enhancement"}
+    ]
+}

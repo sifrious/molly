@@ -4,17 +4,22 @@ namespace Sifrious\Molly\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Actions\ShowTask;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollyDemoCommand extends Command
 {
+    use ReportsFailures;
+
     public const TASK_NAME = 'demo-greeting';
 
     public const PROMPT = 'Return Hello from the greeting helper.';
@@ -27,12 +32,15 @@ class MollyDemoCommand extends Command
 
     protected $description = 'Scaffold the first greeting demo task for Terminal and Bloom';
 
-    public function handle(CreateTask $create, ShowTask $show): int
+    public function handle(CreateTask $create, ShowTask $show, ObserveCheckout $observe): int
     {
         try {
             $workspace = (string) ($this->option('workspace') ?: base_path());
             $files = new Workspace($workspace);
             $root = $files->path;
+            // Creating the task needs Git and a committed checkout; check both before writing the demo files.
+            GitBinary::require();
+            $observe->requireCommit($root);
 
             $this->ensureMollyGitignored($root);
             $createdGreeting = $this->ensureGreetingStub($root);
@@ -74,7 +82,7 @@ class MollyDemoCommand extends Command
             ];
 
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Molly demo task "'.self::TASK_NAME.'" is ready.');
                 note('Request: '.self::PROMPT);
@@ -91,13 +99,7 @@ class MollyDemoCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 
@@ -106,7 +108,7 @@ class MollyDemoCommand extends Command
         $gitignore = $root.'/.gitignore';
         $needle = '.molly/';
         if (! is_file($gitignore)) {
-            File::put($gitignore, $needle.PHP_EOL);
+            $this->write('GITIGNORE_UNWRITABLE', $gitignore, $needle.PHP_EOL);
 
             return;
         }
@@ -116,7 +118,7 @@ class MollyDemoCommand extends Command
             return;
         }
 
-        File::append($gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n");
+        $this->write('GITIGNORE_UNWRITABLE', $gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n", FILE_APPEND);
     }
 
     private function ensureGreetingStub(string $root): bool
@@ -126,8 +128,8 @@ class MollyDemoCommand extends Command
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
-        File::put($path, <<<'PHP'
+        Directory::ensure(dirname($path));
+        $this->write('DEMO_FILE_UNWRITABLE', $path, <<<'PHP'
 <?php
 
 namespace App;
@@ -153,8 +155,8 @@ PHP);
             return false;
         }
 
-        File::ensureDirectoryExists(dirname($path));
-        File::put($path, <<<'PHP'
+        Directory::ensure(dirname($path));
+        $this->write('DEMO_FILE_UNWRITABLE', $path, <<<'PHP'
 <?php
 
 use App\Greeting;
@@ -166,5 +168,14 @@ it('returns Hello from the greeting helper', function () {
 PHP);
 
         return true;
+    }
+
+    /** Write a demo file, or fail with $code, the path, and the reason the system gave. */
+    private function write(string $code, string $path, string $contents, int $flags = 0): void
+    {
+        [$written, $reason] = Directory::attempt(fn (): int|false => file_put_contents($path, $contents, $flags));
+        if ($written === false) {
+            throw new RuntimeException($code.': Molly could not write '.$path.' ('.($reason !== '' ? $reason : 'the file is not writable').'). Check free disk space and that '.dirname($path).' is writable, then run molly:demo again.');
+        }
     }
 }

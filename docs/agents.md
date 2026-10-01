@@ -6,15 +6,17 @@ You do not need MCP to run tasks from Artisan. MCP lets an editor or chat client
 
 ## Ollama
 
-Ollama is the default. Pull a model and save its name:
+Ollama is the default. Let Molly decide which approved model fits this Mac, install it, and save its name:
 
 ```bash
-php artisan molly:setup --agent=ollama --model=qwen2.5-coder:7b
+php artisan molly:preflight
+php artisan molly:install-model
+php artisan molly:setup --agent=ollama --model=MODEL
 php artisan config:clear
 php artisan molly:doctor
 ```
 
-[Ollama](ollama-quickstart.md) covers choosing a model, the endpoint, and the doctor codes.
+[Ollama](ollama-quickstart.md) covers the fit decision, the approved catalogue, the endpoint, and the doctor codes.
 
 ## Amp
 
@@ -54,15 +56,32 @@ It is registered only in the `local` and `testing` environments and has no HTTP 
 
 | Tool | What it does |
 | --- | --- |
-| `molly_task` | Creates tasks, reads tasks and runs, names tasks, links Amp threads, imports GitHub issues, asks for advice, records approvals, locks a written test, records pull requests and merges, and queues a start or retry. |
+| `molly_task` | Creates tasks, reads tasks and runs, names tasks, links Amp threads, imports GitHub issues, asks for advice, prints a pull request description, and queues a start or retry. It refuses human decisions. |
 | `molly_plan` | Creates, reads, and answers plans, and requests a Jev suggestion. |
 | `molly_guide` | Reads Molly's bundled planning guide and the passages it cites. |
 | `molly_knowledge` | Reads the local Laravel, NativePHP, or Tarpit knowledge graph. |
 | `molly_connections` | Reads saved Amp thread links and, optionally, Amp's current connection state. |
 
-Operations that record a human decision (`approve`, `lock_test`, `pr_opened`, `merged`, `comment`) require `approve=true`. None of them opens or merges a pull request.
-
 A start or retry from MCP is queued through the application's queue and needs a worker. A queued reply means the work was dispatched, not that it ran. [Web interface](web-interface.md#queue-requirements) lists the supported queue drivers.
+
+## Human decisions
+
+An MCP client is an agent, so `molly_task` does not record a human decision. The `approve`, `lock_test`, `pr_opened`, `merged`, `comment`, and `handoff` operations fail with `HUMAN_APPROVAL_REQUIRED` and change nothing: no lifecycle event, task field, journal, or GitHub request. Passing `approve=true` makes no difference. The error ends with the Artisan command for a person to run, filled in with the arguments the client passed:
+
+```text
+HUMAN_APPROVAL_REQUIRED: Only a person can approve a verified change. molly_task changed nothing. Ask a person to run: php artisan molly:approve ready-check --approve
+```
+
+| Operation | Command a person runs |
+| --- | --- |
+| `approve` | `molly:approve TASK --approve` |
+| `lock_test` | `molly:lock-test TASK --approve [--file=PATH] [--reason=TEXT]` |
+| `pr_opened` | `molly:pr-opened TASK --url=URL --approve` |
+| `merged` | `molly:merged TASK --sha=SHA --approve` |
+| `comment` | `molly:comment TASK --approve [--close]` |
+| `handoff` | `molly:handoff TASK --from=UUID --to=UUID [--action=ACTION] [--context=TEXT] --approve` |
+
+When the client leaves out the pull request URL, merge SHA, or workspace UUIDs, the command shows `URL`, `SHA`, or `UUID` in its place. After a person runs the command, `show` reports the new display status and `pr_body` prints the pull request description.
 
 ## Knowledge in prompts
 
@@ -90,7 +109,9 @@ This reads a bounded PHP diff, runs Git's whitespace check, and, when Jev is ena
 
 ## Limits
 
-An Amp thread link is a note you save; Molly does not verify that the thread exists or that its executor is an Orb. Remote execution is planned and described in [Execution targets](execution-targets.md).
+An Amp thread link is a note you save; Molly does not verify that the thread exists, and a thread is not an Orb. MCP `molly_task` can queue a start or retry on a registered local Orb with `orb`, `orb_runtime`, or `orb_model`; choosing where a task runs is not a human decision. Registering and revoking Orbs are Artisan commands. [Execution targets](execution-targets.md) covers Orbs.
+
+Molly treats the terminal as the person's. It refuses human decisions from MCP clients, but it cannot tell whether a person or an agent with shell access typed an Artisan command. Do not give an agent a shell where it can run `--approve` commands for you.
 
 ## Next
 
