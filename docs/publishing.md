@@ -96,6 +96,22 @@ A pass prints both sizes and exits 0. A failed `assert` exits 1. `set -e` stops 
 
 Shipped PHP under `src/` counts toward the 400 KiB cap. The cap is the literal `400 * 1024` in that workflow step. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`.
 
+### Measured on cb10522
+
+`git archive` of `cb10522` is 562353 bytes. This page lives under `docs/`, which is `export-ignore`, so a commit that only changes it leaves that zip the same. `git archive` of `main` `08dee7d` is 384517 bytes. The difference is 177836 bytes.
+
+| Piece | Bytes in the zip |
+| --- | ---: |
+| Paths that are in `cb10522` and absent from `main` | 137841 |
+| Compressed growth of paths that are in both | 44623 |
+| Paths that `main` archived and `cb10522` omits | -4628 |
+
+The new paths are runtime code: model fit, Orbs, the worker, redaction, hardware probe, story commands, the model catalogue, and Bloom screen sources. `MollyServiceProvider::registerCommands()` registers those commands. `AcceptanceWriter` is the agent behind `molly:story`.
+
+`main` had 25083 bytes of room under 409600. Shared files then grew by 44623 compressed bytes. An archive with those shared files and none of the new paths is 424512 bytes, still 14912 over the cap. Dropping `bloom-plugin/` (30837 bytes, including sources you build from a checkout) leaves 531516. Also dropping `README.md`, `SECURITY.md`, and `resources/models/catalogue.schema.v1.json` leaves 524889. The schema is documented as part of the shipped catalogue. The planning sources have to stay: the workflow asserts they are present, and `PlanningGuide` reads them.
+
+`export-ignore` cannot bring this tree under 409600 without removing runtime PHP that already shipped on `main`. The workflow constant is unchanged. A later edit could set it to `640 * 1024` (655360), which is 93007 bytes above the `cb10522` archive. That edit is not in this tree.
+
 ## Switching the public install line to v1
 
 The install lines stay on the `^0.2` constraint until all of these are true:
