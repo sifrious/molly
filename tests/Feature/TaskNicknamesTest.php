@@ -216,7 +216,7 @@ it('starts and retries by nickname while retaining UUID locks and run relationsh
     File::ensureDirectoryExists($workspace);
     $task = nicknameTask(['nickname' => 'ready-check', 'workspace' => $workspace, 'status' => $status]);
     app(RestoreTaskBaseline::class)->store($task, []);
-    $this->mock(RunTask::class)->shouldReceive('handle')->once()->andReturnUsing(function (string $prompt, string $root, array $paths, string $testPath, ?Closure $progress, string $taskId, Closure $shouldStop) use ($task): Run {
+    $this->mock(RunTask::class, fn ($mock) => $mock->shouldReceive('refuseUnready')->andReturn([[], null]))->shouldReceive('handle')->once()->andReturnUsing(function (string $prompt, string $root, array $paths, string $testPath, ?Closure $progress, string $taskId, Closure $shouldStop) use ($task): Run {
         expect($taskId)->toBe($task->id);
         expect(fn () => (new Workspace($root))->exclusivelyForTask($task->id, fn (): bool => true))
             ->toThrow(RuntimeException::class, 'WORKSPACE_BUSY');

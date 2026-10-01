@@ -13,6 +13,7 @@ it('requires both parallel branches and their evidence before completing a run',
     File::ensureDirectoryExists($workspace.'/app');
     File::put($workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($workspace);
+    commitGitWorkspace($workspace);
     config(['molly.parallel_checks' => true]);
     $branches = array_map(fn (string $kind): array => [
         'kind' => $kind, 'branch_id' => $kind.'-1', 'attempt_id' => 'attempt-1', 'execution_target' => 'local',

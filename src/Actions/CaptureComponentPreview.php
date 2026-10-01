@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Actions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class CaptureComponentPreview
@@ -32,8 +33,8 @@ class CaptureComponentPreview
         }
 
         $root = (new Workspace($workspace))->path;
-        $directory = $root.'/.molly/previews';
-        File::ensureDirectoryExists($directory, 0700);
+        $directory = Directory::molly($root, 'previews');
+        Directory::ensure($directory, 0700);
         $fixture = $directory.'/'.$phase.'-'.bin2hex(random_bytes(8)).'.html';
         $image = $directory.'/'.$phase.'-'.bin2hex(random_bytes(8)).'.png';
         File::put($fixture, $this->html($components, $phase, $viewport));

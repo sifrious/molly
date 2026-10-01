@@ -145,10 +145,11 @@ it('records Amp provenance without claiming an Ollama model on a blocked run', f
         mkdir($directory.'/app', 0700, true);
         File::put($directory.'/app/Hello.php', '<?php');
         writeProtectedTest($directory, 'tests/Hello.php');
+        commitGitWorkspace($directory);
         $run = app(RunTask::class)->handle('Return Hello.', $directory, ['app/Hello.php'], 'tests/Hello.php');
         expect($run->status)->toBe('failed')->and($run->report['provider'])->toBe('amp')
-            ->and($run->report['model'])->toBeNull()->and($run->report['error'])->toContain('CLEVER_UNAVAILABLE');
-        Process::assertNothingRan();
+            ->and($run->report['model'])->toBeNull()->and($run->report['error'])->toStartWith('AMP_FAILED:')
+            ->and($run->report['complexity_before']['status'])->toBe('unavailable');
     } finally {
         File::deleteDirectory($directory);
         if (isset($run)) {

@@ -10,8 +10,9 @@ What Molly needs from the application, and which combinations the release tests 
 | Laravel | 12, 13 |
 | PHP extensions | DOM, PDO, PDO SQLite |
 | Database | Any working Laravel connection |
-| Git | Required. Molly records the revision each run started from. |
+| Git | Required. The application must be in a Git repository with at least one commit, either at the repository root or in a subdirectory. Molly records the revision each run started from and never runs `git init` or commits for you. |
 | Pest | Pest 4 with `pest-plugin-laravel` 4 is tested. Pest 5 is accepted by doctor but not yet part of release testing. |
+| Paths | The application, workspace, and `MOLLY_HOME` paths may contain spaces, quotes, and non-ASCII characters. |
 
 ## What the release tests cover
 
@@ -21,19 +22,21 @@ What Molly needs from the application, and which combinations the release tests 
 | Fresh application install | New Laravel 12 and 13 applications: install, publish config, migrate, create and read a task, index Laravel knowledge, confirm `--no-dev` leaves Molly out |
 | Jev | The package suite against the accepted Laravel AI classification commit, with the live-capability tests required to run |
 | Sandbox | The Landlock sandbox tests run on Linux and skip on macOS |
+| Paths with spaces and Unicode | `molly:project-init`, `molly:create`, `molly:start` with the real Pest binary and Clever, `molly:show`, `molly:journal`, `molly:handoff`, `molly:story`, `molly:run`, `molly:worker`, and the Git commands `molly:project-new` prints, in a path such as `/tmp/Molly's Tëst ✓/app`. The model is faked. |
 
 The fresh-application job installs the checked-out package. It does not run a model.
 
 ## Installing Pest 4
 
 ```bash
-composer config allow-plugins.pestphp/pest-plugin true
-composer remove --dev phpunit/phpunit
-composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies
-vendor/bin/pest --init
+composer remove --dev phpunit/phpunit --no-update
+composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+./vendor/bin/pest --init
 ```
 
-Laravel 12 applications pin PHPUnit 11, and Pest 4 needs PHPUnit 12, so the `composer remove` line clears that pin. Skip it when `composer.json` does not list `phpunit/phpunit`.
+New Laravel 12 and 13 applications list `phpunit/phpunit` (12 pins PHPUnit 11, and Pest 4 needs PHPUnit 12), so the first line removes it without resolving, and `-W` lets the second line resolve Pest and PHPUnit together. These applications already allow the `pestphp/pest-plugin` Composer plugin; an older application may need `composer config allow-plugins.pestphp/pest-plugin true` first. `./vendor/bin/pest --init` writes `tests/Pest.php`.
+
+This sequence was run on fresh Laravel 12.69.2 and 13.33.0 applications with PHP 8.4.23 and Composer 2.10.2. It installed Pest 4.7.8 and PHPUnit 12.5.33, and both example tests passed.
 
 ## The sandbox
 

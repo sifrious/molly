@@ -12,6 +12,7 @@ use RuntimeException;
 use Sifrious\Molly\Complexity\Probes\ProbeResult;
 use Sifrious\Molly\Complexity\Support\CleverConfig;
 use Sifrious\Molly\Complexity\Support\Git;
+use Sifrious\Molly\Workspace\Directory;
 
 /**
  * The write side of the report: one flat pretty-printed JSON document,
@@ -119,9 +120,7 @@ final class ReportWriter
         $path = $this->repository->path();
         $directory = dirname($path);
 
-        if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
-            throw new RuntimeException(sprintf('Could not create the report directory [%s].', $directory));
-        }
+        Directory::ensure($directory);
 
         $json = json_encode(
             $document,

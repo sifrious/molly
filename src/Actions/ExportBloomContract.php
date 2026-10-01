@@ -2,7 +2,6 @@
 
 namespace Sifrious\Molly\Actions;
 
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Contracts\AcceptanceTest;
@@ -11,10 +10,14 @@ use Sifrious\Molly\Contracts\ExecutionTargetRequest;
 use Sifrious\Molly\Contracts\RepositoryIdentity;
 use Sifrious\Molly\Contracts\TaskContract;
 use Sifrious\Molly\Contracts\VerifierPolicyMap;
+use Sifrious\Molly\Redaction\SecretRedactor;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 class ExportBloomContract
 {
+    public function __construct(private SecretRedactor $redactor) {}
+
     public function handle(string $reference, string $bloomWorkspaceId, string $branch, string $baseSha, string $owner = 'local', string $name = 'workspace'): TaskContract
     {
         $task = app(ShowTask::class)->handle($reference);
@@ -30,7 +33,7 @@ class ExportBloomContract
 
         $contract = new TaskContract(
             $task->id,
-            $task->prompt,
+            $this->redactor->text($task->prompt, $task->workspace),
             new RepositoryIdentity('git', $owner, $name, $task->workspace),
             $bloomWorkspaceId,
             $task->workspace,
@@ -52,11 +55,11 @@ class ExportBloomContract
     private function write(string $workspace, TaskContract $contract): void
     {
         $root = (new Workspace($workspace))->path;
-        $directory = $root.'/.molly';
-        File::ensureDirectoryExists($directory, 0700);
+        $path = Directory::molly($root, 'bloom-contract.json');
+        Directory::ensure(dirname($path), 0700);
         $mask = umask(0077);
         try {
-            if (file_put_contents($directory.'/bloom-contract.json', $contract->toJson(), LOCK_EX) === false) {
+            if (file_put_contents($path, $contract->toJson(), LOCK_EX) === false) {
                 throw new RuntimeException('CONTRACT_UNWRITABLE: Molly could not write the Bloom task contract.');
             }
         } finally {

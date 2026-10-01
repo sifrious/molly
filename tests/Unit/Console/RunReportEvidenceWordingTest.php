@@ -108,3 +108,40 @@ it('keeps verbose manual verification details accessible for Clever probes', fun
     Prompt::assertOutputContains('Line counts do not measure design quality.');
     Prompt::assertOutputContains('Command: php artisan clever:hotspots');
 });
+
+it('labels Clever as advisory and shows scan failures, probe errors, and warnings without verbose mode', function () {
+    Prompt::fake();
+
+    $run = new Run;
+    $run->forceFill([
+        'id' => 'run-clever-errors',
+        'workspace' => '/tmp/molly-workspace',
+        'status' => 'completed',
+        'report' => [
+            'complexity_before' => ['status' => 'error', 'probes' => [], 'reason' => 'clever_scan_failed', 'detail' => 'The report directory is not writable.'],
+            'complexity_after' => [
+                'status' => 'error',
+                'probes' => [[
+                    'key' => 'c4',
+                    'name' => 'The hotspots',
+                    'status' => 'error',
+                    'skip_reason' => 'Git log failed after the repository checks passed.',
+                    'metrics' => null,
+                    'warnings' => ['The shallow clone contains partial history.'],
+                    'caveats' => ['Churn counts commits that touch a path.'],
+                ]],
+            ],
+        ],
+    ]);
+
+    (new RunReport)->show($run);
+
+    Prompt::assertOutputContains('Clever before changes (advisory)');
+    Prompt::assertOutputContains('Clever after changes (advisory)');
+    Prompt::assertOutputContains('Before: clever_scan_failed');
+    Prompt::assertOutputContains('Before detail: The report directory is not writable.');
+    Prompt::assertOutputContains('After error: Git log failed after the repository checks passed.');
+    Prompt::assertOutputContains('After warning: The shallow clone contains partial history.');
+    Prompt::assertOutputDoesntContain('After skipped: Git log failed');
+    Prompt::assertOutputDoesntContain('Churn counts commits that touch a path.');
+});

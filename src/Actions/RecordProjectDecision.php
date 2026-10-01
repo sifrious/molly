@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 class RecordProjectDecision
 {
@@ -30,7 +31,7 @@ class RecordProjectDecision
         $directory = $root.'/docs/decisions';
         $path = $directory.'/'.$date.'-'.$slug.'.md';
         $markdown = $this->render($heading, $reason, $date, $task);
-        File::ensureDirectoryExists($directory, 0755);
+        Directory::ensure($directory, 0755);
         if (is_link($path) || (file_exists($path) && ! is_file($path))) {
             throw new RuntimeException('DECISION_PATH_INVALID: The decision file must be a regular file.');
         }

@@ -11,8 +11,12 @@
   <key>CFBundleExecutable</key>
   <string>MollySurfaces</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>0.2.0</string>
   <key>BloomPluginSurfaceProvider</key>
   <string>MollySurfaceProvider</string>
+  <key>MollyBuiltAgainstBloomCommit</key>
+  <string>1599f05f</string>
+  <key>MollyBloomPluginAPIVersion</key>
+  <integer>1</integer>
 </dict>
 </plist>

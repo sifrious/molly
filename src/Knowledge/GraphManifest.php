@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Knowledge;
 
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /** Load and validate graph bootstrap manifests under `.molly/graphs/manifest.json`. */
 final class GraphManifest
@@ -24,6 +25,7 @@ final class GraphManifest
         public readonly array $units,
         public readonly ?string $updatedAt,
         public readonly ?string $path,
+        public readonly ?string $revision = null,
     ) {}
 
     public static function empty(?string $path = null): self
@@ -129,6 +131,7 @@ final class GraphManifest
             units: array_values($units),
             updatedAt: self::stringOrNull($payload['updated_at'] ?? null),
             path: $path,
+            revision: self::stringOrNull($payload['revision'] ?? null),
         );
     }
 
@@ -185,6 +188,7 @@ final class GraphManifest
             units: $units,
             updatedAt: $this->updatedAt,
             path: $this->path,
+            revision: $this->revision,
         );
     }
 
@@ -203,49 +207,90 @@ final class GraphManifest
     }
 
     /**
+     * Compare what each ready unit recorded when it was built with the checkout now.
+     *
+     * Reasons: `revision_changed` (Git HEAD moved), `revision_unrecorded` (built before
+     * Molly recorded revisions), `lock_changed` (composer.lock bytes differ), and
+     * `version_changed` (the unit's package is no longer at the recorded exact version).
+     *
+     * @param  array<string, string>  $packages  current composer.lock versions by package name
+     * @param  list<string>|null  $unitIds  only these units; null checks every unit
+     * @return array{status: string, stale: ?bool, reasons: list<string>, units: list<array<string, mixed>>, current: array{revision: string, lock_hash: ?string}, fix: ?string}
+     */
+    public function freshness(string $revision, ?string $lockHash, array $packages, ?array $unitIds = null): array
+    {
+        $checked = [];
+        $reasons = [];
+        foreach ($this->units as $unit) {
+            $id = is_string($unit['id'] ?? null) ? $unit['id'] : null;
+            if ($id === null || ($unitIds !== null && ! in_array($id, $unitIds, true)) || ($unit['status'] ?? null) !== 'ready') {
+                continue;
+            }
+
+            $recordedRevision = is_string($unit['revision'] ?? null) ? $unit['revision'] : null;
+            $recordedLock = is_string($unit['lock_hash'] ?? null) ? $unit['lock_hash'] : $this->lockHash;
+            $package = is_string($unit['package'] ?? null) ? $unit['package'] : null;
+            $unitReasons = [];
+            if ($recordedRevision === null) {
+                $unitReasons[] = 'revision_unrecorded';
+            } elseif ($recordedRevision !== $revision) {
+                $unitReasons[] = 'revision_changed';
+            }
+            if ($recordedLock !== $lockHash) {
+                $unitReasons[] = 'lock_changed';
+            }
+            if ($package !== null && $package !== 'project' && ($packages[$package] ?? null) !== ($unit['exact_version'] ?? null)) {
+                $unitReasons[] = 'version_changed';
+            }
+
+            $checked[] = [
+                'id' => $id,
+                'stale' => $unitReasons !== [],
+                'reasons' => $unitReasons,
+                'recorded' => [
+                    'revision' => $recordedRevision,
+                    'lock_hash' => $recordedLock,
+                    'exact_version' => $unit['exact_version'] ?? null,
+                ],
+                'current_version' => $package === null || $package === 'project' ? null : ($packages[$package] ?? null),
+            ];
+            array_push($reasons, ...$unitReasons);
+        }
+
+        $reasons = array_values(array_unique($reasons));
+        sort($reasons);
+        $status = $checked === [] ? 'missing' : ($reasons === [] ? 'fresh' : 'stale');
+
+        return [
+            'status' => $status,
+            'stale' => $status === 'missing' ? null : $reasons !== [],
+            'reasons' => $reasons,
+            'units' => $checked,
+            'current' => ['revision' => $revision, 'lock_hash' => $lockHash],
+            'fix' => $status === 'fresh' ? null : 'php artisan molly:graphs-bootstrap',
+        ];
+    }
+
+    /**
      * Write this manifest privately and atomically under the project graphs directory.
      * Never leaves a partial file that could make a failed unit look ready.
      */
     public function write(string $root): string
     {
-        $directory = rtrim($root, '/').'/.molly/graphs';
+        $directory = Directory::molly($root, 'graphs/manifest.json');
+        $directory = dirname($directory);
         clearstatcache(true, $directory);
         if (is_link($directory) || (file_exists($directory) && ! is_dir($directory))) {
             throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Graph manifest directories must be real directories, not links or files.');
         }
-        if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not create the graph manifest directory.');
-        }
+        Directory::ensure($directory, 0700);
         @chmod($directory, 0700);
 
         $path = $directory.'/manifest.json';
         $payload = $this->toArray();
         // Deterministic formatting for reproducible digests.
         $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
-
-        $temporary = @tempnam($directory, '.manifest-');
-        if ($temporary === false || dirname($temporary) !== $directory) {
-            if (is_string($temporary) && is_file($temporary)) {
-                @unlink($temporary);
-            }
-            throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: Molly could not stage the graph manifest.');
-        }
-
-        try {
-            $written = @file_put_contents($temporary, $json);
-            if ($written !== strlen($json)) {
-                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be written in full.');
-            }
-            @chmod($temporary, 0600);
-            if (! @rename($temporary, $path)) {
-                throw new RuntimeException('KNOWLEDGE_MANIFEST_INVALID: The graph manifest could not be replaced atomically.');
-            }
-            @chmod($path, 0600);
-        } finally {
-            if (isset($temporary) && is_file($temporary) && ! is_link($temporary)) {
-                @unlink($temporary);
-            }
-        }
+        Directory::replaceFile($path, $json, 'KNOWLEDGE_MANIFEST_UNWRITABLE');
 
         return $path;
     }
@@ -260,6 +305,7 @@ final class GraphManifest
             'lock_hash' => $this->lockHash,
             'laravel_exact' => $this->laravelExact,
             'laravel_major' => $this->laravelMajor,
+            'revision' => $this->revision,
             'packages' => $this->packages,
             'units' => $this->units,
             'updated_at' => $this->updatedAt,

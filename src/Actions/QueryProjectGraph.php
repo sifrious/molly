@@ -8,7 +8,10 @@ use Sifrious\Molly\Workspace;
 
 class QueryProjectGraph
 {
-    public function __construct(private Graph $graph) {}
+    public function __construct(
+        private Graph $graph,
+        private CheckGraphFreshness $freshness,
+    ) {}
 
     /**
      * @param  list<string>  $relations
@@ -18,6 +21,9 @@ class QueryProjectGraph
     {
         $root = (new Workspace($workspace))->path;
 
-        return $this->graph->query(new GraphQuery('project', substr(hash('sha256', $root), 0, 12), $concept, $depth, $limit, $relations))->toArray();
+        return [
+            ...$this->graph->query(new GraphQuery('project', substr(hash('sha256', $root), 0, 12), $concept, $depth, $limit, $relations))->toArray(),
+            'freshness' => $this->freshness->handle($root, ['project:workspace']),
+        ];
     }
 }

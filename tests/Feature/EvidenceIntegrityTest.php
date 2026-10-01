@@ -17,6 +17,7 @@ beforeEach(function (): void {
     touch($this->evidenceWorkspace.'/vendor/bin/pest');
     file_put_contents($this->evidenceWorkspace.'/app/Example.php', '<?php return false;');
     writeProtectedTest($this->evidenceWorkspace, 'tests/ExampleTest.php');
+    commitGitWorkspace($this->evidenceWorkspace);
 });
 
 afterEach(function (): void {

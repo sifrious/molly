@@ -3,6 +3,7 @@
 namespace Sifrious\Molly\Journal;
 
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 /** Validate and atomically replace private journal files and Molly support files. */
 class JournalWriter
@@ -13,8 +14,11 @@ class JournalWriter
         if (is_link($path) || (file_exists($path) && ! is_dir($path))) {
             throw new RuntimeException('JOURNAL_PATH_INVALID: Journal directories must be real directories, not links or files.');
         }
-        if (! is_dir($path) && ! @mkdir($path, 0700) && ! is_dir($path)) {
-            throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create the journal directory.');
+        if (! is_dir($path)) {
+            [$made, $reason] = Directory::attempt(fn (): bool => mkdir($path, 0700));
+            if (! $made && ! is_dir($path)) {
+                throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create '.$path.' ('.($reason !== '' ? $reason : 'the parent directory is not writable').'). Check free disk space and that '.dirname($path).' is writable.');
+            }
         }
         $this->validateDirectory($path);
     }
@@ -47,49 +51,26 @@ class JournalWriter
         $this->ensureDirectory($directory);
         $this->validateFile($path);
 
-        $temporary = @tempnam($directory, '.journal-');
-        if ($temporary === false) {
-            throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create the journal file.');
-        }
-
         try {
-            if (dirname($temporary) !== $directory) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not create the journal file.');
-            }
-            $written = @file_put_contents($temporary, $contents);
-            if ($written !== strlen($contents)) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: The journal could not be written in full.');
-            }
-            @chmod($temporary, 0600);
+            Directory::replaceFile($path, $contents, 'JOURNAL_WRITE_FAILED', 0600, function () use ($directory, $path, $expectedHash): void {
+                $this->validateDirectory($directory);
+                $this->validateFile($path);
 
-            $this->validateDirectory($directory);
-            $this->validateFile($path);
-
-            $currentHash = is_file($path) ? @hash_file('sha256', $path) : false;
-            if ($expectedHash === false && $currentHash !== false) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: The existing file changed during export.');
-            }
-            if (is_string($expectedHash) && $currentHash !== $expectedHash) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: The existing file changed during export.');
-            }
-
-            if (! @rename($temporary, $path)) {
-                throw new RuntimeException('JOURNAL_WRITE_FAILED: The journal could not be replaced.');
-            }
+                $currentHash = is_file($path) ? @hash_file('sha256', $path) : false;
+                if ($expectedHash === false && $currentHash !== false) {
+                    throw new RuntimeException('JOURNAL_WRITE_FAILED: The existing file changed during export.');
+                }
+                if (is_string($expectedHash) && $currentHash !== $expectedHash) {
+                    throw new RuntimeException('JOURNAL_WRITE_FAILED: The existing file changed during export.');
+                }
+            });
             @chmod($path, 0600);
             $this->validateFile($path);
         } catch (\Throwable $exception) {
-            if (is_file($temporary) && ! is_link($temporary)) {
-                @unlink($temporary);
-            }
             if ($exception instanceof RuntimeException && str_starts_with($exception->getMessage(), 'JOURNAL_')) {
                 throw $exception;
             }
             throw new RuntimeException('JOURNAL_WRITE_FAILED: Molly could not save the journal. The task and its attempts are unchanged.', previous: $exception);
-        } finally {
-            if (isset($temporary) && is_file($temporary) && ! is_link($temporary)) {
-                @unlink($temporary);
-            }
         }
     }
 
@@ -97,6 +78,8 @@ class JournalWriter
     public function prepareMollyDirectory(string $root): void
     {
         $directory = rtrim($root, '/').'/.molly';
+        // Report a linked .molly as WORKSPACE_PATH_ESCAPE; links below it stay JOURNAL_PATH_INVALID.
+        Directory::molly($root);
         $this->ensureDirectory($directory);
         $gitignore = $directory.'/.gitignore';
         $existing = null;

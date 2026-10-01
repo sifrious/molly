@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Build the immutable acceptance candidate for sifrious/molly (MME-5885).
+#
+# The artifact is a zip of `git archive <commit>` (so .gitattributes export-ignore
+# applies) with "version" and extra.molly-candidate.commit injected into
+# composer.json. Entries are sorted, mtimes and modes are normalized, and zip
+# extra fields are dropped, so building the same commit and version twice
+# produces the same sha256.
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: molly-candidate <commit> <version> --out <dir> [--repo <dir>]
+
+  <commit>   Commit to package (any revision git can resolve to a commit).
+  <version>  Version written into composer.json, such as 0.2.0-RC1.
+  --out      Directory for sifrious-molly-<sha8>.zip and candidate.json.
+  --repo     Git repository to read. Defaults to the repository holding this script.
+
+Refuses a dirty working tree and a commit git cannot resolve.
+USAGE
+}
+
+fail() { echo "molly-candidate: $*" >&2; exit 1; }
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+OUT=""
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --out) [ $# -ge 2 ] || fail "--out needs a directory"; OUT="$2"; shift 2 ;;
+    --repo) [ $# -ge 2 ] || fail "--repo needs a directory"; REPO="$2"; shift 2 ;;
+    --*) usage >&2; fail "unknown option $1" ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+[ "${#POSITIONAL[@]}" -eq 2 ] || { usage >&2; exit 2; }
+[ -n "$OUT" ] || { usage >&2; exit 2; }
+COMMIT_ARG="${POSITIONAL[0]}"
+VERSION="${POSITIONAL[1]}"
+
+PHP="${PHP_BINARY:-$(command -v php || true)}"
+[ -n "$PHP" ] || fail "php is not on PATH (set PHP_BINARY)"
+command -v zip >/dev/null || fail "zip is not on PATH"
+
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|RC)[0-9]*)?$ ]] \
+  || fail "version '$VERSION' must look like 1.2.3 or 1.2.3-RC1"
+
+git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || fail "$REPO is not a git repository"
+if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
+  fail "working tree at $REPO is dirty; commit or stash changes first"
+fi
+SHA="$(git -C "$REPO" rev-parse --verify --quiet "${COMMIT_ARG}^{commit}")" \
+  || fail "unknown commit '$COMMIT_ARG'"
+SHA8="${SHA:0:8}"
+
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
+ARTIFACT="sifrious-molly-${SHA8}.zip"
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/molly-candidate.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+mkdir "$WORK/tree"
+
+git -C "$REPO" archive --format=tar "$SHA" | tar -x -f - -C "$WORK/tree"
+[ -f "$WORK/tree/composer.json" ] || fail "commit $SHA8 has no composer.json"
+
+# Inject version (after "name") and extra.molly-candidate.commit. Objects are
+# decoded as stdClass so empty {} values survive the round trip.
+"$PHP" -r '
+  [$file, $version, $sha] = array_slice($argv, 1);
+  $json = json_decode(file_get_contents($file), false, 512, JSON_THROW_ON_ERROR);
+  $out = new stdClass;
+  foreach (get_object_vars($json) as $key => $value) {
+      if ($key === "version") { continue; }
+      $out->{$key} = $value;
+      if ($key === "name") { $out->version = $version; }
+  }
+  if (! isset($out->version)) { $out->version = $version; }
+  if (! isset($out->extra)) { $out->extra = new stdClass; }
+  $out->extra->{"molly-candidate"} = (object) ["commit" => $sha];
+  file_put_contents($file, json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n");
+' "$WORK/tree/composer.json" "$VERSION" "$SHA"
+
+# Normalize modes and mtimes so the zip depends only on content.
+find "$WORK/tree" -type d -exec chmod 755 {} +
+find "$WORK/tree" -type f -perm -u+x -exec chmod 755 {} +
+find "$WORK/tree" -type f ! -perm -u+x -exec chmod 644 {} +
+find "$WORK/tree" -exec touch -h -t 198001010000 {} +
+
+rm -f "$WORK/$ARTIFACT"
+(
+  cd "$WORK/tree"
+  find . \( -type f -o -type l \) | sed 's|^\./||' | LC_ALL=C sort \
+    | TZ=UTC zip -q -X -D -y "$WORK/$ARTIFACT" -@
+)
+
+SHA256="$(shasum -a 256 "$WORK/$ARTIFACT" | cut -d' ' -f1)"
+mv -f "$WORK/$ARTIFACT" "$OUT/$ARTIFACT"
+
+"$PHP" -r '
+  [$file, $sha, $version, $artifact, $sha256, $zip, $git] = array_slice($argv, 1);
+  $candidate = [
+      "schema" => "molly.acceptance-candidate/1",
+      "commit" => $sha,
+      "version" => $version,
+      "artifact" => $artifact,
+      "sha256" => $sha256,
+      "built_at" => gmdate("Y-m-d\TH:i:s\Z"),
+      "builder" => [
+          "script" => "bin/molly-candidate",
+          "host" => php_uname("n"),
+          "php" => PHP_VERSION,
+          "zip" => $zip,
+          "git" => $git,
+      ],
+  ];
+  file_put_contents($file, json_encode($candidate, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+' "$OUT/candidate.json" "$SHA" "$VERSION" "$ARTIFACT" "$SHA256" \
+  "$(zip -v 2>/dev/null | sed -n 2p | sed 's/^This is //')" "$(git --version)"
+
+echo "commit   $SHA"
+echo "version  $VERSION"
+echo "artifact $OUT/$ARTIFACT"
+echo "sha256   $SHA256"

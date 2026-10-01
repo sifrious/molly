@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
 class Workspace
@@ -17,7 +18,7 @@ class Workspace
         $root = realpath($path);
 
         if ($root === false || ! is_dir($root)) {
-            throw new RuntimeException('WORKSPACE_INVALID: Choose an existing project directory.');
+            throw new RuntimeException('WORKSPACE_INVALID: '.$path.(file_exists($path) ? ' is not a directory' : ' does not exist').'. Choose an existing project directory.');
         }
 
         $this->path = $root;
@@ -77,6 +78,8 @@ class Workspace
         $directory = $this->path.'/.molly';
         $lockPath = $directory.'/'.$filename;
         clearstatcache();
+        // A linked .molly is reported as WORKSPACE_PATH_ESCAPE, naming the link and its target.
+        Directory::molly($this->path);
 
         if (is_link($directory) || is_link($lockPath)
             || (file_exists($directory) && ! is_dir($directory))
@@ -84,7 +87,7 @@ class Workspace
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory and a regular file.');
         }
         if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create the workspace lock directory.');
+            throw new RuntimeException('WORKSPACE_LOCK_INVALID: Molly could not create '.$directory.'. Check free disk space and that the workspace is writable.');
         }
         if (is_link($directory) || ! is_dir($directory)) {
             throw new RuntimeException('WORKSPACE_LOCK_INVALID: The workspace lock requires a real directory.');
@@ -116,7 +119,7 @@ class Workspace
             throw new RuntimeException('FILES_INVALID: Select a list of file paths.');
         }
         if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
+            throw ChoiceRequired::fromList('TEST_PATH_INVALID: Select a PHP test file under tests/.', $this->testFiles(), 'test');
         }
 
         $this->resolve($testPath);
@@ -132,17 +135,84 @@ class Workspace
 
         $paths = array_values(array_filter($paths, fn (string $path): bool => $path !== $testPath));
         if ($paths === []) {
-            throw new RuntimeException('TEST_PROTECTED: Choose implementation files Molly may change. The required Pest test is read-only unless test edits are explicitly allowed.');
+            throw ChoiceRequired::fromList('TEST_PROTECTED: Choose implementation files Molly may change. The required Pest test is read-only unless test edits are explicitly allowed.', $this->sourceFiles(), 'file', multiple: true);
         }
 
         return $paths;
+    }
+
+    /**
+     * Why an implementation run may not write this path, or null when it may.
+     * Uses the same rules as every task file: a relative path under app, routes,
+     * resources, or tests, with no hidden segments or symbolic links.
+     */
+    public function implementationPathError(string $path, string $testPath): ?string
+    {
+        if ($path === $testPath) {
+            return 'TEST_PROTECTED: The required Pest test is read-only for the implementation.';
+        }
+
+        try {
+            $this->resolve($path);
+        } catch (RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * Existing files under routes, app, and resources/views that a task could
+     * select, in that order and sorted within each directory.
+     *
+     * @return list<string>
+     */
+    public function sourceFiles(int $limit = 200): array
+    {
+        $files = [];
+        foreach (['routes', 'app', 'resources/views'] as $root) {
+            $directory = $this->path.'/'.$root;
+            if (is_link($directory) || ! is_dir($directory)) {
+                continue;
+            }
+            $paths = array_map(fn ($file): string => $root.'/'.str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()), File::allFiles($directory));
+            sort($paths, SORT_STRING);
+            foreach ($paths as $path) {
+                if ($this->implementationPathError($path, '') === null) {
+                    $files[] = $path;
+                }
+                if (count($files) >= $limit) {
+                    return $files;
+                }
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * Existing Pest files under tests/, sorted.
+     *
+     * @return list<string>
+     */
+    public function testFiles(int $limit = 200): array
+    {
+        $directory = $this->path.'/tests';
+        if (is_link($directory) || ! is_dir($directory)) {
+            return [];
+        }
+        $paths = array_map(fn ($file): string => 'tests/'.str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()), File::allFiles($directory));
+        $paths = array_values(array_filter($paths, fn (string $path): bool => str_ends_with($path, 'Test.php') && $this->implementationPathError($path, '') === null));
+        sort($paths, SORT_STRING);
+
+        return array_slice($paths, 0, $limit);
     }
 
     /** @return array<string, ?string> */
     public function readProtectedTest(string $testPath): array
     {
         if (! str_starts_with($testPath, 'tests/') || ! str_ends_with($testPath, '.php')) {
-            throw new RuntimeException('TEST_PATH_INVALID: Select a PHP test file under tests/.');
+            throw ChoiceRequired::fromList('TEST_PATH_INVALID: Select a PHP test file under tests/.', $this->testFiles(), 'test');
         }
 
         $absolute = $this->resolve($testPath);
@@ -163,6 +233,20 @@ class Workspace
         $contents = $this->readProtectedTest($testPath)[$testPath];
 
         return $contents === null ? null : hash('sha256', $contents);
+    }
+
+    /**
+     * The error for a required test that does not exist. When the workspace is not a Laravel
+     * application at all, the workspace is the problem, so say that instead.
+     */
+    public function missingProtectedTest(string $testPath): RuntimeException
+    {
+        $markers = array_filter(['artisan', 'composer.json', '.git', 'tests'], fn (string $marker): bool => file_exists($this->path.'/'.$marker));
+        if ($markers === []) {
+            return new RuntimeException('WORKSPACE_INVALID: '.$this->path.' is not a Laravel application: it has no artisan, composer.json, .git, or tests directory, and '.$testPath.' does not exist there. Pass --workspace with your Laravel project root.');
+        }
+
+        return new RuntimeException('PROTECTED_TEST_MISSING: '.$testPath.' does not exist in '.$this->path.'. Create and approve the required Pest test before the implementation turn.');
     }
 
     public function assertProtectedTestUnchanged(string $testPath, string $digest): void
@@ -212,6 +296,7 @@ class Workspace
         if ($this->read(array_keys($before)) !== $before) {
             throw new RuntimeException('WORKSPACE_CHANGED: A selected file changed while the agent was working. No proposal was applied.');
         }
+        $this->assertWritable(array_column($edits, 'path'));
 
         $attempted = [];
         try {
@@ -232,8 +317,47 @@ class Workspace
             if ($failed !== []) {
                 throw new RuntimeException('WORKSPACE_ROLLBACK_FAILED: Review these files before continuing: '.implode(', ', $failed), 0, $exception);
             }
-            throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly could not apply the proposal. Original file contents were restored.', 0, $exception);
+            throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly could not write '.end($attempted).' ('.Directory::reason($exception->getMessage()).'). Original file contents were restored.', 0, $exception);
         }
+    }
+
+    /**
+     * Refuse the write before anything changes when this user cannot write a selected file
+     * or the directory that holds it. File::replace writes a temporary file beside the target
+     * and renames it over the target, so without this check a read-only file in a writable
+     * directory would be replaced, and a failed write could leave the temporary file behind.
+     * The message names the path relative to the workspace and the reason the system gave.
+     *
+     * @param  list<string>  $paths
+     */
+    public function assertWritable(array $paths): void
+    {
+        foreach ($paths as $path) {
+            $absolute = $this->resolve($path);
+            $directory = dirname($absolute);
+            while (! file_exists($directory) && $directory !== $this->path) {
+                $directory = dirname($directory);
+            }
+            if (is_file($absolute) && ($reason = $this->writeBlocker($absolute)) !== null) {
+                throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly cannot write '.$path.' ('.$reason.'). No files were changed. Make '.$path.' writable by this user, then retry the task.');
+            }
+            if (($reason = $this->writeBlocker($directory)) !== null) {
+                $named = $directory === $this->path ? $this->path : substr($directory, strlen($this->path) + 1);
+                throw new RuntimeException('WORKSPACE_WRITE_FAILED: Molly cannot write '.$path.' because it cannot write the directory '.$named.' ('.$reason.'). No files were changed. Make '.$named.' writable by this user, then retry the task.');
+            }
+        }
+    }
+
+    /** The reason the system gives for refusing this user a write to $path, or null. */
+    private function writeBlocker(string $path): ?string
+    {
+        if (function_exists('posix_access')) {
+            $mode = is_dir($path) ? POSIX_W_OK | POSIX_X_OK : POSIX_W_OK;
+
+            return posix_access($path, $mode) ? null : posix_strerror(posix_get_last_error());
+        }
+
+        return is_writable($path) ? null : 'not writable by this user';
     }
 
     /**
@@ -287,7 +411,9 @@ class Workspace
                         throw new RuntimeException('Could not remove the new file.');
                     }
                 } else {
-                    File::replace($absolute, $before[$path]);
+                    // apply() kept the file's mode, so keep it again here. Without a mode,
+                    // File::replace gives the file 0777 - umask, and Git reports a mode change.
+                    File::replace($absolute, $before[$path], is_file($absolute) ? fileperms($absolute) & 0777 : 0666 & ~umask());
                     if (File::get($absolute) !== $before[$path]) {
                         throw new RuntimeException('Could not restore the original contents.');
                     }

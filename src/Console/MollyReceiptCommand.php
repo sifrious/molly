@@ -10,12 +10,13 @@ use Sifrious\Molly\Models\Run;
 use Sifrious\Molly\Workspace;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\intro;
 use function Laravel\Prompts\note;
 
 class MollyReceiptCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:receipt {run : Saved run ID} {--workspace= : Repository path that holds .molly/receipts} {--json : Print JSON only}';
 
     protected $description = 'Read immutable verification receipts for a run without rerunning verification';
@@ -35,8 +36,11 @@ class MollyReceiptCommand extends Command
                 if ($file->getExtension() !== 'json') {
                     continue;
                 }
-                $outcome = VerificationOutcome::fromJson(trim(File::get($file->getPathname())));
-                $receipts[] = [...$outcome->toArray(), 'path' => $file->getPathname()];
+                $json = trim(File::get($file->getPathname()));
+                $outcome = VerificationOutcome::fromJson($json);
+                // The run facts the evidence digest covers, such as the model and the Orb, when the receipt saved them.
+                $context = json_decode($json, true)['context'] ?? null;
+                $receipts[] = [...$outcome->toArray(), ...(is_array($context) ? ['context' => $context] : []), 'path' => $file->getPathname()];
             }
 
             usort($receipts, fn (array $a, array $b): int => strcmp((string) $a['verifier'], (string) $b['verifier']));
@@ -46,11 +50,11 @@ class MollyReceiptCommand extends Command
             }
 
             if ($this->option('json')) {
-                $this->line(json_encode([
+                $this->writeJson([
                     'run' => $runId,
                     'workspace' => (new Workspace($workspace))->path,
                     'receipts' => $receipts,
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                ]);
             } else {
                 intro('Molly verification receipts');
                 note('Run: '.$runId);
@@ -65,23 +69,21 @@ class MollyReceiptCommand extends Command
                     if ($receipt['diagnostics_ref'] !== null) {
                         $this->line('  diagnostics_ref: '.$receipt['diagnostics_ref']);
                     }
+                    $target = $receipt['context']['execution_target'] ?? null;
+                    if (is_array($target) && ($target['kind'] ?? null) === 'orb') {
+                        $this->line('  execution_target: Orb '.($target['orb']['name'] ?? 'unknown').' ('.($target['target_id'] ?? 'no ID').') in '.($target['worktree'] ?? 'an unrecorded worktree'));
+                    }
                     $this->line('  path: '.$receipt['path']);
                 }
             }
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode([
-                    'run' => (string) $this->argument('run'),
-                    'status' => 'error',
-                    'error' => $exception->getMessage(),
-                ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), [
+                'run' => (string) $this->argument('run'),
+                'status' => 'error',
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

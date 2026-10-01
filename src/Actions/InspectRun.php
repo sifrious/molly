@@ -36,7 +36,7 @@ final class InspectRun
                 'id' => $run->id,
                 'task_id' => $run->task_id,
                 'status' => $run->status,
-                'prompt' => $run->prompt,
+                'prompt' => $run->redactedPrompt(),
                 'workspace' => $run->workspace,
                 'created_at' => optional($run->created_at)?->toIso8601String(),
                 'updated_at' => optional($run->updated_at)?->toIso8601String(),
@@ -60,7 +60,7 @@ final class InspectRun
                 'duration_ms' => $report['duration_ms'] ?? null,
             ],
             'inputs' => [
-                'prompt' => $run->prompt,
+                'prompt' => $run->redactedPrompt(),
                 'workspace' => $run->workspace,
             ],
             'outputs' => [

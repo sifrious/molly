@@ -34,7 +34,7 @@ it('requires a prompt when creating a task without interaction', function (array
     $this->app->instance(CreateTask::class, $action);
 
     $this->artisan('molly:create', $options)
-        ->expectsOutputToContain('Provide a prompt when using --json or --no-interaction.')
+        ->expectsOutputToContain('PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction')
         ->assertFailed();
 })->with([[['--json' => true]], [['--no-interaction' => true]]]);
 

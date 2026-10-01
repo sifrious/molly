@@ -34,7 +34,7 @@ config([
     'database.connections.sqlite.busy_timeout' => 10000,
     'database.connections.sqlite.transaction_mode' => 'IMMEDIATE',
     'queue.default' => 'database',
-    'queue.connections.database' => ['driver' => 'database', 'connection' => 'sqlite', 'table' => 'jobs', 'queue' => 'default', 'retry_after' => 120, 'after_commit' => false],
+    'queue.connections.database' => ['driver' => 'database', 'connection' => 'sqlite', 'table' => 'jobs', 'queue' => 'default', 'retry_after' => $settings['retry_after'] ?? 120, 'after_commit' => false],
     'queue.failed' => ['driver' => 'database-uuids', 'database' => 'sqlite', 'table' => 'failed_jobs'],
     'cache.default' => 'array',
     'logging.default' => 'single',
@@ -43,7 +43,7 @@ config([
     'molly.model' => 'queue-fixture-model',
     'molly.parallel_checks' => true,
     'molly.timeout' => 5,
-    'molly.test_timeout' => 5,
+    'molly.test_timeout' => $settings['test_timeout'] ?? 5,
     'molly-complexity.enabled' => true,
     'ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434'],
 ]);
@@ -74,6 +74,12 @@ ChangeWriter::fake(function () use ($root, $settings, $waitFor): array {
     file_put_contents($root.'/generation-calls', getmypid()."\n", FILE_APPEND | LOCK_EX);
     if ($settings['duplicate']) {
         $waitFor(fn (): bool => count(glob($root.'/worker-failed-*')) === 1);
+    }
+    // Stand in for a slow model request: answer only after the test removes the hold file.
+    $deadline = microtime(true) + 30;
+    while (is_file($root.'/hold') && microtime(true) < $deadline) {
+        usleep(20000);
+        clearstatcache(true, $root.'/hold');
     }
 
     return ['summary' => 'Return true from the flag.', 'files' => [['path' => 'app/Flag.php', 'content' => "<?php\nreturn true;\n"]]];

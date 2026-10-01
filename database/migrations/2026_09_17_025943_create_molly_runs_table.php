@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // A migrate stopped before its row in migrations was written runs this again.
+        if (Schema::hasTable('molly_runs')) {
+            return;
+        }
+
         Schema::create('molly_runs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->text('prompt');

@@ -52,6 +52,9 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | Jev gate | The single switch, `MOLLY_JEV_ENABLED`, and the states doctor reports: `disabled`, `unavailable`, `unconfigured`, `ready`. |
 | MCP server | Molly's local stdio server for editors and chat clients. No HTTP route. |
 | Sandbox | Landlock plus private user and network namespaces around the writer and Pest on Linux. |
+| Fit decision | What `molly:preflight` concludes about this Mac and the approved models: `recommended_fit`, `minimum_fit`, `already_installed`, `no_fit`, `unsupported`, or `unknown`. Unknown is never incompatible. |
+| Approved catalogue | The Ollama artifacts Molly may install, with their digests, licences, origin evidence, and the pinned Ollama version. It ships with Molly and is checked against its SHA-256. |
+| Readiness check | The bounded inference and the small Molly task that `molly:install-model` runs before it calls a model ready. |
 
 ## Bloom and GitHub
 
@@ -59,7 +62,7 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | --- | --- |
 | Bloom | An optional macOS workspace and review tool. It owns the checkout and pull request screens; Molly owns the task and its evidence. |
 | Bloom contract | `.molly/bloom-contract.json`, the versioned task description Bloom binds to a workspace. |
-| Handoff | An envelope that passes a task to a child Bloom workspace with the same scope. |
+| Handoff | An envelope that passes a task to a child Bloom workspace with the same scope, after a person confirms it with `molly:handoff --approve`. Saved in `.molly/handoffs/`. |
 | Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
 | Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
-| Orb | A planned remote execution environment. Not shipped; see [Execution targets](../execution-targets.md). |
+| Orb | A registered local worker with its own UUID, runtime and model, repository, and approved worktree root. It runs one task at a time in that task's own Git worktree. Hosted Orbs on another machine are not shipped. See [Execution targets](../execution-targets.md#local-orbs). |

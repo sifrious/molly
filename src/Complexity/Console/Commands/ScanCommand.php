@@ -10,12 +10,14 @@ use Sifrious\Molly\Complexity\Console\Concerns\RendersProbeResults;
 use Sifrious\Molly\Complexity\Probes\ProbeResult;
 use Sifrious\Molly\Complexity\Probes\ProbeStatus;
 use Sifrious\Molly\Complexity\Report\ReportRepository;
+use Sifrious\Molly\Console\ReportsFailures;
 
 use function Laravel\Prompts\info;
 
 final class ScanCommand extends Command
 {
     use RendersProbeResults;
+    use ReportsFailures;
 
     /**
      * The command signature.
@@ -38,10 +40,7 @@ final class ScanCommand extends Command
         $results = $clever->scan();
 
         if ((bool) $this->option('json')) {
-            $this->line((string) json_encode(
-                $reports->read(),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-            ));
+            $this->writeJson($reports->read(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
             return $this->exitCode($results);
         }

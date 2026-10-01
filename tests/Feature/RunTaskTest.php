@@ -42,6 +42,7 @@ beforeEach(function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
+    commitGitWorkspace($this->workspace);
     config(['ai.providers.ollama' => ['driver' => 'ollama', 'url' => 'http://127.0.0.1:11434']]);
 });
 
@@ -144,18 +145,35 @@ it('records incomplete reviews as failures and retains the observed test results
         ->and($run->report['changes'])->toHaveCount(1);
 });
 
-it('does not edit files or call the model when Clever is unavailable', function () {
-    ChangeWriter::fake()->preventStrayPrompts();
-    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn(['status' => 'unavailable', 'reason' => 'clever_not_installed', 'probes' => []]);
-    $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
+it('records Clever as unavailable and still completes the run when Clever is unavailable', function () {
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'unavailable', 'reason' => 'clever_not_installed', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'passed', 'tests' => 1, 'assertions' => 1, 'identified_required_test' => true]);
+
+    $run = runMollyFixture();
+
+    expect($run->status)->toBe('completed')
+        ->and($run->report)->not->toHaveKey('error')
+        ->and($run->report['complexity_before'])->toMatchArray(['status' => 'unavailable', 'reason' => 'clever_not_installed'])
+        ->and($run->report['complexity_after'])->toMatchArray(['status' => 'unavailable', 'reason' => 'clever_not_installed'])
+        ->and($run->report['verification_outcomes'])->not->toHaveKey('clever')
+        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return "Hello";');
+    ChangeWriter::assertPromptedTimes(1);
+});
+
+it('does not report a failed Clever scan as passing', function () {
+    ChangeWriter::fake([mollyProposalFixture()])->preventStrayPrompts();
+    TarpitReviewer::fake([mollyReviewFixture()])->preventStrayPrompts();
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->twice()->andReturn(['status' => 'error', 'reason' => 'clever_scan_failed', 'probes' => []]);
+    $this->mock(VerifyChanges::class)->shouldReceive('handle')->once()->andReturn(['status' => 'failed', 'tests' => 1, 'failures' => 1]);
 
     $run = runMollyFixture();
 
     expect($run->status)->toBe('failed')
-        ->and($run->report['error'])->toStartWith('CLEVER_UNAVAILABLE:')
-        ->and($run->report['changes'])->toBe([])
-        ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return null;');
-    ChangeWriter::assertNeverPrompted();
+        ->and($run->report['complexity_before']['status'])->toBe('error')
+        ->and($run->report['complexity_after']['status'])->toBe('error')
+        ->and($run->report['verification']['failures'])->toBe(1);
 });
 
 it('rejects a proposal outside the selected paths without writing any files', function () {
@@ -400,16 +418,16 @@ it('proves RunTask phase order and failure semantics', function () {
         ->and(is_file($this->workspace.'/.molly/receipts/'.$stopped->id.'/pest.json'))->toBeTrue();
 
     app()->forgetInstance(RunTask::class);
-    // Measurement failure blocks generation.
-    ChangeWriter::fake()->preventStrayPrompts();
+    // Measurement failure is advisory: the model is still asked for changes.
+    ChangeWriter::fake([['summary' => 'No change.', 'files' => [['path' => 'app/Greeting.php', 'content' => '<?php return "Hello";']]]])->preventStrayPrompts();
     $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn([
         'status' => 'unavailable', 'reason' => 'clever_not_installed', 'probes' => [],
     ]);
     $this->mock(VerifyChanges::class)->shouldNotReceive('handle');
     $measureFail = app(RunTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
     expect($measureFail->status)->toBe('failed')
-        ->and($measureFail->report['error'])->toStartWith('CLEVER_UNAVAILABLE:')
-        ->and($measureFail->report['changes'])->toBe([])
+        ->and($measureFail->report['error'])->toStartWith('NO_CHANGES:')
+        ->and($measureFail->report['complexity_before']['status'])->toBe('unavailable')
         ->and(File::get($this->workspace.'/app/Greeting.php'))->toBe('<?php return "Hello";');
 
     app()->forgetInstance(RunTask::class);

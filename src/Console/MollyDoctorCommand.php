@@ -12,16 +12,24 @@ use function Laravel\Prompts\table;
 
 class MollyDoctorCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:doctor {--workspace= : Workspace containing Pest} {--json : Print JSON only}';
 
     protected $description = 'Check Ollama readiness, Pest, run history, sandbox, and Clever without printing secrets';
 
     public function handle(CheckEnvironment $check): int
     {
-        $run = fn (): array => $check->handle((string) ($this->option('workspace') ?: base_path()));
+        $workspace = (string) ($this->option('workspace') ?: base_path());
+        if (! is_dir($workspace)) {
+            $message = 'WORKSPACE_INVALID: '.$workspace.' is not an existing directory. Pass --workspace with your Laravel project root.';
+
+            return $this->reportFailure($message, ['ready' => false, 'status' => 'error', 'error' => $message]);
+        }
+        $run = fn (): array => $check->handle($workspace);
         if ($this->option('json')) {
             $result = $run();
-            $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+            $this->writeJson($result);
         } else {
             intro('Check Molly');
             $result = spin($run, 'Checking local requirements');

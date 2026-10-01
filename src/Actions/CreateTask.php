@@ -2,7 +2,9 @@
 
 namespace Sifrious\Molly\Actions;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
 use Sifrious\Molly\Contracts\LifecycleEventType;
@@ -21,26 +23,31 @@ class CreateTask
     ) {}
 
     /**
+     * Pass requireRedBaseline: false to let the implementation start without a
+     * RED run of the locked test. Molly records that choice on the task.
+     *
      * @param  list<string>  $paths
      * @param  array<string, mixed>  $source
      */
-    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null, bool $allowTestEdits = false): Task
+    public function handle(string $prompt, string $workspace, array $paths, string $testPath, array $source = [], ?string $nickname = null, bool $allowTestEdits = false, bool $requireRedBaseline = true): Task
     {
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
         }
 
-        $reference = $this->bindWorkspace->handle($workspace);
-        $reference->assertAvailableForExecution();
-        // Normalize trailing "/." and similar; persist realpath as observed metadata.
+        // Check the task's own inputs before binding, which runs Git in the workspace. The
+        // workspace is canonical from here on: a relative --workspace, a trailing "/.", and
+        // similar forms resolve once, and the task saves the real path.
         $files = new Workspace($workspace);
         $workspace = $files->path;
-
         $paths = $files->taskPaths($paths, $testPath, $allowTestEdits);
         $testDigest = $files->testDigest($testPath);
         if (! $allowTestEdits && $testDigest === null) {
-            throw new RuntimeException('PROTECTED_TEST_MISSING: Create and approve the required Pest test before the implementation turn.');
+            throw $files->missingProtectedTest($testPath);
         }
+
+        $reference = $this->bindWorkspace->handle($workspace);
+        $reference->assertAvailableForExecution();
 
         $contents = [...$files->read($paths), ...$files->readProtectedTest($testPath)];
         $snapshot = $files->snapshot($contents);
@@ -50,6 +57,10 @@ class CreateTask
             json_encode($source, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('SOURCE_INVALID: Source metadata must contain valid JSON values.', 0, $exception);
+        }
+
+        if (! $requireRedBaseline) {
+            $source['red_baseline_required'] = false;
         }
 
         $nickname = $nickname === null || trim($nickname) === '' ? null : Task::validateNickname($nickname);
@@ -78,6 +89,14 @@ class CreateTask
             ]);
         } catch (UniqueConstraintViolationException $exception) {
             throw new RuntimeException('TASK_NAME_TAKEN: Another task already uses that name.', 0, $exception);
+        } catch (QueryException $exception) {
+            $reason = $exception->getPrevious()?->getMessage() ?? $exception->getMessage();
+            if (preg_match('/readonly database|read-only|disk I\/O error|database or disk is full|unable to open database file/i', $reason) !== 1) {
+                throw $exception;
+            }
+            $database = DB::connection($exception->getConnectionName())->getDatabaseName();
+
+            throw new RuntimeException('DATABASE_UNWRITABLE: Molly could not save the task in '.$database.' ('.$reason.'). Check free disk space and that the database file and its directory are writable.', 0, $exception);
         }
 
         $task = $this->journal->handle($task);

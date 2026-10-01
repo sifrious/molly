@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
 
 /**
  * Create a new Laravel application and initialize Molly inside it.
@@ -18,11 +21,19 @@ final class CreateMollyProject
     public function __construct(
         private InitializeMollyInExistingProject $initialize,
         private ProjectRegistry $registry,
+        private ObserveCheckout $observe = new ObserveCheckout,
     ) {}
 
     /**
+     * A new application is not a Git repository, and Molly never creates one or commits for the
+     * user. When the app is not in a committed checkout, stop after creating it and return
+     * status needs_commit with the reason and the commands to run; the project is attached by
+     * molly:project-init after the user commits it. Inside an existing repository the commands
+     * commit the app there and never run git init. Molly attaches right away only when the HEAD
+     * commit already contains files under the target, such as a tracked directory replaced with --force.
+     *
      * @param  (callable(string, string): void)|null  $progress
-     * @return array{project: MollyProject, created: array<string, bool>, steps: list<string>}
+     * @return array{status: 'created'|'needs_commit', path: string, project: ?MollyProject, created: array<string, bool>, steps: list<string>, reason: ?string, next: list<string>}
      */
     public function handle(
         string $path,
@@ -41,16 +52,17 @@ final class CreateMollyProject
         };
 
         $path = $this->expand($path);
+        GitBinary::require();
         $name ??= basename($path);
         $note('path', 'Target directory '.$path);
 
         if (file_exists($path)) {
             if (! is_dir($path)) {
-                throw new RuntimeException('PROJECT_PATH_INVALID: Target exists and is not a directory.');
+                throw new RuntimeException('PROJECT_PATH_INVALID: '.$path.' exists and is not a directory. Choose a new or empty directory.');
             }
             if ($this->directoryNotEmpty($path)) {
                 if (! $force) {
-                    throw new RuntimeException('PROJECT_PATH_NOT_EMPTY: Choose an empty directory or pass --force.');
+                    throw new RuntimeException('PROJECT_PATH_NOT_EMPTY: '.$path.' is not empty. Choose an empty directory, or pass --force to delete it and create the application again, for example after an interrupted molly:project-new.');
                 }
                 $note('force', 'Removing non-empty target because --force was set');
                 File::deleteDirectory($path);
@@ -60,7 +72,7 @@ final class CreateMollyProject
         if ($runComposer) {
             $note('laravel', 'Creating Laravel application with Composer');
             $parent = dirname($path);
-            File::ensureDirectoryExists($parent);
+            Directory::ensure($parent);
             $result = Process::path($parent)->timeout(900)->run([
                 'composer', 'create-project', 'laravel/laravel', basename($path), '--no-interaction',
             ]);
@@ -69,7 +81,7 @@ final class CreateMollyProject
             }
         } else {
             $note('laravel', 'Skipped Composer create-project (test/scaffold mode)');
-            File::ensureDirectoryExists($path);
+            Directory::ensure($path);
             if (! is_file($path.'/artisan')) {
                 File::put($path.'/artisan', "#!/usr/bin/env php\n<?php\n// scaffold\n");
             }
@@ -89,6 +101,21 @@ final class CreateMollyProject
                 ], JSON_PRETTY_PRINT).'
 ');
             }
+        }
+
+        $location = ObserveCheckout::locate($path);
+        if ($location['root'] === null || $this->observe->head($path) === null || ! $this->observe->headContainsFiles($path)) {
+            $note('git', 'Laravel application created. Molly did not attach it because it is not in a Git commit yet.');
+
+            return [
+                'status' => 'needs_commit',
+                'path' => $path,
+                'project' => null,
+                'created' => ['application' => true, 'metadata' => false],
+                'steps' => $steps,
+                'reason' => $this->commitReason($path, $location),
+                'next' => [...$this->commitCommands($path, $location), $this->initCommand($path, $name)],
+            ];
         }
 
         $result = $this->initialize->handle(
@@ -113,20 +140,76 @@ final class CreateMollyProject
         $note('source', 'Recorded project source as new');
 
         return [
+            'status' => 'created',
+            'path' => $project->path,
             'project' => $project,
             'created' => $result['created'],
             'steps' => $steps,
+            'reason' => null,
+            'next' => [],
         ];
     }
 
+    /**
+     * Inside an existing repository, including one that ignores the path, Molly never suggests
+     * git init: the user commits the app into that repository instead.
+     *
+     * @param  array{root: ?string, ignored_by: ?string}  $location
+     */
+    private function commitReason(string $path, array $location): string
+    {
+        if ($location['ignored_by'] !== null) {
+            return $path.' is ignored by the Git repository at '.$location['ignored_by'].', so its files cannot be committed. Stop ignoring it in '.$location['ignored_by'].', then commit it.';
+        }
+        if ($location['root'] !== null) {
+            return $path.' is inside the Git repository at '.$location['root'].', which has no commit with its files yet. Commit it in that repository.';
+        }
+
+        return $path.' is not in a Git repository. Create a repository for it and commit it.';
+    }
+
+    /**
+     * @param  array{root: ?string, ignored_by: ?string}  $location
+     * @return list<string>
+     */
+    private function commitCommands(string $path, array $location): array
+    {
+        $repository = $location['root'] ?? $location['ignored_by'];
+        if ($repository !== null) {
+            return ObserveCheckout::commitCommands($repository, $path);
+        }
+
+        return [
+            'git -C '.escapeshellarg($path).' init',
+            'git -C '.escapeshellarg($path).' add -A',
+            'git -C '.escapeshellarg($path).' commit -m "Start"',
+        ];
+    }
+
+    private function initCommand(string $path, string $name): string
+    {
+        return 'php artisan molly:project-init '.escapeshellarg($path).($name !== basename($path) ? ' --name='.escapeshellarg($name) : '');
+    }
+
+    /**
+     * The target as an absolute path. A relative path, such as ../shop, resolves once against
+     * the current directory, so the reported path and the printed commands work from anywhere.
+     */
     private function expand(string $path): string
     {
         if (str_starts_with($path, '~/')) {
             $home = getenv('HOME') ?: (getenv('USERPROFILE') ?: '');
             $path = rtrim(str_replace('\\', '/', $home), '/').'/'.substr($path, 2);
         }
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        if ($path === '' || str_starts_with($path, '/') || preg_match('#\A[A-Za-z]:/#', $path) === 1) {
+            return $path;
+        }
+        $parent = realpath(dirname($path));
 
-        return rtrim(str_replace('\\', '/', $path), '/');
+        return $parent === false
+            ? rtrim(str_replace('\\', '/', (string) getcwd()), '/').'/'.$path
+            : rtrim(str_replace('\\', '/', $parent), '/').'/'.basename($path);
     }
 
     private function directoryNotEmpty(string $path): bool

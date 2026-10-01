@@ -8,12 +8,13 @@ use Sifrious\Molly\Actions\CreateTask;
 use Sifrious\Molly\Models\Task;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 
 class MollyCreateCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:create {prompt? : What should Molly work on?} {--workspace= : Repository path} {--file=* : Repository-relative file Molly may change} {--test= : Pest test file that must pass} {--allow-test-edits : Permit this task to change the required Pest test} {--name= : Task nickname} {--json : Print JSON only}';
 
     protected $description = 'Save a task without running the model or changing files';
@@ -25,10 +26,13 @@ class MollyCreateCommand extends Command
             $guided = $interactive && (trim((string) $this->argument('prompt')) === '' || ! $this->option('test') || $this->option('file') === []);
             $prompt = $this->taskPrompt($interactive);
             $nickname = $this->taskNickname($guided);
-            [$paths, $test] = $this->taskFiles($interactive);
-            $task = $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
+            $task = $this->offeringChoices(function () use ($action, $interactive, $prompt, $nickname): Task {
+                [$paths, $test] = $this->taskFiles($interactive);
+
+                return $action->handle($prompt, (string) ($this->option('workspace') ?: base_path()), $paths, $test, nickname: $nickname, allowTestEdits: (bool) $this->option('allow-test-edits'));
+            });
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $task->id, 'status' => $task->status, 'task' => $task->toArray()]);
             } else {
                 $report->show($task);
                 note('Start this task with php artisan molly:start '.$task->reference().'.');
@@ -36,13 +40,7 @@ class MollyCreateCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['id' => null, 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportException($exception, ['id' => null, 'status' => 'error']);
         }
     }
 
@@ -53,7 +51,7 @@ class MollyCreateCommand extends Command
             return $prompt;
         }
         if (! $interactive) {
-            throw new InvalidArgumentException('Provide a prompt when using --json or --no-interaction.');
+            throw new InvalidArgumentException('PROMPT_REQUIRED: Pass the task as the first argument when using --json or --no-interaction, for example php artisan molly:create "Return Hello".');
         }
 
         return text('What should Molly work on?', required: 'Describe the change Molly should make.', transform: trim(...));
@@ -91,7 +89,7 @@ class MollyCreateCommand extends Command
         $test = trim((string) $this->option('test'));
         if ($test === '') {
             if (! $interactive) {
-                throw new InvalidArgumentException('Use --test to name the Pest test file that must pass.');
+                throw new InvalidArgumentException('TEST_REQUIRED: Use --test to name the Pest test file that must pass, for example --test=tests/Feature/GreetingTest.php.');
             }
             $test = text('Which Pest test should pass?', placeholder: 'tests/Feature/HealthTest.php', required: true, hint: 'This test is read-only unless you pass --allow-test-edits.', transform: trim(...));
         }

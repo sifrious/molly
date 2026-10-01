@@ -17,3 +17,5 @@ bloom-plugin/Surfaces/.swiftpm/
 
 # macOS Finder metadata
 .DS_Store
+
+/work

@@ -2,9 +2,10 @@
 
 namespace Sifrious\Molly\Knowledge;
 
-use Illuminate\Support\Facades\File;
 use PDO;
+use PDOException;
 use RuntimeException;
+use Sifrious\Molly\Workspace\Directory;
 
 final class Graph
 {
@@ -29,9 +30,7 @@ final class Graph
         $snapshot = new GraphSnapshot($namespace, $version, $sources, $nodes, $edges);
         $database = $this->connection();
 
-        $database->beginTransaction();
-
-        try {
+        $this->schema->immediately($database, function () use ($database, $namespace, $version, $snapshot): void {
             foreach (['edges', 'nodes', 'sources'] as $table) {
                 $statement = $database->prepare("DELETE FROM {$table} WHERE namespace = :namespace AND version = :version");
                 $statement->execute(compact('namespace', 'version'));
@@ -40,11 +39,7 @@ final class Graph
             $this->insertSources($database, $snapshot->sources);
             $this->insertNodes($database, $snapshot->nodes);
             $this->insertEdges($database, $snapshot->edges);
-            $database->commit();
-        } catch (\Throwable $exception) {
-            $database->rollBack();
-            throw $exception;
-        }
+        });
 
         return ['sources' => count($snapshot->sources), 'nodes' => count($snapshot->nodes), 'edges' => count($snapshot->edges)];
     }
@@ -167,7 +162,11 @@ final class Graph
             throw new RuntimeException('KNOWLEDGE_DATABASE_INVALID: Configure a database path.');
         }
 
-        return str_starts_with($path, '/') ? $path : base_path($path);
+        $path = str_starts_with($path, '/') ? $path : base_path($path);
+        $molly = base_path('.molly').'/';
+
+        // The default store lives under the application's .molly directory; never follow a link out of it.
+        return str_starts_with($path, $molly) ? Directory::molly(base_path(), substr($path, strlen($molly))) : $path;
     }
 
     private function connection(): PDO
@@ -176,16 +175,39 @@ final class Graph
             return $this->connection;
         }
 
-        File::ensureDirectoryExists(dirname($this->path()));
-        $this->connection = new PDO('sqlite:'.$this->path(), options: [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
-        $this->schema->configureConnection($this->connection);
-        $this->schema->migrate($this->connection);
-        $this->schema->assertCompatible($this->connection);
+        $path = $this->path();
+        Directory::ensure(dirname($path));
+        // SQLite writes the database, its journal, and its WAL files beside each other, so
+        // both the directory and an existing file must be writable before the schema check.
+        clearstatcache(true, $path);
+        if (file_exists($path) && ! is_writable($path)) {
+            throw $this->unwritable($path, 'the file is read-only');
+        }
+        if (! file_exists($path) && ! is_writable(dirname($path))) {
+            throw $this->unwritable($path, dirname($path).' is read-only');
+        }
 
-        return $this->connection;
+        try {
+            $connection = new PDO('sqlite:'.$path, options: [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+            $this->schema->configureConnection($connection);
+            $this->schema->migrate($connection);
+        } catch (PDOException $exception) {
+            if (preg_match('/unable to open database file|readonly database|disk is full|disk I\/O error/i', $exception->getMessage(), $match) === 1) {
+                throw $this->unwritable($path, strtolower($match[0]), $exception);
+            }
+            throw $exception;
+        }
+        $this->schema->assertCompatible($connection);
+
+        return $this->connection = $connection;
+    }
+
+    private function unwritable(string $path, string $reason, ?PDOException $previous = null): RuntimeException
+    {
+        return new RuntimeException('DATABASE_UNWRITABLE: Molly could not open the knowledge database '.$path.' ('.$reason.'). Check free disk space and that '.dirname($path).' is writable.', previous: $previous);
     }
 
     /** @param  list<GraphSource>  $sources */

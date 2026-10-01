@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Actions\ConfigureAgent;
+use Sifrious\Molly\Workspace\GitBinary;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process as SymfonyProcess;
 use Throwable;
@@ -14,6 +15,8 @@ use function Laravel\Prompts\select;
 
 class MollySetupCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:setup {--agent= : amp or ollama} {--model= : Installed local Ollama model} {--no-login : Configure Amp without opening its login flow} {--json : Print setup results without interactive prompts}';
 
     protected $description = 'Choose an agent and connect Amp to Molly or select a local Ollama model';
@@ -21,6 +24,8 @@ class MollySetupCommand extends Command
     public function handle(ConfigureAgent $configure, ExecutableFinder $finder): int
     {
         try {
+            // Molly cannot create or run tasks without Git, so refuse before writing .env.
+            GitBinary::require();
             $interactive = $this->input->isInteractive() && ! $this->option('json');
             $agent = $this->option('agent');
             if ($agent === null && $interactive) {
@@ -66,7 +71,7 @@ class MollySetupCommand extends Command
             }
             $result = ['status' => 'configured', 'agent' => $agent, 'model' => $model, 'next_commands' => $next];
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR));
+                $this->writeJson($result);
             } else {
                 $this->info('Saved the '.$agent.' configuration.');
                 foreach ($next as $command) {
@@ -79,13 +84,7 @@ class MollySetupCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'failed', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                $this->error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'failed', 'error' => $exception->getMessage()]);
         }
     }
 }

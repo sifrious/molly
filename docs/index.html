@@ -204,7 +204,7 @@
         </div>
         <div class="outside">
           <h4>Not yet</h4>
-          <p>Verified Orb identity. Remote execution selection. Molly opening or merging pull requests itself. A compiled Bloom macOS integration. Visual previews inside Bloom. Laravel knowledge beyond the areas listed above.</p>
+          <p>Hosted Orbs on another machine. Local Orbs run tasks on this machine. Molly opening or merging pull requests itself. Host-level acceptance of the Bloom integration: the plugin is built against Bloom commit <code>1599f05f</code>. Visual previews inside Bloom. Laravel knowledge beyond the areas listed above.</p>
           <p class="outside__none">Humans still make the final integration decision.</p>
         </div>
       </div>
@@ -218,12 +218,12 @@
           <h2>Install the current release</h2>
           <p>PHP 8.3 or later, Laravel 12 or 13, Pest, Git and a working database. Molly installs from the public GitHub repository until it is listed on Packagist.</p>
         </div>
-        <div class="notice"><div><b>v1 is not tagged yet</b><p>The v1 install line appears here once v1 is tagged and a fresh install is proven.</p></div></div>
+        <div class="notice"><div><b>0.2 is in prelaunch</b><p>The latest tag is v0.1.3. Molly 0.2 is in prelaunch acceptance testing with candidate builds named 0.2.0-RC&lt;n&gt;. The <code>^0.2</code> line below works once v0.2.0 is published.</p></div></div>
       </div>
       <div class="term">
         <div class="term__bar"><span class="app__dots"><i></i><i></i><i></i></span><span>laravel app</span></div>
         <pre class="term__body" style="margin: 0; overflow-x: auto"><span class="p">$</span> composer config repositories.molly vcs https://github.com/sifrious/molly
-<span class="p">$</span> composer require --dev sifrious/molly:^0.1.1
+<span class="p">$</span> composer require --dev sifrious/molly:^0.2
 <span class="p">$</span> php artisan vendor:publish --tag=molly-config
 <span class="p">$</span> php artisan migrate
 <span class="c"># then follow the standalone QuickStart</span></pre>

@@ -9,12 +9,13 @@ use Sifrious\Molly\Actions\IndexNativePhpKnowledge;
 use Sifrious\Molly\Actions\IndexTarpitKnowledge;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 final class MollyKnowledgeIndexCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:knowledge:index {namespace=laravel : Knowledge namespace} {--laravel-version= : Installed Laravel major version} {--json : Print JSON only}';
 
     protected $description = 'Build the local Laravel, NativePHP, or tarpit knowledge graph';
@@ -30,7 +31,7 @@ final class MollyKnowledgeIndexCommand extends Command
                 default => throw new RuntimeException('KNOWLEDGE_NAMESPACE_INVALID: Choose laravel, nativephp, or tarpit.'),
             };
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } elseif ($namespace === 'nativephp') {
                 note('NativePHP Desktop v2 and Mobile v4 knowledge indexed. Tracks stay separate. Installed NativePHP packages are not required or claimed.');
                 table(['Sources', 'Nodes', 'Edges'], [[$result['sources'], $result['nodes'], $result['edges']]]);
@@ -47,13 +48,7 @@ final class MollyKnowledgeIndexCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 

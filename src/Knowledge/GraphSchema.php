@@ -2,8 +2,10 @@
 
 namespace Sifrious\Molly\Knowledge;
 
+use Closure;
 use PDO;
 use RuntimeException;
+use Throwable;
 
 /** Versioned SQLite DDL for the isolated Molly knowledge graph database. */
 final class GraphSchema
@@ -23,9 +25,43 @@ final class GraphSchema
 
     public function configureConnection(PDO $database): void
     {
-        $database->exec('PRAGMA foreign_keys = ON');
+        // Set the busy wait first so every later statement, including the journal switch, honours it.
         $database->exec('PRAGMA busy_timeout = '.self::BUSY_TIMEOUT_MS);
-        $database->exec('PRAGMA journal_mode = '.self::JOURNAL_MODE);
+        $database->exec('PRAGMA foreign_keys = ON');
+        $mode = strtolower((string) $database->query('PRAGMA journal_mode')->fetchColumn());
+        if ($mode !== strtolower(self::JOURNAL_MODE)) {
+            $database->exec('PRAGMA journal_mode = '.self::JOURNAL_MODE);
+        }
+    }
+
+    /**
+     * Run a write inside BEGIN IMMEDIATE.
+     *
+     * A deferred transaction that has already read cannot wait for the write lock; SQLite
+     * returns SQLITE_BUSY at once to avoid a deadlock. Taking the write lock up front lets
+     * the busy timeout apply.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $work
+     * @return T
+     */
+    public function immediately(PDO $database, Closure $work): mixed
+    {
+        $database->exec('BEGIN IMMEDIATE');
+        try {
+            $result = $work();
+            $database->exec('COMMIT');
+
+            return $result;
+        } catch (Throwable $exception) {
+            try {
+                $database->exec('ROLLBACK');
+            } catch (Throwable) {
+                // The transaction already ended; keep the original error.
+            }
+            throw $exception;
+        }
     }
 
     /** Verify recorded schema is present and supported before queries or replacement writes. */
@@ -102,32 +138,35 @@ final class GraphSchema
         ]);
     }
 
-    /** Create or upgrade forward-only; refuse newer unsupported schemas; idempotent. */
+    /**
+     * Create or upgrade forward-only; refuse newer unsupported schemas; idempotent.
+     *
+     * A database already at VERSION is only read, so readers never take a write lock.
+     */
     public function migrate(PDO $database): void
     {
-        $database->beginTransaction();
-        try {
+        $this->assertNotNewer($this->recordedVersion($database));
+        if ($this->recordedVersion($database) === self::VERSION) {
+            return;
+        }
+
+        $this->immediately($database, function () use ($database): void {
+            // Another process may have created the schema while this one waited.
             $current = $this->recordedVersion($database);
-            if ($current === null) {
-                // Fresh or legacy without metadata table — apply full DDL + record version.
-                $this->apply($database);
-            } elseif ($current > self::VERSION) {
-                throw new RuntimeException(
-                    'KNOWLEDGE_SCHEMA_UNSUPPORTED: Knowledge database schema '.$current.' is newer than Molly supports ('.self::VERSION.').'
-                );
-            } elseif ($current < self::VERSION) {
-                // Forward-only upgrades would run here; VERSION==1 has no intermediate steps yet.
-                $this->apply($database);
-            } else {
-                // Already current — re-apply DDL idempotently (IF NOT EXISTS).
+            $this->assertNotNewer($current);
+            if ($current !== self::VERSION) {
+                // Forward-only upgrades would run here; VERSION 1 has no intermediate steps.
                 $this->apply($database);
             }
-            $database->commit();
-        } catch (\Throwable $exception) {
-            if ($database->inTransaction()) {
-                $database->rollBack();
-            }
-            throw $exception;
+        });
+    }
+
+    private function assertNotNewer(?int $current): void
+    {
+        if ($current !== null && $current > self::VERSION) {
+            throw new RuntimeException(
+                'KNOWLEDGE_SCHEMA_UNSUPPORTED: Knowledge database schema '.$current.' is newer than Molly supports ('.self::VERSION.').'
+            );
         }
     }
 
@@ -138,7 +177,7 @@ final class GraphSchema
                 "SELECT value FROM schema_metadata WHERE key = '".self::METADATA_KEY."'"
             );
             $value = $statement?->fetchColumn();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 

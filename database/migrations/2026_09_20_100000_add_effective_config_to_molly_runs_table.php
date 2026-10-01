@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('molly_runs', 'effective_config')) {
+            return;
+        }
+
         Schema::table('molly_runs', function (Blueprint $table) {
             $table->json('effective_config')->nullable()->after('report');
         });

@@ -7,11 +7,12 @@ use RuntimeException;
 use Sifrious\Molly\Actions\UpdateMollySettings;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 
 class MollySettingsSetCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:settings-set
         {--patch= : JSON object of settings overrides}
         {--json : Print JSON only}';
@@ -37,7 +38,7 @@ class MollySettingsSetCommand extends Command
 
             $payload = ['status' => 'ok', ...$action->handle($decoded)];
             if ($this->option('json')) {
-                $this->line(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($payload);
             } else {
                 note('Updated '.$payload['path']);
                 note('Historical run effective_config values are unchanged.');
@@ -45,13 +46,7 @@ class MollySettingsSetCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

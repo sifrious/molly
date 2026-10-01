@@ -4,7 +4,9 @@ namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Sifrious\Molly\ChoiceRequired;
 use Sifrious\Molly\PlanningGuide;
+use Sifrious\Molly\Workspace\GitBinary;
 
 class ReviewCommit
 {
@@ -17,15 +19,16 @@ class ReviewCommit
         if ($workspace === false || ! is_dir($workspace)) {
             throw new RuntimeException('COMMIT_WORKSPACE_INVALID: Choose an existing Git workspace.');
         }
+        GitBinary::require();
         $revision = null;
         if (! $staged) {
             if (! is_string($ref) || trim($ref) === '' || strlen($ref) > 256) {
-                throw new RuntimeException('COMMIT_REF_INVALID: Choose one commit to review.');
+                throw new ChoiceRequired('COMMIT_REF_INVALID: Choose one commit to review.', $this->recentCommits($workspace), 'ref');
             }
             $resolved = Process::path($workspace)->timeout(10)->run(['git', 'rev-parse', '--verify', '--end-of-options', $ref.'^{commit}']);
             $revision = trim($resolved->output());
             if (! $resolved->successful() || ! preg_match('/\A[0-9a-f]{40,64}\z/', $revision)) {
-                throw new RuntimeException('COMMIT_REF_INVALID: Git could not resolve that commit.');
+                throw new ChoiceRequired('COMMIT_REF_INVALID: Git could not resolve '.$ref.' as a commit.', $this->recentCommits($workspace), 'ref');
             }
         }
         $base = $staged ? ['git', 'diff', '--cached'] : ['git', 'show', '--format=', '--root', '--diff-merges=first-parent', $revision];
@@ -54,5 +57,23 @@ class ReviewCommit
             'tests' => 'not_run', 'evaluation' => $evaluation,
             'citations' => array_map(fn (array $source): array => array_intersect_key($source, array_flip(['id', 'title', 'url', 'revision', 'sha256'])), $sources),
         ];
+    }
+
+    /**
+     * The last ten commits as sha => "short sha subject".
+     *
+     * @return array<string, string>
+     */
+    private function recentCommits(string $workspace): array
+    {
+        $log = Process::path($workspace)->timeout(10)->run(['git', 'log', '-n', '10', '--format=%H %h %s']);
+        $commits = [];
+        foreach ($log->successful() ? preg_split('/\R/', trim($log->output())) : [] as $line) {
+            if (preg_match('/\A([0-9a-f]{40,64}) (\S+) ?(.*)\z/', $line, $match) === 1) {
+                $commits[$match[1]] = trim($match[2].' '.$match[3]);
+            }
+        }
+
+        return $commits;
     }
 }

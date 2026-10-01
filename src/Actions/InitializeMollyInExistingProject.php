@@ -8,27 +8,37 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Sifrious\Molly\Projects\MollyProject;
 use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Workspace\Directory;
+use Sifrious\Molly\Workspace\GitBinary;
+use Sifrious\Molly\Workspace\ObserveCheckout;
+use Throwable;
 
 /**
  * Attach Molly to an existing Laravel application without clobbering unrelated config.
  *
  * Safe behaviour:
+ * - Refuses a workspace that is not a Git repository with at least one commit, before any write
  * - Creates `.molly/` and project metadata when missing
  * - Appends `.molly/` to `.gitignore` only when absent
  * - Publishes `config/molly.php` only when the destination file does not exist
  * - Does not rewrite `.env` agent settings (that remains `molly:setup`)
- * - Registers the path in the shared `~/.molly/projects.json` index Bloom also reads
+ * - Registers the path in the shared `~/.molly/projects.json` index Bloom also reads,
+ *   and only after migrations and the graph bootstrap succeed
  * - Requires a tagged release constraint, never a development branch
  */
 final class InitializeMollyInExistingProject
 {
     /** The tagged release line the initializer installs. Keep in step with bin/molly-demo. */
-    public const RELEASE_CONSTRAINT = '^0.1.1';
+    public const RELEASE_CONSTRAINT = '^0.2';
 
     /** Public VCS source used until sifrious/molly is listed on Packagist. */
     public const REPOSITORY_URL = 'https://github.com/sifrious/molly';
 
-    public function __construct(private ProjectRegistry $registry) {}
+    public function __construct(
+        private ProjectRegistry $registry,
+        private BootstrapProjectKnowledgeGraphs $bootstrapGraphs,
+        private ObserveCheckout $observe = new ObserveCheckout,
+    ) {}
 
     /**
      * @param  (callable(string, string): void)|null  $progress
@@ -50,6 +60,9 @@ final class InitializeMollyInExistingProject
         };
 
         $root = $this->assertLaravelRoot($path);
+        GitBinary::require();
+        // The project identity is bound to a commit, so refuse before writing anything, like molly:create.
+        $this->observe->requireCommit($root);
         $note('validate', 'Laravel application root accepted at '.$root);
 
         if ($runComposerRequire && ! $this->packageInstalled($root)) {
@@ -61,8 +74,13 @@ final class InitializeMollyInExistingProject
                 : 'Skipped Composer require');
         }
 
-        $createdGitignore = $this->ensureGitignored($root);
-        $note('gitignore', $createdGitignore ? 'Added .molly/ to .gitignore' : '.molly/ already ignored');
+        try {
+            $ignored = $this->ensureGitignored($root);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('GITIGNORE_UNWRITABLE: Molly could not add .molly/ and /storage/molly/ to '.$root.'/.gitignore'.$this->reason($exception).'. Check free disk space and that the file is writable.', 0, $exception);
+        }
+        $createdGitignore = $ignored !== [];
+        $note('gitignore', $createdGitignore ? 'Added '.implode(' and ', $ignored).' to .gitignore' : '.molly/ and /storage/molly/ already ignored');
 
         $createdConfig = false;
         if (! is_file($root.'/config/molly.php')) {
@@ -81,11 +99,33 @@ final class InitializeMollyInExistingProject
             $note('migrate', 'Skipped migrations');
         }
 
+        $graphs = null;
+        if ($bootstrapGraphs) {
+            $note('graphs', 'Bootstrapping version-pinned knowledge graphs');
+            $graphs = $this->bootstrapGraphs->handle(
+                $root,
+                function (string $step, string $message) use ($note): void {
+                    $note('graphs:'.$step, $message);
+                },
+            );
+            $note(
+                'graphs',
+                $graphs['ok']
+                    ? 'Knowledge graphs ready (Laravel '.$graphs['laravel_exact'].')'
+                    : 'Knowledge graphs finished with retryable failures; see .molly/graphs/manifest.json',
+            );
+        } else {
+            $note('graphs', 'Skipped knowledge graph bootstrap');
+        }
+
+        // Register only after every step succeeded, so a failed init never leaves a
+        // project listed as ready. A bootstrap failure throws before this point.
         $existing = $this->registry->readProject($root);
         $createdMetadata = false;
         if ($existing === null) {
             $project = new MollyProject(
-                id: $this->registry->makeId(),
+                // Reuse the checkout identity so tasks created before init keep their project ID.
+                id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
                 source: 'existing',
@@ -112,25 +152,6 @@ final class InitializeMollyInExistingProject
             }
         }
 
-        $graphs = null;
-        if ($bootstrapGraphs) {
-            $note('graphs', 'Bootstrapping version-pinned knowledge graphs');
-            $graphs = (new BootstrapProjectKnowledgeGraphs)->handle(
-                $root,
-                function (string $step, string $message) use ($note): void {
-                    $note('graphs:'.$step, $message);
-                },
-            );
-            $note(
-                'graphs',
-                $graphs['ok']
-                    ? 'Knowledge graphs ready (Laravel '.$graphs['laravel_exact'].')'
-                    : 'Knowledge graphs finished with retryable failures — see .molly/graphs/manifest.json',
-            );
-        } else {
-            $note('graphs', 'Skipped knowledge graph bootstrap');
-        }
-
         return [
             'project' => $project,
             'created' => [
@@ -148,7 +169,7 @@ final class InitializeMollyInExistingProject
     {
         $root = realpath($path);
         if ($root === false || ! is_dir($root)) {
-            throw new RuntimeException('PROJECT_PATH_INVALID: Choose an existing Laravel project directory.');
+            throw new RuntimeException('PROJECT_PATH_INVALID: '.$path.(file_exists($path) ? ' is not a directory' : ' does not exist').'. Choose an existing Laravel project directory.');
         }
 
         if (! is_file($root.'/artisan') || ! is_file($root.'/composer.json')) {
@@ -170,18 +191,60 @@ final class InitializeMollyInExistingProject
         return str_replace('\\', '/', $root);
     }
 
+    /**
+     * Composer lists a package in vendor/composer/installed.json after extracting it, then writes the
+     * autoload map. A composer require killed partway can leave vendor/sifrious/molly behind without
+     * either, so the rerun runs composer require again unless both name Molly.
+     */
     private function packageInstalled(string $root): bool
     {
-        return is_dir($root.'/vendor/sifrious/molly');
+        $installed = json_decode((string) @file_get_contents($root.'/vendor/composer/installed.json'), true);
+        $packages = is_array($installed) ? ($installed['packages'] ?? $installed) : [];
+        $names = array_map(fn (mixed $package): mixed => is_array($package) ? ($package['name'] ?? null) : null, is_array($packages) ? $packages : []);
+
+        return in_array('sifrious/molly', $names, true)
+            && str_contains((string) @file_get_contents($root.'/vendor/composer/autoload_psr4.php'), "/sifrious/molly/src'");
     }
 
     private function composerRequire(string $root): void
     {
-        if (! $this->hasMollyRepository($root)) {
-            $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
+        // A failed step, such as an authentication error in composer require, puts composer.json
+        // and composer.lock back byte for byte, so no repositories entry is left behind.
+        $saved = $this->composerFiles($root);
+        try {
+            if (! $this->hasMollyRepository($root)) {
+                $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
+            }
+
+            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+        } catch (Throwable $exception) {
+            $this->restoreComposerFiles($root, $saved);
+            throw $exception;
+        }
+    }
+
+    /** @return array<string, ?string> composer.json and composer.lock contents, null when absent */
+    private function composerFiles(string $root): array
+    {
+        $files = [];
+        foreach (['composer.json', 'composer.lock'] as $name) {
+            $files[$name] = is_file($root.'/'.$name) ? File::get($root.'/'.$name) : null;
         }
 
-        $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+        return $files;
+    }
+
+    /** @param  array<string, ?string>  $saved */
+    private function restoreComposerFiles(string $root, array $saved): void
+    {
+        foreach ($saved as $name => $contents) {
+            $path = $root.'/'.$name;
+            if ($contents === null) {
+                File::delete($path);
+            } elseif (! is_file($path) || File::get($path) !== $contents) {
+                File::put($path, $contents);
+            }
+        }
     }
 
     /** @param  list<string>  $arguments */
@@ -217,8 +280,10 @@ final class InitializeMollyInExistingProject
             throw new RuntimeException('CONFIG_STUB_MISSING: Packaged config/molly.php was not found.');
         }
 
-        File::ensureDirectoryExists($root.'/config');
-        File::copy($stub, $destination);
+        Directory::ensure($root.'/config');
+        // Write a staged copy and rename it into place, so an interrupted init never leaves a
+        // truncated config/molly.php that the rerun would keep because the file exists.
+        Directory::replaceFile($destination, File::get($stub), 'CONFIG_UNWRITABLE', 0644);
 
         return true;
     }
@@ -246,24 +311,37 @@ final class InitializeMollyInExistingProject
         return $base !== false && str_replace('\\', '/', $base) === $root;
     }
 
-    private function ensureGitignored(string $root): bool
+    /**
+     * Ignore Molly's local files as the README asks: .molly/ and /storage/molly/. A line
+     * that already covers one, such as /.molly or /storage/, counts, and nothing is added
+     * twice. Returns the lines Molly added.
+     *
+     * @return list<string>
+     */
+    private function ensureGitignored(string $root): array
     {
         $gitignore = $root.'/.gitignore';
-        $needle = '.molly/';
-        if (! is_file($gitignore)) {
-            File::put($gitignore, $needle.PHP_EOL);
-
-            return true;
+        $contents = is_file($gitignore) ? File::get($gitignore) : '';
+        $covered = [
+            '.molly/' => '/\A\/?\.molly\/?\z/',
+            '/storage/molly/' => '/\A\/?storage(\/molly)?\/?\z/',
+        ];
+        $lines = array_map(trim(...), preg_split('/\R/', $contents) ?: []);
+        $missing = array_keys(array_filter($covered, fn (string $pattern): bool => preg_grep($pattern, $lines) === []));
+        if ($missing === []) {
+            return [];
         }
 
-        $contents = File::get($gitignore);
-        if (preg_match('/(^|\\n)\\s*\\.molly\\/?\\s*($|\\n)/', $contents) === 1) {
-            return false;
-        }
+        // Append, so an interrupted write never loses the lines already there.
+        File::append($gitignore, ($contents === '' || str_ends_with($contents, "\n") ? '' : "\n").implode("\n", $missing)."\n");
 
-        File::append($gitignore, (str_ends_with($contents, "\n") ? '' : "\n").$needle."\n");
+        return $missing;
+    }
 
-        return true;
+    /** PHP's reason without the function name and path, which the message already names. */
+    private function reason(Throwable $exception): string
+    {
+        return preg_match('/\): (?:Failed to open stream: )?(.+)\z/', $exception->getMessage(), $match) === 1 ? ' ('.$match[1].')' : '';
     }
 
     private function processError(string $output): string

@@ -183,7 +183,7 @@ php artisan molly:approve TASK --approve
 php artisan molly:pr-body TASK
 php artisan molly:pr-opened TASK --url URL --approve
 php artisan molly:merged TASK --sha SHA --approve
-php artisan molly:handoff TASK --from UUID --to UUID
+php artisan molly:handoff TASK --from UUID --to UUID --approve
 ```
 
 `molly:pr-opened` and `molly:merged` record. They do not open or merge.

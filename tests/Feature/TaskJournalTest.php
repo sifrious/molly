@@ -153,6 +153,36 @@ it('exports a pending task through JSON without creating an attempt', function (
         ->and($task->runs()->count())->toBe(0);
 });
 
+it('writes the task journal and refreshes the project journal and glossary with molly:journal TASK --project', function (): void {
+    $task = journalTask();
+    $journal = $this->journalWorkspace.'/.molly/journal/'.$task->id.'.md';
+
+    $exit = Artisan::call('molly:journal', ['task' => 'health-check', '--project' => true, '--json' => true, '--no-interaction' => true]);
+    $result = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(0)
+        ->and($result)->toMatchArray([
+            'task_id' => $task->id,
+            'path' => $journal,
+            'attempt_count' => 0,
+            'status' => 'written',
+            'journal_path' => $this->journalWorkspace.'/.molly/JOURNAL.md',
+            'glossary_path' => $this->journalWorkspace.'/.molly/GLOSSARY.md',
+        ])
+        ->and(File::get($journal))->toContain('# Task journal', 'No attempts recorded.')
+        ->and(fileperms($journal) & 0777)->toBe(0600)
+        ->and(fileperms(dirname($journal)) & 0777)->toBe(0700)
+        ->and(File::get($result['journal_path']))->toContain('# Project journal')
+        ->and($task->fresh()->journal_status['status'])->toBe('written');
+
+    File::delete($journal);
+    $this->artisan('molly:journal', ['task' => $task->id, '--project' => true])
+        ->expectsOutputToContain('Journal saved: '.$journal)
+        ->expectsOutputToContain('Project journal saved: '.$this->journalWorkspace.'/.molly/JOURNAL.md')
+        ->assertSuccessful();
+    expect(File::exists($journal))->toBeTrue();
+});
+
 it('prints a concise confirmation after saving a journal', function (): void {
     $task = journalTask();
 
@@ -171,7 +201,7 @@ it('reports an unknown task without creating a journal directory', function (): 
         ->and(is_dir($this->journalWorkspace.'/.molly'))->toBeFalse();
 });
 
-it('rejects symbolic links anywhere in the journal path without altering their targets', function (string $location): void {
+it('rejects symbolic links anywhere in the journal path without altering their targets', function (string $location, string $code): void {
     $task = journalTask(['status' => 'failed']);
     $outside = $this->journalWorkspace.'/outside';
     mkdir($outside);
@@ -184,13 +214,18 @@ it('rejects symbolic links anywhere in the journal path without altering their t
     symlink($location === 'file' ? $outside.'/untouched.md' : $outside, $link);
     $before = $task->fresh()->getRawOriginal();
 
-    expect(fn () => app(ExportTaskJournal::class)->handle($task->id))->toThrow(RuntimeException::class, 'JOURNAL_PATH_INVALID');
+    expect(fn () => app(ExportTaskJournal::class)->handle($task->id))->toThrow(RuntimeException::class, $code);
 
     expect(File::get($outside.'/untouched.md'))->toBe('Keep this file.')
         ->and(scandir($outside))->toBe(['.', '..', 'untouched.md'])
         ->and($task->fresh()->getRawOriginal())->toBe($before);
     unlink($link);
-})->with(['metadata directory' => '.molly', 'journal directory' => '.molly/journal', 'journal file' => 'file']);
+})->with([
+    // A linked .molly is a workspace escape; links below it are invalid journal paths.
+    'metadata directory' => ['.molly', 'WORKSPACE_PATH_ESCAPE: '],
+    'journal directory' => ['.molly/journal', 'JOURNAL_PATH_INVALID'],
+    'journal file' => ['file', 'JOURNAL_PATH_INVALID'],
+]);
 
 it('rejects files in place of journal directories', function (string $location): void {
     $task = journalTask();

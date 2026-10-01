@@ -1,0 +1,41 @@
+{
+  "namespace": "tarpit",
+  "version": "notes-2026-09-17",
+  "sources": [
+    {"ref":"documentation:mary-tarpit","title":"Mary Perry: Cleverness is a loan","location":"https://clever.mary.win/","revision":"sha256:afc4c4d05d4efca5ecdc05f54b7a35cded9b1c07677fda6e74e8cd33e56ed32d","digest":"fd26e2a6aee43808607864d9dfdcb25fef52dddb2f3ec7126cfd501e1d13613a","metadata":{"path":"sources/mary-tarpit.md","retrieved_at":"2026-09-17"}}
+  ],
+  "nodes": [
+    {"ref":"concept:accident","label":"Accident","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"concept:cleverness","label":"Cleverness","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"concept:complexity","label":"Complexity","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"concept:essence","label":"Essence","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"concept:layers","label":"Layers","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"concept:tarpit","label":"Tarpit","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"ref":"documentation_section:docs:mary-tarpit#complexity-divided","label":"Complexity, divided","sources":["documentation:mary-tarpit"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:mary-tarpit#the-layers","label":"The layers","sources":["documentation:mary-tarpit"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:mary-tarpit#the-tar-pit","label":"The tar pit","sources":["documentation:mary-tarpit"],"metadata":{"heading_level":2}},
+    {"ref":"version:tarpit:notes-2026-09-17","label":"Tarpit notes 2026-09-17","sources":["documentation:mary-tarpit"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:accident","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#complexity-divided","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:cleverness","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#complexity-divided","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:complexity","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#complexity-divided","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:complexity","relation":"related_to","to":"concept:accident","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:complexity","relation":"related_to","to":"concept:cleverness","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:complexity","relation":"related_to","to":"concept:essence","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:essence","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#complexity-divided","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:layers","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#the-layers","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:layers","relation":"related_to","to":"concept:tarpit","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:tarpit","relation":"documented_in","to":"documentation_section:docs:mary-tarpit#the-tar-pit","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"concept:tarpit","relation":"related_to","to":"concept:complexity","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:accident","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:cleverness","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:complexity","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:essence","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:layers","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"concept:tarpit","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"documentation_section:docs:mary-tarpit#complexity-divided","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"documentation_section:docs:mary-tarpit#the-layers","sources":["documentation:mary-tarpit"],"metadata":[]},
+    {"from":"version:tarpit:notes-2026-09-17","relation":"contains","to":"documentation_section:docs:mary-tarpit#the-tar-pit","sources":["documentation:mary-tarpit"],"metadata":[]}
+  ]
+}

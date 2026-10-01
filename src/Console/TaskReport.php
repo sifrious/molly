@@ -23,7 +23,7 @@ class TaskReport
         if ($task->nickname !== null) {
             note('Task ID: '.$task->id);
         }
-        note($task->prompt);
+        note($task->redactedPrompt());
         note('Workspace: '.$task->workspace);
         note('Required test: '.$task->test_path.($task->allow_test_edits ? ' (writable for this task)' : ' (protected)'));
         if ($task->test_digest) {
@@ -61,11 +61,28 @@ class TaskReport
         if ($task->status === 'running' && $task->stop_requested_at !== null) {
             note('Stop requested. Molly will stop at the next execution boundary. An active model request or test process may finish first.');
         }
+        $scope = $task->allow_test_edits && is_array($task->source['scope']['files'] ?? null) ? $task->source['scope']['files'] : [];
+        if ($scope !== []) {
+            table(['File derived for the implementation'], array_map(fn (string $path): array => [$path], $scope));
+        }
         if ($task->relationLoaded('runs')) {
+            $check = $task->status === 'running' ? null : $task->latestAuthoredTest();
+            if ($check !== null) {
+                note('Authored test check: '.$check['classification'].' ('.($check['reason'] ?? 'no reason recorded').')');
+                foreach (Task::authoredTestProblems($check) as $problem) {
+                    warning($problem);
+                }
+            }
+            if ($check !== null) {
+                $next = $task->authoringNextStep($check);
+                note('Next: '.$next['reason'].' Run '.$next['command'].'.');
+            } elseif ($task->allow_test_edits && $task->runs->isNotEmpty() && $task->status !== 'running') {
+                note('Review '.$task->test_path.', then lock it with php artisan molly:lock-test '.$task->reference().' --approve.');
+            }
             if ($task->runs->isEmpty()) {
                 note('No runs yet. Start this task with php artisan molly:start '.$task->reference().'.');
             } else {
-                table(['Run', 'Status'], $task->runs->map(fn (Run $run): array => [$run->id, $run->status])->all());
+                table(['Run', 'Status', 'Target'], $task->runs->map(fn (Run $run): array => [$run->id, $run->status, isset($run->report['execution_target']['orb']['name']) ? 'orb '.$run->report['execution_target']['orb']['name'] : 'local'])->all());
                 note('Read a run report with php artisan molly:show RUN_ID.');
             }
         }

@@ -7,11 +7,12 @@ use RuntimeException;
 use Sifrious\Molly\Actions\ShowRun;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\intro;
 
 class MollyShowCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:show {run : Saved run ID} {--json : Print JSON only}';
 
     protected $description = 'Read a saved run report without rerunning the task';
@@ -24,7 +25,7 @@ class MollyShowCommand extends Command
                 throw new RuntimeException('RUN_NOT_FOUND: No saved run has that ID.');
             }
             if ($this->option('json')) {
-                $this->line(json_encode(['id' => $run->id, 'status' => $run->status, 'report' => $run->report], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson(['id' => $run->id, 'status' => $run->status, 'report' => $run->report]);
             } else {
                 intro('Saved Molly run');
                 $report->show($run, $this->output->isVerbose());
@@ -32,13 +33,7 @@ class MollyShowCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['id' => (string) $this->argument('run'), 'status' => 'error', 'report' => ['error' => $exception->getMessage()]], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['id' => (string) $this->argument('run'), 'status' => 'error', 'report' => ['error' => $exception->getMessage()]]);
         }
     }
 }

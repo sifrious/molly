@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Workspace\BindWorkspaceReference;
 use Sifrious\Molly\Workspace\ObserveCheckout;
 use Sifrious\Molly\Workspace\ProjectIdentity;
@@ -31,9 +33,9 @@ it('round-trips workspace reference json without treating path as id', function 
     $reference = new WorkspaceReference(
         project: ProjectIdentity::mint(),
         workspace: WorkspaceIdentity::mint(),
-        repositoryId: (string) Illuminate\Support\Str::uuid(),
+        repositoryId: (string) Str::uuid(),
         repositoryRemoteIdentity: 'github:sifrious/molly',
-        checkoutId: (string) Illuminate\Support\Str::uuid(),
+        checkoutId: (string) Str::uuid(),
         checkoutKind: 'clone',
         availability: 'available',
         currentPath: '/tmp/observed-path-only',
@@ -51,9 +53,9 @@ it('captures provenance only when available with a head', function () {
     $reference = new WorkspaceReference(
         project: ProjectIdentity::mint(),
         workspace: WorkspaceIdentity::mint(),
-        repositoryId: (string) Illuminate\Support\Str::uuid(),
+        repositoryId: (string) Str::uuid(),
         repositoryRemoteIdentity: null,
-        checkoutId: (string) Illuminate\Support\Str::uuid(),
+        checkoutId: (string) Str::uuid(),
         checkoutKind: 'clone',
         availability: 'ambiguous',
         currentPath: '/tmp/x',
@@ -63,19 +65,30 @@ it('captures provenance only when available with a head', function () {
     expect(fn () => Provenance::capture($reference))->toThrow(InvalidArgumentException::class);
 });
 
-it('observes git head from the Molly worktree without using path as identity', function () {
-    $obs = app(ObserveCheckout::class)->handle(base_path());
-    expect($obs['path'])->toBe(realpath(base_path()) ?: base_path())
-        ->and($obs['head'])->toMatch('/^[0-9a-f]{40}$/');
+it('observes git head from a checkout without using path as identity', function () {
+    // A temporary checkout, never the Testbench skeleton at base_path().
+    $checkout = sys_get_temp_dir().'/molly-observe-'.Str::uuid();
+    File::ensureDirectoryExists($checkout);
+    File::put($checkout.'/README.md', "Example\n");
+    $head = commitGitWorkspace($checkout);
 
-    $bound = app(BindWorkspaceReference::class)->handle(base_path());
-    expect($bound->availability)->toBe('available')
-        ->and($bound->head?->sha)->toBe($obs['head'])
-        ->and($bound->workspace->id)->not->toBe($bound->currentPath)
-        ->and($bound->project->id)->not->toBe($bound->currentPath);
+    try {
+        $obs = app(ObserveCheckout::class)->handle($checkout);
+        expect($obs['path'])->toBe($checkout)
+            ->and($obs['head'])->toBe($head);
 
-    $again = app(BindWorkspaceReference::class)->handle(base_path());
-    // Fresh mint each bind until a registry exists — path never becomes the id.
-    expect($again->workspace->id)->not->toBe($bound->workspace->id)
-        ->and($again->currentPath)->toBe($bound->currentPath);
+        $bound = app(BindWorkspaceReference::class)->handle($checkout);
+        expect($bound->availability)->toBe('available')
+            ->and($bound->head?->sha)->toBe($obs['head'])
+            ->and($bound->workspace->id)->not->toBe($bound->currentPath)
+            ->and($bound->project->id)->not->toBe($bound->currentPath);
+
+        $again = app(BindWorkspaceReference::class)->handle($checkout);
+        // The same checkout binds to the same stored IDs; the path is still never the ID.
+        expect($again->workspace->id)->toBe($bound->workspace->id)
+            ->and($again->project->id)->toBe($bound->project->id)
+            ->and($again->currentPath)->toBe($bound->currentPath);
+    } finally {
+        File::deleteDirectory($checkout);
+    }
 });

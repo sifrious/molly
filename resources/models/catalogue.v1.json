@@ -1,0 +1,352 @@
+{
+  "catalogue_version": "1.0.0",
+  "policy_version": "1.0.0",
+  "reviewed_at": "2026-09-28",
+  "review_by": "2027-03-28",
+  "runtimes": [
+    {
+      "runtime": "ollama",
+      "version": "0.34.4",
+      "platforms": ["macos-apple-silicon"],
+      "minimum_os_version": "14.0",
+      "source": "https://github.com/ollama/ollama/tree/v0.34.4",
+      "upstream_revision": "b2da9e468af2479058ae18c6d908ed29de410684",
+      "observed": {
+        "date": "2026-09-28",
+        "host": "Mac Studio Mac15,14, Apple M3 Ultra, 96 GB, macOS 27.0",
+        "application": "/Applications/Ollama.app",
+        "application_version": "0.34.4",
+        "minimum_system_version": "14.0",
+        "code_signing_team": "3MU9H2V9Y9",
+        "binary_sha256": "bba8b79eac84ab092b9568978c1116e6c950eda588961b14d8608ac683a2af0b",
+        "version_sources": ["ollama --version", "GET /api/version"]
+      }
+    }
+  ],
+  "entries": [
+    {
+      "identity": {
+        "model_id": "gpt-oss:20b",
+        "model_version": "2025-08-05",
+        "upstream_revision": "sha256:17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7"
+      },
+      "developer": {
+        "organization": "OpenAI",
+        "organization_country": "US",
+        "origin": "us-developed",
+        "origin_evidence": [
+          "https://openai.com/index/introducing-gpt-oss/",
+          "https://github.com/openai/gpt-oss"
+        ]
+      },
+      "artifact": {
+        "kind": "ollama-model",
+        "name": "gpt-oss:20b",
+        "source": "https://registry.ollama.ai/v2/library/gpt-oss/manifests/20b",
+        "digest_algorithm": "sha256",
+        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+        "size_bytes": 13793441244,
+        "weights": {
+          "digest": "e7b273f9636059a689e3ddcab3716e4f65abe0143ac978e46673ad0e52d09efb",
+          "size_bytes": 13793422144
+        },
+        "install": {
+          "method": "pull"
+        }
+      },
+      "license": {
+        "spdx_id": "Apache-2.0",
+        "version": "2.0",
+        "source": "https://huggingface.co/openai/gpt-oss-20b/blob/f81fef1ddd90d214968e951a76834f1ded130a18/LICENSE",
+        "usage_policy_source": "https://openai.com/policies/usage-policies/",
+        "commercial_use": "permitted",
+        "local_use": "permitted",
+        "redistribution": "permitted",
+        "hosted_commercial_use": "permitted",
+        "notice_requirements": [
+          "Provide recipients a copy of Apache License 2.0.",
+          "Mark modified files with prominent change notices.",
+          "Retain applicable copyright, patent, trademark, and attribution notices.",
+          "Include applicable NOTICE attributions when a NOTICE file is distributed."
+        ],
+        "constraints": [
+          "Apache License 2.0 terms apply.",
+          "OpenAI usage policies apply to use of the model.",
+          "No trademark rights are granted beyond describing origin and reproducing notices."
+        ]
+      },
+      "runtime_compatibility": [
+        {
+          "runtime": "ollama",
+          "version_constraint": "0.34.4",
+          "platforms": ["macos-apple-silicon"],
+          "requirements": ["metal"]
+        }
+      ],
+      "hardware": {
+        "minimum_memory_bytes": 17179869184,
+        "recommended_memory_bytes": 25769803776,
+        "requirements": [
+          "At least 16 GiB of unified memory. OpenAI states that gpt-oss-20b runs within 16 GB of memory.",
+          "Apple silicon with Metal, so Ollama runs the model on the GPU."
+        ],
+        "recommended": [
+          "24 GiB or more of unified memory, so the model, macOS, Bloom, and Molly fit together within molly.memory.headroom_gb."
+        ]
+      },
+      "capabilities": {
+        "context_window_tokens": 131072,
+        "harmony_format": true,
+        "tool_calling": true,
+        "function_calling": true,
+        "structured_outputs": true
+      },
+      "execution_modes": {
+        "local": "permitted",
+        "byo_cloud": "permitted",
+        "harness_managed_cloud": "permitted"
+      },
+      "review": {
+        "reviewed_at": "2026-09-28",
+        "evidence": [
+          "https://openai.com/index/introducing-gpt-oss/",
+          "https://huggingface.co/openai/gpt-oss-20b/blob/f81fef1ddd90d214968e951a76834f1ded130a18/LICENSE",
+          "https://ollama.com/library/gpt-oss",
+          "https://github.com/ollama/ollama/tree/v0.34.4"
+        ],
+        "observed": {
+          "date": "2026-09-28",
+          "host": "Mac Studio Mac15,14, Apple M3 Ultra, 96 GB, macOS 27.0",
+          "sources": ["GET /api/tags", "POST /api/show", "ollama show --modelfile gpt-oss:20b"],
+          "runtime_version": "0.34.4",
+          "parameter_size": "20.9B",
+          "quantization": "MXFP4",
+          "config_digest": "776beb3adb235076157cfea408b8ea2a2d25eae99d7f5da997f607f6b69fa0fa",
+          "license_layer_digest": "f60356777647e927149cbd4c0ec1314a90caba9400ad205ddc4ce47ed001c2d6"
+        }
+      },
+      "admission": {
+        "decision": "approved",
+        "rejection_reasons": []
+      }
+    },
+    {
+      "identity": {
+        "model_id": "gpt-oss:120b-code",
+        "model_version": "2025-08-05",
+        "upstream_revision": "sha256:a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9"
+      },
+      "developer": {
+        "organization": "OpenAI",
+        "organization_country": "US",
+        "origin": "us-developed",
+        "origin_evidence": [
+          "https://openai.com/index/introducing-gpt-oss/",
+          "https://github.com/openai/gpt-oss"
+        ]
+      },
+      "artifact": {
+        "kind": "ollama-model",
+        "name": "gpt-oss:120b-code",
+        "source": "https://registry.ollama.ai/v2/library/gpt-oss/manifests/120b",
+        "digest_algorithm": "sha256",
+        "digest": "4dda6ee4a98ead297f4cdeae389ecdc1963ed4cad90b10c8a11e1cc2a7b0fcaf",
+        "size_bytes": 65369818623,
+        "weights": {
+          "digest": "6be6d66a3f546d8c19b130dc41dc24b2fc159f84ffbc76a0ee0676205083cf5a",
+          "size_bytes": 65369799840
+        },
+        "install": {
+          "method": "derive",
+          "from": {
+            "name": "gpt-oss:120b",
+            "digest": "a951a23b46a1f6093dafee2ea481d634b4e31ac720a8a16f3f91e04f5a40ecd9",
+            "size_bytes": 65369818941
+          },
+          "parameters": {
+            "num_ctx": 65536,
+            "temperature": 1
+          }
+        }
+      },
+      "license": {
+        "spdx_id": "Apache-2.0",
+        "version": "2.0",
+        "source": "https://huggingface.co/openai/gpt-oss-120b/blob/main/LICENSE",
+        "usage_policy_source": "https://openai.com/policies/usage-policies/",
+        "commercial_use": "permitted",
+        "local_use": "permitted",
+        "redistribution": "permitted",
+        "hosted_commercial_use": "permitted",
+        "notice_requirements": [
+          "Provide recipients a copy of Apache License 2.0.",
+          "Mark modified files with prominent change notices.",
+          "Retain applicable copyright, patent, trademark, and attribution notices.",
+          "Include applicable NOTICE attributions when a NOTICE file is distributed."
+        ],
+        "constraints": [
+          "Apache License 2.0 terms apply.",
+          "OpenAI usage policies apply to use of the model.",
+          "No trademark rights are granted beyond describing origin and reproducing notices."
+        ]
+      },
+      "runtime_compatibility": [
+        {
+          "runtime": "ollama",
+          "version_constraint": "0.34.4",
+          "platforms": ["macos-apple-silicon"],
+          "requirements": ["metal"]
+        }
+      ],
+      "hardware": {
+        "minimum_memory_bytes": 103079215104,
+        "recommended_memory_bytes": 103079215104,
+        "requirements": [
+          "At least 96 GiB of unified memory. The weights alone are 65.4 GB, and OpenAI states that gpt-oss-120b runs on a single 80 GB GPU.",
+          "Apple silicon with Metal, so Ollama runs the model on the GPU."
+        ],
+        "recommended": [
+          "96 GiB or more of unified memory, so the model, a 65,536-token context, macOS, Bloom, and Molly fit together within molly.memory.headroom_gb."
+        ]
+      },
+      "capabilities": {
+        "context_window_tokens": 131072,
+        "harmony_format": true,
+        "tool_calling": true,
+        "function_calling": true,
+        "structured_outputs": true
+      },
+      "execution_modes": {
+        "local": "permitted",
+        "byo_cloud": "permitted",
+        "harness_managed_cloud": "permitted"
+      },
+      "review": {
+        "reviewed_at": "2026-09-28",
+        "evidence": [
+          "https://openai.com/index/introducing-gpt-oss/",
+          "https://huggingface.co/openai/gpt-oss-120b/blob/main/LICENSE",
+          "https://ollama.com/library/gpt-oss",
+          "https://github.com/ollama/ollama/tree/v0.34.4"
+        ],
+        "observed": {
+          "date": "2026-09-28",
+          "host": "Mac Studio Mac15,14, Apple M3 Ultra, 96 GB, macOS 27.0",
+          "sources": ["GET /api/tags", "POST /api/show", "ollama show --modelfile gpt-oss:120b-code"],
+          "runtime_version": "0.34.4",
+          "parent_model": "gpt-oss:120b",
+          "parameter_size": "116.8B",
+          "modelfile_parameters": "PARAMETER num_ctx 65536, PARAMETER temperature 1",
+          "config_digest": "7aad01099eab124f00149cf495d5226b2fa9d3e297553c7b7cce5598d54d5b3d",
+          "params_layer_digest": "b0e39b74c4585f1133b706dae9c7fa37d5770e011f0eddf5dcdb8ff850c48c58",
+          "license_layer_digest": "f60356777647e927149cbd4c0ec1314a90caba9400ad205ddc4ce47ed001c2d6"
+        }
+      },
+      "admission": {
+        "decision": "approved",
+        "rejection_reasons": []
+      }
+    },
+    {
+      "identity": {
+        "model_id": "qwen2.5-coder:7b",
+        "model_version": "2.5",
+        "upstream_revision": "sha256:dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364"
+      },
+      "developer": {
+        "organization": "Qwen team, Alibaba Cloud",
+        "organization_country": "CN",
+        "origin": "non-us-developed",
+        "origin_evidence": [
+          "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+          "https://ollama.com/library/qwen2.5-coder"
+        ]
+      },
+      "artifact": {
+        "kind": "ollama-model",
+        "name": "qwen2.5-coder:7b",
+        "source": "https://registry.ollama.ai/v2/library/qwen2.5-coder/manifests/7b",
+        "digest_algorithm": "sha256",
+        "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+        "size_bytes": 4683087561,
+        "weights": {
+          "digest": "60e05f2100071479f596b964f89f510f057ce397ea22f2833a0cfe029bfc2463",
+          "size_bytes": 4683074048
+        },
+        "install": {
+          "method": "pull"
+        }
+      },
+      "license": {
+        "spdx_id": "Apache-2.0",
+        "version": "2.0",
+        "source": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct/blob/main/LICENSE",
+        "usage_policy_source": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+        "commercial_use": "permitted",
+        "local_use": "permitted",
+        "redistribution": "permitted",
+        "hosted_commercial_use": "permitted",
+        "notice_requirements": [
+          "Provide recipients a copy of Apache License 2.0.",
+          "Retain applicable copyright, patent, trademark, and attribution notices."
+        ],
+        "constraints": [
+          "Apache License 2.0 terms apply."
+        ]
+      },
+      "runtime_compatibility": [
+        {
+          "runtime": "ollama",
+          "version_constraint": "0.34.4",
+          "platforms": ["macos-apple-silicon"],
+          "requirements": ["metal"]
+        }
+      ],
+      "hardware": {
+        "minimum_memory_bytes": 8589934592,
+        "recommended_memory_bytes": 17179869184,
+        "requirements": [
+          "At least 8 GiB of unified memory."
+        ],
+        "recommended": [
+          "16 GiB or more of unified memory."
+        ]
+      },
+      "capabilities": {
+        "context_window_tokens": 32768,
+        "harmony_format": false,
+        "tool_calling": true,
+        "function_calling": true,
+        "structured_outputs": true
+      },
+      "execution_modes": {
+        "local": "permitted",
+        "byo_cloud": "permitted",
+        "harness_managed_cloud": "permitted"
+      },
+      "review": {
+        "reviewed_at": "2026-09-28",
+        "evidence": [
+          "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+          "https://ollama.com/library/qwen2.5-coder"
+        ],
+        "observed": {
+          "date": "2026-09-28",
+          "host": "Mac Studio Mac15,14, Apple M3 Ultra, 96 GB, macOS 27.0",
+          "sources": ["GET /api/tags", "POST /api/show"],
+          "runtime_version": "0.34.4",
+          "parameter_size": "7.6B",
+          "quantization": "Q4_K_M",
+          "license_layer_digest": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e"
+        }
+      },
+      "admission": {
+        "decision": "rejected",
+        "rejection_reasons": [
+          "origin_not_us_developed",
+          "developer_organization_not_us"
+        ]
+      }
+    }
+  ]
+}

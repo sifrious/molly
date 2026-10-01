@@ -1,0 +1,137 @@
+<?php
+
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Symfony\Component\Console\Output\BufferedOutput;
+
+/*
+ * These tests go through Artisan and the container binding for
+ * BootstrapProjectKnowledgeGraphs. Nothing here injects a hand-built bootstrap.
+ */
+
+beforeEach(function (): void {
+    $this->mollyHome = sys_get_temp_dir().'/molly-home-'.Str::uuid();
+    File::ensureDirectoryExists($this->mollyHome);
+    putenv('MOLLY_HOME='.$this->mollyHome);
+    $_ENV['MOLLY_HOME'] = $this->mollyHome;
+
+    $this->knowledgeDatabase = sys_get_temp_dir().'/molly-knowledge-'.Str::uuid().'.sqlite';
+    config()->set('molly.knowledge.database', $this->knowledgeDatabase);
+
+    $this->laravelRoot = sys_get_temp_dir().'/molly-init-'.Str::uuid();
+    File::ensureDirectoryExists($this->laravelRoot.'/vendor/sifrious/molly');
+    File::put($this->laravelRoot.'/artisan', "#!/usr/bin/env php\n<?php\n");
+    File::put($this->laravelRoot.'/composer.json', json_encode([
+        'name' => 'example/app',
+        'require' => ['laravel/framework' => '^12.0'],
+    ], JSON_PRETTY_PRINT));
+    commitGitWorkspace($this->laravelRoot);
+});
+
+afterEach(function (): void {
+    File::deleteDirectory($this->mollyHome);
+    File::deleteDirectory($this->laravelRoot);
+    foreach (['', '-wal', '-shm'] as $suffix) {
+        File::delete($this->knowledgeDatabase.$suffix);
+    }
+    putenv('MOLLY_HOME');
+    unset($_ENV['MOLLY_HOME']);
+});
+
+function writeInitLock(string $root, array $packages): void
+{
+    File::put($root.'/composer.lock', json_encode(['packages' => $packages, 'packages-dev' => []], JSON_PRETTY_PRINT));
+}
+
+function registeredPaths(string $home): array
+{
+    $index = $home.'/projects.json';
+
+    return is_file($index) ? (json_decode(File::get($index), true) ?: []) : [];
+}
+
+it('runs molly:project-init with the container bootstrap and registers the project after the graphs are built', function (): void {
+    writeInitLock($this->laravelRoot, [['name' => 'laravel/framework', 'version' => 'v12.0.0']]);
+
+    $exit = Artisan::call('molly:project-init', [
+        'path' => $this->laravelRoot,
+        '--no-composer' => true,
+        '--json' => true,
+    ]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    $root = str_replace('\\', '/', realpath($this->laravelRoot));
+    expect($exit)->toBe(0)
+        ->and($payload['status'])->toBe('initialized')
+        ->and($payload['graphs']['ok'])->toBeTrue()
+        ->and($payload['graphs']['laravel_exact'])->toBe('12.0.0')
+        ->and(File::exists($this->laravelRoot.'/.molly/graphs/manifest.json'))->toBeTrue()
+        ->and(File::exists($this->laravelRoot.'/.molly/project.json'))->toBeTrue()
+        ->and(registeredPaths($this->mollyHome))->toContain($root);
+
+    $steps = $payload['steps'];
+    $graphsDone = array_key_last(array_filter($steps, fn (string $step): bool => str_starts_with($step, 'graphs')));
+    $registered = array_key_first(array_filter($steps, fn (string $step): bool => str_starts_with($step, 'register')));
+    expect($registered)->toBeGreaterThan($graphsDone);
+});
+
+it('does not register a project when molly:project-init fails during the graph bootstrap', function (): void {
+    writeInitLock($this->laravelRoot, [['name' => 'some/other', 'version' => '1.0.0']]);
+
+    $exit = Artisan::call('molly:project-init', [
+        'path' => $this->laravelRoot,
+        '--no-composer' => true,
+        '--json' => true,
+    ]);
+    $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($exit)->toBe(1)
+        ->and($payload['status'])->toBe('error')
+        ->and($payload['error'])->toContain('LARAVEL_VERSION_MISSING')
+        ->and(File::exists($this->laravelRoot.'/.molly/project.json'))->toBeFalse()
+        ->and(registeredPaths($this->mollyHome))->toBe([]);
+});
+
+it('runs molly:project-new with the container bootstrap', function (): void {
+    // Replacing a directory the HEAD commit already tracks, so Molly can attach the new app right away.
+    $parent = sys_get_temp_dir().'/molly-new-'.Str::uuid();
+    $target = $parent.'/app';
+    File::ensureDirectoryExists($target);
+    File::put($target.'/README.md', "# app\n");
+    commitGitWorkspace($parent);
+
+    try {
+        $exit = Artisan::call('molly:project-new', [
+            'path' => $target,
+            '--force' => true,
+            '--no-composer' => true,
+            '--no-migrate' => true,
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exit)->toBe(0)
+            ->and($payload['status'])->toBe('created')
+            ->and($payload['project']['source'])->toBe('new')
+            ->and(File::exists($target.'/.molly/graphs/manifest.json'))->toBeTrue()
+            ->and(registeredPaths($this->mollyHome))->toContain(str_replace('\\', '/', realpath($target)));
+    } finally {
+        File::deleteDirectory($parent);
+    }
+});
+
+it('prints every step and the result when molly:project-init migrates the application it runs in', function (): void {
+    writeInitLock($this->laravelRoot, [['name' => 'laravel/framework', 'version' => 'v12.0.0']]);
+    // Run init in the application itself, so migrations go through a nested Artisan::call.
+    app()->setBasePath(str_replace('\\', '/', realpath($this->laravelRoot)));
+
+    $exit = Artisan::call('molly:project-init', ['--no-composer' => true], $buffer = new BufferedOutput);
+    $output = $buffer->fetch();
+
+    expect($exit)->toBe(0)
+        ->and($output)->toContain('[migrate] Running migrations')
+        ->and($output)->toContain('[graphs] Knowledge graphs ready (Laravel 12.0.0)')
+        ->and($output)->toContain('[register] Wrote .molly/project.json and registered globally')
+        ->and($output)->toContain('Molly is initialized in '.base_path());
+});

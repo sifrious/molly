@@ -3,7 +3,6 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\Validator;
-use Laravel\Ai\Responses\StructuredAgentResponse;
 use RuntimeException;
 use Sifrious\Molly\Agents\AmpResponse;
 use Sifrious\Molly\Agents\ChangeWriter;
@@ -18,20 +17,25 @@ class GenerateChanges
         private CollectTarpitKnowledge $tarpit,
         private AmpResponse $amp,
         private PestTestAuthoring $pestTestAuthoring,
+        private LocalOllama $ollama,
     ) {}
 
     /**
      * @param  array<string, string|null>  $files
      * @param  array<string, mixed>|null  $previousAttempt
+     * @param  array<string, string|null>  $readOnlyFiles  context the model may read but not change, such as tests/Pest.php
+     * @param  array<string, string|null>|null  $livewire  the workspace's Livewire layout, from LivewireLayout::toArray()
      * @return array{summary: string, files: list<array{path: string, content: string}>}
      */
-    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null, bool $allowTestEdits = false, ?string $testDigest = null): array
+    public function handle(string $prompt, array $files, string $testPath, ?array $previousAttempt = null, bool $allowTestEdits = false, ?string $testDigest = null, array $readOnlyFiles = [], ?array $livewire = null): array
     {
         $input = json_encode([
             'task' => $prompt,
             'allowed_files' => $files,
             'required_test' => $testPath,
             'protected_test' => ['path' => $testPath, 'digest' => $testDigest, 'writable' => $allowTestEdits],
+            ...($readOnlyFiles === [] ? [] : ['read_only_files' => $readOnlyFiles]),
+            ...($livewire === null ? [] : ['livewire' => $livewire]),
             'laravel_knowledge' => $this->knowledge->handle($prompt, $files, $testPath),
             'nativephp_knowledge' => $this->nativephp->handle($prompt, $files, $testPath),
             'tarpit_knowledge' => $this->tarpit->handle($prompt, $files, $testPath),
@@ -46,20 +50,20 @@ class GenerateChanges
         );
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * ChangeWriter::make() resolves through the container, so an application
+     * can bind a ChangeWriter subclass. validateProposal() still applies.
+     *
+     * @return array<string, mixed>
+     */
     private function acquireProposal(string $input): array
     {
         if (config('molly.agent', 'ollama') === 'amp') {
-            return $this->amp->prompt(new ChangeWriter, $input);
+            return $this->amp->prompt(ChangeWriter::make(), $input);
         }
 
         if (config('molly.agent', 'ollama') === 'ollama') {
-            LocalOllama::validate();
-            $response = ChangeWriter::make()->prompt(
-                $input, provider: 'ollama', model: config('molly.model'), timeout: config('molly.timeout'),
-            );
-
-            return $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+            return $this->ollama->prompt(ChangeWriter::make(), $input);
         }
 
         throw new RuntimeException('AGENT_INVALID: Choose amp or ollama for molly.agent.');

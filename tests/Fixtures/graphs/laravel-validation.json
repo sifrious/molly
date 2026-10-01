@@ -1,0 +1,22 @@
+{
+  "namespace": "laravel",
+  "version": "13",
+  "sources": [
+    {"ref":"documentation:validation","title":"Laravel 13 validation","location":"https://github.com/laravel/docs/blob/b94b890362111c44de223e09502c610a9d9f20d8/validation.md","revision":"b94b890362111c44de223e09502c610a9d9f20d8","digest":"a14de7da35e6cdd26f87a9b3529322dcac3544925353d0792c201bb98e2a03e6","metadata":{"path":"sources/laravel-validation.md","retrieved_at":"2026-09-17"}},
+    {"ref":"framework_source:Illuminate\\Validation\\Validator","title":"Illuminate\\Validation\\Validator","location":"vendor/laravel/framework/src/Illuminate/Validation/Validator.php","revision":"13","metadata":{"installed_version":"13","package":"laravel/framework","package_path":"src/Illuminate/Validation/Validator.php","symbol":"Illuminate\\Validation\\Validator"}}
+  ],
+  "nodes": [
+    {"ref":"class:Illuminate\\Validation\\Validator","label":"Validator","sources":["framework_source:Illuminate\\Validation\\Validator"],"metadata":{"symbol":"Illuminate\\Validation\\Validator"}},
+    {"ref":"concept:validation","label":"Validation","sources":["documentation:validation"],"metadata":[]},
+    {"ref":"documentation_section:docs:validation#introduction","label":"Introduction","sources":["documentation:validation"],"metadata":{"heading_level":2}},
+    {"ref":"documentation_section:docs:validation#writing-the-validation-logic","label":"Writing the Validation Logic","sources":["documentation:validation"],"metadata":{"heading_level":3}},
+    {"ref":"version:laravel:13","label":"Laravel 13","sources":["documentation:validation"],"metadata":[]}
+  ],
+  "edges": [
+    {"from":"concept:validation","relation":"documented_in","to":"documentation_section:docs:validation#introduction","sources":["documentation:validation"],"metadata":[]},
+    {"from":"concept:validation","relation":"uses","to":"class:Illuminate\\Validation\\Validator","sources":["framework_source:Illuminate\\Validation\\Validator"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"concept:validation","sources":["documentation:validation"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:validation#introduction","sources":["documentation:validation"],"metadata":[]},
+    {"from":"version:laravel:13","relation":"contains","to":"documentation_section:docs:validation#writing-the-validation-logic","sources":["documentation:validation"],"metadata":[]}
+  ]
+}

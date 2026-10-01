@@ -6,12 +6,13 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\RecommendTaskNextStep;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyAdviceCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:advice {task : Saved task name or ID} {--json : Print JSON only}';
 
     protected $description = 'Explain the next step for a saved task without executing it';
@@ -21,7 +22,7 @@ class MollyAdviceCommand extends Command
         try {
             $advice = $action->handle((string) $this->argument('task'));
             if ($this->option('json')) {
-                $this->line(json_encode($advice, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($advice);
             } else {
                 note('Task '.$advice['task_reference'].' / '.$advice['observed']['task_status']);
                 note($advice['reason']);
@@ -42,13 +43,7 @@ class MollyAdviceCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['task' => (string) $this->argument('task'), 'status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['task' => (string) $this->argument('task'), 'status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

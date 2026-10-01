@@ -6,13 +6,14 @@ use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Sifrious\Molly\Models\Task;
 use Sifrious\Molly\Workspace;
+use Sifrious\Molly\Workspace\Directory;
 
 class RestoreTaskBaseline
 {
     public function store(Task $task, array $files): void
     {
         $path = $this->path($task);
-        File::ensureDirectoryExists(dirname($path), 0700);
+        Directory::ensure(dirname($path), 0700);
         $payload = json_encode([
             'task_id' => $task->id,
             'workspace' => $task->workspace,
@@ -22,6 +23,24 @@ class RestoreTaskBaseline
             throw new RuntimeException('BASELINE_UNWRITABLE: Molly could not store the task baseline.');
         }
         chmod($path, 0600);
+    }
+
+    /**
+     * Replace some files in the recorded baseline and keep the rest. Without
+     * a usable baseline this records nothing, so a retry still stops with
+     * BASELINE_MISSING or BASELINE_INVALID.
+     *
+     * @param  array<string, string|null>  $files
+     */
+    public function merge(Task $task, array $files): void
+    {
+        $path = $this->path($task);
+        $payload = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        if (! is_array($payload) || ($payload['task_id'] ?? null) !== $task->id || ! is_array($payload['files'] ?? null)) {
+            return;
+        }
+
+        $this->store($task, [...$payload['files'], ...$files]);
     }
 
     public function handle(Task $task): void
@@ -49,13 +68,13 @@ class RestoreTaskBaseline
 
                 continue;
             }
-            File::ensureDirectoryExists(dirname($absolute));
+            Directory::ensure(dirname($absolute));
             File::replace($absolute, $contents, is_file($absolute) ? fileperms($absolute) & 0777 : 0644);
         }
     }
 
     private function path(Task $task): string
     {
-        return $task->workspace.'/.molly/baselines/'.$task->id.'.json';
+        return Directory::molly($task->workspace, 'baselines/'.$task->id.'.json');
     }
 }

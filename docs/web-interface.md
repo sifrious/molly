@@ -20,6 +20,8 @@ php artisan serve --host=127.0.0.1 --port=8000
 
 Open `http://127.0.0.1:8000/molly`. The route prefix is `molly.ui.prefix` in `config/molly.php`.
 
+`--port=8000` tells `serve` to use only port 8000. If another program holds it, `serve` prints `Failed to listen on 127.0.0.1:8000 (reason: Address already in use)` and exits with status 1. Leave out `--port` and `serve` moves to the next free port and prints the address it chose. Molly itself opens no port; see [The port is already in use](troubleshooting.md#the-port-is-already-in-use).
+
 Molly accepts requests only in the `local` and `testing` environments and only from `localhost`, `127.0.0.1`, or `[::1]`. A custom development domain, a tunnel, or a remote client gets a 403.
 
 ## The pages
@@ -55,9 +57,9 @@ If no run appears, check `php artisan queue:failed` and the worker output before
 
 ### Queue requirements
 
-Web and MCP starts work with the database, Redis, Beanstalkd, and SQS drivers. The reservation time (or the SQS visibility timeout) must be longer than 3600 seconds, Molly's job timeout; `3700` is the documented value for `retry_after`. The sync, deferred, null, and failover drivers are rejected.
+Web and MCP starts work with the database, Redis, Beanstalkd, and SQS drivers. The reservation time (or the SQS visibility timeout) must be longer than 3600 seconds, Molly's job timeout; `3700` is the documented value for `retry_after`. The sync, deferred, null, and failover drivers are rejected with `QUEUE_DRIVER_UNSUPPORTED`, and a `retry_after` of 3600 or less with `QUEUE_RETRY_AFTER_TOO_SHORT`. Both messages name the queue connection.
 
-With SQLite and more than one worker on PHP 8.4 or later, set `transaction_mode` to `IMMEDIATE` and `busy_timeout` to `10000` on the connection. On PHP 8.3, use one worker. Molly does not change your database settings.
+With SQLite and more than one worker on PHP 8.4 or later, set `transaction_mode` to `IMMEDIATE` and `busy_timeout` to `10000` on the connection. Two workers on a SQLite queue need PHP 8.4 or later: Laravel ignores `transaction_mode` on PHP 8.3, and the workers fail each other with `database is locked`. On PHP 8.3, `molly:worker start` refuses a second worker in the workspace with `WORKER_CONCURRENCY_UNSUPPORTED` and starts nothing. Use one worker there, or a MySQL or PostgreSQL queue database. Molly does not change your database settings.
 
 Starting a task from Artisan needs no worker.
 

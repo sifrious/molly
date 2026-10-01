@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # Mac-local release gates for sifrious/molly (MME-5399).
+# With --docs, run only the documentation gate.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+echo "==> documentation links, required alpha docs, and open alpha requirements"
+python3 bin/molly-docs-check --release
+if [ "${1:-}" = "--docs" ]; then
+  echo "DOCUMENTATION GATE PASSED"
+  exit 0
+fi
 PHP="${PHP_BINARY:-$(command -v php)}"
 echo "==> PHP: $($PHP -v | head -1)"
 echo "==> composer validate --strict"
@@ -14,9 +21,12 @@ composer audit --locked
 echo "==> package tests"
 ./vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning
 echo "==> archive inspect"
-composer archive --format=zip --file=/tmp/molly-release-archive
-unzip -l /tmp/molly-release-archive.zip | head -40
-if unzip -l /tmp/molly-release-archive.zip | grep -q 'composer.lock'; then
+# composer archive writes --file relative to --dir, so an absolute --file lands inside the package.
+ARCHIVE_DIR="$(mktemp -d)"
+trap 'rm -rf "$ARCHIVE_DIR"' EXIT
+composer archive --format=zip --dir="$ARCHIVE_DIR" --file=molly-release-archive
+unzip -l "$ARCHIVE_DIR/molly-release-archive.zip" | head -40
+if unzip -l "$ARCHIVE_DIR/molly-release-archive.zip" | grep -q 'composer.lock'; then
   echo "FAIL: composer.lock must stay out of the package archive" >&2
   exit 1
 fi

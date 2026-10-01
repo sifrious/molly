@@ -1,40 +1,82 @@
 #!/usr/bin/env bash
-# Registers Molly's Bloom plugin manifest + Surfaces.bundle into Application Support and enables it.
+# Install Molly's Bloom plugin: copy plugin.json and Surfaces.bundle into Bloom's plugin folder
+# and add sifrious.molly to enabled.json. Safe to run again; each run replaces the installed copy.
+#
+# Environment:
+#   BLOOM_APP          Bloom app bundle to check for (default: first of Bloom Dev.app, Bloom.app
+#                      in ~/Applications and /Applications)
+#   BLOOM_PLUGINS_DIR  Plugin root (default: ~/Library/Application Support/Bloom/Plugins)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PLUGIN_ID="sifrious.molly"
 SRC_MANIFEST="$ROOT/bloom-plugin/plugin.json"
 SRC_SURFACES="$ROOT/bloom-plugin/Surfaces.bundle"
-DEST_DIR="${HOME}/Library/Application Support/Bloom/Plugins/sifrious.molly"
-ENABLED="${HOME}/Library/Application Support/Bloom/Plugins/enabled.json"
+PLUGINS_DIR="${BLOOM_PLUGINS_DIR:-$HOME/Library/Application Support/Bloom/Plugins}"
+DEST_DIR="$PLUGINS_DIR/$PLUGIN_ID"
+ENABLED="$PLUGINS_DIR/enabled.json"
 
-if [[ ! -f "$SRC_MANIFEST" ]]; then
-  echo "Missing $SRC_MANIFEST" >&2
+fail() {
+  echo "molly-bloom-plugin-register: $*" >&2
   exit 1
+}
+
+if [[ -n "${BLOOM_APP:-}" ]]; then
+  [[ -d "$BLOOM_APP" ]] || fail "BLOOM_APP is set to $BLOOM_APP, but no app exists there."
+  APP="$BLOOM_APP"
+else
+  APP=""
+  for candidate in "$HOME/Applications/Bloom Dev.app" "$HOME/Applications/Bloom.app" "/Applications/Bloom Dev.app" "/Applications/Bloom.app"; do
+    if [[ -d "$candidate" ]]; then
+      APP="$candidate"
+      break
+    fi
+  done
+  [[ -n "$APP" ]] || fail "Bloom is not installed. Looked for Bloom Dev.app and Bloom.app in ~/Applications and /Applications. Install Bloom, or set BLOOM_APP to its path, then run this again."
 fi
-if [[ ! -d "$SRC_SURFACES" ]]; then
-  echo "Missing $SRC_SURFACES — run bloom-plugin/Surfaces/build-bundle.sh first" >&2
-  exit 1
+
+[[ -f "$SRC_MANIFEST" ]] || fail "Missing $SRC_MANIFEST."
+[[ -f "$SRC_SURFACES/Contents/Info.plist" && -f "$SRC_SURFACES/Contents/MacOS/MollySurfaces" ]] \
+  || fail "Missing $SRC_SURFACES. Build it with bloom-plugin/Surfaces/build-bundle.sh first."
+
+BUILT_AGAINST="$(/usr/libexec/PlistBuddy -c 'Print :MollyBuiltAgainstBloomCommit' "$SRC_SURFACES/Contents/Info.plist" 2>/dev/null || echo "not recorded")"
+HOST_COMMIT="$(/usr/libexec/PlistBuddy -c 'Print :BloomMasterCommit' "$APP/Contents/Info.plist" 2>/dev/null || echo "not recorded")"
+
+echo "Bloom app:            $APP"
+echo "Bloom host commit:    $HOST_COMMIT"
+echo "Bundle built against: $BUILT_AGAINST"
+if [[ "$HOST_COMMIT" != "not recorded" && "$BUILT_AGAINST" != "not recorded" && "$HOST_COMMIT" != "$BUILT_AGAINST"* && "$BUILT_AGAINST" != "$HOST_COMMIT"* ]]; then
+  echo "Note: the bundle was built against a different Bloom commit. It loads only if that Bloom exports the same BloomPluginAPI symbols."
 fi
 
 mkdir -p "$DEST_DIR"
 cp "$SRC_MANIFEST" "$DEST_DIR/plugin.json"
+echo "Copied plugin.json to $DEST_DIR/plugin.json"
 rm -rf "$DEST_DIR/Surfaces.bundle"
 cp -R "$SRC_SURFACES" "$DEST_DIR/Surfaces.bundle"
+echo "Copied Surfaces.bundle to $DEST_DIR/Surfaces.bundle"
 
-PLUGIN_ID="sifrious.molly" ENABLED_PATH="$ENABLED" python3 - <<'PY'
-import json, os, pathlib
+PLUGIN_ID="$PLUGIN_ID" ENABLED_PATH="$ENABLED" python3 - <<'PY'
+import json, os, pathlib, sys
 path = pathlib.Path(os.environ["ENABLED_PATH"])
-path.parent.mkdir(parents=True, exist_ok=True)
 plugin_id = os.environ["PLUGIN_ID"]
 ids = []
 if path.exists():
-    ids = json.loads(path.read_text())
-if plugin_id not in ids:
+    try:
+        ids = json.loads(path.read_text())
+    except json.JSONDecodeError as error:
+        sys.exit(f"molly-bloom-plugin-register: {path} is not valid JSON ({error}). Fix or remove it, then run this again.")
+    if not isinstance(ids, list):
+        sys.exit(f"molly-bloom-plugin-register: {path} must be a JSON array of plugin ids.")
+if plugin_id in ids:
+    print(f"{plugin_id} was already listed in {path}")
+else:
     ids.append(plugin_id)
-path.write_text(json.dumps(sorted(set(ids)), indent=2) + "\n")
-print(f"enabled {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(set(ids)), indent=2) + "\n")
+    print(f"Added {plugin_id} to {path}")
 PY
 
-echo "Installed Molly plugin manifest + Surfaces.bundle to $DEST_DIR"
-ls -la "$DEST_DIR"
-ls -la "$DEST_DIR/Surfaces.bundle/Contents/MacOS/"
+SHA="$(shasum -a 256 "$DEST_DIR/Surfaces.bundle/Contents/MacOS/MollySurfaces" | awk '{print $1}')"
+VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$DEST_DIR/plugin.json")"
+echo "Installed Molly plugin $VERSION (MollySurfaces sha256 $SHA)."
+echo "Quit and reopen Bloom to load it. Bloom reads plugins once at launch."

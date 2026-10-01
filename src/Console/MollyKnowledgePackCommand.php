@@ -6,13 +6,14 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\CollectRunKnowledge;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\intro;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 final class MollyKnowledgePackCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:knowledge:pack {prompt : Task prompt to inspect} {--file=* : Allowed file paths} {--test=tests/Feature/ExampleTest.php : Pest test path} {--json : Print JSON only}';
 
     protected $description = 'Show JIT Laravel context-pack query inputs, selected items, and selection reasons without running an agent';
@@ -33,7 +34,7 @@ final class MollyKnowledgePackCommand extends Command
             )->toArray();
 
             if ($this->option('json')) {
-                $this->line(json_encode($pack, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($pack);
 
                 return self::SUCCESS;
             }
@@ -60,13 +61,7 @@ final class MollyKnowledgePackCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

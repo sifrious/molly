@@ -6,12 +6,13 @@ use Illuminate\Console\Command;
 use Sifrious\Molly\Actions\FindTaskConnections;
 use Throwable;
 
-use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\table;
 
 class MollyConnectionsCommand extends Command
 {
+    use ReportsFailures;
+
     protected $signature = 'molly:connections {task : Saved task name or ID} {--stored : Read association history without contacting Amp} {--json : Print JSON only}';
 
     protected $description = 'Find Amp executors linked to a task, including prior associations';
@@ -21,7 +22,7 @@ class MollyConnectionsCommand extends Command
         try {
             $result = $find->handle((string) $this->argument('task'), ! $this->option('stored'));
             if ($this->option('json')) {
-                $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+                $this->writeJson($result);
             } else {
                 note($result['reason'] ?? 'Amp connection status observed.');
                 if ($result['matches'] !== []) {
@@ -39,13 +40,7 @@ class MollyConnectionsCommand extends Command
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
-            if ($this->option('json')) {
-                $this->line(json_encode(['status' => 'error', 'error' => $exception->getMessage()], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE));
-            } else {
-                error($exception->getMessage());
-            }
-
-            return self::FAILURE;
+            return $this->reportFailure($exception->getMessage(), ['status' => 'error', 'error' => $exception->getMessage()]);
         }
     }
 }

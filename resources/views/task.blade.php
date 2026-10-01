@@ -11,7 +11,7 @@
 <div class="actions"><flux:button type="submit" :loading="false">Save nickname</flux:button></div>
 </form>
 @if($task->stop_requested_at)<p>Stop requested at {{ $task->stop_requested_at }}.</p>@endif
-<h2>Prompt</h2><pre>{{ $task->prompt }}</pre>
+<h2>Prompt</h2><pre>{{ $task->redactedPrompt() }}</pre>
 <h2>Selected files</h2><ul>@foreach($task->paths as $path)<li><code>{{ $path }}</code></li>@endforeach</ul>
 @if($issue_url || $linked_pr)
 <h2>Source context</h2>
