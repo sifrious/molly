@@ -72,6 +72,15 @@ final class LifecycleLog
                 LifecycleEventType::Stopped => DisplayStatus::Stopped,
                 LifecycleEventType::Failed => DisplayStatus::Failed,
                 LifecycleEventType::Merged => DisplayStatus::Merged,
+                LifecycleEventType::CommandRequested,
+                LifecycleEventType::CommandStarted,
+                LifecycleEventType::CommandCompleted,
+                LifecycleEventType::CommandFailed,
+                LifecycleEventType::CheckRecorded,
+                LifecycleEventType::ArtifactRecorded,
+                LifecycleEventType::RecommendationRecorded,
+                LifecycleEventType::HandoffRequested,
+                LifecycleEventType::HandoffAcknowledged => $status,
             };
         }
 

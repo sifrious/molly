@@ -24,4 +24,13 @@ enum LifecycleEventType: string
     case Recovered = 'recovered';
     case HandedOff = 'handed_off';
     case StartRefused = 'start_refused';
+    case CommandRequested = 'command.requested';
+    case CommandStarted = 'command.started';
+    case CommandCompleted = 'command.completed';
+    case CommandFailed = 'command.failed';
+    case CheckRecorded = 'check.recorded';
+    case ArtifactRecorded = 'artifact.recorded';
+    case RecommendationRecorded = 'recommendation.recorded';
+    case HandoffRequested = 'handoff.requested';
+    case HandoffAcknowledged = 'handoff.acknowledged';
 }

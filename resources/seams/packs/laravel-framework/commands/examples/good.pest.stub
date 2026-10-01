@@ -1,0 +1,5 @@
+<?php
+
+it('reports application readiness', function () {
+    $this->artisan('readiness:check')->expectsOutput('Ready')->assertExitCode(0);
+});

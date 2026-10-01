@@ -168,6 +168,7 @@ it('encodes JSON in console code only for writeJson and for output that is not a
         'src/Console/MollyCheckCommand.php' => 1, // the check envelope, written to a file
         'src/Console/MollyInspectCommand.php' => 1, // a note for people without --json
         'src/Console/MollyPreflightCommand.php' => 2, // values in the table for people without --json
+        'src/Console/MollySeamCommand.php' => 1, // a note for people without --json
         'src/Console/MollySettingsCommand.php' => 1, // a note for people without --json
         'src/Console/RunReport.php' => 1, // a value in the report for people
         'src/Console/WritesJson.php' => 1,

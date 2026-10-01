@@ -220,3 +220,17 @@ Timeouts, size limits, the memory headroom, the attempt limit, parallel checks, 
 - [Settings](../settings.md) for the global file
 - [Commands](commands.md)
 - [Troubleshooting](../troubleshooting.md)
+
+## Seam instruction packs
+
+Publish `config/molly-seams.php` with `vendor:publish --tag=molly-seam-config`. These keys have no new environment variables.
+
+| Key | Default and purpose | Consumer |
+| --- | --- | --- |
+| `molly-seams.path` | `resources/molly/seams`, complete application packs relative to the workspace | `src/Seams/InstructionPacks.php` |
+| `molly-seams.max_file_bytes` | 262144, maximum instruction file size | `src/Seams/PackFiles.php` |
+| `molly-seams.max_pack_bytes` | 2097152, maximum total pack size | `src/Seams/InstructionPacks.php` |
+| `molly-seams.handlers` | Empty name-to-class map of trusted `StepHandler` implementations | `src/Seams/SeamSteps.php` |
+| `molly-seams.step_timeout` | 300 seconds, verification budget divided between bounded Pest invocations | `src/Actions/ExecuteSeamStep.php` |
+
+Seam policies use the existing `molly.verification.seam_<step>` keys, defaulting to required, and `molly.verification_actions.seam_<step>` failure actions. `src/Actions/DecideRunCompletion.php` resolves them when the revision is created. Ordinary pack edits cannot alter the frozen policy. The persistent queue and sandbox requirements remain in effect. See [Editable seam instructions](../seams.md).

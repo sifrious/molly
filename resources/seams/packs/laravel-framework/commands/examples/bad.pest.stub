@@ -1,0 +1,6 @@
+<?php
+
+// This does not invoke the registered command.
+it('reports application readiness', function () {
+    expect('Ready')->toBeString();
+});
