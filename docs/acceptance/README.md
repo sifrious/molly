@@ -151,6 +151,16 @@ Gate-level errors reject the whole run:
 | `MALFORMED_INDEX` | `index.json` has the wrong `schema` or no `records` list. |
 | `UNKNOWN_SUBCASE` | A record names a subcase the manifest does not have. |
 
+## Verifier permissions
+
+`php artisan molly:verify` is the M04 check runner. The gate still only reads evidence, and this command does not replace it or run the other stages.
+
+Screen Recording and Accessibility belong to the process that drives the Bloom UI. When either one is missing, a check that still needs that observation is `BLOCKED_VERIFIER_PERMISSION`. The M04 summary counts product failures, harness failures, and permission blocks separately, so those checks are not 16 Molly failures. `release_complete` stays false. A gate record for that check uses `BLOCKED`, not `FAIL`. `FAIL` is only `PRODUCT_FAIL`.
+
+The command asks macOS to show its normal permission dialog and can open the Screen Recording or Accessibility pane. It does not write the TCC database, and `permission_granted_by_cli` is true only when a later inspection reports the permission granted. `--permissionless` skips the request and still runs every check that does not need the permission. `--retry-native-ui` reruns the permission-blocked checks after you change the permission, and it refuses the saved evidence when the candidate SHA or the verifier environment differs.
+
+On a machine that is not a Mac, both permissions are `unsupported`. That is a property of the verifier environment. It is not a Molly product failure, and it is not a grant.
+
 ## Limitations
 
 - A record with `counts: null` skips the test-count checks unless the manifest marks the subcase `test_bearing: true`, in which case counts are required.
