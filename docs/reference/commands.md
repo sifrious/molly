@@ -204,9 +204,38 @@ php artisan clever:hotspots
 
 Each probe writes its section of `storage/molly/complexity/report.json` (or the path in `molly-complexity.report.path`). They are measurements, not a score, and they register only where Clever is enabled.
 
+## Acceptance verification
+
+`molly:verify` runs the M04 Bloom checks. It does not run the other 149 acceptance checks, and a finished M04 run does not close MME-5885.
+
+```bash
+php artisan molly:verify
+php artisan molly:verify --permissionless
+php artisan molly:verify --check-permissions
+php artisan molly:verify --retry-native-ui
+```
+
+The first command inspects Screen Recording and Accessibility for the PHP process and the app that launched it. On a Mac, a missing permission is requested through the public API and the matching System Settings pane is opened when macOS does not report the permission granted. Molly cannot grant either permission. The JSON field `permission_granted_by_cli` is true only when macOS reports a permission granted after that request.
+
+`--permissionless` does not request either permission. Checks that do not need them still run. A check whose remaining proof is the visible Bloom UI is `BLOCKED_VERIFIER_PERMISSION`. A failed programmatic check, such as settings that do not match the run configuration, is still `PRODUCT_FAIL`.
+
+`--check-permissions` reports the current permission state and does not run the checks. `--retry-native-ui` reruns only checks whose saved outcome is `BLOCKED_VERIFIER_PERMISSION`, and only when the candidate SHA and verifier environment still match the saved run. A mismatch leaves the saved evidence in place.
+
+Each check outcome is one of `PASS`, `PRODUCT_FAIL`, `HARNESS_FAIL`, `BLOCKED_VERIFIER_PERMISSION`, `BLOCKED_PREREQUISITE`, `EVIDENCE_INCOMPLETE`, `NOT_RUN`, or `APPROVED_NA`. The M04 summary counts those separately. Two permission blocks and two passes do not make M04 a product failure, and `release_complete` stays false until every check in the run passed. `--json` is the document to read. The prose is not.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | The requested checks finished with no product or harness failure. In `--permissionless` mode, permission blocks may remain. |
+| 1 | At least one check is `PRODUCT_FAIL`. |
+| 2 | The verifier failed, for example the permission probe or a fixture. |
+| 3 | A prerequisite is missing, evidence is incomplete, or a permission blocks a check outside `--permissionless` mode. |
+| 4 | The invocation is invalid, or `--retry-native-ui` refused to reuse the saved evidence. |
+
+`--no-interaction` does not grant a permission and does not skip a macOS dialog. Use `--permissionless` for that. Evidence is written under `storage/molly/acceptance` unless you pass `--evidence`.
+
 ## Exit codes
 
-`0` means the command did what you asked; `1` means Molly reported a failure. A read command exits `0` even when the run it shows failed, so scripts should read the returned `status`, `ready`, or `retry_allowed` field as well. `molly:start` and `molly:retry` exit `0` only when the new run completed.
+`0` means the command did what you asked; `1` means Molly reported a failure. A read command exits `0` even when the run it shows failed, so scripts should read the returned `status`, `ready`, or `retry_allowed` field as well. `molly:start` and `molly:retry` exit `0` only when the new run completed. `molly:verify` uses the exit codes in [Acceptance verification](#acceptance-verification). Read its JSON either way.
 
 ## Errors
 
