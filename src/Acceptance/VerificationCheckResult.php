@@ -11,6 +11,7 @@ final readonly class VerificationCheckResult
      * @param  list<string>  $requiredPermissions
      * @param  array<string, string>  $observedPermissions
      * @param  list<string>  $evidencePaths
+     * @param  list<CheckAssertion>  $assertions
      */
     public function __construct(
         public string $checkId,
@@ -28,6 +29,7 @@ final readonly class VerificationCheckResult
         public array $evidencePaths,
         public string $stage = 'M04',
         public int $attempt = 1,
+        public array $assertions = [],
     ) {}
 
     /** @param  array<string, mixed>  $data */
@@ -54,6 +56,10 @@ final readonly class VerificationCheckResult
             array_values($data['evidence_paths'] ?? []),
             (string) ($data['stage'] ?? 'M04'),
             (int) ($data['attempt'] ?? 1),
+            array_values(array_map(
+                fn (mixed $assertion): CheckAssertion => CheckAssertion::fromArray(is_array($assertion) ? $assertion : []),
+                is_array($data['assertions'] ?? null) ? $data['assertions'] : [],
+            )),
         );
     }
 
@@ -77,6 +83,7 @@ final readonly class VerificationCheckResult
             'exit_code' => $this->exitCode,
             'evidence_paths' => $this->evidencePaths,
             'attempt' => $this->attempt,
+            'assertions' => array_map(fn (CheckAssertion $assertion): array => $assertion->toArray(), $this->assertions),
         ];
     }
 }

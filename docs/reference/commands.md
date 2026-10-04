@@ -213,11 +213,14 @@ php artisan molly:verify
 php artisan molly:verify --permissionless
 php artisan molly:verify --check-permissions
 php artisan molly:verify --retry-native-ui
+php artisan molly:verify --permissionless --project=/path/to/app --candidate=<sha> --evidence=<dir> --json --no-interaction
 ```
 
-The first command inspects Screen Recording and Accessibility for the PHP process and the app that launched it. On a Mac, a missing permission is requested through the public API and the matching System Settings pane is opened when macOS does not report the permission granted. Molly cannot grant either permission. The JSON field `permission_granted_by_cli` is true only when macOS reports a permission granted after that request.
+The first command inspects Screen Recording and Accessibility for the PHP process and the app that launched it. On a Mac, a missing permission is requested through the public API and the matching System Settings pane is opened when macOS does not report the permission granted. Molly cannot grant either permission. The JSON field `permission_granted_by_cli` is true only when macOS reports a permission granted after that request. If the inspection throws, times out, or returns nothing readable, the permission state is `unknown`. Molly does not treat unknown as granted or denied, and the other checks still run.
 
-`--permissionless` does not request either permission. Checks that do not need them still run. A check whose remaining proof is the visible Bloom UI is `BLOCKED_VERIFIER_PERMISSION`. A failed programmatic check, such as settings that do not match the run configuration, is still `PRODUCT_FAIL`.
+`--permissionless` does not request either permission, does not open Settings, and does not drive the Bloom UI even when the permission is granted. You do not need `--check-permissions` first. Checks that can be compared through services, storage, or a host log still run. A check whose remaining proof is the visible Bloom UI is `EVIDENCE_INCOMPLETE` with reason `NATIVE_OBSERVATION_DISABLED`. That is the mode skipping the observation. An observed missing permission on the default command is `BLOCKED_VERIFIER_PERMISSION`. A failed programmatic check, such as settings that do not match the run effective model, is still `PRODUCT_FAIL`.
+
+`--project` selects the Laravel app whose projects, tasks, runs, settings, and host logs are compared. Omit it and those comparisons stay `EVIDENCE_INCOMPLETE`. `--candidate` and `--evidence` are unchanged.
 
 `--check-permissions` reports the current permission state and does not run the checks. `--retry-native-ui` reruns only checks whose saved outcome is `BLOCKED_VERIFIER_PERMISSION`, and only when the candidate SHA and verifier environment still match the saved run. A mismatch leaves the saved evidence in place.
 
@@ -225,10 +228,10 @@ Each check outcome is one of `PASS`, `PRODUCT_FAIL`, `HARNESS_FAIL`, `BLOCKED_VE
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | The requested checks finished with no product or harness failure. In `--permissionless` mode, permission blocks may remain. |
+| 0 | The requested checks finished with no product or harness failure and no incomplete evidence. |
 | 1 | At least one check is `PRODUCT_FAIL`. |
-| 2 | The verifier failed, for example the permission probe or a fixture. |
-| 3 | A prerequisite is missing, evidence is incomplete, or a permission blocks a check outside `--permissionless` mode. |
+| 2 | The verifier failed, for example a retry whose permission inspection did not run. The previous check results stay in place. |
+| 3 | A prerequisite is missing, evidence is incomplete, native observation was skipped, or a permission blocks a check outside `--permissionless` mode. |
 | 4 | The invocation is invalid, or `--retry-native-ui` refused to reuse the saved evidence. |
 
 `--no-interaction` does not grant a permission and does not skip a macOS dialog. Use `--permissionless` for that. Evidence is written under `storage/molly/acceptance` unless you pass `--evidence`.

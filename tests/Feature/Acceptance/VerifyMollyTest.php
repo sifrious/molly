@@ -1,8 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Sifrious\Molly\Acceptance\CheckOutcome;
-use Sifrious\Molly\Acceptance\M04CheckCatalog;
+use Sifrious\Molly\Acceptance\CompiledHostBloomObserver;
+use Sifrious\Molly\Acceptance\MacOsPermissionPrompt;
+use Sifrious\Molly\Acceptance\MacOsTccProbe;
 use Sifrious\Molly\Acceptance\MacOsVerifierPermissionInspector;
 use Sifrious\Molly\Acceptance\MacOsVerifierPermissionRequester;
 use Sifrious\Molly\Acceptance\PackageRoot;
@@ -14,8 +17,17 @@ use Sifrious\Molly\Acceptance\VerifierPermissionInspector;
 use Sifrious\Molly\Acceptance\VerifierPermissionSnapshot;
 use Sifrious\Molly\Acceptance\VerifierProcessIdentity;
 use Sifrious\Molly\Actions\VerifyMolly;
+use Sifrious\Molly\Conversations\Conversation;
+use Sifrious\Molly\Conversations\ConversationStore;
+use Sifrious\Molly\Journal\JournalRenderer;
 use Sifrious\Molly\Mcp\MollyServer;
 use Sifrious\Molly\Mcp\MollyVerify;
+use Sifrious\Molly\Models\Run;
+use Sifrious\Molly\Models\Task;
+use Sifrious\Molly\Projects\MollyProject;
+use Sifrious\Molly\Projects\ProjectRegistry;
+use Sifrious\Molly\Settings\MollySettings;
+use Sifrious\Molly\Settings\SettingsStore;
 use Sifrious\Molly\Tests\Support\FixedPermissionInspector;
 use Sifrious\Molly\Tests\Support\SequencePermissionInspector;
 use Sifrious\Molly\Tests\Support\StubPermissionPrompt;
@@ -27,6 +39,7 @@ function verificationSha(): string
 
 beforeEach(function () {
     $this->verificationDirectories = [];
+    $this->mollyHomeBefore = getenv('MOLLY_HOME');
 });
 
 function verificationDirectory(): string
@@ -58,52 +71,101 @@ function permissionSnapshot(PermissionState $screen, PermissionState $accessibil
     );
 }
 
-function programmedContext(string $directory, array $replace = []): VerificationContext
+/**
+ * @return array{home: string, project: string, evidence: string}
+ */
+function bloomFixture(string $effectiveModel = 'local-test-model'): array
 {
-    $observations = [];
-    $native = [];
-    foreach ((new M04CheckCatalog)->checks() as $check) {
-        if ($check->requiredPermissions !== []) {
-            $observations[$check->id] = [
-                'disposition' => 'needs_native',
-                'reason_code' => 'NATIVE_UI_REQUIRED',
-                'message' => $check->requirement.' still needs a native Bloom observation.',
-            ];
-            $native[$check->id] = [
-                'disposition' => 'complete',
-                'outcome' => CheckOutcome::Pass->value,
-                'reason_code' => 'NATIVE_OBSERVED',
-                'message' => $check->id.' native observation passed.',
-            ];
-        } else {
-            $observations[$check->id] = [
-                'disposition' => 'complete',
-                'outcome' => CheckOutcome::Pass->value,
-                'reason_code' => 'PROGRAMMATIC_PASS',
-                'message' => $check->id.' passed from shared state.',
-            ];
-        }
-    }
+    $home = verificationDirectory();
+    $root = verificationDirectory();
+    $project = $root.'/new-app';
+    $existing = $root.'/existing-app';
+    mkdir($project.'/.molly', 0700, true);
+    mkdir($existing.'/.molly', 0700, true);
+    $project = realpath($project);
+    $existing = realpath($existing);
+    putenv('MOLLY_HOME='.$home);
+    $_ENV['MOLLY_HOME'] = $home;
+    $_SERVER['MOLLY_HOME'] = $home;
 
-    return new VerificationContext(
-        verificationSha(),
-        '',
-        PackageRoot::path(),
-        $directory,
-        VerificationMode::Default,
-        null,
-        array_replace($observations, $replace['observations'] ?? []),
-        array_replace($native, $replace['native'] ?? []),
-        $replace['harnessBroken'] ?? [],
-        $replace['sharedState'] ?? [],
-    );
+    $registry = new ProjectRegistry($home);
+    $registry->writeProject(new MollyProject((string) Str::uuid(), 'New', $project, 'new', '2026-10-04T12:00:00Z'));
+    $registry->writeProject(new MollyProject((string) Str::uuid(), 'Existing', $existing, 'existing', '2026-10-04T12:00:00Z'));
+    (new SettingsStore($home))->write(MollySettings::fromArray(['runtime' => ['model' => 'local-test-model']]));
+
+    $task = Task::create([
+        'nickname' => 'bloom-check',
+        'prompt' => 'Add a health endpoint.',
+        'workspace' => $project,
+        'paths' => ['routes/web.php'],
+        'test_path' => 'tests/Feature/HealthTest.php',
+        'status' => 'running',
+        'worker_id' => 'worker-1',
+    ]);
+    $run = Run::create([
+        'task_id' => $task->id,
+        'prompt' => $task->prompt,
+        'workspace' => $project,
+        'status' => 'passed',
+        'report' => [
+            'verification' => ['passed' => 1, 'failed' => 0],
+            'diff' => ['id' => 'diff-1', 'task_id' => $task->id],
+            'receipt' => ['id' => 'receipt-1'],
+        ],
+        'effective_config' => ['config' => ['runtime' => ['model' => $effectiveModel]]],
+    ]);
+    $run->forceFill([
+        'report' => [
+            'verification' => ['passed' => 1, 'failed' => 0],
+            'diff' => ['id' => 'diff-1', 'task_id' => $task->id, 'run_id' => $run->id],
+            'receipt' => ['id' => 'receipt-1', 'run_id' => $run->id],
+        ],
+    ])->save();
+    app(ConversationStore::class)->put(new Conversation(
+        (string) Str::uuid(),
+        'Health',
+        [[
+            'id' => 'm1',
+            'sequence' => 1,
+            'role' => 'user',
+            'body' => 'Add a health endpoint.',
+            'at' => '2026-10-04T12:00:00Z',
+            'provenance' => ['source' => 'test', 'kind' => 'fixture'],
+        ]],
+        [$task->id],
+        [$run->id],
+        '2026-10-04T12:00:00Z',
+        '2026-10-04T12:00:00Z',
+        $project,
+    ));
+
+    $renderer = new JournalRenderer;
+    file_put_contents($project.'/.molly/GLOSSARY.md', $renderer->glossaryCopy($renderer->glossarySourceLink($project)));
+    file_put_contents($project.'/.molly/restart-state.json', json_encode([
+        'before' => ['task_id' => $task->id],
+        'after' => ['task_id' => $task->id],
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($project.'/host-incompat.log', "plugin sifrious.molly skipped: apiVersion 2 is not supported. host stable\n");
+    file_put_contents($project.'/host-broken.log', "status missingBundle missingProvider\n");
+
+    return ['home' => $home, 'project' => $project, 'evidence' => verificationDirectory()];
 }
 
 function outcomeOf(array $document, string $id): string
 {
+    return checkRow($document, $id)['outcome'];
+}
+
+function reasonOf(array $document, string $id): string
+{
+    return checkRow($document, $id)['reason_code'];
+}
+
+function checkRow(array $document, string $id): array
+{
     foreach ($document['checks'] as $check) {
         if ($check['check_id'] === $id) {
-            return $check['outcome'];
+            return $check;
         }
     }
 
@@ -116,151 +178,302 @@ function attemptPath(string $directory, array $document, string $id, int $attemp
 }
 
 afterEach(function () {
+    $previous = $this->mollyHomeBefore;
+    if (! is_string($previous) || $previous === '') {
+        putenv('MOLLY_HOME');
+        unset($_ENV['MOLLY_HOME'], $_SERVER['MOLLY_HOME']);
+    } else {
+        putenv('MOLLY_HOME='.$previous);
+        $_ENV['MOLLY_HOME'] = $previous;
+        $_SERVER['MOLLY_HOME'] = $previous;
+    }
     foreach ($this->verificationDirectories ?? [] as $directory) {
         File::deleteDirectory($directory);
     }
 });
 
-it('runs native checks when both permissions are granted', function () {
+it('collects the same programmatic evidence from the command and MCP', function () {
+    $fixture = bloomFixture();
     bindPermissions(PermissionState::Granted, PermissionState::Granted);
-    $directory = verificationDirectory();
+    $sha = verificationSha();
 
-    $document = app(VerifyMolly::class)->verify(
-        VerificationMode::Default,
-        $directory,
-        verificationSha(),
-        programmedContext($directory),
-    );
+    [$exit, $cli] = mollyJson('molly:verify', [
+        '--permissionless' => true,
+        '--candidate' => $sha,
+        '--evidence' => $fixture['evidence'],
+        '--project' => $fixture['project'],
+    ]);
+    $mcpEvidence = verificationDirectory();
+    $mcp = MollyServer::tool(MollyVerify::class, [
+        'operation' => 'run_permissionless',
+        'evidence' => $mcpEvidence,
+        'candidate' => $sha,
+        'project' => $fixture['project'],
+    ]);
+    $mcp->assertOk();
+    $method = new ReflectionMethod($mcp, 'structuredContent');
+    $method->setAccessible(true);
+    $document = $method->invoke($mcp);
+    expect($document)->toBeArray();
 
-    expect($document['exit_code'])->toBe(0)
-        ->and($document['permission_granted_by_cli'])->toBeFalse()
-        ->and($document['acceptance_program_complete'])->toBeFalse()
-        ->and($document['summary'])->toMatchArray([
-            'product_failures' => 0,
-            'harness_failures' => 0,
-            'permission_blocks' => 0,
-            'passes' => 16,
-            'release_complete' => true,
-        ])
-        ->and($document['native_checks_run'])->toBe(['M04.1', 'M04.2', 'M04.3', 'M04.10', 'M04.12', 'M04.16'])
-        ->and($document['stages'][0]['release_complete'])->toBeTrue();
+    expect($exit)->toBe(3)
+        ->and($cli['checks'])->toHaveCount(16)
+        ->and($document['checks'])->toHaveCount(16)
+        ->and($cli['release_complete'])->toBeFalse()
+        ->and($document['native_observation'])->toBe('disabled_by_mode')
+        ->and(outcomeOf($cli, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.4'))->toBe(outcomeOf($cli, 'M04.4'))
+        ->and(reasonOf($document, 'M04.9'))->toBe(reasonOf($cli, 'M04.9'))
+        ->and(checkRow($cli, 'M04.4')['assertions'][0]['expected'])->toBe('one task')
+        ->and(checkRow($cli, 'M04.4')['assertions'][0]['source_artifact'])->toBe('database:molly_tasks')
+        ->and(checkRow($document, 'M04.4')['assertions'][0]['actual'])->toBe(checkRow($cli, 'M04.4')['assertions'][0]['actual']);
 });
 
-it('blocks screen recording checks and still runs accessibility and programmatic checks', function () {
-    bindPermissions(PermissionState::Denied, PermissionState::Granted);
-    $directory = verificationDirectory();
+it('does not drive native UI in permissionless mode when both permissions are granted', function () {
+    $fixture = bloomFixture();
+    $observer = new CompiledHostBloomObserver;
+    $prompt = new class(new MacOsTccProbe) extends MacOsPermissionPrompt
+    {
+        public int $requests = 0;
+
+        public int $settings = 0;
+
+        public function request(VerifierPermissionSnapshot $before): bool
+        {
+            $this->requests++;
+
+            return true;
+        }
+
+        public function openSettings(VerifierPermissionSnapshot $after): array
+        {
+            $this->settings++;
+
+            return ['settings'];
+        }
+    };
+    app()->instance(CompiledHostBloomObserver::class, $observer);
+    app()->instance(MacOsPermissionPrompt::class, $prompt);
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
 
     $document = app(VerifyMolly::class)->verify(
-        VerificationMode::Default,
-        $directory,
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
         verificationSha(),
-        programmedContext($directory),
+        null,
+        $fixture['project'],
     );
 
-    expect($document['native_checks_run'])->toBe(['M04.2', 'M04.3', 'M04.10'])
-        ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.12'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.16'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.2'))->toBe('PASS')
+    expect($observer->calls)->toBe(0)
+        ->and($prompt->requests)->toBe(0)
+        ->and($prompt->settings)->toBe(0)
+        ->and($document['native_checks_run'])->toBe([])
+        ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and($document['preflight']['settings_opened'])->toBe([])
+        ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
-        ->and($document['summary']['product_failures'])->toBe(0)
-        ->and($document['stages'][0])->toMatchArray([
-            'stage' => 'M04',
-            'product_failures' => 0,
-            'harness_failures' => 0,
-            'permission_blocks' => 3,
-            'passes' => 13,
-            'release_complete' => false,
-        ])
-        ->and($document['exit_code'])->toBe(3)
-        ->and($document['checks'][0]['acceptance_record_outcome'])->toBe('BLOCKED');
-});
-
-it('blocks accessibility checks and still runs screen recording checks', function () {
-    bindPermissions(PermissionState::Granted, PermissionState::NotDetermined);
-    $directory = verificationDirectory();
-
-    $document = app(VerifyMolly::class)->verify(
-        VerificationMode::Default,
-        $directory,
-        verificationSha(),
-        programmedContext($directory),
-    );
-
-    expect($document['native_checks_run'])->toBe(['M04.1', 'M04.12', 'M04.16'])
-        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.3'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.1'))->toBe('PASS')
-        ->and(outcomeOf($document, 'M04.9'))->toBe('PASS')
+        ->and($document['release_complete'])->toBeFalse()
         ->and($document['summary']['product_failures'])->toBe(0);
 });
 
-it('keeps running programmatic checks when both permissions are missing', function () {
-    bindPermissions(PermissionState::NotDetermined, PermissionState::Denied);
-    $directory = verificationDirectory();
-    $context = programmedContext($directory);
+it('still runs independent assertions when accessibility is missing', function () {
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::Granted, PermissionState::Denied);
 
-    $default = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, verificationSha(), $context);
-    $permissionlessDirectory = verificationDirectory();
-    $permissionless = app(VerifyMolly::class)->verify(
-        VerificationMode::Permissionless,
-        $permissionlessDirectory,
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Default,
+        $fixture['evidence'],
         verificationSha(),
-        programmedContext($permissionlessDirectory),
+        null,
+        $fixture['project'],
     );
 
-    expect($default['summary'])->toMatchArray(['product_failures' => 0, 'permission_blocks' => 6, 'passes' => 10])
-        ->and($default['exit_code'])->toBe(3)
-        ->and($default['permission_granted_by_cli'])->toBeFalse()
-        ->and($permissionless['exit_code'])->toBe(0)
-        ->and($permissionless['summary']['permission_blocks'])->toBe(6)
-        ->and($permissionless['release_complete'])->toBeFalse()
-        ->and(outcomeOf($permissionless, 'M04.4'))->toBe('PASS')
-        ->and(outcomeOf($permissionless, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION');
+    expect(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($document, 'M04.3'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.9'))->toBe('PASS')
+        ->and($document['summary']['product_failures'])->toBe(0)
+        ->and($document['release_complete'])->toBeFalse()
+        ->and($document['checks'])->toHaveCount(16);
 });
 
-it('reruns only the checks a verifier permission blocked', function () {
-    $directory = verificationDirectory();
+it('keeps running programmatic checks when both permissions are missing', function () {
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::NotDetermined, PermissionState::Denied);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Default,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.14'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
+        ->and($document['summary']['product_failures'])->toBe(0)
+        ->and($document['summary']['passes'])->toBeGreaterThan(0)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
+it('runs independent assertions when the platform cannot observe TCC', function () {
+    $fixture = bloomFixture();
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Default,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(PHP_OS_FAMILY)->not->toBe('Darwin')
+        ->and($document['preflight']['screen_recording'])->toBe('unsupported')
+        ->and($document['preflight']['accessibility'])->toBe('unsupported')
+        ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and($document['summary']['product_failures'])->toBe(0)
+        ->and($document['permission_granted_by_cli'])->toBeFalse();
+});
+
+it('continues independent checks when permission inspection fails', function () {
+    $fixture = bloomFixture('other-model');
+    app()->instance(VerifierPermissionInspector::class, new class implements VerifierPermissionInspector
+    {
+        public function inspect(): VerifierPermissionSnapshot
+        {
+            throw new RuntimeException('swift unavailable');
+        }
+    });
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect($document['checks'])->toHaveCount(16)
+        ->and($document['preflight']['inspection_status'])->toBe('not_observed')
+        ->and($document['preflight']['screen_recording'])->toBe('unknown')
+        ->and($document['preflight']['accessibility'])->toBe('unknown')
+        ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and(outcomeOf($document, 'M04.9'))->toBe('PRODUCT_FAIL')
+        ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
+        ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and($document['summary']['product_failures'])->toBe(1)
+        ->and($document['exit_code'])->toBe(1)
+        ->and($document['permission_granted_by_cli'])->toBeFalse();
+});
+
+it('reports a programmatic defect as a product failure when accessibility is missing', function () {
+    $fixture = bloomFixture('other-model');
+    bindPermissions(PermissionState::Granted, PermissionState::NotDetermined);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.9'))->toBe('PRODUCT_FAIL')
+        ->and(reasonOf($document, 'M04.9'))->toBe('SETTINGS_MISMATCH')
+        ->and(checkRow($document, 'M04.9')['assertions'][0]['expected'])->toBe('other-model')
+        ->and(checkRow($document, 'M04.9')['assertions'][0]['actual'])->toBe('local-test-model')
+        ->and(outcomeOf($document, 'M04.2'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and($document['summary']['product_failures'])->toBe(1)
+        ->and($document['exit_code'])->toBe(1);
+});
+
+it('reports a broken fixture as a harness failure', function () {
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $context = new VerificationContext(
+        verificationSha(),
+        '',
+        PackageRoot::path(),
+        $fixture['evidence'],
+        VerificationMode::Permissionless,
+        null,
+        [],
+        [],
+        ['M04.4'],
+        [],
+        $fixture['project'],
+    );
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        $context,
+    );
+
+    expect(outcomeOf($document, 'M04.4'))->toBe('HARNESS_FAIL')
+        ->and(outcomeOf($document, 'M04.9'))->toBe('PASS')
+        ->and($document['summary']['harness_failures'])->toBe(1)
+        ->and($document['summary']['product_failures'])->toBe(0)
+        ->and($document['exit_code'])->toBe(2);
+});
+
+it('keeps previous results when a retry inspection fails', function () {
+    $fixture = bloomFixture();
     bindPermissions(PermissionState::Denied, PermissionState::Granted);
     $first = app(VerifyMolly::class)->verify(
         VerificationMode::Default,
-        $directory,
+        $fixture['evidence'],
         verificationSha(),
-        programmedContext($directory),
+        null,
+        $fixture['project'],
     );
-    $blockedAttempt = file_get_contents(attemptPath($directory, $first, 'M04.1', 1));
-    $passedAttempt = file_get_contents(attemptPath($directory, $first, 'M04.2', 1));
-    $preflight = file_get_contents($directory.'/runs/'.$first['run_id'].'/preflight-attempt-1.json');
+    $blocked = file_get_contents(attemptPath($fixture['evidence'], $first, 'M04.12', 1));
+    $passed = file_get_contents(attemptPath($fixture['evidence'], $first, 'M04.4', 1));
+    $preflight = file_get_contents($fixture['evidence'].'/runs/'.$first['run_id'].'/preflight-attempt-1.json');
+    app()->instance(VerifierPermissionInspector::class, new class implements VerifierPermissionInspector
+    {
+        public function inspect(): VerifierPermissionSnapshot
+        {
+            throw new RuntimeException('swift timed out');
+        }
+    });
 
-    bindPermissions(PermissionState::Granted, PermissionState::Granted);
     $retry = app(VerifyMolly::class)->verify(
         VerificationMode::RetryNativeUi,
-        $directory,
+        $fixture['evidence'],
         verificationSha(),
-        programmedContext($directory),
+        null,
+        $fixture['project'],
     );
 
-    expect($retry['retried_checks'])->toBe(['M04.1', 'M04.12', 'M04.16'])
-        ->and($retry['native_checks_run'])->toBe(['M04.1', 'M04.12', 'M04.16'])
-        ->and($retry['run_id'])->toBe($first['run_id'])
-        ->and(outcomeOf($retry, 'M04.1'))->toBe('PASS')
-        ->and(outcomeOf($retry, 'M04.2'))->toBe('PASS')
-        ->and($retry['summary'])->toMatchArray(['product_failures' => 0, 'permission_blocks' => 0, 'passes' => 16])
-        ->and(file_get_contents(attemptPath($directory, $first, 'M04.1', 1)))->toBe($blockedAttempt)
-        ->and(file_get_contents(attemptPath($directory, $first, 'M04.2', 1)))->toBe($passedAttempt)
-        ->and(is_file(attemptPath($directory, $first, 'M04.2', 2)))->toBeFalse()
-        ->and(json_decode(file_get_contents(attemptPath($directory, $first, 'M04.1', 2)), true)['outcome'])->toBe('PASS')
-        ->and(file_get_contents($directory.'/runs/'.$first['run_id'].'/preflight-attempt-1.json'))->toBe($preflight);
+    expect(outcomeOf($first, 'M04.12'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($first, 'M04.4'))->toBe('PASS')
+        ->and($retry['checks'])->toHaveCount(16)
+        ->and(outcomeOf($retry, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($retry, 'M04.12'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and($retry['retried_checks'])->toBe([])
+        ->and($retry['preflight_diagnostic']['inspection_status'])->toBe('not_observed')
+        ->and($retry['exit_code'])->toBe(2)
+        ->and(file_get_contents(attemptPath($fixture['evidence'], $first, 'M04.12', 1)))->toBe($blocked)
+        ->and(file_get_contents(attemptPath($fixture['evidence'], $first, 'M04.4', 1)))->toBe($passed)
+        ->and(is_file(attemptPath($fixture['evidence'], $first, 'M04.4', 2)))->toBeFalse()
+        ->and(is_file(attemptPath($fixture['evidence'], $first, 'M04.12', 2)))->toBeFalse()
+        ->and(file_get_contents($fixture['evidence'].'/runs/'.$first['run_id'].'/preflight-attempt-1.json'))->toBe($preflight);
 });
 
 it('rejects stale evidence when the candidate SHA changed', function () {
     $directory = verificationDirectory();
     bindPermissions(PermissionState::Denied, PermissionState::Granted);
-    $first = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, verificationSha(), programmedContext($directory));
+    $first = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, verificationSha());
     $before = hash_file('sha256', attemptPath($directory, $first, 'M04.1', 1));
 
-    $retry = app(VerifyMolly::class)->verify(VerificationMode::RetryNativeUi, $directory, str_repeat('cd', 20), programmedContext($directory));
+    $retry = app(VerifyMolly::class)->verify(VerificationMode::RetryNativeUi, $directory, str_repeat('cd', 20));
 
     expect($retry['exit_code'])->toBe(4)
         ->and($retry['reason_code'])->toBe('CANDIDATE_SHA_MISMATCH')
@@ -272,7 +485,7 @@ it('rejects stale evidence when the candidate SHA changed', function () {
 it('rejects stale evidence when the verifier environment changed', function () {
     $directory = verificationDirectory();
     bindPermissions(PermissionState::Granted, PermissionState::Granted);
-    $first = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha(), programmedContext($directory));
+    $first = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha());
     $path = $directory.'/runs/'.$first['run_id'].'/result.json';
     $saved = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
     $saved['environment']['os_family'] = 'Darwin';
@@ -284,34 +497,6 @@ it('rejects stale evidence when the verifier environment changed', function () {
     expect($retry['exit_code'])->toBe(4)
         ->and($retry['reason_code'])->toBe('ENVIRONMENT_CHANGED')
         ->and(hash_file('sha256', $path))->toBe($before);
-});
-
-it('reports a product failure in permissionless mode', function () {
-    $directory = verificationDirectory();
-    $context = new VerificationContext(verificationSha(), '', PackageRoot::path(), $directory, VerificationMode::Permissionless, null, [], [], [], [
-        'settings_match' => false,
-    ]);
-
-    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha(), $context);
-
-    expect(outcomeOf($document, 'M04.9'))->toBe('PRODUCT_FAIL')
-        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and($document['summary']['product_failures'])->toBe(1)
-        ->and($document['exit_code'])->toBe(1)
-        ->and($document['permission_granted_by_cli'])->toBeFalse();
-});
-
-it('reports a broken fixture as a harness failure', function () {
-    $directory = verificationDirectory();
-    $context = programmedContext($directory, ['harnessBroken' => ['M04.4']]);
-
-    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha(), $context);
-
-    expect(outcomeOf($document, 'M04.4'))->toBe('HARNESS_FAIL')
-        ->and(outcomeOf($document, 'M04.4'))->not->toBe('PRODUCT_FAIL')
-        ->and($document['summary']['harness_failures'])->toBe(1)
-        ->and($document['summary']['product_failures'])->toBe(0)
-        ->and($document['exit_code'])->toBe(2);
 });
 
 it('does not let saved permission history override the current inspection', function () {
@@ -336,19 +521,22 @@ it('does not let saved permission history override the current inspection', func
         ->and($document['exit_code'])->toBe(0);
 });
 
-it('blocks the native nav check when host telemetry exists and screen recording does not', function () {
+it('does not accept a caller supplied pass record', function () {
     $directory = verificationDirectory();
-    $telemetry = $directory.'/host.json';
-    file_put_contents($telemetry, json_encode(['plugin_discovered' => true, 'plugin_id' => 'sifrious.molly'], JSON_THROW_ON_ERROR));
-    bindPermissions(PermissionState::NotDetermined, PermissionState::Granted);
-    $context = new VerificationContext(verificationSha(), '', PackageRoot::path(), $directory, VerificationMode::Default, $telemetry);
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $context = new VerificationContext(verificationSha(), '', PackageRoot::path(), $directory, VerificationMode::Permissionless, null, [
+        'M04.4' => [
+            'disposition' => 'complete',
+            'outcome' => CheckOutcome::Pass->value,
+            'reason_code' => 'PROGRAMMATIC_PASS',
+            'message' => 'caller said pass',
+        ],
+    ]);
 
     $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha(), $context);
 
-    expect(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and($document['summary']['product_failures'])->toBe(0)
-        ->and($document['preflight']['checks_affected'])->toContain('M04.1')
-        ->and($document['preflight']['checks_unaffected'])->toContain('M04.4');
+    expect(outcomeOf($document, 'M04.4'))->not->toBe('PASS')
+        ->and(reasonOf($document, 'M04.4'))->toBe('TASK_NOT_OBSERVED');
 });
 
 it('does not hide a broken plugin seam behind a missing permission', function () {
@@ -361,8 +549,8 @@ it('does not hide a broken plugin seam behind a missing permission', function ()
     $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha(), $context);
 
     expect(outcomeOf($document, 'M04.1'))->toBe('PRODUCT_FAIL')
-        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and($document['exit_code'])->toBe(1);
+        ->and($document['exit_code'])->toBe(1)
+        ->and($document['summary']['product_failures'])->toBe(1);
 });
 
 it('reports this machine as unsupported and does not claim a grant', function () {
@@ -380,7 +568,7 @@ it('reports this machine as unsupported and does not claim a grant', function ()
         ->and($document['preflight']['settings_opened'])->toBe([])
         ->and($document['summary']['product_failures'])->toBe(0)
         ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
-        ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION');
+        ->and($document['release_complete'])->toBeFalse();
 });
 
 it('does not claim the CLI granted a permission the probe did not request', function () {
@@ -417,7 +605,7 @@ it('records a grant only from the inspector after a request, and opens settings 
         ->and($deniedPrompt->requested)->toBeTrue();
 });
 
-it('serves the same verification through the command and MCP', function () {
+it('serves permission inspection through the command and MCP', function () {
     $directory = verificationDirectory();
     $sha = verificationSha();
 
@@ -438,29 +626,13 @@ it('serves the same verification through the command and MCP', function () {
         'evidence' => $directory,
         'candidate' => $sha,
     ]);
-    $ran = MollyServer::tool(MollyVerify::class, [
-        'operation' => 'run_permissionless',
-        'evidence' => $directory,
-        'candidate' => $sha,
-    ]);
 
     expect($exit)->toBe(0)
         ->and($json['screen_recording'])->toBe('unsupported')
         ->and($json['permission_granted_by_cli'])->toBeFalse()
-        ->and($json['checks_affected'])->toContain('M04.2')
         ->and($conflict[0])->toBe(4)
         ->and($conflict[1]['reason_code'])->toBe('VERIFICATION_MODE_CONFLICT');
     $inspected->assertOk()->assertSee(['unsupported', 'permission_granted_by_cli']);
-    $ran->assertOk()->assertSee(['BLOCKED_VERIFIER_PERMISSION', 'product_failures', 'permission_granted_by_cli']);
-
-    $latest = MollyServer::tool(MollyVerify::class, ['operation' => 'latest', 'evidence' => $directory]);
-    $latest->assertOk()->assertSee(['M04.2', $sha]);
-    $evidence = MollyServer::tool(MollyVerify::class, [
-        'operation' => 'check_evidence',
-        'evidence' => $directory,
-        'check_id' => 'M04.2',
-    ]);
-    $evidence->assertOk()->assertSee(['BLOCKED_VERIFIER_PERMISSION', 'M04.2']);
 });
 
 it('does not ship a TCC reset or a CLI grant', function () {

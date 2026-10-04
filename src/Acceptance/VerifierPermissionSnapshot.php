@@ -33,6 +33,19 @@ final readonly class VerifierPermissionSnapshot
         );
     }
 
+    public static function unobserved(VerifierProcessIdentity $process, ?DateTimeImmutable $at = null): self
+    {
+        return new self(
+            PermissionState::Unknown,
+            PermissionState::Unknown,
+            $process,
+            PHP_OS_FAMILY,
+            null,
+            php_uname('n'),
+            $at ?? new DateTimeImmutable('now', new DateTimeZone('UTC')),
+        );
+    }
+
     public function state(PermissionKind $kind): PermissionState
     {
         return match ($kind) {
@@ -41,12 +54,35 @@ final readonly class VerifierPermissionSnapshot
         };
     }
 
-    /** @param  list<PermissionKind>  $required */
+    /**
+     * Permissions this inspection actually reported as unavailable.
+     * Unknown is not granted and is not an observed denial.
+     *
+     * @param  list<PermissionKind>  $required
+     * @return list<PermissionKind>
+     */
     public function missing(array $required): array
     {
         return array_values(array_filter(
             $required,
-            fn (PermissionKind $kind): bool => ! $this->state($kind)->isGranted(),
+            fn (PermissionKind $kind): bool => match ($this->state($kind)) {
+                PermissionState::Denied, PermissionState::NotDetermined, PermissionState::Unsupported => true,
+                PermissionState::Granted, PermissionState::Unknown => false,
+            },
+        ));
+    }
+
+    /**
+     * Required permissions this inspection did not observe.
+     *
+     * @param  list<PermissionKind>  $required
+     * @return list<PermissionKind>
+     */
+    public function notObserved(array $required): array
+    {
+        return array_values(array_filter(
+            $required,
+            fn (PermissionKind $kind): bool => $this->state($kind) === PermissionState::Unknown,
         ));
     }
 
@@ -75,7 +111,7 @@ final readonly class VerifierPermissionSnapshot
     public function denyWhereRequestDidNotGrant(): self
     {
         $map = fn (PermissionState $state): PermissionState => match ($state) {
-            PermissionState::Granted, PermissionState::Unsupported => $state,
+            PermissionState::Granted, PermissionState::Unsupported, PermissionState::Unknown => $state,
             PermissionState::Denied, PermissionState::NotDetermined => PermissionState::Denied,
         };
 

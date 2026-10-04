@@ -77,6 +77,7 @@ final class VerificationRunner
             [$path],
             $result->stage,
             $result->attempt,
+            $result->assertions,
         );
     }
 }

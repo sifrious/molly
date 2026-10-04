@@ -8,6 +8,7 @@ enum PermissionState: string
     case Denied = 'denied';
     case NotDetermined = 'not_determined';
     case Unsupported = 'unsupported';
+    case Unknown = 'unknown';
 
     public function isGranted(): bool
     {

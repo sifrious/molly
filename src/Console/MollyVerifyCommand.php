@@ -24,6 +24,7 @@ class MollyVerifyCommand extends Command
         {--retry-native-ui : Rerun checks blocked only by a verifier permission}
         {--candidate= : Candidate commit SHA. Defaults to HEAD}
         {--evidence= : Directory for verification evidence}
+        {--project= : Project directory for programmatic Bloom checks}
         {--json : Print JSON only}';
 
     protected $description = 'Verify the M04 Bloom checks, and keep a missing macOS permission separate from a Molly failure';
@@ -39,6 +40,8 @@ class MollyVerifyCommand extends Command
         $evidence = is_string($evidence) && $evidence !== '' ? $evidence : storage_path('molly/acceptance');
         $candidate = $this->option('candidate');
         $candidate = is_string($candidate) && $candidate !== '' ? $candidate : null;
+        $project = $this->option('project');
+        $project = is_string($project) && $project !== '' ? $project : null;
 
         if (count($selected) > 1) {
             $document = [
@@ -51,7 +54,7 @@ class MollyVerifyCommand extends Command
                 'permission_granted_by_cli' => false,
             ];
         } else {
-            $document = $verify->verify($selected[0] ?? VerificationMode::Default, $evidence, $candidate);
+            $document = $verify->verify($selected[0] ?? VerificationMode::Default, $evidence, $candidate, null, $project);
         }
 
         return $this->present($document);

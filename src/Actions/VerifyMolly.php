@@ -57,7 +57,7 @@ class VerifyMolly
     }
 
     /** @return array<string, mixed> */
-    public function verify(VerificationMode $mode, string $evidenceRoot, ?string $candidateSha = null, ?VerificationContext $context = null): array
+    public function verify(VerificationMode $mode, string $evidenceRoot, ?string $candidateSha = null, ?VerificationContext $context = null, ?string $projectRoot = null): array
     {
         if ($mode === VerificationMode::CheckPermissions) {
             return $this->inspectPermissions($evidenceRoot, $candidateSha);
@@ -70,6 +70,7 @@ class VerifyMolly
         if (! is_string($resolved)) {
             return $this->invalid((string) $resolved['reason_code'], (string) $resolved['message']);
         }
+        $context = $this->context($mode, $context, $projectRoot);
         if ($mode === VerificationMode::RetryNativeUi) {
             return $this->retry($evidenceRoot, $resolved, $context);
         }
@@ -104,16 +105,16 @@ class VerifyMolly
     }
 
     /** @return array<string, mixed> */
-    private function fresh(VerificationMode $mode, string $evidenceRoot, string $sha, ?VerificationContext $context): array
+    private function fresh(VerificationMode $mode, string $evidenceRoot, string $sha, VerificationContext $context): array
     {
         $runId = (string) Str::uuid();
-        $context = ($context ?? $this->blankContext($mode))->forRun($runId, $sha, $evidenceRoot, $mode);
+        $context = $context->forRun($runId, $sha, $evidenceRoot, $mode);
 
         return $this->execute($mode, $evidenceRoot, $sha, $runId, VerificationPlan::full($this->catalog, $mode), $context, null);
     }
 
     /** @return array<string, mixed> */
-    private function retry(string $evidenceRoot, string $sha, ?VerificationContext $context): array
+    private function retry(string $evidenceRoot, string $sha, VerificationContext $context): array
     {
         $previous = $this->evidence->latest($evidenceRoot);
         if ($previous === null || ! is_string($previous['run_id'] ?? null) || ! is_array($previous['checks'] ?? null)) {
@@ -139,8 +140,7 @@ class VerifyMolly
 
             return $previous;
         }
-        $context = ($context ?? $this->blankContext(VerificationMode::RetryNativeUi))
-            ->forRun($previous['run_id'], $sha, $evidenceRoot, VerificationMode::RetryNativeUi);
+        $context = $context->forRun($previous['run_id'], $sha, $evidenceRoot, VerificationMode::RetryNativeUi);
         $document = $this->execute(
             VerificationMode::RetryNativeUi,
             $evidenceRoot,
@@ -172,22 +172,27 @@ class VerifyMolly
         try {
             $preflight = $this->preflight->run($evidenceRoot, $runId, $sha, $mode->requestsPermissions());
         } catch (Throwable $exception) {
+            if ($previous !== null) {
+                return $this->preservePrevious($evidenceRoot, $previous, $exception->getMessage());
+            }
             $preflight = $this->preflight->failed($evidenceRoot, $runId, $sha, $exception);
-            $document = $this->document($mode, $sha, $runId, $started, [], $preflight, [], $previous, 'Permission inspection failed. Molly did not call that a product failure.', []);
-            $document['summary']['harness_failures'] = 1;
-            $document['stages'][0]['harness_failures'] = 1;
-            $document['stages'][0]['release_complete'] = false;
-            $document['exit_code'] = 2;
-            $document['release_complete'] = false;
+        }
+        if ($previous !== null && ($preflight['inspection_status'] ?? null) !== 'observed') {
             $this->evidence->writePreflight($evidenceRoot, $runId, $this->publicPreflight($preflight), $this->evidence->preflightAttempt($evidenceRoot, $runId));
-            $this->evidence->writeRun($evidenceRoot, $runId, $document);
 
-            return $document;
+            return $this->preservePrevious($evidenceRoot, $previous, (string) ($preflight['inspection_error'] ?? $preflight['message'] ?? 'Permission inspection failed.'));
         }
 
-        $snapshot = $preflight['snapshot'];
+        $snapshot = $preflight['snapshot'] ?? null;
         if (! $snapshot instanceof VerifierPermissionSnapshot) {
-            return $this->harnessDocument('Permission inspection returned no snapshot.', $sha);
+            if ($previous !== null) {
+                return $this->preservePrevious($evidenceRoot, $previous, 'Permission inspection returned no snapshot.');
+            }
+            $snapshot = VerifierPermissionSnapshot::unobserved(VerifierProcessIdentity::capture());
+            $preflight['snapshot'] = $snapshot;
+            $preflight['inspection_status'] = 'not_observed';
+            $preflight['screen_recording'] = $snapshot->screenRecording->value;
+            $preflight['accessibility'] = $snapshot->accessibility->value;
         }
         $executed = $this->runner->run($plan, $snapshot, $context);
         $results = $this->merge($previous, $executed['results']);
@@ -275,6 +280,7 @@ class VerifyMolly
             'environment' => $previous['environment'] ?? $this->environment(),
             'preflight' => $this->publicPreflight($preflight),
             'checks' => array_map(fn (VerificationCheckResult $result): array => $result->toArray(), $results),
+            'native_observation' => $mode === VerificationMode::Permissionless ? 'disabled_by_mode' : 'available',
             'native_checks_run' => $nativeChecksRun,
             'retried_checks' => $mode === VerificationMode::RetryNativeUi ? $selectedChecks : [],
             'permission_blocked_checks' => $blocked,
@@ -356,9 +362,43 @@ class VerifyMolly
         return true;
     }
 
-    private function blankContext(VerificationMode $mode): VerificationContext
+    private function context(VerificationMode $mode, ?VerificationContext $given, ?string $projectRoot): VerificationContext
     {
-        return new VerificationContext('', '', PackageRoot::path(), '', $mode);
+        $context = $given ?? new VerificationContext('', '', PackageRoot::path(), '', $mode);
+        if (is_string($projectRoot) && $projectRoot !== '' && $context->projectRoot === '') {
+            $context = $context->withProject($projectRoot);
+        }
+
+        return $context;
+    }
+
+    /** @param  array<string, mixed>  $previous */
+    private function preservePrevious(string $evidenceRoot, array $previous, string $error): array
+    {
+        $checks = is_array($previous['checks'] ?? null) ? $previous['checks'] : [];
+        $document = $previous;
+        $document['status'] = 'completed';
+        $document['release_complete'] = false;
+        $document['acceptance_program_complete'] = false;
+        $document['permission_granted_by_cli'] = false;
+        $document['retried_checks'] = [];
+        $document['native_checks_run'] = [];
+        $document['checks'] = $checks;
+        $document['preflight_diagnostic'] = [
+            'outcome' => CheckOutcome::HarnessFail->value,
+            'reason_code' => 'PERMISSION_PROBE_FAILED',
+            'inspection_status' => 'not_observed',
+            'inspection_error' => $error,
+            'message' => 'Permission inspection failed. Molly kept the previous M04 results and did not rewrite check attempts.',
+        ];
+        $document['message'] = $document['preflight_diagnostic']['message'];
+        $productFailures = (int) ($previous['summary']['product_failures'] ?? 0);
+        $document['exit_code'] = $productFailures > 0 ? 1 : 2;
+        if (is_string($previous['run_id'] ?? null)) {
+            $this->evidence->writeRun($evidenceRoot, $previous['run_id'], $document);
+        }
+
+        return $document;
     }
 
     /** @return array<string, mixed> */

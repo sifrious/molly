@@ -19,7 +19,22 @@ final class VerificationResultClassifier
         int $attempt,
     ): array {
         if ($probe->disposition === ProbeDisposition::Complete || $this->terminal($probe->outcome)) {
-            return [$this->result($check, $probe->outcome, $probe->reasonCode, $probe->message, $snapshot, $context, $startedAt, $attempt, $probe->evidencePaths), false];
+            return [$this->result($check, $probe->outcome, $probe->reasonCode, $probe->message, $snapshot, $context, $startedAt, $attempt, $probe->evidencePaths, $probe->assertions), false];
+        }
+
+        if ($context->mode === VerificationMode::Permissionless) {
+            return [$this->result(
+                $check,
+                CheckOutcome::EvidenceIncomplete,
+                'NATIVE_OBSERVATION_DISABLED',
+                $probe->message.' Permissionless mode did not drive the Bloom UI and did not request '.$this->permissionText($snapshot).'.',
+                $snapshot,
+                $context,
+                $startedAt,
+                $attempt,
+                [],
+                $probe->assertions,
+            ), false];
         }
 
         $missing = $snapshot->missing($check->requiredPermissions);
@@ -35,10 +50,27 @@ final class VerificationResultClassifier
                 $context,
                 $startedAt,
                 $attempt,
+                [],
+                $probe->assertions,
             ), false];
         }
 
-        return [$this->result($check, CheckOutcome::NotRun, 'NATIVE_OBSERVATION_PENDING', $probe->message, $snapshot, $context, $startedAt, $attempt), true];
+        if ($snapshot->notObserved($check->requiredPermissions) !== []) {
+            return [$this->result(
+                $check,
+                CheckOutcome::EvidenceIncomplete,
+                'PERMISSION_STATE_NOT_OBSERVED',
+                $probe->message.' Molly did not observe the permission state, so it did not call that permission granted or denied.',
+                $snapshot,
+                $context,
+                $startedAt,
+                $attempt,
+                [],
+                $probe->assertions,
+            ), false];
+        }
+
+        return [$this->result($check, CheckOutcome::NotRun, 'NATIVE_OBSERVATION_PENDING', $probe->message, $snapshot, $context, $startedAt, $attempt, [], $probe->assertions), true];
     }
 
     public function finishNative(
@@ -55,7 +87,7 @@ final class VerificationResultClassifier
             ? $check->id.' asked for another native observation after its permission was already granted.'
             : $native->message;
 
-        return $this->result($check, $outcome, $reason, $message, $snapshot, $context, $startedAt, $attempt, $native->evidencePaths);
+        return $this->result($check, $outcome, $reason, $message, $snapshot, $context, $startedAt, $attempt, $native->evidencePaths, $native->assertions);
     }
 
     public function harness(
@@ -70,7 +102,10 @@ final class VerificationResultClassifier
         return $this->result($check, CheckOutcome::HarnessFail, $reasonCode, $message, $snapshot, $context, $startedAt, $attempt);
     }
 
-    /** @param  list<string>  $evidencePaths */
+    /**
+     * @param  list<string>  $evidencePaths
+     * @param  list<CheckAssertion>  $assertions
+     */
     private function result(
         VerificationCheckDefinition $check,
         CheckOutcome $outcome,
@@ -81,6 +116,7 @@ final class VerificationResultClassifier
         DateTimeImmutable $startedAt,
         int $attempt,
         array $evidencePaths = [],
+        array $assertions = [],
     ): VerificationCheckResult {
         return new VerificationCheckResult(
             $check->id,
@@ -101,7 +137,13 @@ final class VerificationResultClassifier
             $evidencePaths,
             $check->stage,
             $attempt,
+            $assertions,
         );
+    }
+
+    private function permissionText(VerifierPermissionSnapshot $snapshot): string
+    {
+        return 'Screen Recording ('.$snapshot->screenRecording->value.') or Accessibility ('.$snapshot->accessibility->value.')';
     }
 
     private function terminal(CheckOutcome $outcome): bool

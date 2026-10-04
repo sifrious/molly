@@ -21,15 +21,34 @@ final class PermissionPreflight
      */
     public function run(string $evidenceRoot, string $runId, string $candidateSha, bool $requestMissing): array
     {
-        $before = $this->inspector->inspect();
-        $request = $requestMissing && $this->shouldRequest($before)
-            ? $this->requester->requestMissing($before)
-            : PermissionRequestResult::fromInspection($before, $before, false, []);
+        $inspectionError = null;
+        try {
+            $before = $this->inspector->inspect();
+            $inspectionStatus = 'observed';
+        } catch (Throwable $exception) {
+            $before = VerifierPermissionSnapshot::unobserved(VerifierProcessIdentity::capture());
+            $inspectionStatus = 'not_observed';
+            $inspectionError = $exception->getMessage();
+        }
+        try {
+            $request = $requestMissing && $inspectionStatus === 'observed' && $this->shouldRequest($before)
+                ? $this->requester->requestMissing($before)
+                : PermissionRequestResult::fromInspection($before, $before, false, []);
+        } catch (Throwable $exception) {
+            $request = PermissionRequestResult::fromInspection($before, $before, false, []);
+            $inspectionStatus = 'not_observed';
+            $inspectionError = $exception->getMessage();
+        }
         $after = $request->after;
         $affected = [];
+        $notObserved = [];
         $unaffected = [];
         foreach ($this->catalog->checks() as $check) {
-            if ($after->missing($check->requiredPermissions) !== []) {
+            if ($check->requiredPermissions === []) {
+                $unaffected[] = $check->id;
+            } elseif ($after->notObserved($check->requiredPermissions) !== []) {
+                $notObserved[] = $check->id;
+            } elseif ($after->missing($check->requiredPermissions) !== []) {
                 $affected[] = $check->id;
             } else {
                 $unaffected[] = $check->id;
@@ -59,6 +78,8 @@ final class PermissionPreflight
             'bundle_id' => $after->process->bundleId,
             'screen_recording' => $after->screenRecording->value,
             'accessibility' => $after->accessibility->value,
+            'inspection_status' => $inspectionStatus,
+            'inspection_error' => $inspectionError,
             'preflight_at' => JsonDocument::formatTime($at),
             'request_attempted' => $request->requestAttempted,
             'settings_opened' => $request->settingsOpened,
@@ -68,6 +89,7 @@ final class PermissionPreflight
             'previous_disposition' => $history['previous'],
             'changed_since_previous' => $history['changed'],
             'checks_affected' => $affected,
+            'checks_permission_not_observed' => $notObserved,
             'checks_unaffected' => $unaffected,
             'message' => $request->message,
             'snapshot' => $after,
@@ -86,8 +108,10 @@ final class PermissionPreflight
             'macos_version' => null,
             'process' => VerifierProcessIdentity::capture()->toArray(),
             'bundle_id' => null,
-            'screen_recording' => null,
-            'accessibility' => null,
+            'screen_recording' => PermissionState::Unknown->value,
+            'accessibility' => PermissionState::Unknown->value,
+            'inspection_status' => 'not_observed',
+            'inspection_error' => $exception->getMessage(),
             'preflight_at' => JsonDocument::formatTime(new DateTimeImmutable('now', new DateTimeZone('UTC'))),
             'request_attempted' => false,
             'settings_opened' => [],
@@ -97,9 +121,10 @@ final class PermissionPreflight
             'previous_disposition' => PermissionHistoryDisposition::NeverChecked->value,
             'changed_since_previous' => false,
             'checks_affected' => [],
+            'checks_permission_not_observed' => [],
             'checks_unaffected' => [],
             'message' => $exception->getMessage(),
-            'snapshot' => null,
+            'snapshot' => VerifierPermissionSnapshot::unobserved(VerifierProcessIdentity::capture()),
             'harness_failure' => true,
         ];
     }
@@ -122,6 +147,9 @@ final class PermissionPreflight
     private function disposition(VerifierPermissionSnapshot $snapshot, bool $requestAttempted): PermissionHistoryDisposition
     {
         $states = [$snapshot->screenRecording, $snapshot->accessibility];
+        if (in_array(PermissionState::Unknown, $states, true)) {
+            return PermissionHistoryDisposition::NeverChecked;
+        }
         if (! in_array(PermissionState::Denied, $states, true)
             && ! in_array(PermissionState::NotDetermined, $states, true)
             && in_array(PermissionState::Granted, $states, true)) {

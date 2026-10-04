@@ -6,24 +6,32 @@ use InvalidArgumentException;
 
 final readonly class ProbeResult
 {
-    /** @param  list<string>  $evidencePaths */
+    /**
+     * @param  list<string>  $evidencePaths
+     * @param  list<CheckAssertion>  $assertions
+     */
     public function __construct(
         public ProbeDisposition $disposition,
         public CheckOutcome $outcome,
         public string $reasonCode,
         public string $message,
         public array $evidencePaths = [],
+        public array $assertions = [],
     ) {}
 
-    /** @param  list<string>  $evidencePaths */
-    public static function complete(CheckOutcome $outcome, string $reasonCode, string $message, array $evidencePaths = []): self
+    /**
+     * @param  list<string>  $evidencePaths
+     * @param  list<CheckAssertion>  $assertions
+     */
+    public static function complete(CheckOutcome $outcome, string $reasonCode, string $message, array $evidencePaths = [], array $assertions = []): self
     {
-        return new self(ProbeDisposition::Complete, $outcome, $reasonCode, $message, $evidencePaths);
+        return new self(ProbeDisposition::Complete, $outcome, $reasonCode, $message, $evidencePaths, $assertions);
     }
 
-    public static function needsNative(string $reasonCode, string $message): self
+    /** @param  list<CheckAssertion>  $assertions */
+    public static function needsNative(string $reasonCode, string $message, array $assertions = []): self
     {
-        return new self(ProbeDisposition::NeedsNative, CheckOutcome::NotRun, $reasonCode, $message);
+        return new self(ProbeDisposition::NeedsNative, CheckOutcome::NotRun, $reasonCode, $message, [], $assertions);
     }
 
     /** @param  array<string, mixed>  $data */

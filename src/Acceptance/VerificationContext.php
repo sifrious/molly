@@ -21,7 +21,27 @@ final readonly class VerificationContext
         public array $nativeObservations = [],
         public array $harnessBroken = [],
         public array $sharedState = [],
+        public string $projectRoot = '',
+        public ?string $mollyHome = null,
     ) {}
+
+    public function withProject(string $projectRoot): self
+    {
+        return new self(
+            $this->candidateSha,
+            $this->runId,
+            $this->repoRoot,
+            $this->evidenceRoot,
+            $this->mode,
+            $this->hostTelemetryPath,
+            $this->observations,
+            $this->nativeObservations,
+            $this->harnessBroken,
+            $this->sharedState,
+            $projectRoot,
+            $this->mollyHome,
+        );
+    }
 
     public function forRun(string $runId, string $candidateSha, string $evidenceRoot, VerificationMode $mode): self
     {
@@ -36,6 +56,8 @@ final readonly class VerificationContext
             $this->nativeObservations,
             $this->harnessBroken,
             $this->sharedState,
+            $this->projectRoot,
+            $this->mollyHome,
         );
     }
 }

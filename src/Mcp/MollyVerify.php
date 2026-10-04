@@ -25,16 +25,18 @@ class MollyVerify extends Tool
             'operation' => ['required', 'in:inspect_permissions,run,run_permissionless,retry_native_ui,latest,check_evidence'],
             'evidence' => ['sometimes', 'string', 'max:500'],
             'candidate' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'project' => ['sometimes', 'nullable', 'string', 'max:500'],
             'check_id' => ['required_if:operation,check_evidence', 'string', 'max:20'],
             'attempt' => ['sometimes', 'integer', 'min:1'],
         ]);
         $evidence = is_string($data['evidence'] ?? null) && $data['evidence'] !== '' ? $data['evidence'] : storage_path('molly/acceptance');
         $candidate = is_string($data['candidate'] ?? null) && $data['candidate'] !== '' ? $data['candidate'] : null;
+        $project = is_string($data['project'] ?? null) && $data['project'] !== '' ? $data['project'] : null;
         $result = match ($data['operation']) {
             'inspect_permissions' => $verify->inspectPermissions($evidence, $candidate),
-            'run' => $verify->verify(VerificationMode::Default, $evidence, $candidate),
-            'run_permissionless' => $verify->verify(VerificationMode::Permissionless, $evidence, $candidate),
-            'retry_native_ui' => $verify->verify(VerificationMode::RetryNativeUi, $evidence, $candidate),
+            'run' => $verify->verify(VerificationMode::Default, $evidence, $candidate, null, $project),
+            'run_permissionless' => $verify->verify(VerificationMode::Permissionless, $evidence, $candidate, null, $project),
+            'retry_native_ui' => $verify->verify(VerificationMode::RetryNativeUi, $evidence, $candidate, null, $project),
             'latest' => $verify->latest($evidence),
             'check_evidence' => $verify->checkEvidence($evidence, $data['check_id'], isset($data['attempt']) ? (int) $data['attempt'] : null),
         };
@@ -59,6 +61,7 @@ class MollyVerify extends Tool
             ])->required(),
             'evidence' => $schema->string()->description('Evidence directory. Defaults to storage/molly/acceptance.'),
             'candidate' => $schema->string()->description('40-character candidate SHA. Defaults to HEAD.'),
+            'project' => $schema->string()->description('Project directory for programmatic Bloom checks.'),
             'check_id' => $schema->string()->description('Check id, required for check_evidence. Example: M04.2.'),
             'attempt' => $schema->integer()->description('Attempt number for check_evidence. Defaults to the latest attempt.'),
         ];

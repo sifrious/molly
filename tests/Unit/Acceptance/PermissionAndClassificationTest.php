@@ -47,8 +47,8 @@ function classificationResult(string $id, CheckOutcome $outcome): VerificationCh
     );
 }
 
-it('keeps granted, denied, not determined, and unsupported separate for both permissions', function () {
-    $states = [PermissionState::Granted, PermissionState::Denied, PermissionState::NotDetermined, PermissionState::Unsupported];
+it('keeps granted, denied, not determined, unsupported, and unknown separate for both permissions', function () {
+    $states = [PermissionState::Granted, PermissionState::Denied, PermissionState::NotDetermined, PermissionState::Unsupported, PermissionState::Unknown];
 
     foreach ($states as $screen) {
         foreach ($states as $accessibility) {
