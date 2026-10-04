@@ -15,13 +15,17 @@ final class StubPermissionPrompt extends MacOsPermissionPrompt
     /** @var list<string> */
     public array $opened = [];
 
-    public function __construct()
+    public function __construct(private bool $attemptsRequest = true)
     {
         parent::__construct(new MacOsTccProbe);
     }
 
     public function request(VerifierPermissionSnapshot $before): bool
     {
+        if (! $this->attemptsRequest) {
+            return false;
+        }
+
         $this->requested = true;
 
         return true;

@@ -159,7 +159,7 @@ Screen Recording and Accessibility belong to the process that drives the Bloom U
 
 The command asks macOS to show its normal permission dialog and can open the Screen Recording or Accessibility pane. It does not write the TCC database, and `permission_granted_by_cli` is true only when a later inspection reports the permission granted. `--permissionless` skips the request, skips Settings, and does not drive the Bloom UI. Programmatic comparisons still run. `release_complete` stays false while a mandatory native observation is missing. `--retry-native-ui` reruns the permission-blocked checks after you change the permission, and it refuses the saved evidence when the candidate SHA or the verifier environment differs. A failed retry inspection leaves the previous check files unchanged.
 
-On a machine that is not a Mac, both permissions are `unsupported`. That is a property of the verifier environment. It is not a Molly product failure, and it is not a grant.
+On a machine that is not a Mac, both permissions are `unsupported`. That is a property of the verifier environment. It is not a Molly product failure, and it is not a grant. On a Mac, Molly reports the state it observed, so a Screen Recording or Accessibility grant stays `granted`. Checks that do not need the permission still run.
 
 ## Limitations
 

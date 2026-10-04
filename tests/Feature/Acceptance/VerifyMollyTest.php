@@ -40,6 +40,7 @@ function verificationSha(): string
 beforeEach(function () {
     $this->verificationDirectories = [];
     $this->mollyHomeBefore = getenv('MOLLY_HOME');
+    app()->instance(MacOsPermissionPrompt::class, new StubPermissionPrompt(false));
 });
 
 function verificationDirectory(): string
@@ -321,6 +322,7 @@ it('keeps running programmatic checks when both permissions are missing', functi
 
 it('runs independent assertions when the platform cannot observe TCC', function () {
     $fixture = bloomFixture();
+    bindPermissions(PermissionState::Unsupported, PermissionState::Unsupported, PHP_OS_FAMILY);
 
     $document = app(VerifyMolly::class)->verify(
         VerificationMode::Default,
@@ -330,14 +332,17 @@ it('runs independent assertions when the platform cannot observe TCC', function 
         $fixture['project'],
     );
 
-    expect(PHP_OS_FAMILY)->not->toBe('Darwin')
+    expect($document['preflight']['platform'])->toBe(PHP_OS_FAMILY)
         ->and($document['preflight']['screen_recording'])->toBe('unsupported')
         ->and($document['preflight']['accessibility'])->toBe('unsupported')
         ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and($document['preflight']['settings_opened'])->toBe([])
+        ->and($document['checks'])->toHaveCount(16)
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
         ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
         ->and($document['summary']['product_failures'])->toBe(0)
-        ->and($document['permission_granted_by_cli'])->toBeFalse();
+        ->and($document['permission_granted_by_cli'])->toBeFalse()
+        ->and($document['release_complete'])->toBeFalse();
 });
 
 it('continues independent checks when permission inspection fails', function () {
@@ -488,7 +493,7 @@ it('rejects stale evidence when the verifier environment changed', function () {
     $first = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $directory, verificationSha());
     $path = $directory.'/runs/'.$first['run_id'].'/result.json';
     $saved = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
-    $saved['environment']['os_family'] = 'Darwin';
+    $saved['environment']['os_family'] = PHP_OS_FAMILY === 'Darwin' ? 'Linux' : 'Darwin';
     file_put_contents($path, json_encode($saved, JSON_THROW_ON_ERROR));
     $before = hash_file('sha256', $path);
 
@@ -553,33 +558,35 @@ it('does not hide a broken plugin seam behind a missing permission', function ()
         ->and($document['summary']['product_failures'])->toBe(1);
 });
 
-it('reports this machine as unsupported and does not claim a grant', function () {
+it('does not claim a grant when the permission observation is unsupported', function () {
     $directory = verificationDirectory();
+    bindPermissions(PermissionState::Unsupported, PermissionState::Unsupported, PHP_OS_FAMILY);
 
-    $permissions = app(MacOsVerifierPermissionInspector::class)->inspect();
     $document = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, verificationSha());
 
-    expect(PHP_OS_FAMILY)->not->toBe('Darwin')
-        ->and($permissions->screenRecording)->toBe(PermissionState::Unsupported)
-        ->and($permissions->accessibility)->toBe(PermissionState::Unsupported)
+    expect($document['preflight']['screen_recording'])->toBe('unsupported')
+        ->and($document['preflight']['accessibility'])->toBe('unsupported')
         ->and($document['permission_granted_by_cli'])->toBeFalse()
-        ->and($document['preflight']['screen_recording'])->toBe('unsupported')
         ->and($document['preflight']['request_attempted'])->toBeFalse()
         ->and($document['preflight']['settings_opened'])->toBe([])
+        ->and($document['checks'])->toHaveCount(16)
         ->and($document['summary']['product_failures'])->toBe(0)
         ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
         ->and($document['release_complete'])->toBeFalse();
 });
 
 it('does not claim the CLI granted a permission the probe did not request', function () {
-    $granted = permissionSnapshot(PermissionState::Granted, PermissionState::Granted);
-    app()->instance(VerifierPermissionInspector::class, new SequencePermissionInspector([$granted]));
+    $prompt = new StubPermissionPrompt(false);
+    $inspector = new SequencePermissionInspector([
+        permissionSnapshot(PermissionState::Granted, PermissionState::Granted),
+    ]);
 
-    $result = app(MacOsVerifierPermissionRequester::class)->requestMissing(
+    $result = (new MacOsVerifierPermissionRequester($inspector, $prompt))->requestMissing(
         permissionSnapshot(PermissionState::NotDetermined, PermissionState::NotDetermined),
     );
 
-    expect($result->requestAttempted)->toBeFalse()
+    expect($prompt->requested)->toBeFalse()
+        ->and($result->requestAttempted)->toBeFalse()
         ->and($result->permissionGrantedByCli)->toBeFalse()
         ->and($result->settingsOpened)->toBe([])
         ->and($result->after->screenRecording)->toBe(PermissionState::Granted);
@@ -608,6 +615,7 @@ it('records a grant only from the inspector after a request, and opens settings 
 it('serves permission inspection through the command and MCP', function () {
     $directory = verificationDirectory();
     $sha = verificationSha();
+    $observed = app(MacOsVerifierPermissionInspector::class)->inspect();
 
     [$exit, $json] = mollyJson('molly:verify', [
         '--check-permissions' => true,
@@ -628,11 +636,18 @@ it('serves permission inspection through the command and MCP', function () {
     ]);
 
     expect($exit)->toBe(0)
-        ->and($json['screen_recording'])->toBe('unsupported')
+        ->and($json['screen_recording'])->toBe($observed->screenRecording->value)
+        ->and($json['accessibility'])->toBe($observed->accessibility->value)
+        ->and($json['request_attempted'])->toBeFalse()
+        ->and($json['settings_opened'])->toBe([])
         ->and($json['permission_granted_by_cli'])->toBeFalse()
         ->and($conflict[0])->toBe(4)
         ->and($conflict[1]['reason_code'])->toBe('VERIFICATION_MODE_CONFLICT');
-    $inspected->assertOk()->assertSee(['unsupported', 'permission_granted_by_cli']);
+    $inspected->assertOk()->assertSee([
+        $observed->screenRecording->value,
+        $observed->accessibility->value,
+        'permission_granted_by_cli',
+    ]);
 });
 
 it('does not ship a TCC reset or a CLI grant', function () {
