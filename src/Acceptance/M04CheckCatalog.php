@@ -15,7 +15,7 @@ final class M04CheckCatalog
         $accessibility = [PermissionKind::Accessibility];
 
         return [
-            $this->check('M04.1', 'Compiled host launches with plugin discovered through extension seam', $screen),
+            $this->check('M04.1', 'Compiled host launches with plugin discovered through extension seam', []),
             $this->check('M04.2', 'New project', $accessibility),
             $this->check('M04.3', 'Add existing project', $accessibility),
             $this->check('M04.4', 'Tasks surface shows and creates tasks', []),
@@ -24,13 +24,13 @@ final class M04CheckCatalog
             $this->check('M04.7', 'Graph surface', []),
             $this->check('M04.8', 'Glossary surface', []),
             $this->check('M04.9', 'Settings match effective run configuration', []),
-            $this->check('M04.10', 'Worker controls/status', $accessibility),
+            $this->check('M04.10', 'Worker controls/status', []),
             $this->check('M04.11', 'Traceability task to run to conversation to diff to receipt', []),
             $this->check('M04.12', 'CLI changes visible in Bloom', $screen),
             $this->check('M04.13', 'Incompatible plugin apiVersion produces useful error', []),
             $this->check('M04.14', 'Missing host handled', []),
             $this->check('M04.15', 'Broken assets/routes detected', []),
-            $this->check('M04.16', 'State survives reload and host restart', $screen),
+            $this->check('M04.16', 'State survives reload and host restart', []),
         ];
     }
 

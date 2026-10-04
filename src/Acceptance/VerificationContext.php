@@ -23,6 +23,7 @@ final readonly class VerificationContext
         public array $sharedState = [],
         public string $projectRoot = '',
         public ?string $mollyHome = null,
+        public ?BloomHostSnapshot $host = null,
     ) {}
 
     public function withProject(string $projectRoot): self
@@ -40,6 +41,26 @@ final readonly class VerificationContext
             $this->sharedState,
             $projectRoot,
             $this->mollyHome,
+            $this->host,
+        );
+    }
+
+    public function withHost(BloomHostSnapshot $host): self
+    {
+        return new self(
+            $this->candidateSha,
+            $this->runId,
+            $this->repoRoot,
+            $this->evidenceRoot,
+            $this->mode,
+            $this->hostTelemetryPath,
+            $this->observations,
+            $this->nativeObservations,
+            $this->harnessBroken,
+            $this->sharedState,
+            $this->projectRoot,
+            $this->mollyHome,
+            $host,
         );
     }
 
@@ -58,6 +79,7 @@ final readonly class VerificationContext
             $this->sharedState,
             $this->projectRoot,
             $this->mollyHome,
+            $this->host,
         );
     }
 }

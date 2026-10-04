@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Acceptance\BloomHostInspector;
 use Sifrious\Molly\Acceptance\CheckOutcome;
 use Sifrious\Molly\Acceptance\CompiledHostBloomObserver;
 use Sifrious\Molly\Acceptance\MacOsPermissionPrompt;
@@ -20,6 +21,9 @@ use Sifrious\Molly\Actions\VerifyMolly;
 use Sifrious\Molly\Conversations\Conversation;
 use Sifrious\Molly\Conversations\ConversationStore;
 use Sifrious\Molly\Journal\JournalRenderer;
+use Sifrious\Molly\Knowledge\Graph;
+use Sifrious\Molly\Knowledge\GraphNode;
+use Sifrious\Molly\Knowledge\GraphSource;
 use Sifrious\Molly\Mcp\MollyServer;
 use Sifrious\Molly\Mcp\MollyVerify;
 use Sifrious\Molly\Models\Run;
@@ -152,6 +156,36 @@ function bloomFixture(string $effectiveModel = 'local-test-model'): array
     return ['home' => $home, 'project' => $project, 'evidence' => verificationDirectory()];
 }
 
+function bloomPluginDirectory(string $id = 'sifrious.molly', int $apiVersion = 1, bool $enabled = true): string
+{
+    $directory = verificationDirectory().'/Bloom/Plugins';
+    mkdir($directory.'/sifrious.molly', 0700, true);
+    file_put_contents($directory.'/sifrious.molly/plugin.json', json_encode([
+        'id' => $id,
+        'apiVersion' => $apiVersion,
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($directory.'/enabled.json', json_encode($enabled ? [$id] : [], JSON_THROW_ON_ERROR));
+
+    return $directory;
+}
+
+function bloomProcessListing(int $pid = 4242): string
+{
+    return $pid." /Applications/Bloom.app/Contents/MacOS/Bloom\n";
+}
+
+function seedTaskGraph(string $project): string
+{
+    $database = $project.'/.molly/knowledge.sqlite';
+    config()->set('molly.knowledge.database', $database);
+    $version = substr(hash('sha256', $project), 0, 12);
+    $source = new GraphSource('project', $version, 'task', 'task-1', 'Saved task', $project.'/.molly/tasks');
+    $node = new GraphNode('project', $version, 'task', 'Task', 'Task', [$source->id()]);
+    app(Graph::class)->replace('project', $version, [$source], [$node], []);
+
+    return $database;
+}
+
 function outcomeOf(array $document, string $id): string
 {
     return checkRow($document, $id)['outcome'];
@@ -179,6 +213,7 @@ function attemptPath(string $directory, array $document, string $id, int $attemp
 }
 
 afterEach(function () {
+    config()->set('molly.knowledge.database', '.molly/knowledge.sqlite');
     $previous = $this->mollyHomeBefore;
     if (! is_string($previous) || $previous === '') {
         putenv('MOLLY_HOME');
@@ -230,6 +265,185 @@ it('collects the same programmatic evidence from the command and MCP', function 
         ->and(checkRow($document, 'M04.4')['assertions'][0]['actual'])->toBe(checkRow($cli, 'M04.4')['assertions'][0]['actual']);
 });
 
+it('collects the same host telemetry from the command and MCP', function () {
+    $fixture = bloomFixture();
+    $plugins = bloomPluginDirectory();
+    $database = seedTaskGraph($fixture['project']);
+    $inspector = new BloomHostInspector(bloomProcessListing(), $plugins);
+    $observer = new CompiledHostBloomObserver;
+    $prompt = new class(new MacOsTccProbe) extends MacOsPermissionPrompt
+    {
+        public int $requests = 0;
+
+        public int $settings = 0;
+
+        public function request(VerifierPermissionSnapshot $before): bool
+        {
+            $this->requests++;
+
+            return false;
+        }
+
+        public function openSettings(VerifierPermissionSnapshot $after): array
+        {
+            $this->settings++;
+
+            return ['settings'];
+        }
+    };
+    app()->instance(BloomHostInspector::class, $inspector);
+    app()->instance(CompiledHostBloomObserver::class, $observer);
+    app()->instance(MacOsPermissionPrompt::class, $prompt);
+    bindPermissions(PermissionState::Denied, PermissionState::Denied);
+    $sha = verificationSha();
+
+    [$exit, $cli] = mollyJson('molly:verify', [
+        '--permissionless' => true,
+        '--candidate' => $sha,
+        '--evidence' => $fixture['evidence'],
+        '--project' => $fixture['project'],
+    ]);
+    $mcp = MollyServer::tool(MollyVerify::class, [
+        'operation' => 'run_permissionless',
+        'evidence' => verificationDirectory(),
+        'candidate' => $sha,
+        'project' => $fixture['project'],
+    ]);
+    $mcp->assertOk();
+    $method = new ReflectionMethod($mcp, 'structuredContent');
+    $method->setAccessible(true);
+    $document = $method->invoke($mcp);
+
+    expect($exit)->toBe(3)
+        ->and($inspector->inspections)->toBe(2)
+        ->and($observer->calls)->toBe(0)
+        ->and($prompt->requests)->toBe(0)
+        ->and($prompt->settings)->toBe(0)
+        ->and($cli['native_checks_run'])->toBe([])
+        ->and($document['native_checks_run'])->toBe([])
+        ->and($cli['native_observation'])->toBe('disabled_by_mode')
+        ->and($document['native_observation'])->toBe('disabled_by_mode')
+        ->and($cli['preflight']['request_attempted'])->toBeFalse()
+        ->and($cli['preflight']['settings_opened'])->toBe([])
+        ->and($cli['preflight']['accessibility'])->toBe('denied')
+        ->and($cli['host']['running'])->toBeTrue()
+        ->and($cli['host']['pid'])->toBe(4242)
+        ->and($cli['host']['plugin_id'])->toBe('sifrious.molly')
+        ->and($cli['host']['enabled'])->toBeTrue()
+        ->and($document['host'])->toBe($cli['host'])
+        ->and($cli['release_complete'])->toBeFalse()
+        ->and($document['release_complete'])->toBeFalse()
+        ->and($cli['summary']['product_failures'])->toBe(0);
+
+    foreach (['M04.1', 'M04.7', 'M04.10', 'M04.13', 'M04.15', 'M04.16'] as $id) {
+        $left = checkRow($cli, $id);
+        $right = checkRow($document, $id);
+        expect($left['outcome'])->toBe('PASS')
+            ->and($right['outcome'])->toBe('PASS')
+            ->and($right['reason_code'])->toBe($left['reason_code'])
+            ->and($left['assertions'])->not->toBeEmpty();
+        foreach ($left['assertions'] as $index => $assertion) {
+            expect($assertion['candidate_sha'])->toBe($sha)
+                ->and($assertion['run_id'])->toBe($cli['run_id'])
+                ->and($assertion['assertion'])->not->toBe('')
+                ->and($assertion['expected'])->not->toBe('')
+                ->and($assertion['actual'])->not->toBe('')
+                ->and($assertion['source_artifact'])->not->toBe('')
+                ->and($right['assertions'][$index]['expected'])->toBe($assertion['expected'])
+                ->and($right['assertions'][$index]['actual'])->toBe($assertion['actual'])
+                ->and($right['assertions'][$index]['source_artifact'])->toBe($assertion['source_artifact'])
+                ->and($right['assertions'][$index]['candidate_sha'])->toBe($sha)
+                ->and($right['assertions'][$index]['run_id'])->toBe($document['run_id']);
+        }
+    }
+
+    expect(reasonOf($cli, 'M04.1'))->toBe('HOST_PLUGIN_DISCOVERED')
+        ->and(reasonOf($cli, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($cli, 'M04.3'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.3'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($cli, 'M04.12'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.12'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(checkRow($cli, 'M04.7')['assertions'][0]['source_artifact'])->toBe($database)
+        ->and(checkRow($cli, 'M04.7')['assertions'][0]['actual'])->toBe(checkRow($document, 'M04.7')['assertions'][0]['actual']);
+});
+
+it('reports a wrong plugin id as a product failure when accessibility is missing', function () {
+    $fixture = bloomFixture();
+    $observer = new CompiledHostBloomObserver;
+    app()->instance(BloomHostInspector::class, new BloomHostInspector(bloomProcessListing(), bloomPluginDirectory('other.plugin')));
+    app()->instance(CompiledHostBloomObserver::class, $observer);
+    bindPermissions(PermissionState::Granted, PermissionState::Denied);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.1'))->toBe('PRODUCT_FAIL')
+        ->and(reasonOf($document, 'M04.1'))->toBe('HOST_PLUGIN_NOT_DISCOVERED')
+        ->and(checkRow($document, 'M04.1')['assertions'][2]['expected'])->toBe('sifrious.molly apiVersion 1 enabled')
+        ->and(checkRow($document, 'M04.1')['assertions'][2]['actual'])->toContain('other.plugin')
+        ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.10'))->toBe('PASS')
+        ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and($observer->calls)->toBe(0)
+        ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and($document['preflight']['settings_opened'])->toBe([])
+        ->and($document['preflight']['accessibility'])->toBe('denied')
+        ->and($document['summary']['product_failures'])->toBe(1)
+        ->and($document['exit_code'])->toBe(1)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
+it('does not accept a host telemetry file that claims the plugin was discovered', function () {
+    $fixture = bloomFixture();
+    $empty = verificationDirectory().'/Plugins';
+    mkdir($empty, 0700, true);
+    file_put_contents($fixture['project'].'/host-telemetry.json', json_encode([
+        'plugin_discovered' => true,
+        'plugin_id' => 'sifrious.molly',
+        'outcome' => 'PASS',
+    ], JSON_THROW_ON_ERROR));
+    app()->instance(BloomHostInspector::class, new BloomHostInspector("999 /usr/bin/php /tmp/bloom-plugin/build.php\n", $empty));
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $context = new VerificationContext(
+        verificationSha(),
+        '',
+        PackageRoot::path(),
+        $fixture['evidence'],
+        VerificationMode::Permissionless,
+        $fixture['project'].'/host-telemetry.json',
+        [
+            'M04.1' => [
+                'disposition' => 'complete',
+                'outcome' => CheckOutcome::Pass->value,
+                'reason_code' => 'PROGRAMMATIC_PASS',
+                'message' => 'caller said pass',
+            ],
+        ],
+        [],
+        [],
+        [],
+        $fixture['project'],
+    );
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        $context,
+    );
+
+    expect(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
+        ->and(reasonOf($document, 'M04.1'))->toBe('COMPILED_HOST_NOT_OBSERVED')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($document['release_complete'])->toBeFalse();
+});
+
 it('does not drive native UI in permissionless mode when both permissions are granted', function () {
     $fixture = bloomFixture();
     $observer = new CompiledHostBloomObserver;
@@ -272,6 +486,11 @@ it('does not drive native UI in permissionless mode when both permissions are gr
         ->and($document['preflight']['request_attempted'])->toBeFalse()
         ->and($document['preflight']['settings_opened'])->toBe([])
         ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.3'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.12'))->toBe('NATIVE_OBSERVATION_DISABLED')
+        ->and(reasonOf($document, 'M04.1'))->toBe('COMPILED_HOST_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.16'))->toBe('RESTART_HOST_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.13'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
         ->and($document['release_complete'])->toBeFalse()
         ->and($document['summary']['product_failures'])->toBe(0);
@@ -291,7 +510,8 @@ it('still runs independent assertions when accessibility is missing', function (
 
     expect(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
         ->and(outcomeOf($document, 'M04.3'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_VERIFIER_PERMISSION')
+        ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_PREREQUISITE')
+        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_HOST_NOT_OBSERVED')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
         ->and(outcomeOf($document, 'M04.9'))->toBe('PASS')
         ->and($document['summary']['product_failures'])->toBe(0)

@@ -137,6 +137,6 @@ it('keeps screen recording checks and accessibility checks distinct', function (
         }
     }
 
-    expect($screen)->toBe(['M04.1', 'M04.12', 'M04.16'])
-        ->and($accessibility)->toBe(['M04.2', 'M04.3', 'M04.10']);
+    expect($screen)->toBe(['M04.12'])
+        ->and($accessibility)->toBe(['M04.2', 'M04.3']);
 });

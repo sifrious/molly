@@ -6,6 +6,8 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Sifrious\Molly\Acceptance\BloomHostInspector;
+use Sifrious\Molly\Acceptance\BloomHostSnapshot;
 use Sifrious\Molly\Acceptance\CheckOutcome;
 use Sifrious\Molly\Acceptance\EvidenceRecorder;
 use Sifrious\Molly\Acceptance\M04CheckCatalog;
@@ -29,6 +31,7 @@ class VerifyMolly
         private VerificationRunner $runner,
         private EvidenceRecorder $evidence,
         private M04CheckCatalog $catalog,
+        private BloomHostInspector $hosts,
     ) {}
 
     /** @return array<string, mixed> */
@@ -194,10 +197,11 @@ class VerifyMolly
             $preflight['screen_recording'] = $snapshot->screenRecording->value;
             $preflight['accessibility'] = $snapshot->accessibility->value;
         }
+        $context = $context->withHost($this->hosts->inspect());
         $executed = $this->runner->run($plan, $snapshot, $context);
         $results = $this->merge($previous, $executed['results']);
         $selected = array_map(fn ($check): string => $check->id, $plan->checks);
-        $document = $this->document($mode, $sha, $runId, $started, $results, $preflight, $executed['native_checks_run'], $previous, null, $selected);
+        $document = $this->document($mode, $sha, $runId, $started, $results, $preflight, $executed['native_checks_run'], $previous, null, $selected, $context->host);
         $this->evidence->writePreflight($evidenceRoot, $runId, $this->publicPreflight($preflight), $this->evidence->preflightAttempt($evidenceRoot, $runId));
         $this->evidence->writeRun($evidenceRoot, $runId, $document);
 
@@ -252,6 +256,7 @@ class VerifyMolly
         ?array $previous,
         ?string $message,
         array $selectedChecks,
+        ?BloomHostSnapshot $host,
     ): array {
         $summary = VerificationSummary::fromResults($results);
         $finished = new DateTimeImmutable('now', new DateTimeZone('UTC'));
@@ -281,6 +286,7 @@ class VerifyMolly
             'preflight' => $this->publicPreflight($preflight),
             'checks' => array_map(fn (VerificationCheckResult $result): array => $result->toArray(), $results),
             'native_observation' => $mode === VerificationMode::Permissionless ? 'disabled_by_mode' : 'available',
+            'host' => $host instanceof BloomHostSnapshot ? $host->toArray() : null,
             'native_checks_run' => $nativeChecksRun,
             'retried_checks' => $mode === VerificationMode::RetryNativeUi ? $selectedChecks : [],
             'permission_blocked_checks' => $blocked,
