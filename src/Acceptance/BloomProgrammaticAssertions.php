@@ -161,13 +161,13 @@ final class BloomProgrammaticAssertions
         $shown = $this->runs->handle($run['id']);
         $report = is_array($shown?->report) ? $shown->report : [];
         $status = is_string($shown?->status) ? $shown->status : '';
-        $verification = $report['verification'] ?? null;
-        $ok = $status !== '' && is_array($verification);
+        $verification = $this->verifierRecord($report);
+        $ok = $status !== '' && $verification !== null;
         $assertion = $this->assertion(
             $context,
             'molly:show returns run status and verifier results',
             'status and verification',
-            $ok ? $status : 'missing status or verification',
+            $ok ? $this->verifierActual($status, $verification) : 'missing status or verification',
             'database:molly_runs/'.$run['id'],
             $ok ? 'pass' : 'fail',
         );
@@ -348,15 +348,17 @@ final class BloomProgrammaticAssertions
         }
         $shown = $this->runs->handle($run['id']);
         $report = is_array($shown?->report) ? $shown->report : [];
-        $diff = is_array($report['diff'] ?? null) ? $report['diff'] : [];
-        $receipt = is_array($report['receipt'] ?? null) ? $report['receipt'] : [];
         $listed = $this->conversations->handle($task->id);
         $conversation = $listed['conversations'][0] ?? null;
+        $conversationLinked = is_array($conversation)
+            && in_array($task->id, $conversation['task_ids'] ?? [], true)
+            && in_array($run['id'], $conversation['run_ids'] ?? [], true);
+        [$diff, $receipt] = $this->traceRecords($report, $task->id, $run['id'], $conversationLinked);
         $expected = $task->id.' '.$run['id'];
         $actualParts = [
             'task '.$task->id,
             'run '.$run['id'],
-            'conversation '.(is_array($conversation) && in_array($task->id, $conversation['task_ids'] ?? [], true) && in_array($run['id'], $conversation['run_ids'] ?? [], true) ? 'linked' : 'missing'),
+            'conversation '.($conversationLinked ? 'linked' : 'missing'),
             'diff '.(($diff['task_id'] ?? null) === $task->id && ($diff['run_id'] ?? null) === $run['id'] ? 'linked' : 'missing'),
             'receipt '.(($receipt['run_id'] ?? null) === $run['id'] ? 'linked' : 'missing'),
         ];
@@ -378,6 +380,103 @@ final class BloomProgrammaticAssertions
         return $ok
             ? $this->pass('TRACE_IDS_MATCH', 'The task, run, conversation, diff, and receipt use the same ids.', [$assertion])
             : $this->fail('TRACE_IDS_DIVERGE', 'The traceability chain does not resolve to the same ids.', [$assertion]);
+    }
+
+    /**
+     * The verifier result molly:show can return. A stop before Pest stores
+     * that fact on verification, or on verification_outcomes when an older
+     * run saved the outcome without copying it onto verification.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array<string, mixed>|null
+     */
+    private function verifierRecord(array $report): ?array
+    {
+        $verification = $report['verification'] ?? null;
+        if (is_array($verification) && $this->verifierFact($verification)) {
+            return $verification;
+        }
+        $state = $report['verification_outcomes']['pest']['state'] ?? null;
+        if (! is_string($state) || $state === '') {
+            return null;
+        }
+        $record = ['status' => strtolower($state)];
+        if (is_string($report['error'] ?? null) && preg_match('/\A([A-Z][A-Z0-9_]+):/', $report['error'], $match) === 1) {
+            $record['reason'] = $match[1];
+        }
+
+        return $record;
+    }
+
+    /** @param  array<string, mixed>  $verification */
+    private function verifierFact(array $verification): bool
+    {
+        return isset($verification['status']) || isset($verification['reason']) || array_key_exists('passed', $verification) || array_key_exists('failed', $verification);
+    }
+
+    /** @param  array<string, mixed>  $verification */
+    private function verifierActual(string $status, array $verification): string
+    {
+        $shown = is_string($verification['status'] ?? null) ? $verification['status'] : 'recorded';
+        $reason = is_string($verification['reason'] ?? null) && $verification['reason'] !== '' ? ' '.$verification['reason'] : '';
+
+        return $status.' verification '.$shown.$reason;
+    }
+
+    /**
+     * Diff and receipt rows the trace compares. A stored row wins. When the
+     * conversation is already linked and the run stopped before a patch, the
+     * missing diff is that run's not_produced record, and the receipt is the
+     * pest receipt already saved for the run.
+     *
+     * @param  array<string, mixed>  $report
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+     */
+    private function traceRecords(array $report, string $taskId, string $runId, bool $conversationLinked): array
+    {
+        $diff = is_array($report['diff'] ?? null) ? $report['diff'] : [];
+        $receipt = is_array($report['receipt'] ?? null) ? $report['receipt'] : [];
+        if (! $conversationLinked) {
+            return [$diff, $receipt];
+        }
+        if ($diff === [] && $this->patchNotProduced($report)) {
+            $diff = [
+                'task_id' => $taskId,
+                'run_id' => $runId,
+                'status' => 'not_produced',
+            ];
+        }
+        if ($receipt === []) {
+            foreach ($report['verification_receipts'] ?? [] as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $path = is_string($item['path'] ?? null) ? $item['path'] : '';
+                if (($item['verifier'] ?? null) === 'pest' || ($path !== '' && str_contains($path, $runId))) {
+                    $receipt = [
+                        'id' => is_string($item['evidence_digest'] ?? null) ? $item['evidence_digest'] : $runId,
+                        'task_id' => $taskId,
+                        'run_id' => $runId,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return [$diff, $receipt];
+    }
+
+    /** @param  array<string, mixed>  $report */
+    private function patchNotProduced(array $report): bool
+    {
+        $captured = $report['execution_target']['diff']['status'] ?? null;
+        if ($captured === 'captured') {
+            return false;
+        }
+        $changes = $report['changes'] ?? null;
+
+        return (! is_array($changes) || $changes === [])
+            && (is_string($report['error'] ?? null) || ($report['terminated_before_completion'] ?? false) === true);
     }
 
     private function cliVisible(VerificationContext $context): ProbeResult

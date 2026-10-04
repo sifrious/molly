@@ -397,6 +397,97 @@ it('reports a programmatic defect as a product failure when accessibility is mis
         ->and($document['exit_code'])->toBe(1);
 });
 
+it('shows run status and trace ids when the provider refuses before verification', function () {
+    $fixture = bloomFixture();
+    $run = Run::query()->firstOrFail();
+    $run->update([
+        'status' => 'failed',
+        'report' => [
+            'error' => 'LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.',
+            'terminated_before_completion' => true,
+            'changes' => [],
+            'verification_outcomes' => [
+                'pest' => ['state' => 'NOT_RUN', 'policy' => 'required', 'failure_action' => 'retry'],
+            ],
+            'verification_receipts' => [[
+                'verifier' => 'pest',
+                'state' => 'NOT_RUN',
+                'evidence_digest' => str_repeat('ab', 32),
+                'path' => $fixture['project'].'/.molly/receipts/'.$run->id.'/pest.json',
+            ]],
+        ],
+    ]);
+    bindPermissions(PermissionState::Granted, PermissionState::NotDetermined);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.5'))->toBe('PASS')
+        ->and(reasonOf($document, 'M04.5'))->toBe('RUN_STATUS_SHOWN')
+        ->and(checkRow($document, 'M04.5')['assertions'][0]['actual'])->toBe('failed verification not_run LOCAL_PROVIDER_INVALID')
+        ->and(outcomeOf($document, 'M04.11'))->toBe('PASS')
+        ->and(reasonOf($document, 'M04.11'))->toBe('TRACE_IDS_MATCH')
+        ->and($document['preflight']['request_attempted'])->toBeFalse()
+        ->and($document['preflight']['settings_opened'])->toBe([])
+        ->and($document['summary']['product_failures'])->toBe(0)
+        ->and($document['release_complete'])->toBeFalse()
+        ->and($document['checks'])->toHaveCount(16);
+});
+
+it('keeps a mismatched diff id as a product failure', function () {
+    $fixture = bloomFixture();
+    $run = Run::query()->firstOrFail();
+    $report = $run->report;
+    $report['diff']['run_id'] = 'other-run';
+    $run->update(['report' => $report]);
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.5'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.11'))->toBe('PRODUCT_FAIL')
+        ->and(reasonOf($document, 'M04.11'))->toBe('TRACE_IDS_DIVERGE')
+        ->and($document['summary']['product_failures'])->toBe(1)
+        ->and($document['exit_code'])->toBe(1)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
+it('does not treat a run without a verifier record as shown', function () {
+    $fixture = bloomFixture();
+    $run = Run::query()->firstOrFail();
+    $run->update([
+        'status' => 'failed',
+        'report' => [
+            'error' => 'LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.',
+        ],
+    ]);
+    bindPermissions(PermissionState::Granted, PermissionState::NotDetermined);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.5'))->toBe('PRODUCT_FAIL')
+        ->and(reasonOf($document, 'M04.5'))->toBe('RUN_STATUS_MISSING')
+        ->and($document['summary']['product_failures'])->toBeGreaterThan(0)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
 it('reports a broken fixture as a harness failure', function () {
     $fixture = bloomFixture();
     bindPermissions(PermissionState::Granted, PermissionState::Granted);
