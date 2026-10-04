@@ -30,6 +30,17 @@ it('reads a running bloom process and the enabled plugin', function () {
         ->and($host->pluginSource)->toBe($plugins.'/sifrious.molly/plugin.json');
 });
 
+it('reads the live process list when the caller does not supply one', function () {
+    $plugins = sys_get_temp_dir().'/molly-bloom-plugins-'.bin2hex(random_bytes(4));
+    mkdir($plugins, 0700, true);
+
+    $host = (new BloomHostInspector(null, $plugins))->inspect();
+    File::deleteDirectory($plugins);
+
+    expect($host->processSource)->toBe('ps -ax -o pid=,command=')
+        ->and($host->pluginSource)->toBe($plugins.'/sifrious.molly/plugin.json');
+});
+
 it('leaves the host unobserved when the process list has no compiled bloom', function () {
     $plugins = sys_get_temp_dir().'/molly-bloom-plugins-'.bin2hex(random_bytes(4));
     mkdir($plugins, 0700, true);

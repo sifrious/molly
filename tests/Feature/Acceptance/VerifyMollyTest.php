@@ -174,6 +174,21 @@ function bloomProcessListing(int $pid = 4242): string
     return $pid." /Applications/Bloom.app/Contents/MacOS/Bloom\n";
 }
 
+/**
+ * A process list and plugin directory that do not see a Bloom app already running on the machine.
+ *
+ * @return array{inspector: BloomHostInspector, plugins: string}
+ */
+function isolateBloomHost(): array
+{
+    $plugins = verificationDirectory().'/Bloom/Plugins';
+    mkdir($plugins, 0700, true);
+    $inspector = new BloomHostInspector("999 /usr/bin/php /tmp/not-a-host\n", $plugins);
+    app()->instance(BloomHostInspector::class, $inspector);
+
+    return ['inspector' => $inspector, 'plugins' => $plugins];
+}
+
 function seedTaskGraph(string $project): string
 {
     $database = $project.'/.molly/knowledge.sqlite';
@@ -469,6 +484,7 @@ it('does not drive native UI in permissionless mode when both permissions are gr
     };
     app()->instance(CompiledHostBloomObserver::class, $observer);
     app()->instance(MacOsPermissionPrompt::class, $prompt);
+    $host = isolateBloomHost();
     bindPermissions(PermissionState::Granted, PermissionState::Granted);
 
     $document = app(VerifyMolly::class)->verify(
@@ -489,6 +505,10 @@ it('does not drive native UI in permissionless mode when both permissions are gr
         ->and(reasonOf($document, 'M04.3'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and(reasonOf($document, 'M04.12'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and(reasonOf($document, 'M04.1'))->toBe('COMPILED_HOST_NOT_OBSERVED')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($document['host']['process_source'])->toBe('supplied-process-listing')
+        ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
+        ->and($host['inspector']->inspections)->toBe(1)
         ->and(reasonOf($document, 'M04.16'))->toBe('RESTART_HOST_NOT_OBSERVED')
         ->and(reasonOf($document, 'M04.13'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
@@ -498,6 +518,7 @@ it('does not drive native UI in permissionless mode when both permissions are gr
 
 it('still runs independent assertions when accessibility is missing', function () {
     $fixture = bloomFixture();
+    $host = isolateBloomHost();
     bindPermissions(PermissionState::Granted, PermissionState::Denied);
 
     $document = app(VerifyMolly::class)->verify(
@@ -512,6 +533,10 @@ it('still runs independent assertions when accessibility is missing', function (
         ->and(outcomeOf($document, 'M04.3'))->toBe('BLOCKED_VERIFIER_PERMISSION')
         ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_PREREQUISITE')
         ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_HOST_NOT_OBSERVED')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($document['host']['process_source'])->toBe('supplied-process-listing')
+        ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
+        ->and($host['inspector']->inspections)->toBe(1)
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
         ->and(outcomeOf($document, 'M04.9'))->toBe('PASS')
         ->and($document['summary']['product_failures'])->toBe(0)
@@ -521,6 +546,7 @@ it('still runs independent assertions when accessibility is missing', function (
 
 it('keeps running programmatic checks when both permissions are missing', function () {
     $fixture = bloomFixture();
+    $host = isolateBloomHost();
     bindPermissions(PermissionState::NotDetermined, PermissionState::Denied);
 
     $document = app(VerifyMolly::class)->verify(
@@ -535,6 +561,10 @@ it('keeps running programmatic checks when both permissions are missing', functi
         ->and(outcomeOf($document, 'M04.14'))->toBe('PASS')
         ->and(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
         ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($document['host']['process_source'])->toBe('supplied-process-listing')
+        ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
+        ->and($host['inspector']->inspections)->toBe(1)
         ->and($document['summary']['product_failures'])->toBe(0)
         ->and($document['summary']['passes'])->toBeGreaterThan(0)
         ->and($document['release_complete'])->toBeFalse();
@@ -871,6 +901,7 @@ it('does not hide a broken plugin seam behind a missing permission', function ()
 
 it('does not claim a grant when the permission observation is unsupported', function () {
     $directory = verificationDirectory();
+    $host = isolateBloomHost();
     bindPermissions(PermissionState::Unsupported, PermissionState::Unsupported, PHP_OS_FAMILY);
 
     $document = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, verificationSha());
@@ -883,6 +914,10 @@ it('does not claim a grant when the permission observation is unsupported', func
         ->and($document['checks'])->toHaveCount(16)
         ->and($document['summary']['product_failures'])->toBe(0)
         ->and(outcomeOf($document, 'M04.1'))->toBe('BLOCKED_PREREQUISITE')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($document['host']['process_source'])->toBe('supplied-process-listing')
+        ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
+        ->and($host['inspector']->inspections)->toBe(1)
         ->and($document['release_complete'])->toBeFalse();
 });
 
