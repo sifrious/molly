@@ -66,3 +66,16 @@ Terms you will meet in Molly's reports and pages, with what they mean in practic
 | Recorded pull request, recorded merge | A URL or SHA a person supplied with `--approve`. Molly does not open or merge pull requests. |
 | Thread link | A saved note that an Amp thread relates to a task. Not proof of execution. |
 | Orb | A registered local worker with its own UUID, runtime and model, repository, and approved worktree root. It runs one task at a time in that task's own Git worktree. Hosted Orbs on another machine are not shipped. See [Execution targets](../execution-targets.md#local-orbs). |
+
+## Seam verification
+
+| Term | Meaning |
+| --- | --- |
+| Instruction pack | The complete versioned manifest, prose, schema, plan, examples and template for one seam. Application files override the whole bundled pack. `src/Seams/InstructionPacks.php`. |
+| Seam contract | Explicit target state, production scope, behavior cases, expected outcomes and a reviewed negative control. A class name alone is not a contract. `src/Actions/PreviewSeamTests.php`. |
+| Seam revision | Immutable instruction, contract, baseline, generated-test and policy snapshot attached to a saved planning review. New expectations require a new revision. `src/Models/SeamRevision.php`. |
+| Seam attempt | One durable execution of the next permitted step, stored as an existing Run with linked retries and immutable artifacts. `src/Actions/RequestSeamStep.php` and `src/Actions/RecordSeamAttempt.php`. |
+| Meaningful RED | Protected cases fail by assertion, and an executable baseline probe confirms their declared pre-implementation response. Bootstrap failure is not RED. `src/Actions/VerifySeamBehavior.php`. |
+| Already-implemented path | Explicit intake verification that records GREEN without inventing historical RED. It still requires protected tests and sensitivity checks. `src/Actions/VerifySeamBehavior.php`. |
+| Targeted negative control | One reviewed literal production change in an isolated copy. The named protected case must detect it and cleanup must succeed. `src/Actions/DetectFalseGreen.php`. |
+| Seam handoff acknowledgement | A receiving agent names the exact revision, candidate and evidence digests after verification. This is distinct from the human-approved transfer to a child Bloom workspace. `src/Actions/AcknowledgeSeamHandoff.php`. |

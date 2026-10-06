@@ -1,0 +1,2486 @@
+{
+  "schema_version": 1,
+  "epic": "MME-6576",
+  "seams": [
+    {
+      "source_guide_id": "MME-6421",
+      "name": "Eloquent Models",
+      "parent": "MME-6583",
+      "generator": "MME-6584",
+      "verification": "MME-6585",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6421",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentModelTest.php#L902-L914",
+      "fixtures_and_cases": "Use RefreshDatabase and an orders migration/factory. Test rejected transition leaves the old row intact; guarded input cannot assign privileged fields; null/default casts; dirty vs unchanged save. Do not fake Eloquent when persistence is the claim.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6422",
+      "name": "Casts",
+      "parent": "MME-6586",
+      "generator": "MME-6587",
+      "verification": "MME-6588",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6422",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/EloquentModelCustomCastingTest.php#L86-L122",
+      "fixtures_and_cases": "Install Trimmed as the name cast. Test null, empty string, invalid input and dirty tracking; multi-column casts must assert every stored column. Check serialization separately. A get-only assertion misses a broken setter.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6423",
+      "name": "Attribute Objects",
+      "parent": "MME-6589",
+      "generator": "MME-6590",
+      "verification": "MME-6591",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6423",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Integration/Database/DatabaseEloquentModelAttributeCastingTest.php#L23-L106",
+      "fixtures_and_cases": "Test null policy, serialization, object cache mutation and syncOriginal behavior. Attribute is the combined get/set seam; cross-reference Accessors and Mutators rather than installing competing implementations.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6424",
+      "name": "Accessors",
+      "parent": "MME-6592",
+      "generator": "MME-6593",
+      "verification": "MME-6594",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6424",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentModelTest.php#L2517-L2525",
+      "fixtures_and_cases": "Provide name fixture. Test missing underlying values and hidden/appended output. Query-count test guards list serialization against N+1 calls. Do not assert only that the accessor method exists.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6425",
+      "name": "Mutators",
+      "parent": "MME-6595",
+      "generator": "MME-6596",
+      "verification": "MME-6597",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6425",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentModelTest.php#L1536-L1544",
+      "fixtures_and_cases": "Use RefreshDatabase. Test null only if supported, already-normalized values, repeated assignment and unique constraints after normalization. Assert raw storage, not only transformed reads.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6426",
+      "name": "Local Scopes",
+      "parent": "MME-6598",
+      "generator": "MME-6599",
+      "verification": "MME-6600",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6426",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentLocalScopesTest.php#L24-L33",
+      "fixtures_and_cases": "Test empty results, chained scopes and grouped OR clauses. Prefer returned records for application claims; SQL/binding assertions belong to builder extension contracts.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6427",
+      "name": "Global Scopes",
+      "parent": "MME-6601",
+      "generator": "MME-6602",
+      "verification": "MME-6603",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6427",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentGlobalScopesTest.php#L28-L35",
+      "fixtures_and_cases": "Use an isolated model and DB. Test two tenants/requests, relation queries and deliberate administrative bypass. Do not treat a filter as complete authorization. Reset booted model state if a test changes registrations.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6428",
+      "name": "Gates",
+      "parent": "MME-6604",
+      "generator": "MME-6605",
+      "verification": "MME-6606",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6428",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Auth/AuthAccessGateTest.php#L20-L34",
+      "fixtures_and_cases": "Cover guest behavior, before/after overrides and the actual protected endpoint. Mocking Gate::allows to true does not prove your registered ability.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6429",
+      "name": "Policies",
+      "parent": "MME-6607",
+      "generator": "MME-6608",
+      "verification": "MME-6609",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6429",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Auth/AuthAccessGateTest.php#L136-L152",
+      "fixtures_and_cases": "Test guest, owner, unrelated user and admin override; then a real route with authorization enabled. A directly constructed policy test alone misses registration errors.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6430",
+      "name": "Relationships",
+      "parent": "MME-6610",
+      "generator": "MME-6611",
+      "verification": "MME-6612",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6430",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentRelationshipsTest.php#L34-L49",
+      "fixtures_and_cases": "Test empty relation, eager loading, non-default keys and pivot values if used. Include query count for a list page. A HasMany instance assertion alone cannot catch a wrong key.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6431",
+      "name": "Observers",
+      "parent": "MME-6613",
+      "generator": "MME-6614",
+      "verification": "MME-6615",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6431",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentModelTest.php#L2265-L2275",
+      "fixtures_and_cases": "Define AuditSink and RecordingAuditSink in test fixtures. Do not Event::fake() the observer away. Cover duplicate registration, rollback/no after-commit effect and quiet/bulk operations that intentionally bypass events.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6432",
+      "name": "Model Events",
+      "parent": "MME-6616",
+      "generator": "MME-6617",
+      "verification": "MME-6618",
+      "labels": [
+        "package:laravel/framework",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6432",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentModelTest.php#L929-L941",
+      "fixtures_and_cases": "Supply event constructor accepting Order. This test proves emission only. Test listener behavior separately without faking it; include rollback, veto and bulk-update semantics.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6433",
+      "name": "Controllers",
+      "parent": "MME-6619",
+      "generator": "MME-6620",
+      "verification": "MME-6621",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "executable",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6433",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Routing/RoutingRouteTest.php#L1739-L1760",
+      "fixtures_and_cases": "Register /orders, its request/action and DB fixtures. Test valid 201 and exact returned ID, unauthenticated/forbidden, unknown resource, service failure and no side effects on rejection. Direct method calls miss middleware.",
+      "verification_state": "covered_by_local_fixture_tests"
+    },
+    {
+      "source_guide_id": "MME-6434",
+      "name": "Form Requests",
+      "parent": "MME-6622",
+      "generator": "MME-6623",
+      "verification": "MME-6624",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6434",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Foundation/FoundationFormRequestTest.php#L44-L52",
+      "fixtures_and_cases": "Route must type-hint the request. Add valid data plus injected role test proving role unchanged; denied authorize gives 403; max-length boundary; prepareForValidation behavior. Calling rules() alone does not run validation.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6435",
+      "name": "Action Classes",
+      "parent": "MME-6625",
+      "generator": "MME-6626",
+      "verification": "MME-6627",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6435",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Container/ContainerCallTest.php#L130-L166",
+      "fixtures_and_cases": "Define PriceBook/FixedPriceBook fixtures. Test missing SKU, dependency failure and repeat-call policy. Add real provider-resolution test; use a transport contract test for LivePriceApi. Do not invent a Laravel Action base class.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6436",
+      "name": "Services",
+      "parent": "MME-6628",
+      "generator": "MME-6629",
+      "verification": "MME-6630",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6436",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Container/ContextualBindingTest.php#L11-L55",
+      "fixtures_and_cases": "Contract fixtures as in Action Classes. Verify each contextual consumer, provider binding and sequential request isolation. Use singleton only for state safe across all consumers; request state needs scoped lifetime.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6437",
+      "name": "Jobs",
+      "parent": "MME-6631",
+      "generator": "MME-6632",
+      "verification": "MME-6633",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6437",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Support/SupportTestingBusFakeTest.php#L30-L43",
+      "fixtures_and_cases": "Define writer with durable idempotency equivalent in real adapter. Also assert dispatch payload separately, then serialize/worker-run in integration; timeout, retry exhaustion and failed callback. Queue/Bus fake never executes handle.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6438",
+      "name": "Events",
+      "parent": "MME-6634",
+      "generator": "MME-6635",
+      "verification": "MME-6636",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6438",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Events/EventsDispatcherTest.php#L14-L34",
+      "fixtures_and_cases": "This isolated dispatch test needs no app. Add application registration test and event payload compatibility. Avoid listener-order dependencies; specify exception and after-commit behavior.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6439",
+      "name": "Event Listeners",
+      "parent": "MME-6637",
+      "generator": "MME-6638",
+      "verification": "MME-6639",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6439",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Events/QueuedEventsTest.php#L35-L50",
+      "fixtures_and_cases": "Also dispatch through actual app registration. For ShouldQueue test queue routing/serialization and duplicate delivery independently. Event::fake would suppress the listener under test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6440",
+      "name": "Notifications",
+      "parent": "MME-6640",
+      "generator": "MME-6641",
+      "verification": "MME-6642",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6440",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Notifications/NotificationSenderTest.php#L57-L70",
+      "fixtures_and_cases": "Define OrderNotice with public orderId. This proves intent only: separately persist database notification and assert data/recipient; custom transport error, opt-out, locale and queued delivery.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6441",
+      "name": "Mailables",
+      "parent": "MME-6643",
+      "generator": "MME-6644",
+      "verification": "MME-6645",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6441",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Mail/MailMailableAssertionsTest.php#L11-L17",
+      "fixtures_and_cases": "Supply receipt view and constructor. Add subject, recipient, escaped user text and attachment bytes/MIME tests. Mail::fake checks sending/queueing only; test a local transport separately when headers or encoding matter.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6442",
+      "name": "Pipelines",
+      "parent": "MME-6646",
+      "generator": "MME-6647",
+      "verification": "MME-6648",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6442",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Pipeline/PipelineTest.php#L14-L35",
+      "fixtures_and_cases": "Test order with non-commutative transforms, short-circuit prevents later effects, exceptions and empty pipeline. Do not merely expect next() called once; assert its value and result.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6443",
+      "name": "Transactions",
+      "parent": "MME-6649",
+      "generator": "MME-6650",
+      "verification": "MME-6651",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6443",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseTransactionsTest.php#L61-L79",
+      "fixtures_and_cases": "Also assert the exception explicitly in production test. Exercise commit and rollback callbacks without an outer RefreshDatabase transaction hiding commit. Use production DB for deadlocks/savepoints; an outbox can bridge durable external effects.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6444",
+      "name": "Commands",
+      "parent": "MME-6652",
+      "generator": "MME-6653",
+      "verification": "MME-6654",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "executable",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6444",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Console/CommandTest.php#L34-L67",
+      "fixtures_and_cases": "Register command and run fixture operation. Test dependency failure nonzero exit, invalid options, dry-run no writes and command-to-command wiring. See Console Commands for signature/UI contract; Artisan for registration.",
+      "verification_state": "covered_by_local_fixture_tests"
+    },
+    {
+      "source_guide_id": "MME-6445",
+      "name": "Scheduling",
+      "parent": "MME-6655",
+      "generator": "MME-6656",
+      "verification": "MME-6657",
+      "labels": [
+        "package:laravel/framework",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6445",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Console/Scheduling/ScheduleTest.php#L34-L41",
+      "fixtures_and_cases": "Select by explicit event name in the app to avoid ambiguous fixtures. Test due/not-due boundaries, DST if local time, overlap mutex expiry and release on failure with shared cache. Metadata assertion does not prove execution.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6446",
+      "name": "Query Builder",
+      "parent": "MME-6658",
+      "generator": "MME-6659",
+      "verification": "MME-6660",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6446",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseQueryBuilderTest.php#L52-L58",
+      "fixtures_and_cases": "Create known rows first. Include null, empty IN, pagination order and production dialect. SQL snapshots are appropriate for custom grammar contracts, not every business query.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6447",
+      "name": "Database Connections",
+      "parent": "MME-6661",
+      "generator": "MME-6662",
+      "verification": "MME-6663",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6447",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseConnectionFactoryTest.php#L47-L56",
+      "fixtures_and_cases": "Create isolated reporting DB with two rows and another connection with different data. Test reconnect, transaction isolation and read/write routing with actual supported server; purge resolved connections after test config changes.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6448",
+      "name": "Migrations",
+      "parent": "MME-6664",
+      "generator": "MME-6665",
+      "verification": "MME-6666",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6448",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseMigratorTest.php#L22-L30",
+      "fixtures_and_cases": "Run on disposable DB only. Test clean install and upgrade from previous schema with representative rows; down/up if supported; indexes and constraints on production engine. Never run migrate:fresh against a shared or production DB.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6449",
+      "name": "Seeders",
+      "parent": "MME-6667",
+      "generator": "MME-6668",
+      "verification": "MME-6669",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6449",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseSeederTest.php#L31-L49",
+      "fixtures_and_cases": "Use RefreshDatabase and unique name migration. Test child dependency order and environment restrictions; seeders must not silently send real mail or change production users.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6450",
+      "name": "Factories",
+      "parent": "MME-6670",
+      "generator": "MME-6671",
+      "verification": "MME-6672",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6450",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Database/DatabaseEloquentFactoryTest.php#L112-L166",
+      "fixtures_and_cases": "Test make vs create, explicit override precedence, relationships and callbacks. Random data can fill irrelevant fields; do not let it determine boundary cases.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6451",
+      "name": "Filesystems",
+      "parent": "MME-6673",
+      "generator": "MME-6674",
+      "verification": "MME-6675",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6451",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Filesystem/FilesystemAdapterTest.php#L57-L71",
+      "fixtures_and_cases": "Supply deterministic export fixture. Test invalid path, missing file, write failure and visibility. Fake disk is local: use disposable remote bucket contract test for S3 permissions, metadata and streaming.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6452",
+      "name": "Cache",
+      "parent": "MME-6676",
+      "generator": "MME-6677",
+      "verification": "MME-6678",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6452",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Cache/CacheRepositoryTest.php#L42-L48",
+      "fixtures_and_cases": "Use unique keys and reset resolved stores. Test expiry with controlled clock, tenant isolation, cached null, invalidation and lock contention on actual shared cache; array store cannot prove distributed locking.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6453",
+      "name": "Session",
+      "parent": "MME-6679",
+      "generator": "MME-6680",
+      "verification": "MME-6681",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6453",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Session/SessionStoreTest.php#L19-L36",
+      "fixtures_and_cases": "Also perform subsequent requests proving flash expiration, guest isolation, session regeneration at login and logout invalidation. Use cookie/session middleware. Handler errors need adapter integration tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6454",
+      "name": "HTTP Client",
+      "parent": "MME-6682",
+      "generator": "MME-6683",
+      "verification": "MME-6684",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6454",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Http/HttpClientTest.php#L81-L89",
+      "fixtures_and_cases": "Define HttpPriceBook adapter. Test 404/429/500, malformed JSON and connection failure. Assert retry count and idempotency for writes. A broad Http::fake() default 200 can conceal a wrong URL.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6455",
+      "name": "Broadcasting",
+      "parent": "MME-6685",
+      "generator": "MME-6686",
+      "verification": "MME-6687",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6455",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Broadcasting/BroadcastEventTest.php#L16-L32",
+      "fixtures_and_cases": "Also dispatch through BroadcastEvent with a recording broadcaster to assert channel/name. Test private-channel owner vs other user and socket exclusion; real WebSocket client verifies delivery/reconnect, not Event::fake alone.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6456",
+      "name": "Queues",
+      "parent": "MME-6688",
+      "generator": "MME-6689",
+      "verification": "MME-6690",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6456",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Support/SupportTestingQueueFakeTest.php#L37-L50",
+      "fixtures_and_cases": "Separate enqueue contract from job behavior (Jobs guide). Test real worker serialization, retries, failed jobs, after-commit dispatch and duplicate deliveries using disposable broker/DB.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6457",
+      "name": "Logging",
+      "parent": "MME-6691",
+      "generator": "MME-6692",
+      "verification": "MME-6693",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6457",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Log/LogLoggerTest.php#L17-L28",
+      "fixtures_and_cases": "This checks logging contract; application test must induce actual failure through its service. Assert no tokens/passwords/full payloads, correlation IDs, causal exception and appropriate severity. Do not log every loop iteration.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6458",
+      "name": "Configuration",
+      "parent": "MME-6694",
+      "generator": "MME-6695",
+      "verification": "MME-6696",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6458",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Config/RepositoryTest.php#L50-L62",
+      "fixtures_and_cases": "Provide PriceOptions binding. Test invalid config fails early, default values and config:cache in disposable app. Re-resolve services after changing config; a prebuilt singleton will not magically refresh.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6459",
+      "name": "Environment",
+      "parent": "MME-6697",
+      "generator": "MME-6698",
+      "verification": "MME-6699",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6459",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Foundation/Bootstrap/LoadEnvironmentVariablesTest.php#L41-L52",
+      "fixtures_and_cases": "Application test above is config behavior, not .env loading. For bootstrap test start separate PHP processes with temporary env files, verify cached/uncached behavior and missing required variable; restore env and never print secrets.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6460",
+      "name": "Service Providers",
+      "parent": "MME-6700",
+      "generator": "MME-6701",
+      "verification": "MME-6702",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6460",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Foundation/FoundationApplicationTest.php#L50-L67",
+      "fixtures_and_cases": "Boot real provider/Testbench, no replacement in the registration test. Add behavior test with replaced transport; test discovery, config merge and duplicate boot. Avoid resolving stateful services prematurely.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6461",
+      "name": "Container",
+      "parent": "MME-6703",
+      "generator": "MME-6704",
+      "verification": "MME-6705",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6461",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Container/ContainerExtendTest.php#L11-L38",
+      "fixtures_and_cases": "Test decorator output, inner call on miss and no inner call on hit. Resolve before/after extend if supported contract requires it. Verify scoped/singleton/transient identities and no stale request user.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6462",
+      "name": "Dependency Injection",
+      "parent": "MME-6706",
+      "generator": "MME-6707",
+      "verification": "MME-6708",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6462",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Container/ContextualBindingTest.php#L11-L55",
+      "fixtures_and_cases": "Direct unit test plus app-resolution test. Test contextual consumer mappings and missing binding errors. Do not inject the entire container into domain objects.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6463",
+      "name": "Contracts",
+      "parent": "MME-6709",
+      "generator": "MME-6710",
+      "verification": "MME-6711",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6463",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Container/ContainerTest.php#L91-L103",
+      "fixtures_and_cases": "Configure real adapter sandbox fixture with A=99. Shared suite must cover missing SKU and failure taxonomy, not only happy path. A fake can drift; verify both implement the same semantic contract.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6464",
+      "name": "Routes",
+      "parent": "MME-6712",
+      "generator": "MME-6713",
+      "verification": "MME-6714",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6464",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Routing/RoutingRouteTest.php#L62-L192",
+      "fixtures_and_cases": "Test correct verb, successful response, route name generation and route:cache in disposable app. Verify auth middleware; direct controller calls cannot prove routing.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6465",
+      "name": "Route Groups",
+      "parent": "MME-6715",
+      "generator": "MME-6716",
+      "verification": "MME-6717",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6465",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Routing/RouteRegistrarTest.php#L284-L302",
+      "fixtures_and_cases": "Add authenticated success and unrelated route unaffected; nested middleware ordering, domain/prefix and cached route behavior.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6466",
+      "name": "Route Model Binding",
+      "parent": "MME-6718",
+      "generator": "MME-6719",
+      "verification": "MME-6720",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6466",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Routing/ImplicitRouteBindingTest.php#L18-L35",
+      "fixtures_and_cases": "Register typed user/post handler with scoped binding. Test slug key, missing value, enum invalid case and soft-deleted policy. Binding is not a substitute for permission checks.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6467",
+      "name": "Middleware",
+      "parent": "MME-6721",
+      "generator": "MME-6722",
+      "verification": "MME-6723",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6467",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Routing/RoutingSortedMiddlewareTest.php#L10-L48",
+      "fixtures_and_cases": "Route middleware must remain enabled. Test allowed response preservation, order with authentication, exception path and terminable behavior if used.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6468",
+      "name": "Blade",
+      "parent": "MME-6724",
+      "generator": "MME-6725",
+      "verification": "MME-6726",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6468",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/View/Blade/BladeEchoTest.php#L7-L50",
+      "fixtures_and_cases": "Test empty data and locale. For custom compiler directive assert compiled contract and render output; do not couple application tests to every generated PHP token.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6469",
+      "name": "Blade Components",
+      "parent": "MME-6727",
+      "generator": "MME-6728",
+      "verification": "MME-6729",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6469",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/View/ViewComponentAttributeBagTest.php#L10-L120",
+      "fixtures_and_cases": "Supply anonymous component. Test default type, caller type override, named slots, escaping of untrusted props and class composition; use browser only for actual interactive behavior.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6470",
+      "name": "API Resources",
+      "parent": "MME-6730",
+      "generator": "MME-6731",
+      "verification": "MME-6732",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6470",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Integration/Http/ResourceTest.php#L56-L98",
+      "fixtures_and_cases": "Also test HTTP wrapper/status, pagination links, loaded/unloaded relations and no N+1. Exact allowlist catches accidental token/password leakage.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6471",
+      "name": "Livewire",
+      "parent": "MME-6733",
+      "generator": "MME-6734",
+      "verification": "MME-6735",
+      "labels": [
+        "package:livewire/livewire",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6471",
+      "upstream_test": "https://github.com/livewire/livewire/blob/eee4431ba2d0327876ca9801c4ddbd15c268f3ee/src/Tests/ComponentDependencyInjectionUnitTest.php#L12-L19",
+      "fixtures_and_cases": "Provide component/rules/action. Test valid DB effect, forged IDs and forbidden actions; browser coverage for JS-only interactions and hydration round trips. Direct save() does not exercise hydration security.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6472",
+      "name": "Inertia",
+      "parent": "MME-6736",
+      "generator": "MME-6737",
+      "verification": "MME-6738",
+      "labels": [
+        "package:inertiajs/inertia-laravel",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6472",
+      "upstream_test": "https://github.com/inertiajs/inertia-laravel/blob/4da52b72da39396cad1d3ec8523b6c649009456e/tests/Testing/AssertableInertiaTest.php#L15-L23",
+      "fixtures_and_cases": "Create authorized order fixture. Test partial/deferred props, redirect validation errors, shared prop isolation and browser navigation. Server response tests cannot prove React/Vue rendering.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6473",
+      "name": "Volt",
+      "parent": "MME-6739",
+      "generator": "MME-6740",
+      "verification": "MME-6741",
+      "labels": [
+        "package:livewire/volt",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6473",
+      "upstream_test": "https://github.com/livewire/volt/blob/18ae5b1f4bd900288d4c9db91110eb9d4eb6357a/tests/Feature/FunctionalComponentTest.php#L47-L54",
+      "fixtures_and_cases": "Mount actual named component; test authorized success, forged state and computed state refresh. Include browser test where Alpine/DOM behavior matters; follow installed Volt/Livewire compatibility.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6474",
+      "name": "Artisan",
+      "parent": "MME-6742",
+      "generator": "MME-6743",
+      "verification": "MME-6744",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6474",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Console/ConsoleApplicationTest.php#L41-L51",
+      "fixtures_and_cases": "Test real provider discovery, help/list visibility, output and nonzero failure. Commands guide covers business behavior; Console Commands covers signature and interaction.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6475",
+      "name": "Console Commands",
+      "parent": "MME-6745",
+      "generator": "MME-6746",
+      "verification": "MME-6747",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6475",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Console/CommandSignatureTest.php#L14-L60",
+      "fixtures_and_cases": "Check exact arguments/options, missing required argument, confirmation cancel, invalid input, verbosity and failure exit code. Avoid duplicating all Artisan internals in business tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6476",
+      "name": "Validation",
+      "parent": "MME-6748",
+      "generator": "MME-6749",
+      "verification": "MME-6750",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6476",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Validation/ValidationInvokableRuleTest.php#L16-L32",
+      "fixtures_and_cases": "Add passing, empty/null rules, Unicode policy and nested field errors via named datasets. Test custom rule through Validator, then the real request. Do not send network calls for every keystroke.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6477",
+      "name": "Authentication",
+      "parent": "MME-6751",
+      "generator": "MME-6752",
+      "verification": "MME-6753",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6477",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Auth/AuthGuardTest.php#L34-L49",
+      "fixtures_and_cases": "Also test valid login, guard-specific identity, session regeneration/logout, throttling and disabled users. actingAs bypasses credential verification; use it only when authentication itself is not under test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6478",
+      "name": "Authorization",
+      "parent": "MME-6754",
+      "generator": "MME-6755",
+      "verification": "MME-6756",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6478",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Auth/AuthorizeMiddlewareTest.php#L66-L85",
+      "fixtures_and_cases": "Provide registered policy/route. Test owner success, guest denial and every alternate entry point (API, Livewire, command if exposed). A hidden button is not an authorization test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6479",
+      "name": "CSRF",
+      "parent": "MME-6757",
+      "generator": "MME-6758",
+      "verification": "MME-6759",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6479",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Http/Middleware/PreventRequestForgeryTest.php#L24-L33",
+      "fixtures_and_cases": "Harness requirement: Laravel normally bypasses CSRF during unit testing. Override runningUnitTests in a test middleware subclass or boot a non-testing HTTP process; select token-fallback behavior per installed version. Assert no DB effect, valid token success, missing/mismatched token and same-origin policy. A normal feature test without re-enabling protection proves nothing.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6480",
+      "name": "Encryption",
+      "parent": "MME-6760",
+      "generator": "MME-6761",
+      "verification": "MME-6762",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6480",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Encryption/EncrypterTest.php#L13-L32",
+      "fixtures_and_cases": "Add byte tampering, wrong key, supported old-key rotation and empty input. Never snapshot randomized ciphertext or log secrets/keys; isolate test keys.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6481",
+      "name": "Hashing",
+      "parent": "MME-6763",
+      "generator": "MME-6764",
+      "verification": "MME-6765",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6481",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Hashing/HasherTest.php#L27-L36",
+      "fixtures_and_cases": "Test rehash after configured cost change and algorithm compatibility; use reduced test cost only in testing config. Do not fake hashing in credential verification tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6482",
+      "name": "Localization",
+      "parent": "MME-6766",
+      "generator": "MME-6767",
+      "verification": "MME-6768",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6482",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Translation/TranslationTranslatorTest.php#L20-L36",
+      "fixtures_and_cases": "Provide exact fr translation fixture. Test missing key fallback, plural boundaries, unsupported locale and two sequential users with different locales; reset locale after tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6483",
+      "name": "Telescope",
+      "parent": "MME-6769",
+      "generator": "MME-6770",
+      "verification": "MME-6771",
+      "labels": [
+        "package:laravel/telescope",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6483",
+      "upstream_test": "https://github.com/laravel/telescope/blob/bedfc50a3561c93cd89064643139a51c56bfd8a6/tests/Watchers/QueryWatcherTest.php#L25-L40",
+      "fixtures_and_cases": "Integration sketch: $entries must come from real Telescope storage after flushing; never leave it as an invented helper in runnable tests. Reuse upstream WatcherTestCase setup. Test ignored/internal queries, access gate, secret redaction and disabled watcher; observability must not break the user request.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6484",
+      "name": "Pulse",
+      "parent": "MME-6772",
+      "generator": "MME-6773",
+      "verification": "MME-6774",
+      "labels": [
+        "package:laravel/pulse",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6484",
+      "upstream_test": "https://github.com/laravel/pulse/blob/1087d1be1042ef5dbb52c00e06196a822414f2a7/tests/Feature/Recorders/SlowQueriesTest.php#L11-L55",
+      "fixtures_and_cases": "Supply QueryExecuted event and Pulse migrations/recorder setup; this is a harness sketch. Test threshold just below/equal/above, sampling, bucketing with frozen time and redaction/card authorization. Do not generate real slow requests with sleeps.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6485",
+      "name": "Context",
+      "parent": "MME-6775",
+      "generator": "MME-6776",
+      "verification": "MME-6777",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6485",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Integration/Log/ContextTest.php#L95-L108",
+      "fixtures_and_cases": "Test hidden values absent from logs, queue propagation, missing/invalid payload and independent sequential jobs. Restore/flush context and hooks to avoid contaminating later tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6486",
+      "name": "Feature Flags",
+      "parent": "MME-6778",
+      "generator": "MME-6779",
+      "verification": "MME-6780",
+      "labels": [
+        "package:laravel/pennant",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6486",
+      "upstream_test": "https://github.com/laravel/pennant/blob/d49771e646a7c598509c85f33755e1353bccc7dc/tests/Feature/FeatureManagerTest.php#L31-L42",
+      "fixtures_and_cases": "Use Laravel\\\\Pennant\\\\Feature import and isolated store. Test explicit override, purge, guest scope and rollout fallback; clear cached resolutions. Flags do not replace authorization.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6487",
+      "name": "Time",
+      "parent": "MME-6781",
+      "generator": "MME-6782",
+      "verification": "MME-6783",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6487",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Support/DateFacadeTest.php#L33-L45",
+      "fixtures_and_cases": "Define Expiry value with expires_at. Test one tick before/at/after, timezone conversion and DST. Always restore clock in afterEach/finally; no sleeps. Pure date values may be constructed directly.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6488",
+      "name": "Current User",
+      "parent": "MME-6784",
+      "generator": "MME-6785",
+      "verification": "MME-6786",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6488",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Http/HttpRequestTest.php#L1850-L1858",
+      "fixtures_and_cases": "Add actual authenticated HTTP route test, guest/null behavior, guard selection and sequential requests/jobs for different users. CLI has no implicit HTTP user; require explicit actor.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6489",
+      "name": "Statamic Addon registration",
+      "parent": "MME-6787",
+      "generator": "MME-6788",
+      "verification": "MME-6789",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6489",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Providers/AddonServiceProviderTest.php#L43-L54",
+      "fixtures_and_cases": "Boot the real AddonServiceProvider with AddonTestCase; verify discovery, settings blueprint and config override. Registration-only assertion is insufficient: render the public extension and test duplicate boot.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6490",
+      "name": "Statamic Tags",
+      "parent": "MME-6790",
+      "generator": "MME-6791",
+      "verification": "MME-6792",
+      "labels": [
+        "package:statamic/cms",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6490",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Tags/TagsTest.php#L16-L49",
+      "fixtures_and_cases": "Register a ProductTags fixture and replace this contextual example with its actual tag handle. Test params, tag pairs, missing context and escaped untrusted values. Inject repositories; no production query hidden in template parsing.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6491",
+      "name": "Statamic Modifiers",
+      "parent": "MME-6793",
+      "generator": "MME-6794",
+      "verification": "MME-6795",
+      "labels": [
+        "package:statamic/cms",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6491",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Modifiers/ModifierTest.php#L13-L29",
+      "fixtures_and_cases": "Extend Statamic Modifiers Modifier and register handle. Add Antlers integration proving registration, null/array type policy and composition order. A pure modifier must not do remote IO.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6492",
+      "name": "Statamic Fieldtypes",
+      "parent": "MME-6796",
+      "generator": "MME-6797",
+      "verification": "MME-6798",
+      "labels": [
+        "package:statamic/cms",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6492",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Fields/FieldtypeTest.php#L23-L36",
+      "fixtures_and_cases": "Test process/preProcess round trip, augment vs raw data and validation. Mount the actual CP field for client behavior, including empty/reset state. Keep augmentation pure and repository dependencies replaceable.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6493",
+      "name": "Statamic Blueprints and validation",
+      "parent": "MME-6799",
+      "generator": "MME-6800",
+      "verification": "MME-6801",
+      "labels": [
+        "package:statamic/cms",
+        "Domain behavior"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6493",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Fields/BlueprintTest.php#L37-L48",
+      "fixtures_and_cases": "Use version-specific blueprint structure from upstream. Test hidden/conditional fields, validation failure, fieldsets and locale. Fetch blueprint through repository to verify addon registration; metadata checks alone cannot prove validation.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6494",
+      "name": "Statamic Repositories and Stache",
+      "parent": "MME-6802",
+      "generator": "MME-6803",
+      "verification": "MME-6804",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6494",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Assets/AssetRepositoryTest.php#L23-L52",
+      "fixtures_and_cases": "Create/save an entry in isolated content directory, then reload through repository. Test missing ID, cache rebuild, update/delete invalidation and site isolation. Avoid assuming flat files: repository may use an alternate driver.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6495",
+      "name": "Statamic Query scopes",
+      "parent": "MME-6805",
+      "generator": "MME-6806",
+      "verification": "MME-6807",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6495",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Search/QueryBuilderTest.php#L22-L36",
+      "fixtures_and_cases": "Prepare published and draft fixtures; apply the actual registered scope, not only this underlying query. Test empty results, chained filters, pagination and search index consistency; do not eagerly materialize in a composable scope.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6496",
+      "name": "Statamic Actions",
+      "parent": "MME-6808",
+      "generator": "MME-6809",
+      "verification": "MME-6810",
+      "labels": [
+        "package:statamic/cms",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6496",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Actions/RenameAssetTest.php#L62-L84",
+      "fixtures_and_cases": "Exercise the CP action route with a permitted user and real isolated asset. Assert old path gone, new path present, metadata preserved. Denied user, missing asset, collisions and failure rollback; cannot prove with visibleTo alone.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6497",
+      "name": "Statamic Widgets",
+      "parent": "MME-6811",
+      "generator": "MME-6812",
+      "verification": "MME-6813",
+      "labels": [
+        "package:statamic/cms",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6497",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Widgets/WidgetTest.php#L13-L32",
+      "fixtures_and_cases": "Bind deterministic ReportReader, configure widget, render in CP. Test denied user, empty results, config defaults and locale. A widget canView/permission test must also prevent fetching private data.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6498",
+      "name": "Statamic Permissions and policies",
+      "parent": "MME-6814",
+      "generator": "MME-6815",
+      "verification": "MME-6816",
+      "labels": [
+        "package:statamic/cms",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6498",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Permissions/PermissionsTest.php#L14-L28",
+      "fixtures_and_cases": "Test registered permission in role assignment plus denied/allowed route access; superuser and site-specific permissions. Do not mock Gate to always allow.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6499",
+      "name": "Statamic Events and hooks",
+      "parent": "MME-6817",
+      "generator": "MME-6818",
+      "verification": "MME-6819",
+      "labels": [
+        "package:statamic/cms",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6499",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Support/HookableTest.php#L13-L40",
+      "fixtures_and_cases": "Use actual Hookable target and registered lifecycle name. Test next return propagation, ordering, intentional veto and exceptions; clear static hook registrations. Hook names are target-specific, not universally 'saving'.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6500",
+      "name": "Statamic Search indexes",
+      "parent": "MME-6820",
+      "generator": "MME-6821",
+      "verification": "MME-6822",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6500",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Search/IndexManagerTest.php#L15-L74",
+      "fixtures_and_cases": "Build temporary index with searchable content. Test index selection per site, insert/update/delete, pagination and empty query. Match configured driver API; use sandbox engine for remote search contract.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6501",
+      "name": "Statamic Static cache invalidation",
+      "parent": "MME-6823",
+      "generator": "MME-6824",
+      "verification": "MME-6825",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6501",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/StaticCaching/DefaultInvalidatorTest.php#L48-L58",
+      "fixtures_and_cases": "Use recording/disposable cacher and rules linking entry/asset to dependent URLs. Test targeted invalidation, unrelated URL retained, full flush policy and localized URLs. Verify generated page changes after save.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6502",
+      "name": "Statamic GraphQL extensions",
+      "parent": "MME-6826",
+      "generator": "MME-6827",
+      "verification": "MME-6828",
+      "labels": [
+        "package:statamic/cms",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6502",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Feature/GraphQL/CustomQueryTest.php#L17-L27",
+      "fixtures_and_cases": "Define foo query fixture in provider. Test unknown query, invalid arguments, unauthorized token, private fields and resolver query count. Upstream custom query file includes registration environment hooks.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6503",
+      "name": "Statamic Forms and submissions",
+      "parent": "MME-6829",
+      "generator": "MME-6830",
+      "verification": "MME-6831",
+      "labels": [
+        "package:statamic/cms",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6503",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Forms/SubmissionTest.php#L25-L38",
+      "fixtures_and_cases": "Submit through real form endpoint and assert stored allowed data. Test invalid form, spam/honeypot, CSRF and duplicate/retry behavior; fake mail only when verifying submission, then test mail separately. Isolate content directories.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6504",
+      "name": "Statamic Asset processing",
+      "parent": "MME-6832",
+      "generator": "MME-6833",
+      "verification": "MME-6834",
+      "labels": [
+        "package:statamic/cms",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6504",
+      "upstream_test": "https://github.com/statamic/cms/blob/15b522fd4513b26bafdafe09b754675d6cb38967/tests/Assets/AssetUploaderTest.php#L14-L59",
+      "fixtures_and_cases": "Use explicit namespace from source. Test traversal, Unicode, collision, MIME validation, dimensions and metadata preservation via real temporary file. Filename cleaning is not sufficient authorization/path containment.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6505",
+      "name": "Filament Panel plugins",
+      "parent": "MME-6835",
+      "generator": "MME-6836",
+      "verification": "MME-6837",
+      "labels": [
+        "package:filament/filament",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6505",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Panels/ComponentCachingTest.php#L24-L38",
+      "fixtures_and_cases": "Boot actual panel provider and plugin register/boot methods. Test another panel does not receive resources, plugin config overrides, cached component restoration and tenant access. A getResources assertion needs page behavior companion.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6506",
+      "name": "Filament Resources and pages",
+      "parent": "MME-6838",
+      "generator": "MME-6839",
+      "verification": "MME-6840",
+      "labels": [
+        "package:filament/filament",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6506",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Panels/Resources/Pages/CreateRecordTest.php#L29-L33",
+      "fixtures_and_cases": "Use Pest Livewire plugin and real panel/user fixture. Test required errors, policy denial, hooks and redirects. Set current panel/tenant explicitly. Browser check only for JS-specific behavior.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6507",
+      "name": "Filament Forms and custom fields",
+      "parent": "MME-6841",
+      "generator": "MME-6842",
+      "verification": "MME-6843",
+      "labels": [
+        "package:filament/forms",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6507",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Forms/ValidationTest.php#L18-L36",
+      "fixtures_and_cases": "Assert DB unchanged after failure; valid save, hydration/dehydration, custom field state casts and disabled/nondehydrated behavior. Client input alone never proves server rules.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6508",
+      "name": "Filament Schemas and state",
+      "parent": "MME-6844",
+      "generator": "MME-6845",
+      "verification": "MME-6846",
+      "labels": [
+        "package:filament/schemas",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6508",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Schemas/SchemaTest.php#L16-L21",
+      "fixtures_and_cases": "Test nested state paths, defaults, conditional visibility/dehydration and two component instances. Add actual submission assertion; form-set alone tests only state assignment.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6509",
+      "name": "Filament Tables and filters",
+      "parent": "MME-6847",
+      "generator": "MME-6848",
+      "verification": "MME-6849",
+      "labels": [
+        "package:filament/tables",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6509",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Tables/TableTest.php#L30-L35",
+      "fixtures_and_cases": "Seed matching/nonmatching and unauthorized rows. Test filters, sort ties, pagination, reset and tenant-scoped query. Do not merely assert filter UI exists.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6510",
+      "name": "Filament Actions and bulk actions",
+      "parent": "MME-6850",
+      "generator": "MME-6851",
+      "verification": "MME-6852",
+      "labels": [
+        "package:filament/actions",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6510",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Actions/DeleteActionTest.php#L16-L23",
+      "fixtures_and_cases": "Use actual action location/TestAction when table/schema scoped. Test denied crafted call, cancel, bulk mixed authorization and transaction failure. Visibility tests alone are insufficient.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6511",
+      "name": "Filament Infolists",
+      "parent": "MME-6853",
+      "generator": "MME-6854",
+      "verification": "MME-6855",
+      "labels": [
+        "package:filament/infolists",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6511",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Infolists/StateTest.php#L26-L69",
+      "fixtures_and_cases": "Seed malicious text and assert it is escaped, test nested state, formatting, empty value and unauthorized fields absent. Avoid N+1 during entry rendering.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6512",
+      "name": "Filament Widgets",
+      "parent": "MME-6856",
+      "generator": "MME-6857",
+      "verification": "MME-6858",
+      "labels": [
+        "package:filament/widgets",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6512",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Widgets/WidgetTest.php#L19-L22",
+      "fixtures_and_cases": "Test allowed/denied, tenant-specific aggregates, date/time boundaries, empty data and query budgets. Use injected report reader; browser for chart interactions, PHP for data.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6513",
+      "name": "Filament Notifications",
+      "parent": "MME-6859",
+      "generator": "MME-6860",
+      "verification": "MME-6861",
+      "labels": [
+        "package:filament/notifications",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6513",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Notifications/NotificationTest.php#L24-L28",
+      "fixtures_and_cases": "Trigger actual action, assert expected notification and saved state. Test validation/no success message, failure redaction and database recipient isolation. Notifications are not proof that the operation succeeded.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6514",
+      "name": "Filament Render hooks",
+      "parent": "MME-6862",
+      "generator": "MME-6863",
+      "verification": "MME-6864",
+      "labels": [
+        "package:filament/support",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6514",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Support/RenderHooksTest.php#L11-L20",
+      "fixtures_and_cases": "Use exact hook from installed version. Test scoped hooks apply only to intended page/panel, ordering and escaping. Reset hook registry between tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6515",
+      "name": "Filament Imports",
+      "parent": "MME-6865",
+      "generator": "MME-6866",
+      "verification": "MME-6867",
+      "labels": [
+        "package:filament/actions",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6515",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Actions/ImportActionSubmissionTest.php#L39-L77",
+      "fixtures_and_cases": "Provide uploaded CSV, required column map and options. Submission test proves job payload only; execute importer separately and assert records, row failures, replay idempotency, file permissions and authorized download. Include invalid row among valid rows.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6516",
+      "name": "Filament Authorization and tenancy",
+      "parent": "MME-6868",
+      "generator": "MME-6869",
+      "verification": "MME-6870",
+      "labels": [
+        "package:filament/filament",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6516",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Actions/DownloadAuthorizationTest.php#L101-L151",
+      "fixtures_and_cases": "Test colliding user IDs across user models, ownership, download policies, tenant query scopes and forged Livewire record/action calls. Use a real panel and distinct tenant fixtures; do not disable authorization to simplify tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6517",
+      "name": "Filament Configurable components",
+      "parent": "MME-6871",
+      "generator": "MME-6872",
+      "verification": "MME-6873",
+      "labels": [
+        "package:filament/support",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6517",
+      "upstream_test": "https://github.com/filamentphp/filament/blob/915c372bce605eaa4e14ae1c823102111ab98518/tests/src/Support/ConfigurableTest.php#L8-L14",
+      "fixtures_and_cases": "Construct inside/outside scoped callback and test cleanup, override precedence, closure DI and two users. Use instance configuration for request state; static configuration should be context-free.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6518",
+      "name": "NativePHP Plugin discovery and registry",
+      "parent": "MME-6874",
+      "generator": "MME-6875",
+      "verification": "MME-6876",
+      "labels": [
+        "package:nativephp/mobile",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6518",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/Plugins/PluginRegistryTest.php#L47-L69",
+      "fixtures_and_cases": "Inject discovery fixture with two plugins, then test actual composer discovery/registration. Missing/disabled plugin, duplicate names and build inclusion differ from PHP provider discovery; verify both.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6519",
+      "name": "NativePHP Plugin manifests and permissions",
+      "parent": "MME-6877",
+      "generator": "MME-6878",
+      "verification": "MME-6879",
+      "labels": [
+        "package:nativephp/mobile",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6519",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Unit/Plugins/PluginManifestValidationTest.php#L26-L39",
+      "fixtures_and_cases": "Use upstream manifest fixtures and validator API. Test required keys, unknown types, platform-specific dependencies, malformed permissions and deterministic generated manifest. Real device test deny/allow/revoke; PHP validity does not grant OS permission.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6520",
+      "name": "NativePHP Bridge functions",
+      "parent": "MME-6880",
+      "generator": "MME-6881",
+      "verification": "MME-6882",
+      "labels": [
+        "package:nativephp/mobile",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6520",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/FakeBridgeTest.php#L10-L20",
+      "fixtures_and_cases": "Use Native Mobile Testing Native import and a fixture screen calling the named function. Assert decoded parameters, missing function, denial and malformed response. Fake proves PHP contract; simulator/device proves Swift/Kotlin implementation and thread behavior.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6521",
+      "name": "NativePHP Plugin lifecycle hooks",
+      "parent": "MME-6883",
+      "generator": "MME-6884",
+      "verification": "MME-6885",
+      "labels": [
+        "package:nativephp/mobile",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6521",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/Plugins/PluginHookRunnerTest.php#L74-L82",
+      "fixtures_and_cases": "Run actual hook runner against temporary projects twice. Test hook order, disabled plugin, nonzero process failure and cleanup after interrupted build. Compare generated content, not only exit code.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6522",
+      "name": "NativePHP Native events",
+      "parent": "MME-6886",
+      "generator": "MME-6887",
+      "verification": "MME-6888",
+      "labels": [
+        "package:nativephp/mobile",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6522",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Unit/Edge/ScreenLifecycleEventsTest.php#L34-L46",
+      "fixtures_and_cases": "Mount, dispatch event, unmount/remount and dispatch again through real test harness. Assert one update per event, stale screen not changed, wrong event ignored and typed payload handling. Device test background/resume ordering.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6523",
+      "name": "NativePHP Native routes and deep links",
+      "parent": "MME-6889",
+      "generator": "MME-6890",
+      "verification": "MME-6891",
+      "labels": [
+        "package:nativephp/mobile",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6523",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/DeepLinkFallbackTest.php#L16-L21",
+      "fixtures_and_cases": "Provide registered screen and fixtures. Test unknown route fallback, malformed deep link, missing record and guest permission. Exercise cold start and warm app on both platforms; route existence is not complete navigation proof.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6524",
+      "name": "NativePHP Secure storage",
+      "parent": "MME-6892",
+      "generator": "MME-6893",
+      "verification": "MME-6894",
+      "labels": [
+        "package:nativephp/mobile",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6524",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Unit/SecureStorageTest.php#L13-L25",
+      "fixtures_and_cases": "Disable FakeBridge in afterEach. Test found, locked-device unavailable, error and deletion separately. Device tests must cover keychain/keystore accessibility, reinstall policy and lock/unlock; never include real tokens in logs.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6525",
+      "name": "NativePHP Async tasks",
+      "parent": "MME-6895",
+      "generator": "MME-6896",
+      "verification": "MME-6897",
+      "labels": [
+        "package:nativephp/mobile",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6525",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/AsyncTaskCompletionTest.php#L81-L97",
+      "fixtures_and_cases": "Script completions out of order in AsyncTaskCompletionTest harness. Test success, failure, cancellation, timeout, duplicate completion and unmounted target; native threading and process death require device execution.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6526",
+      "name": "NativePHP Push notifications",
+      "parent": "MME-6898",
+      "generator": "MME-6899",
+      "verification": "MME-6900",
+      "labels": [
+        "package:nativephp/mobile",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6526",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Unit/PushNotificationsTest.php#L8-L17",
+      "fixtures_and_cases": "Use package push test adapter/harness. Test registration denial, token refresh, foreground/background/cold-start, duplicate delivery and unauthorized deep links. Sandbox APNs/FCM real delivery is separate from PHP event test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6527",
+      "name": "NativePHP Native UI components",
+      "parent": "MME-6901",
+      "generator": "MME-6902",
+      "verification": "MME-6903",
+      "labels": [
+        "package:nativephp/mobile",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6527",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/Edge/BladeNativeRenderingTest.php#L55-L75",
+      "fixtures_and_cases": "Add render-tree assertions for props and native event interactions. Test nested state, empty data, keyed reorder and disposal. PHP tree test cannot prove layout, keyboard or platform accessibility; run iOS/Android device checks.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6528",
+      "name": "NativePHP Accessibility",
+      "parent": "MME-6904",
+      "generator": "MME-6905",
+      "verification": "MME-6906",
+      "labels": [
+        "package:nativephp/mobile",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6528",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/A11yAssertionsTest.php#L15-L20",
+      "fixtures_and_cases": "Check actual accessibility API in pinned version; test unlabeled negative fixture so audit is sensitive. Also VoiceOver/TalkBack, dynamic text, focus after navigation and contrast on device; tree audit is not full accessibility certification.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6529",
+      "name": "NativePHP Build hooks and platform compilers",
+      "parent": "MME-6907",
+      "generator": "MME-6908",
+      "verification": "MME-6909",
+      "labels": [
+        "package:nativephp/mobile",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6529",
+      "upstream_test": "https://github.com/NativePHP/mobile-air/blob/8957a3b7adb17955b2bac40dcfb14f4f08d1eab8/tests/Feature/Plugins/AndroidCompilerTest.php#L114-L136",
+      "fixtures_and_cases": "Use upstream AndroidCompiler and IOSCompiler fixture patterns. Test plugin addition/removal, escaping, malformed manifest, platform-only dependency and rebuild idempotency; compile both platforms. Signing credentials remain external and redacted.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6530",
+      "name": "NativePHP Desktop windows",
+      "parent": "MME-6910",
+      "generator": "MME-6911",
+      "verification": "MME-6912",
+      "labels": [
+        "package:nativephp/desktop",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6530",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/Fakes/FakeWindowManagerTest.php#L14-L19",
+      "fixtures_and_cases": "Verify exact fake assertion in installed desktop version. Test ID, target URL, size defaults, duplicate open/focus and close behavior; real desktop shell for OS window lifecycle. Fake contract swaps are covered upstream.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6531",
+      "name": "NativePHP Desktop menus",
+      "parent": "MME-6913",
+      "generator": "MME-6914",
+      "verification": "MME-6915",
+      "labels": [
+        "package:nativephp/desktop",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6531",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/MenuBar/MenuBarTest.php#L7-L34",
+      "fixtures_and_cases": "Inspect actual MenuBar payload and trigger registered handler; test enabled/disabled items, separators, accelerator, locale and callback identity. Assert resulting app state, not only serialization. Native menu presentation requires desktop smoke test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6532",
+      "name": "NativePHP Desktop child processes",
+      "parent": "MME-6916",
+      "generator": "MME-6917",
+      "verification": "MME-6918",
+      "labels": [
+        "package:nativephp/desktop",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6532",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/Fakes/FakeChildProcessTest.php#L10-L15",
+      "fixtures_and_cases": "Test argument arrays/escaping, working directory, environment allowlist, nonzero exit, stderr, timeout and kill. Run disposable real child process integration; fake proves dispatch only, not OS cleanup.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6533",
+      "name": "NativePHP Desktop queue workers",
+      "parent": "MME-6919",
+      "generator": "MME-6920",
+      "verification": "MME-6921",
+      "labels": [
+        "package:nativephp/desktop",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6533",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/Fakes/FakeQueueWorkerTest.php#L11-L16",
+      "fixtures_and_cases": "Invoke worker-start application operation before assertion. Test queue list, tries/timeout, duplicate start, shutdown and crash recovery. Real desktop process test verifies worker stops when app exits.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6534",
+      "name": "NativePHP Desktop shortcuts and power",
+      "parent": "MME-6922",
+      "generator": "MME-6923",
+      "verification": "MME-6924",
+      "labels": [
+        "package:nativephp/desktop",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6534",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/Fakes/FakeGlobalShortcutTest.php#L10-L15",
+      "fixtures_and_cases": "Trigger app registration before assertion. Test callback behavior, collision/registration failure, unregister and suspend/resume. Power monitor uses its own fake/contract; OS behavior needs desktop test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6535",
+      "name": "NativePHP Desktop packaging",
+      "parent": "MME-6925",
+      "generator": "MME-6926",
+      "verification": "MME-6927",
+      "labels": [
+        "package:nativephp/desktop",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6535",
+      "upstream_test": "https://github.com/NativePHP/desktop/blob/2e517ffd23b4e8df8fd04108bbd1ac9ce08fbc1a/tests/Build/CleanEnvFileTest.php#L47-L64",
+      "fixtures_and_cases": "Use temporary input/build paths, deterministic dummy secrets, upstream CleanEnvFile harness. Test missing env, allowed keys, quoted/multiline values and repeat build. Verify actual packaged archive before release; never log secret values.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6536",
+      "name": "SuperNative Reactive screens",
+      "parent": "MME-6928",
+      "generator": "MME-6929",
+      "verification": "MME-6930",
+      "labels": [
+        "package:nativephp/super-native",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6536",
+      "upstream_test": "https://github.com/NativePHP/super-native/blob/7d9751df6c673bb77358a303550f2f4ba30513d4/tests/Feature/Native/CounterTest.php#L6-L12",
+      "fixtures_and_cases": "Use public demo Counter fixture or app equivalent. Test repeat/acceleration, no active hold, lower/upper bounds and lifecycle disposal. Tests in demo show state transitions, not native timer precision.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6537",
+      "name": "SuperNative Event channel and payloads",
+      "parent": "MME-6931",
+      "generator": "MME-6932",
+      "verification": "MME-6933",
+      "labels": [
+        "package:nativephp/super-native",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6537",
+      "upstream_test": "https://github.com/NativePHP/super-native/blob/7d9751df6c673bb77358a303550f2f4ba30513d4/tests/Feature/Native/EventChannelTest.php#L6-L12",
+      "fixtures_and_cases": "Use demo fixture or own equivalent. Test Unicode byte vs character length, empty/large payload, stale target and duplicate events. Native device integration needed for transport limits; PHP harness does not traverse actual shared memory.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6538",
+      "name": "SuperNative Navigation transitions",
+      "parent": "MME-6934",
+      "generator": "MME-6935",
+      "verification": "MME-6936",
+      "labels": [
+        "package:nativephp/super-native",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6538",
+      "upstream_test": "https://github.com/NativePHP/super-native/blob/7d9751df6c673bb77358a303550f2f4ba30513d4/tests/Feature/Native/NavigationTransitionsTest.php#L9-L17",
+      "fixtures_and_cases": "Demo route/fixture adaptation. Test back stack, parameterless route, invalid record and rapid double-tap. Check animations and platform navigation with real shell, not PHP tree only.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6539",
+      "name": "SuperNative Theme and rendering",
+      "parent": "MME-6937",
+      "generator": "MME-6938",
+      "verification": "MME-6939",
+      "labels": [
+        "package:nativephp/super-native",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6539",
+      "upstream_test": "https://github.com/NativePHP/super-native/blob/7d9751df6c673bb77358a303550f2f4ba30513d4/tests/Feature/Native/ThemeConfigTest.php#L10-L22",
+      "fixtures_and_cases": "Resolve every configured token using pinned TailwindParser, both modes. Test unknown token and fallback, tree output, large text and screenshots on both platforms. ThemeConfigTest has a light/dark dataset.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6540",
+      "name": "SuperNative Accessibility",
+      "parent": "MME-6940",
+      "generator": "MME-6941",
+      "verification": "MME-6942",
+      "labels": [
+        "package:nativephp/super-native",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6540",
+      "upstream_test": "https://github.com/NativePHP/super-native/blob/7d9751df6c673bb77358a303550f2f4ba30513d4/tests/Feature/Native/AccessibilityTest.php#L1-L21",
+      "fixtures_and_cases": "Evidence gap: inspected demo AccessibilityTest.php contains imports/comments/helper only, no executable test at pinned commit. Use NativePHP A11yAssertionsTest as supporting implementation evidence. Add real app route dataset, parameter fixtures and justified skip list; VoiceOver/TalkBack remain required.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6541",
+      "name": "Sanctum Tokens and abilities",
+      "parent": "MME-6943",
+      "generator": "MME-6944",
+      "verification": "MME-6945",
+      "labels": [
+        "package:laravel/sanctum",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6541",
+      "upstream_test": "https://github.com/laravel/sanctum/blob/1aa53e0b955415571837971ee6ca0a9427c58a4f/tests/Unit/CheckAbilitiesTest.php#L16-L32",
+      "fixtures_and_cases": "Test required all/any abilities, expired/revoked tokens and actual bearer authentication in separate test. actingAs bypasses token parsing; SPA stateful cookie mode has different ability semantics and still requires policies.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6542",
+      "name": "Passport OAuth grants and scopes",
+      "parent": "MME-6946",
+      "generator": "MME-6947",
+      "verification": "MME-6948",
+      "labels": [
+        "package:laravel/passport",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6542",
+      "upstream_test": "https://github.com/laravel/passport/blob/fe069acef0e1be32fbd80d33304f7affaa85f0f1/tests/Feature/AuthorizationCodeGrantWithPkceTest.php#L31-L90",
+      "fixtures_and_cases": "Drive real authorization-code exchange with fixture client/keypair and wrong code verifier; adapt exact error status to protocol fixture. Valid exchange, replayed code, wrong redirect, revocation and scope denial. Passport::actingAs alone cannot test OAuth protocol.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6543",
+      "name": "Fortify Authentication actions and responses",
+      "parent": "MME-6949",
+      "generator": "MME-6950",
+      "verification": "MME-6951",
+      "labels": [
+        "package:laravel/fortify",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6543",
+      "upstream_test": "https://github.com/laravel/fortify/blob/c456642584c102f6a6aafee9932299542da637b5/tests/ResponseBindingTest.php#L43-L50",
+      "fixtures_and_cases": "Use enabled registration features and app policy fixture. Assert created row and hashed password; duplicate email, invalid password, custom response binding and two-factor failure. Bind interfaces with compatible responses, not arbitrary classes.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6544",
+      "name": "Socialite OAuth providers",
+      "parent": "MME-6952",
+      "generator": "MME-6953",
+      "verification": "MME-6954",
+      "labels": [
+        "package:laravel/socialite",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6544",
+      "upstream_test": "https://github.com/laravel/socialite/blob/fa0181ee6204ca28a55cd67145fadd631ac209cf/tests/SocialiteManagerTest.php#L27-L35",
+      "fixtures_and_cases": "Then test actual callback using mocked transport/fixture profile: matching state, wrong state, denial, absent email and existing account linking policy. Driver resolution alone is not login security; do not default stateless for browser flows.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6545",
+      "name": "Scout Search engines and searchable models",
+      "parent": "MME-6955",
+      "generator": "MME-6956",
+      "verification": "MME-6957",
+      "labels": [
+        "package:laravel/scout",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6545",
+      "upstream_test": "https://github.com/laravel/scout/blob/ce2542f5a7297d21975ddcd7115dbf798fd8ba00/tests/Feature/SearchableTest.php#L19-L29",
+      "fixtures_and_cases": "Test registered custom engine update/delete/search mapping, soft-delete policy, tenant filters and eventual consistency using disposable index. Queue intent separate from indexing completion; do not expose private columns.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6546",
+      "name": "Cashier Stripe subscriptions and webhooks",
+      "parent": "MME-6958",
+      "generator": "MME-6959",
+      "verification": "MME-6960",
+      "labels": [
+        "package:laravel/cashier",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6546",
+      "upstream_test": "https://github.com/laravel/cashier-stripe/blob/4070a7a537fa97f28be3fd7fb8976ee83b8531e3/tests/Feature/VerifyWebhookSignatureTest.php#L33-L45",
+      "fixtures_and_cases": "Use exact configured route/status for pinned middleware; build raw signed payload and timestamp fixtures. Test valid, forged, expired, replayed and out-of-order events; subscription state and one ledger effect. Sandbox Stripe calls are separate and opt-in.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6547",
+      "name": "Cashier Paddle subscriptions and webhooks",
+      "parent": "MME-6961",
+      "generator": "MME-6962",
+      "verification": "MME-6963",
+      "labels": [
+        "package:laravel/cashier-paddle",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6547",
+      "upstream_test": "https://github.com/laravel/cashier-paddle/blob/e7fae77d9c0852055592bb495d7934dcd35ba037/tests/Feature/WebhooksTest.php#L17-L64",
+      "fixtures_and_cases": "Set signature harness properly and exact Paddle fixture schema/migrations. Test duplicate event, cancellation/refund, unknown customer and signature rejection. Cashier::fake bypasses provider IO; assert final local state independently.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6548",
+      "name": "Horizon Supervisors and queue monitoring",
+      "parent": "MME-6964",
+      "generator": "MME-6965",
+      "verification": "MME-6966",
+      "labels": [
+        "package:laravel/horizon",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6548",
+      "upstream_test": "https://github.com/laravel/horizon/blob/5d9f80448a192d03ddb338cf91f73fbe5a50e250/tests/Feature/SupervisorOptionsTest.php#L10-L15",
+      "fixtures_and_cases": "Replace default with configured invoices queue in app test and inspect generated worker command. Disposable Redis integration for processing, timeout/retry, metrics/tags and dashboard access; avoid shared production queues.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6549",
+      "name": "Octane Worker lifecycle and scoped state",
+      "parent": "MME-6967",
+      "generator": "MME-6968",
+      "verification": "MME-6969",
+      "labels": [
+        "package:laravel/octane",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6549",
+      "upstream_test": "https://github.com/laravel/octane/blob/fd3539c500a4b4dea3315572c0b0a1052ed58d6f/tests/AuthenticationFlushingTest.php#L10-L49",
+      "fixtures_and_cases": "Use one real Octane worker/harness for both requests, not two fresh test applications. Test auth, locale, request/container rebinding, Context/logs and exception cleanup; static and singleton request state are the core welding risk.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6550",
+      "name": "Reverb Channels and protocol",
+      "parent": "MME-6970",
+      "generator": "MME-6971",
+      "verification": "MME-6972",
+      "labels": [
+        "package:laravel/reverb",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6550",
+      "upstream_test": "https://github.com/laravel/reverb/blob/74c8c4082c07f428d6399cc2f9bc5c6fd1cb1179/tests/Unit/Protocols/Pusher/Channels/PrivateChannelTest.php#L17-L24",
+      "fixtures_and_cases": "Test app channel authorization and Reverb valid/invalid signed subscription separately. Real two-client test for channel isolation, disconnect/reconnect and origin policy. Mocking broadcast delivery alone cannot prove subscription security.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6551",
+      "name": "Prompts Input and validation",
+      "parent": "MME-6973",
+      "generator": "MME-6974",
+      "verification": "MME-6975",
+      "labels": [
+        "package:laravel/prompts",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6551",
+      "upstream_test": "https://github.com/laravel/prompts/blob/0afa781e5088144a6fb1882ab9cf6e5fb5c37652/tests/Feature/TextPromptTest.php#L14-L21",
+      "fixtures_and_cases": "Import Laravel Prompts functions/Prompt/Key. Named datasets for empty, default, invalid then corrected input and cancellation. Test noninteractive fallback and output without requiring a real terminal.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6552",
+      "name": "MCP Tools",
+      "parent": "MME-6976",
+      "generator": "MME-6977",
+      "verification": "MME-6978",
+      "labels": [
+        "package:laravel/mcp",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6552",
+      "upstream_test": "https://github.com/laravel/mcp/blob/efdcaea72811e5a3a2298abd56d84132e32181b2/tests/Feature/Testing/Tools/AssertErrorsTest.php#L30-L35",
+      "fixtures_and_cases": "Use actual server/tool fixture. Test schema, registration, authorization, invalid args, result/error shape and no side effects on rejection. Transport auth/headers/streaming need HTTP/stdio integration; tool metadata cannot enforce authorization.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6553",
+      "name": "MCP Resources and prompts",
+      "parent": "MME-6979",
+      "generator": "MME-6980",
+      "verification": "MME-6981",
+      "labels": [
+        "package:laravel/mcp",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6553",
+      "upstream_test": "https://github.com/laravel/mcp/blob/efdcaea72811e5a3a2298abd56d84132e32181b2/tests/Feature/Testing/Resources/AssertSeeTest.php#L42-L49",
+      "fixtures_and_cases": "Adapt fixture method/params to installed package. Test URI templates, MIME/content, missing resources, prompt args, error responses and cross-user isolation. Never treat external resource content as trusted instructions.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6554",
+      "name": "AI SDK Agents and tools",
+      "parent": "MME-6982",
+      "generator": "MME-6983",
+      "verification": "MME-6984",
+      "labels": [
+        "package:laravel/ai",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6554",
+      "upstream_test": "https://github.com/laravel/ai/blob/8d438dbcf5eedebb9e52eeb2fc033f1430b8d92e/tests/Feature/AgentWithToolsTest.php#L22-L34",
+      "fixtures_and_cases": "Script tool call and reply through Agent::fake; test input validation, denied tool, approval, retry and resulting domain state. Real provider evaluation uses bounded non-sensitive dataset, cost/time cap; deterministic unit tests do not prove model quality.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6555",
+      "name": "AI SDK Providers and fakes",
+      "parent": "MME-6985",
+      "generator": "MME-6986",
+      "verification": "MME-6987",
+      "labels": [
+        "package:laravel/ai",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6555",
+      "upstream_test": "https://github.com/laravel/ai/blob/8d438dbcf5eedebb9e52eeb2fc033f1430b8d92e/tests/Feature/AgentFakeTest.php#L41-L64",
+      "fixtures_and_cases": "Test provider selection/options, failover, stream failure, schema validation, rate limits and no unintended calls. Also embeddings/audio/image/file adapters where used; dimension/format/resource lifecycle, not only text. Separate fake contract from live sandbox eval.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6556",
+      "name": "Nightwatch Sensors and redaction",
+      "parent": "MME-6988",
+      "generator": "MME-6989",
+      "verification": "MME-6990",
+      "labels": [
+        "package:laravel/nightwatch",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6556",
+      "upstream_test": "https://github.com/laravel/nightwatch/blob/3a266e56bec7226a79e2417fc588afd1b419ec82/tests/Unit/FilteringTest.php#L50-L68",
+      "fixtures_and_cases": "Induce actual request/query/log/queue events in package harness and inspect serialized payload. Test disabled sensor, sampling, redaction, user attribution and agent outage not breaking requests. SaaS backend internals are not established by open agent tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6557",
+      "name": "Boost Tools and guidelines",
+      "parent": "MME-6991",
+      "generator": "MME-6992",
+      "verification": "MME-6993",
+      "labels": [
+        "package:laravel/boost",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6557",
+      "upstream_test": "https://github.com/laravel/boost/blob/97b8da0cb8c2c1da75531a36e34adaa313a64afc/tests/Feature/Mcp/ToolRegistryTest.php#L6-L12",
+      "fixtures_and_cases": "Use registry namespace from source. Test discovery and allowlist plus real denied execution, guideline merge idempotency and incompatible package versions. Treat generated guidance as reviewable files; never test destructive tools against production.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6558",
+      "name": "Dusk Browser pages and components",
+      "parent": "MME-6994",
+      "generator": "MME-6995",
+      "verification": "MME-6996",
+      "labels": [
+        "package:laravel/dusk",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6558",
+      "upstream_test": "https://github.com/laravel/dusk/blob/c1a7b7a215fc250bfec19f1105aca54ff654f24d/tests/Unit/ComponentTest.php#L19-L32",
+      "fixtures_and_cases": "Use browser-specific TestCase/runner, stable dusk selectors and isolated app/DB. Test denied/invalid login too, console/network errors and screenshots on failure. Pest can wrap Dusk tests with proper base class, but PHP unit mocks cannot replace browser execution.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6559",
+      "name": "Pint Presets and custom rules",
+      "parent": "MME-6997",
+      "generator": "MME-6998",
+      "verification": "MME-6999",
+      "labels": [
+        "package:laravel/pint",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6559",
+      "upstream_test": "https://github.com/laravel/pint/blob/006bd7825eb01daf92959d060b89cd9514fe4253/tests/Feature/PresetTest.php#L3-L12",
+      "fixtures_and_cases": "Run installed Pint on a temporary fixture directory. Test compliant input, violating input under --test nonzero, formatted output and second-pass idempotency. Pint is style verification, not behavioral testing.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6560",
+      "name": "Envoy Tasks and hooks",
+      "parent": "MME-7000",
+      "generator": "MME-7001",
+      "verification": "MME-7002",
+      "labels": [
+        "package:laravel/envoy",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6560",
+      "upstream_test": "https://github.com/laravel/envoy/blob/56485c7333d84324b4c6043fcbe10932d73118e6/tests/CompilerTest.php#L10-L22",
+      "fixtures_and_cases": "Use Compiler fixture and exact hook APIs. Test task/story order, before/after/finished, failed command stops deployment and argument escaping. Do not execute deployment commands against real hosts in a unit test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6561",
+      "name": "Tinker Casters and aliases",
+      "parent": "MME-7003",
+      "generator": "MME-7004",
+      "verification": "MME-7005",
+      "labels": [
+        "package:laravel/tinker",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6561",
+      "upstream_test": "https://github.com/laravel/tinker/blob/8f4063c64bb5a39c2ae46d400995ce7d28a2e593/tests/TinkerCasterTest.php#L11-L19",
+      "fixtures_and_cases": "Test bounded output, empty/large collections, aliases and secret redaction. Use subprocess for interactive REPL behavior; casting is observation and should not mutate domain state.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6562",
+      "name": "Laravel Process fakes and pools",
+      "parent": "MME-7006",
+      "generator": "MME-7007",
+      "verification": "MME-7008",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6562",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Process/ProcessTest.php#L19-L34",
+      "fixtures_and_cases": "Assert exact command/cwd/env, exit/stderr, timeout and pool failure. Prevent stray processes where supported. Real disposable process integration tests argument escaping/cancellation; fake alone does not execute binary.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6563",
+      "name": "Laravel Rate limiters",
+      "parent": "MME-7009",
+      "generator": "MME-7010",
+      "verification": "MME-7011",
+      "labels": [
+        "package:laravel/framework",
+        "Cross-cutting concerns"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6563",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Cache/RateLimiterTest.php#L27-L42",
+      "fixtures_and_cases": "Test limit boundary, reset with controlled time, Retry-After and different-user independence. Shared-store concurrency test needed for distributed guarantees; clear unique test keys only.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6564",
+      "name": "Laravel Image drivers",
+      "parent": "MME-7012",
+      "generator": "MME-7013",
+      "verification": "MME-7014",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6564",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Image/ImageTest.php#L31-L38",
+      "fixtures_and_cases": "Inspect actual adapter API and use tiny fixture image. Assert output dimensions, format, orientation, transparency, original bytes unchanged and invalid/oversized input rejection. Driver-specific GD/Imagick tests need extensions; do not use exact lossy bytes across drivers.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6565",
+      "name": "Laravel Macros",
+      "parent": "MME-7015",
+      "generator": "MME-7016",
+      "verification": "MME-7017",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6565",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Support/SupportMacroableTest.php#L23-L31",
+      "fixtures_and_cases": "Register in provider then test empty/multiple values, fluent composition and name conflicts. Flush test-added macros; do not override built-ins or capture request state in global macro closures.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6566",
+      "name": "Folio File routes and middleware",
+      "parent": "MME-7018",
+      "generator": "MME-7019",
+      "verification": "MME-7020",
+      "labels": [
+        "package:laravel/folio",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6566",
+      "upstream_test": "https://github.com/laravel/folio/blob/70c8bd6f3247e8241ee2d2902eed6950567e0c75/tests/Feature/MiddlewareTest.php#L47-L56",
+      "fixtures_and_cases": "Create fixture page in configured pages directory. Test permitted response, model binding, missing page, named route and route-cache behavior. Blade rendering cannot replace an HTTP routing test.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6567",
+      "name": "Head Metadata and schemas",
+      "parent": "MME-7021",
+      "generator": "MME-7022",
+      "verification": "MME-7023",
+      "labels": [
+        "package:laravel/head",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6567",
+      "upstream_test": "https://github.com/laravel/head/blob/8ac3f59e0ee223208dca5485b8113f7919baba82/tests/Feature/HeadBuilderTest.php#L13-L25",
+      "fixtures_and_cases": "Test actual rendered head, escaping, duplicate tag precedence, canonical and JSON-LD validity, Inertia/Livewire navigation and two requests with different metadata. Use installed builder methods from pinned file, not a guessed API.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6568",
+      "name": "Homestead Provisioning settings",
+      "parent": "MME-7024",
+      "generator": "MME-7025",
+      "verification": "MME-7026",
+      "labels": [
+        "package:laravel/homestead",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6568",
+      "upstream_test": "https://github.com/laravel/homestead/blob/98a798b18a078121252f0ecfe3e10cba050ce504/tests/Settings/YamlSettingsTest.php#L16-L27",
+      "fixtures_and_cases": "Parse real YAML settings through package API. Test defaults, invalid YAML, path spaces and generated provision config; disposable VM proves provision behavior. PHP parsing test cannot establish host DNS/network correctness.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6569",
+      "name": "Valet Site drivers",
+      "parent": "MME-7027",
+      "generator": "MME-7028",
+      "verification": "MME-7029",
+      "labels": [
+        "package:laravel/valet",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6569",
+      "upstream_test": "https://github.com/laravel/valet/blob/874dd14d58b5cec2f3c869f4f755627179b28c16/tests/Drivers/LaravelValetDriverTest.php#L7-L13",
+      "fixtures_and_cases": "Use exact installed driver signature and fixture project. Test match/nonmatch, public assets, missing files, traversal and correct front controller. Real macOS Valet smoke check is separate from path unit tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6570",
+      "name": "Pail Log filters",
+      "parent": "MME-7030",
+      "generator": "MME-7031",
+      "verification": "MME-7032",
+      "labels": [
+        "package:laravel/pail",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6570",
+      "upstream_test": "https://github.com/laravel/pail/blob/47b9176cc96edbfd3fa5609fa0efb1de7f901ea5/tests/Features/Filters/LevelTest.php#L3-L18",
+      "fixtures_and_cases": "Feed deterministic multiline logs with mixed levels through actual filter harness. Test stack traces, malformed entries, ANSI handling and stream interruption. Redaction belongs at log producer too; filtering is not encryption.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6571",
+      "name": "Jetstream Team actions",
+      "parent": "MME-7033",
+      "generator": "MME-7034",
+      "verification": "MME-7035",
+      "labels": [
+        "package:laravel/jetstream",
+        "Application coordination"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6571",
+      "upstream_test": "https://github.com/laravel/jetstream/blob/05c91adfb2d7f2fb36e9d52e7abf339641b87af4/tests/CreateTeamTest.php#L23-L37",
+      "fixtures_and_cases": "Call registered action with allowed actor first. Test denied user, validation, owner membership, switching teams and deletion safeguards. Keep Jetstream version/stack-specific fixtures; do not duplicate Fortify credential tests.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6572",
+      "name": "Precognition Validation-only requests",
+      "parent": "MME-7036",
+      "generator": "MME-7037",
+      "verification": "MME-7038",
+      "labels": [
+        "package:laravel/framework",
+        "Delivery layer"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6572",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Integration/Routing/PrecognitionTest.php#L28-L39",
+      "fixtures_and_cases": "Test valid probe returns expected precognitive status/headers without calling action, invalid field errors, auth and normal submit performs exactly one write. Client debounce/stale-response handling belongs to JS tests in laravel/precognition; Pest handles server contract.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6573",
+      "name": "Laravel Concurrency drivers",
+      "parent": "MME-7039",
+      "generator": "MME-7040",
+      "verification": "MME-7041",
+      "labels": [
+        "package:laravel/framework",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6573",
+      "upstream_test": "https://github.com/laravel/framework/blob/aad74d9d01406901dbb6e359092cf5e261b62b09/tests/Integration/Concurrency/ConcurrencyTest.php#L39-L49",
+      "fixtures_and_cases": "Test real configured process/fork/sync driver, serializable closure captures, ordering, exception propagation, environment and process cleanup. Sync driver cannot prove process isolation or parallel speed.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6574",
+      "name": "Mix Build extensions",
+      "parent": "MME-7042",
+      "generator": "MME-7043",
+      "verification": "MME-7044",
+      "labels": [
+        "package:laravel-mix",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6574",
+      "upstream_test": "https://github.com/laravel-mix/laravel-mix/blob/b116bf064a7aa60dcc05cc9a03edbe9eb3a3ae2f/test/integration/plugins/BuildCallbackPlugin.js#L8-L31",
+      "fixtures_and_cases": "Use upstream BuildCallbackPlugin JS test as primary evidence, not a Pest rewrite of webpack. Test callback ordering, rebuild, production/dev and failed build exit; inspect assets and second build. Preserve JS runner and package lock.",
+      "verification_state": "NOT_RUN"
+    },
+    {
+      "source_guide_id": "MME-6575",
+      "name": "Sail Runtime configuration",
+      "parent": "MME-7045",
+      "generator": "MME-7046",
+      "verification": "MME-7047",
+      "labels": [
+        "package:laravel/sail",
+        "Infrastructure seams"
+      ],
+      "availability": "pending_adapter",
+      "guide_url": "https://linear.app/sifirous/issue/MME-6575",
+      "upstream_test": "https://github.com/laravel/sail/blob/603f570a1b190b14ec9b39026894f3a0ce16359e/bin/sail#L1-L45",
+      "fixtures_and_cases": "Evidence is bin/sail implementation, not a located upstream suite. Validate compose config, service selection, ports, PHP extensions and UID mapping in disposable containers. Pest verifies application behavior inside container; shell/container integration verifies runtime. Do not invent upstream Sail tests.",
+      "verification_state": "NOT_RUN"
+    }
+  ]
+}

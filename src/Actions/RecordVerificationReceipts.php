@@ -124,6 +124,9 @@ final class RecordVerificationReceipts
     private function context(array $report): array
     {
         $context = [];
+        if (is_array($report['seam'] ?? null)) {
+            $context['seam'] = $report['seam'];
+        }
         if (is_array($report['red_baseline'] ?? null)) {
             $context['red_baseline'] = array_intersect_key($report['red_baseline'], array_flip([
                 'classification', 'reason', 'tests', 'failures', 'errors', 'junit_digest', 'test_digest', 'recorded_at',

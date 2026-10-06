@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "steps": [
+    {
+      "id": "harness",
+      "handler": "seam.harness",
+      "arguments": {},
+      "after": []
+    },
+    {
+      "id": "pre",
+      "handler": "seam.pre",
+      "arguments": {},
+      "after": [
+        "harness"
+      ]
+    },
+    {
+      "id": "lock",
+      "handler": "seam.lock",
+      "arguments": {},
+      "after": [
+        "pre"
+      ]
+    },
+    {
+      "id": "implementation",
+      "handler": "seam.implementation",
+      "arguments": {},
+      "after": [
+        "lock"
+      ]
+    },
+    {
+      "id": "post",
+      "handler": "seam.post",
+      "arguments": {},
+      "after": [
+        "implementation"
+      ]
+    },
+    {
+      "id": "sensitivity",
+      "handler": "seam.sensitivity",
+      "arguments": {},
+      "after": [
+        "post"
+      ]
+    },
+    {
+      "id": "cleanup",
+      "handler": "seam.cleanup",
+      "arguments": {},
+      "after": [
+        "sensitivity"
+      ]
+    },
+    {
+      "id": "handoff",
+      "handler": "seam.handoff",
+      "arguments": {},
+      "after": [
+        "cleanup"
+      ]
+    }
+  ]
+}

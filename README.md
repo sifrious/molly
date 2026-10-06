@@ -77,6 +77,12 @@ php artisan molly:create
 
 Molly asks what should change, which Pest test must pass, and which files it may edit. Creating a task saves it without calling the model. Start it with `php artisan molly:start TASK`.
 
+## Editable seam tests
+
+Publish the controller and command instruction packs with `php artisan vendor:publish --tag=molly-seams`, and their configuration with `php artisan vendor:publish --tag=molly-seam-config`. Edit complete packs in `resources/molly/seams/<package>/<seam>/`. Ordinary republishing preserves local edits.
+
+`php artisan molly:seam list --json` lists executable packs and the 155-guide catalogue. The initial adapters support stateless JSON controllers and non-interactive Artisan commands. The remaining adapters are pending. `molly:seam` and the existing MCP server's `molly_seam` tool share frozen plans, deterministic generation, protected-test approval, RED/GREEN evidence and targeted negative controls. Model choice does not affect completion decisions. See [Editable seam instructions](docs/seams.md) for the full example, MCP operations, configuration and current limits.
+
 ## Documentation
 
 Start with [Getting started](docs/getting-started.md). Then:

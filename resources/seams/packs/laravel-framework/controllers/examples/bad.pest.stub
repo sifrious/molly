@@ -1,0 +1,6 @@
+<?php
+
+// This never calls the application.
+it('reports application readiness', function () {
+    expect(['ready' => true])->toBe(['ready' => true]);
+});

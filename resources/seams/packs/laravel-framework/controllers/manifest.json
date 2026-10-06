@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "seam_id": "laravel-framework/controllers",
+  "pack_version": "1.0.0",
+  "template_version": "1.0.0",
+  "package": {
+    "name": "laravel/framework",
+    "versions": "^12.0 || ^13.0"
+  },
+  "source_guide_id": "MME-6433",
+  "guide_url": "https://linear.app/sifirous/issue/MME-6433",
+  "tickets": {
+    "parent": "MME-6619",
+    "generator": "MME-6620",
+    "verification": "MME-6621"
+  },
+  "layer": "Application coordination",
+  "adapter": "http",
+  "capabilities": [
+    "php",
+    "pest",
+    "laravel-http"
+  ],
+  "files": [
+    "manifest.json",
+    "instructions.md",
+    "input.schema.json",
+    "plan.json",
+    "examples/good.pest.stub",
+    "examples/bad.pest.stub",
+    "templates/feature.pest.stub"
+  ]
+}

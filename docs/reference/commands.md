@@ -263,3 +263,11 @@ After a test-authoring run, `molly:start`, `molly:retry`, and `molly:task` print
 - [Tasks](../tasks.md)
 - [Configuration](configuration.md)
 - [Troubleshooting](../troubleshooting.md)
+
+## Seam instructions and verification
+
+`molly:seam OPERATION` exposes the shared instruction-pack workflow. Operations are `list`, `inspect`, `compare`, `validate`, `plan`, `preview`, `write`, `advance`, `status`, `report`, `cancel`, `resume` and `acknowledge`. Use `--json` for structured results. `--workspace` defaults to the application root.
+
+Pack operations take `--seam=PACKAGE/SEAM`. Validation and planning take `--contract=JSON_FILE`; planning also takes a completed `--plan=ID`. Revision operations take `--revision=ID`. Writing and advancing require the reviewed `--digest=SHA256`. Advance takes `--step=ID` and `--key=REQUEST_KEY`, and optionally `--actor=author|implementer|verifier|coordinator`. Without `--wait`, it returns a queued run ID. Reuse a request key after a lost response; use a new key for a failed step's retry.
+
+Acknowledgement requires `--candidate-digest`, `--evidence-digest` and `--recipient`, in addition to revision and digest. Human test locking still uses `molly:lock-test TASK --approve`. MCP cannot approve it. See [Editable seam instructions](../seams.md) for the executable example and resource templates.

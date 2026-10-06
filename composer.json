@@ -9,6 +9,7 @@
         "ext-dom": "*",
         "ext-pdo": "*",
         "ext-pdo_sqlite": "*",
+        "composer/semver": "^3.4",
         "illuminate/console": "^12.0|^13.0",
         "illuminate/database": "^12.0|^13.0",
         "illuminate/process": "^12.0|^13.0",
@@ -18,7 +19,8 @@
         "laravel/mcp": "^1.0",
         "laravel/prompts": "^0.3.24",
         "livewire/flux": "^2.20",
-        "livewire/livewire": "^4.4"
+        "livewire/livewire": "^4.4",
+        "opis/json-schema": "^2.4.1"
     },
     "require-dev": {
         "laravel/pint": "^1.30",

@@ -3,8 +3,10 @@
 namespace Sifrious\Molly\Actions;
 
 use Illuminate\Support\Facades\File;
+use Sifrious\Molly\Seams\WorkspaceEvidence;
 use Sifrious\Molly\Verification\FalseGreenVerifier;
 use Sifrious\Molly\Verification\VerificationState;
+use Sifrious\Molly\Workspace;
 use Sifrious\Molly\Workspace\Directory;
 use Throwable;
 
@@ -15,6 +17,76 @@ use Throwable;
 final class DetectFalseGreen implements FalseGreenVerifier
 {
     public function __construct(private VerifyChanges $verify) {}
+
+    /** Run a reviewed literal mutation in a disposable application copy. */
+    public function targeted(string $workspace, string $testPath, array $control, string $evidenceDirectory): array
+    {
+        $snapshot = app(WorkspaceEvidence::class)->capture($workspace);
+        $copy = sys_get_temp_dir().'/molly-seam-control-'.bin2hex(random_bytes(12));
+        Directory::ensure($copy, 0700);
+        $result = [];
+        try {
+            foreach ($snapshot['files'] as $path => $digest) {
+                if ($digest === null) {
+                    continue;
+                }
+                Directory::ensure(dirname($copy.'/'.$path), 0700);
+                if (! copy($workspace.'/'.$path, $copy.'/'.$path)) {
+                    throw new \RuntimeException('NEGATIVE_CONTROL_INCONCLUSIVE: Could not copy '.$path.'.');
+                }
+            }
+            // Composer's app mappings must point at the copy. Package sources remain shared.
+            Directory::ensure($copy.'/vendor', 0700);
+            foreach (['autoload.php', 'composer', 'bin'] as $path) {
+                if (is_dir($workspace.'/vendor/'.$path)) {
+                    File::copyDirectory($workspace.'/vendor/'.$path, $copy.'/vendor/'.$path);
+                } elseif (is_file($workspace.'/vendor/'.$path)) {
+                    copy($workspace.'/vendor/'.$path, $copy.'/vendor/'.$path);
+                }
+            }
+            foreach (glob($workspace.'/vendor/*') ?: [] as $path) {
+                if (! in_array(basename($path), ['autoload.php', 'composer', 'bin'], true) && ! file_exists($copy.'/vendor/'.basename($path))) {
+                    symlink(realpath($path), $copy.'/vendor/'.basename($path));
+                }
+            }
+            foreach (['bootstrap/cache', 'storage/framework/cache', 'storage/framework/sessions', 'storage/framework/views', 'storage/logs'] as $directory) {
+                Directory::ensure($copy.'/'.$directory, 0700);
+            }
+            $clean = $this->verify->handle($copy, $testPath, $evidenceDirectory.'/control-clean');
+            $result['clean_copy'] = $clean;
+            if (($clean['status'] ?? null) !== 'passed') {
+                $result['state'] = 'REVIEW_REQUIRED';
+                $result['reason'] = 'NEGATIVE_CONTROL_INCONCLUSIVE';
+            } else {
+                $absolute = $copy.'/'.$control['path'];
+                $before = (new Workspace($copy))->read([$control['path']])[$control['path']];
+                if ($before === null || substr_count($before, $control['find']) !== 1) {
+                    throw new \RuntimeException('NEGATIVE_CONTROL_INCONCLUSIVE: The reviewed mutation must match exactly once in '.$control['path'].'.');
+                }
+                Directory::replaceFile($absolute, str_replace($control['find'], $control['replace'], $before), 'NEGATIVE_CONTROL_INCONCLUSIVE');
+                $mutated = $this->verify->handle($copy, $testPath, $evidenceDirectory.'/control-mutated');
+                $classification = app(RecordRedBaseline::class)->classify($mutated, $copy, $testPath);
+                $targeted = array_filter($mutated['failing_tests'] ?? [], fn (array $failure): bool => ($failure['kind'] ?? null) === 'failure'
+                    && str_contains($failure['name'] ?? '', 'seam '.$control['case_id'].':'));
+                $sensitive = $classification['classification'] === 'missing_behavior' && $targeted !== [] && ($mutated['errors'] ?? 0) === 0;
+                $result = [...$result, 'verification' => $mutated, 'classification' => $classification,
+                    'state' => $sensitive ? 'PASS' : (($mutated['status'] ?? null) === 'passed' ? 'FAIL' : 'REVIEW_REQUIRED'),
+                    'reason' => $sensitive ? null : (($mutated['status'] ?? null) === 'passed' ? 'NEGATIVE_CONTROL_SURVIVED' : 'NEGATIVE_CONTROL_INCONCLUSIVE')];
+            }
+        } finally {
+            foreach (glob($copy.'/vendor/*') ?: [] as $path) {
+                if (is_link($path)) {
+                    unlink($path);
+                }
+            }
+            File::deleteDirectory($copy);
+            if (file_exists($copy)) {
+                throw new \RuntimeException('CLEANUP_FAILED: Could not remove '.$copy.'.');
+            }
+        }
+
+        return [...$result, 'cleaned_up' => true, 'candidate_tree_digest' => $snapshot['tree_digest']];
+    }
 
     public function handle(string $workspace, string $testPath, array $mutablePaths, string $evidenceDirectory): array
     {

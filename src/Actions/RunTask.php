@@ -112,6 +112,9 @@ class RunTask
      */
     public function refuseUnready(string $prompt, Workspace $files, array $paths, string $testPath, ?Task $task): array
     {
+        if ($task !== null) {
+            app(GuardSeamRevision::class)->beforeImplementation($task);
+        }
         if (trim($prompt) === '' || strlen($prompt) > 8192) {
             throw new RuntimeException('PROMPT_INVALID: Describe the task in 1 to 8192 bytes.');
         }

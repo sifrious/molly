@@ -15,6 +15,29 @@ class DecideRunCompletion
         private ReviewChanges $review,
     ) {}
 
+    /** Resolve seam policy through the same application configuration as task verification. */
+    public function seamPolicies(array $steps): array
+    {
+        $policies = [];
+        foreach ($steps as $step) {
+            $policies[$step['id']] = ['policy' => $this->policy('seam_'.$step['id'])->value,
+                'failure_action' => $this->failureAction('seam_'.$step['id'], FailureAction::Retry)->value];
+        }
+
+        return $policies;
+    }
+
+    public function forSeam(array $policies, array $results): array
+    {
+        $checks = [];
+        foreach ($policies as $id => $policy) {
+            $checks[$id] = ['state' => VerificationState::from($results[$id]['state'] ?? 'NOT_RUN'),
+                'policy' => VerifierPolicy::from($policy['policy']), 'failure_action' => FailureAction::from($policy['failure_action'])];
+        }
+
+        return $this->decide($checks);
+    }
+
     /**
      * @param  array<string, mixed>  $report
      * @param  array<string, string>  $after

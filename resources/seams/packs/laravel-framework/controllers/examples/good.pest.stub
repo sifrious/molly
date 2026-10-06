@@ -1,0 +1,5 @@
+<?php
+
+it('reports application readiness', function () {
+    $this->getJson('/ready')->assertStatus(200)->assertExactJson(['ready' => true]);
+});
