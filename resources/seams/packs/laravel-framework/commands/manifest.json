@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "seam_id": "laravel-framework/commands",
+  "pack_version": "1.0.0",
+  "template_version": "1.0.0",
+  "package": {
+    "name": "laravel/framework",
+    "versions": "^12.0 || ^13.0"
+  },
+  "source_guide_id": "MME-6444",
+  "guide_url": "https://linear.app/sifirous/issue/MME-6444",
+  "tickets": {
+    "parent": "MME-6652",
+    "generator": "MME-6653",
+    "verification": "MME-6654"
+  },
+  "layer": "Application coordination",
+  "adapter": "console",
+  "capabilities": [
+    "php",
+    "pest",
+    "laravel-console"
+  ],
+  "files": [
+    "manifest.json",
+    "instructions.md",
+    "input.schema.json",
+    "plan.json",
+    "examples/good.pest.stub",
+    "examples/bad.pest.stub",
+    "templates/feature.pest.stub"
+  ]
+}

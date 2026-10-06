@@ -34,6 +34,7 @@ class LockProtectedTest
         }
 
         $task ??= throw new RuntimeException('TASK_NOT_FOUND: No saved task has that name or ID.');
+        app(GuardSeamRevision::class)->beforeLock($task);
         if (! $task->allow_test_edits) {
             return $this->confirmLocked($task, $reason);
         }

@@ -167,6 +167,10 @@ function laravelShapedWorkspace(): string
         {
             protected function defineEnvironment($app): void
             {
+                // Keep child Pest processes independent of the developer's Testbench .env.
+                $app['config']->set('session.driver', 'array');
+                $app['config']->set('database.default', 'sqlite');
+                $app['config']->set('database.connections.sqlite.database', ':memory:');
                 // A fresh application has APP_KEY in .env; the web middleware needs it.
                 $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
             }

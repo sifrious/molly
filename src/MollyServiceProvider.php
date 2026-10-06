@@ -59,6 +59,7 @@ use Sifrious\Molly\Console\MollyReceiptCommand;
 use Sifrious\Molly\Console\MollyRetryCommand;
 use Sifrious\Molly\Console\MollyReviewCommitCommand;
 use Sifrious\Molly\Console\MollyRunCommand;
+use Sifrious\Molly\Console\MollySeamCommand;
 use Sifrious\Molly\Console\MollySettingsCommand;
 use Sifrious\Molly\Console\MollySettingsSetCommand;
 use Sifrious\Molly\Console\MollySetupCommand;
@@ -104,6 +105,7 @@ class MollyServiceProvider extends ServiceProvider
             });
         $this->mergeConfigFrom(__DIR__.'/../config/molly.php', 'molly');
         $this->mergeConfigFrom(__DIR__.'/../config/molly-complexity.php', 'molly-complexity');
+        $this->mergeConfigFrom(__DIR__.'/../config/molly-seams.php', 'molly-seams');
     }
 
     public function boot(): void
@@ -160,6 +162,7 @@ class MollyServiceProvider extends ServiceProvider
             MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
             MollyPreflightCommand::class, MollyInstallModelCommand::class, MollyStoryCommand::class,
             MollyOrbsCommand::class, MollyOrbRegisterCommand::class, MollyOrbRevokeCommand::class, MollyQueueCommand::class,
+            MollySeamCommand::class,
         ]);
         if ($this->app->make(Clever::class)->enabled()) {
             $this->commands([ScanCommand::class, OwnedDiffCommand::class, WeldsCommand::class, LonelyFilesCommand::class, HotspotsCommand::class]);
@@ -168,6 +171,12 @@ class MollyServiceProvider extends ServiceProvider
 
     private function publishConfig(): void
     {
+        $this->publishes([
+            __DIR__.'/../resources/seams/packs' => resource_path('molly/seams'),
+        ], 'molly-seams');
+        $this->publishes([
+            __DIR__.'/../config/molly-seams.php' => config_path('molly-seams.php'),
+        ], 'molly-seam-config');
         $this->publishes([
             __DIR__.'/../config/molly.php' => config_path('molly.php'),
             __DIR__.'/../config/molly-complexity.php' => config_path('molly-complexity.php'),

@@ -32,7 +32,11 @@ class VerifyChanges
             return [...$report, 'reason' => 'evidence_directory_unwritable'];
         }
 
+        $started = hrtime(true);
         $execution = $this->executePestProcess($workspace, $command, $evidenceDirectory);
+        $report = [...$report, 'exit_code' => $execution['exit_code'] ?? null,
+            'stdout' => $execution['stdout'] ?? '', 'stderr' => $execution['stderr'] ?? '',
+            'duration_ms' => (hrtime(true) - $started) / 1_000_000];
         if (($execution['reason'] ?? null) !== null) {
             return [...$report, 'output' => $execution['output'], 'reason' => $execution['reason']];
         }
@@ -76,10 +80,10 @@ class VerifyChanges
                 );
                 $output = $sandboxed['output'].$sandboxed['error'];
                 if ($sandboxed['timed_out']) {
-                    return ['output' => $output, 'successful' => false, 'reason' => 'test_timeout'];
+                    return ['output' => $output, 'successful' => false, 'reason' => 'test_timeout', 'stdout' => $sandboxed['output'], 'stderr' => $sandboxed['error'], 'exit_code' => $sandboxed['exit_code']];
                 }
 
-                return ['output' => $output, 'successful' => $sandboxed['exit_code'] === 0];
+                return ['output' => $output, 'successful' => $sandboxed['exit_code'] === 0, 'stdout' => $sandboxed['output'], 'stderr' => $sandboxed['error'], 'exit_code' => $sandboxed['exit_code']];
             }
 
             $result = Process::path($workspace)
@@ -90,12 +94,14 @@ class VerifyChanges
             return [
                 'output' => $result->output().$result->errorOutput(),
                 'successful' => $result->successful(),
+                'stdout' => $result->output(), 'stderr' => $result->errorOutput(), 'exit_code' => $result->exitCode(),
             ];
         } catch (ProcessTimedOutException $exception) {
             return [
                 'output' => $exception->result->output().$exception->result->errorOutput(),
                 'successful' => false,
                 'reason' => 'test_timeout',
+                'stdout' => $exception->result->output(), 'stderr' => $exception->result->errorOutput(), 'exit_code' => $exception->result->exitCode(),
             ];
         } catch (Throwable $exception) {
             return [
