@@ -4,13 +4,14 @@ namespace Sifrious\Molly\Actions;
 
 use DateTimeImmutable;
 use DateTimeZone;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Acceptance\BloomHostInspector;
 use Sifrious\Molly\Acceptance\BloomHostSnapshot;
 use Sifrious\Molly\Acceptance\CheckOutcome;
 use Sifrious\Molly\Acceptance\EvidenceRecorder;
 use Sifrious\Molly\Acceptance\M04CheckCatalog;
+use Sifrious\Molly\Acceptance\PackageIdentity;
+use Sifrious\Molly\Acceptance\PackageIdentityReader;
 use Sifrious\Molly\Acceptance\PackageRoot;
 use Sifrious\Molly\Acceptance\PermissionPreflight;
 use Sifrious\Molly\Acceptance\VerificationCheckResult;
@@ -26,12 +27,15 @@ use Throwable;
 
 class VerifyMolly
 {
+    private ?PackageIdentity $packageIdentity = null;
+
     public function __construct(
         private PermissionPreflight $preflight,
         private VerificationRunner $runner,
         private EvidenceRecorder $evidence,
         private M04CheckCatalog $catalog,
         private BloomHostInspector $hosts,
+        private PackageIdentityReader $packages,
     ) {}
 
     /** @return array<string, mixed> */
@@ -43,7 +47,7 @@ class VerifyMolly
         }
         $sha = $this->candidate($candidateSha);
         if (! is_string($sha)) {
-            return $this->invalid($sha['reason_code'], $sha['message']);
+            return $sha;
         }
 
         try {
@@ -60,7 +64,7 @@ class VerifyMolly
     }
 
     /** @return array<string, mixed> */
-    public function verify(VerificationMode $mode, string $evidenceRoot, ?string $candidateSha = null, ?VerificationContext $context = null, ?string $projectRoot = null): array
+    public function verify(VerificationMode $mode, string $evidenceRoot, ?string $candidateSha = null, ?VerificationContext $context = null, ?string $projectRoot = null, ?string $task = null, ?string $run = null): array
     {
         if ($mode === VerificationMode::CheckPermissions) {
             return $this->inspectPermissions($evidenceRoot, $candidateSha);
@@ -71,9 +75,9 @@ class VerifyMolly
         }
         $resolved = $this->candidate($candidateSha);
         if (! is_string($resolved)) {
-            return $this->invalid((string) $resolved['reason_code'], (string) $resolved['message']);
+            return $resolved;
         }
-        $context = $this->context($mode, $context, $projectRoot);
+        $context = $this->context($mode, $context, $projectRoot, $task, $run);
         if ($mode === VerificationMode::RetryNativeUi) {
             return $this->retry($evidenceRoot, $resolved, $context);
         }
@@ -283,6 +287,7 @@ class VerifyMolly
             'summary' => $summary->toArray(),
             'stages' => [VerificationSummary::stage('M04', $results)],
             'environment' => $previous['environment'] ?? $this->environment(),
+            'package_identity' => $this->packageIdentity?->toArray(),
             'preflight' => $this->publicPreflight($preflight),
             'checks' => array_map(fn (VerificationCheckResult $result): array => $result->toArray(), $results),
             'native_observation' => $mode === VerificationMode::Permissionless ? 'disabled_by_mode' : 'available',
@@ -319,29 +324,69 @@ class VerifyMolly
         return null;
     }
 
-    /** @return string|array{reason_code: string, message: string} */
+    /** @return string|array<string, mixed> */
     private function candidate(?string $given): string|array
     {
+        $this->packageIdentity = $this->packages->read();
+        $proven = $this->packageIdentity->commit;
         if (is_string($given) && $given !== '') {
             if (preg_match('/\A[0-9a-f]{40}\z/', $given) !== 1) {
-                return ['reason_code' => 'CANDIDATE_SHA_INVALID', 'message' => 'The candidate SHA must be 40 lowercase hex characters.'];
+                return $this->refusedCandidate('CANDIDATE_SHA_INVALID', 'The candidate SHA must be 40 lowercase hex characters.', 4, $given);
+            }
+            if ($proven === null) {
+                return $this->refusedCandidate('CANDIDATE_UNVERIFIED', 'Molly could not prove the installed commit, so it did not trust --candidate '.$given.'.', 3, $given);
+            }
+            if ($given !== $proven) {
+                return $this->refusedCandidate('CANDIDATE_MISMATCH', 'The --candidate SHA '.$given.' does not match the installed commit '.$proven.'. Molly did not run the checks.', 4, $given);
             }
 
             return $given;
         }
-        $result = Process::path(PackageRoot::path())->timeout(10)->run(['git', 'rev-parse', 'HEAD']);
-        $sha = trim($result->output());
-        if (! $result->successful() || preg_match('/\A[0-9a-f]{40}\z/', $sha) !== 1) {
-            return ['reason_code' => 'CANDIDATE_SHA_UNRESOLVED', 'message' => 'Molly could not read HEAD. Pass --candidate with the 40-character SHA.'];
+        if ($proven === null) {
+            return $this->refusedCandidate('CANDIDATE_UNVERIFIED', 'Molly could not prove the installed commit. An injected candidate commit or a clean git HEAD is required before the checks run.', 3, null);
         }
 
-        return $sha;
+        return $proven;
+    }
+
+    /** @return array<string, mixed> */
+    private function refusedCandidate(string $reason, string $message, int $exit, ?string $given): array
+    {
+        return [
+            'schema' => 'molly.acceptance-verification/1',
+            'status' => $exit === 4 ? 'invalid' : 'completed',
+            'exit_code' => $exit,
+            'reason_code' => $reason,
+            'candidate_sha' => $given,
+            'message' => $message,
+            'release_complete' => false,
+            'acceptance_program_complete' => false,
+            'reused_evidence' => false,
+            'permission_granted_by_cli' => false,
+            'package_identity' => $this->packageIdentity?->toArray(),
+            'environment' => $this->environment(),
+            'summary' => [
+                'product_failures' => 0,
+                'harness_failures' => 0,
+                'permission_blocks' => 0,
+                'prerequisite_blocks' => 0,
+                'evidence_incomplete' => 0,
+                'passes' => 0,
+                'approved_na' => 0,
+                'not_run' => 0,
+                'release_complete' => false,
+            ],
+            'checks' => [],
+        ];
     }
 
     /** @return array<string, mixed> */
     private function environment(): array
     {
         $process = VerifierProcessIdentity::capture();
+
+        $connection = (string) config('database.default');
+        $database = config('database.connections.'.$connection.'.database');
 
         return [
             'os_family' => PHP_OS_FAMILY,
@@ -350,7 +395,22 @@ class VerifyMolly
             'parent_name' => $process->parentName,
             'bundle_id' => $process->bundleId,
             'machine' => php_uname('n'),
+            'molly_home' => $this->recordedMollyHome(),
+            'db_connection' => $connection,
+            'db_database' => is_string($database) ? $database : null,
+            'queue_connection' => (string) config('queue.default'),
         ];
+    }
+
+    private function recordedMollyHome(): string
+    {
+        $env = getenv('MOLLY_HOME');
+        if (is_string($env) && $env !== '') {
+            return rtrim(str_replace('\\', '/', $env), '/');
+        }
+        $userHome = getenv('HOME') ?: sys_get_temp_dir();
+
+        return rtrim(str_replace('\\', '/', $userHome), '/').'/.molly';
     }
 
     /** @param  array<string, mixed>|null  $saved */
@@ -368,11 +428,19 @@ class VerifyMolly
         return true;
     }
 
-    private function context(VerificationMode $mode, ?VerificationContext $given, ?string $projectRoot): VerificationContext
+    private function context(VerificationMode $mode, ?VerificationContext $given, ?string $projectRoot, ?string $task = null, ?string $run = null): VerificationContext
     {
         $context = $given ?? new VerificationContext('', '', PackageRoot::path(), '', $mode);
         if (is_string($projectRoot) && $projectRoot !== '' && $context->projectRoot === '') {
             $context = $context->withProject($projectRoot);
+        }
+        if ($context->mollyHome === null || $context->mollyHome === '') {
+            $context = $context->withMollyHome($this->recordedMollyHome());
+        }
+        $task = is_string($task) && $task !== '' ? $task : $context->taskReference;
+        $run = is_string($run) && $run !== '' ? $run : $context->runReference;
+        if ($task !== null || $run !== null) {
+            $context = $context->withSelection($task, $run);
         }
 
         return $context;
@@ -420,6 +488,8 @@ class VerifyMolly
             'acceptance_program_complete' => false,
             'reused_evidence' => false,
             'permission_granted_by_cli' => false,
+            'package_identity' => $this->packageIdentity?->toArray(),
+            'environment' => $this->packageIdentity instanceof PackageIdentity ? $this->environment() : null,
         ];
     }
 

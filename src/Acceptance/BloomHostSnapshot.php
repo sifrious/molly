@@ -5,6 +5,7 @@ namespace Sifrious\Molly\Acceptance;
 /**
  * Facts read from a compiled Bloom process and its plugin directory.
  * This is not a check outcome. A caller-supplied PASS record is not one of these facts.
+ * enabled is the on-disk plugin list. loaded is a process observation that MollySurfaces is in that pid.
  */
 final readonly class BloomHostSnapshot
 {
@@ -17,6 +18,9 @@ final readonly class BloomHostSnapshot
         public bool $enabled,
         public string $processSource,
         public string $pluginSource,
+        public bool $loaded = false,
+        public string $loadSource = '',
+        public bool $ambiguous = false,
     ) {}
 
     /** @return array<string, bool|int|string|null> */
@@ -29,8 +33,11 @@ final readonly class BloomHostSnapshot
             'plugin_id' => $this->pluginId,
             'api_version' => $this->apiVersion,
             'enabled' => $this->enabled,
+            'loaded' => $this->loaded,
             'process_source' => $this->processSource,
             'plugin_source' => $this->pluginSource,
+            'load_source' => $this->loadSource,
+            'ambiguous' => $this->ambiguous,
         ];
     }
 }

@@ -8,7 +8,6 @@ use Sifrious\Molly\Actions\GetMollySettings;
 use Sifrious\Molly\Actions\ListConversations;
 use Sifrious\Molly\Actions\ListMollyProjects;
 use Sifrious\Molly\Actions\ListTasks;
-use Sifrious\Molly\Actions\ManageWorker;
 use Sifrious\Molly\Actions\QueryProjectGraph;
 use Sifrious\Molly\Actions\ShowRun;
 use Sifrious\Molly\Journal\JournalRenderer;
@@ -30,7 +29,7 @@ final class BloomProgrammaticAssertions
         private GetMollySettings $settings,
         private QueryProjectGraph $graph,
         private JournalRenderer $glossary,
-        private ManageWorker $workerControl,
+        private QueueWorkerProbe $workerProbe,
     ) {}
 
     public function probe(VerificationCheckDefinition $check, VerificationContext $context): ProbeResult
@@ -48,7 +47,7 @@ final class BloomProgrammaticAssertions
             'M04.10' => $this->worker($context),
             'M04.11' => $this->trace($context),
             'M04.12' => $this->cliVisible($context),
-            'M04.13' => $this->hostLog($context, 'host-incompat.log', 'INCOMPAT_LOG', 'skipped', 'apiVersion', 'stable'),
+            'M04.13' => $this->hostDiagnostic($context, 'host-incompat.log', 'INCOMPAT_LOG', 'incompatible'),
             'M04.14' => $this->missingHost($context),
             'M04.15' => $this->brokenAssets($context),
             'M04.16' => $this->restart($context),
@@ -78,24 +77,29 @@ final class BloomProgrammaticAssertions
         if ($host === null || ! $host->running) {
             return $this->prerequisite(
                 'COMPILED_HOST_NOT_OBSERVED',
-                'The extension seam matches. The compiled Bloom host has not been observed, so M04.1 is not accepted.',
+                $host?->ambiguous === true
+                    ? 'More than one Bloom process is running. Set BLOOM_APP to the app under test. M04.1 did not take the first match.'
+                    : 'The extension seam matches. The compiled Bloom host has not been observed, so M04.1 is not accepted.',
                 [$seam, $process],
             );
         }
         $discovered = $host->pluginId === 'sifrious.molly' && $host->apiVersion === 1 && $host->enabled;
         $plugin = $this->assertion(
             $context,
-            'running host has sifrious.molly enabled at apiVersion 1',
-            'sifrious.molly apiVersion 1 enabled',
-            'plugin '.($host->pluginId ?? 'missing').' apiVersion '.($host->apiVersion === null ? 'missing' : (string) $host->apiVersion).' enabled '.($host->enabled ? 'yes' : 'no'),
-            $host->pluginSource,
-            $discovered ? 'pass' : 'fail',
+            'running host has sifrious.molly enabled at apiVersion 1 and the plugin loaded',
+            'sifrious.molly apiVersion 1 enabled and loaded',
+            'plugin '.($host->pluginId ?? 'missing').' apiVersion '.($host->apiVersion === null ? 'missing' : (string) $host->apiVersion).' enabled '.($host->enabled ? 'yes' : 'no').' loaded '.($host->loaded ? 'yes' : 'no'),
+            $host->loaded ? $host->loadSource : $host->pluginSource,
+            $discovered && $host->loaded ? 'pass' : ($discovered ? 'not_observed' : 'fail'),
         );
         if (! $discovered) {
             return $this->fail('HOST_PLUGIN_NOT_DISCOVERED', 'Bloom is running as pid '.$host->pid.'. The enabled plugin is not sifrious.molly at apiVersion 1.', [$seam, $process, $plugin]);
         }
+        if (! $host->loaded) {
+            return $this->incomplete('PLUGIN_LOAD_NOT_OBSERVED', 'Bloom is running as pid '.$host->pid.' and sifrious.molly is enabled on disk. Molly did not observe MollySurfaces loaded in that process.', [$seam, $process, $plugin]);
+        }
 
-        return $this->pass('HOST_PLUGIN_DISCOVERED', 'Bloom is running as pid '.$host->pid.' and sifrious.molly apiVersion 1 is enabled.', [$seam, $process, $plugin]);
+        return $this->pass('HOST_PLUGIN_DISCOVERED', 'Bloom is running as pid '.$host->pid.' and sifrious.molly apiVersion 1 is loaded.', [$seam, $process, $plugin]);
     }
 
     private function project(VerificationContext $context, string $source, string $assertion): ProbeResult
@@ -144,9 +148,7 @@ final class BloomProgrammaticAssertions
     {
         $task = $this->task($context);
         if (! $task instanceof Task) {
-            return $this->incomplete('TASK_NOT_OBSERVED', 'molly:tasks has no task for this project.', [
-                $this->assertion($context, 'a task is listed for the project', 'one task', $task ?? 'none', 'ListTasks', 'not_observed'),
-            ]);
+            return $this->taskMissing($context, $task, 'a task is listed for the project', 'one task', 'ListTasks');
         }
 
         return $this->pass('TASK_LISTED', 'molly:tasks lists '.$task->reference().'.', [
@@ -157,10 +159,8 @@ final class BloomProgrammaticAssertions
     private function runSurface(VerificationContext $context): ProbeResult
     {
         $run = $this->run($context);
-        if ($run === null) {
-            return $this->incomplete('RUN_NOT_OBSERVED', 'Molly has no saved run to show for this project.', [
-                $this->assertion($context, 'molly:show returns run status and verifier results', 'status and verification', 'no run', 'ShowRun', 'not_observed'),
-            ]);
+        if (! isset($run['id'])) {
+            return $this->runMissing($context, $run, 'molly:show returns run status and verifier results', 'status and verification', 'ShowRun');
         }
         $shown = $this->runs->handle($run['id']);
         $report = is_array($shown?->report) ? $shown->report : [];
@@ -185,9 +185,7 @@ final class BloomProgrammaticAssertions
     {
         $task = $this->task($context);
         if (! $task instanceof Task) {
-            return $this->incomplete('CONVERSATION_NOT_OBSERVED', 'Molly has no task whose conversation can be listed.', [
-                $this->assertion($context, 'conversation links to the task', 'task id', 'no task', 'ListConversations', 'not_observed'),
-            ]);
+            return $this->taskMissing($context, $task, 'conversation links to the task', 'task id', 'ListConversations');
         }
         $listed = $this->conversations->handle($task->id);
         $match = null;
@@ -210,22 +208,32 @@ final class BloomProgrammaticAssertions
 
     private function graphSurface(VerificationContext $context): ProbeResult
     {
-        if ($context->projectRoot === '') {
-            return $this->incomplete('GRAPH_NOT_OBSERVED', 'Molly has no project whose graph can be queried.', [
-                $this->assertion($context, 'graph nodes carry provenance', 'nodes with provenance', 'no project', 'QueryProjectGraph', 'not_observed'),
-            ]);
+        $task = $this->task($context);
+        if (! $task instanceof Task) {
+            return $this->taskMissing($context, $task, 'the selected task is in the project graph', 'task id with provenance', 'QueryProjectGraph');
         }
         try {
-            $result = $this->graph->handle('Task', $context->projectRoot, 1, 20);
+            $result = $this->graph->handle($task->id, $context->projectRoot, 1, 20);
         } catch (Throwable $exception) {
             return $this->incomplete('GRAPH_NOT_OBSERVED', $exception->getMessage(), [
-                $this->assertion($context, 'graph nodes carry provenance', 'nodes with provenance', $exception->getMessage(), 'QueryProjectGraph', 'not_observed'),
+                $this->assertion($context, 'the selected task is in the project graph', $task->id, $exception->getMessage(), 'QueryProjectGraph', 'not_observed'),
             ]);
         }
         $nodes = is_array($result['nodes'] ?? null) ? $result['nodes'] : [];
-        if ($nodes === []) {
-            return $this->incomplete('GRAPH_NOT_OBSERVED', 'molly:project:query returned no nodes for this project.', [
-                $this->assertion($context, 'graph nodes carry provenance', 'nodes with provenance', '0 nodes', 'QueryProjectGraph', 'not_observed'),
+        $exact = false;
+        foreach ($nodes as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+            $key = strtolower((string) ($node['key'] ?? ''));
+            $label = strtolower((string) ($node['label'] ?? ''));
+            if ($key === strtolower($task->id) || $label === strtolower($task->id)) {
+                $exact = true;
+            }
+        }
+        if ($nodes === [] || ! $exact) {
+            return $this->incomplete('GRAPH_NOT_OBSERVED', 'molly:project:query returned no node for task '.$task->id.'.', [
+                $this->assertion($context, 'the selected task is in the project graph', $task->id, '0 nodes for this task', 'QueryProjectGraph', 'not_observed'),
             ]);
         }
         $missing = 0;
@@ -237,9 +245,9 @@ final class BloomProgrammaticAssertions
         $database = (string) config('molly.knowledge.database', '.molly/knowledge.sqlite');
         $assertion = $this->assertion(
             $context,
-            'graph nodes carry provenance',
-            'every node has provenance',
-            $missing === 0 ? count($nodes).' nodes with provenance' : $missing.' nodes without provenance',
+            'the selected task is in the project graph with provenance',
+            $task->id.' with provenance',
+            $missing === 0 ? count($nodes).' nodes for '.$task->id.' with provenance' : $missing.' nodes without provenance',
             $database,
             $missing === 0 ? 'pass' : 'fail',
         );
@@ -320,63 +328,58 @@ final class BloomProgrammaticAssertions
 
     private function worker(VerificationContext $context): ProbeResult
     {
-        $task = $this->task($context);
-        if (! $task instanceof Task || ! is_string($task->worker_id) || $task->worker_id === '') {
-            return $this->incomplete('WORKER_NOT_OBSERVED', 'Molly has no running task with a worker id.', [
-                $this->assertion($context, 'worker status and control state are readable', 'worker id, task status, and control state', 'none', 'ListTasks', 'not_observed'),
-            ]);
-        }
         if ($context->projectRoot === '') {
-            return $this->incomplete('WORKER_NOT_OBSERVED', 'Molly has no project whose worker control can be read.', [
-                $this->assertion($context, 'worker status and control state are readable', 'worker id, task status, and control state', 'no project', 'ManageWorker', 'not_observed'),
+            return $this->incomplete('WORKER_NOT_OBSERVED', 'Molly has no project whose queue worker can be read.', [
+                $this->assertion($context, 'molly:worker queue:work process is running', 'running queue:work', 'no project', 'ManageWorker', 'not_observed'),
             ]);
         }
         try {
-            $status = $this->workerControl->status($context->projectRoot);
+            $status = $this->workerProbe->status($context->projectRoot);
         } catch (Throwable $exception) {
             $invalid = str_contains($exception->getMessage(), 'WORKER_RECORD_INVALID');
 
             return $invalid
                 ? $this->fail('WORKER_RECORD_INVALID', $exception->getMessage(), [
-                    $this->assertion($context, 'worker status and control state are readable', 'worker id, task status, and control state', $exception->getMessage(), 'ManageWorker', 'fail'),
+                    $this->assertion($context, 'molly:worker queue:work process is running', 'running queue:work', $exception->getMessage(), 'ManageWorker', 'fail'),
                 ])
                 : $this->incomplete('WORKER_NOT_OBSERVED', $exception->getMessage(), [
-                    $this->assertion($context, 'worker status and control state are readable', 'worker id, task status, and control state', $exception->getMessage(), 'ManageWorker', 'not_observed'),
+                    $this->assertion($context, 'molly:worker queue:work process is running', 'running queue:work', $exception->getMessage(), 'ManageWorker', 'not_observed'),
                 ]);
         }
         $state = is_string($status['state'] ?? null) ? $status['state'] : 'unreadable';
+        $command = is_array($status['command'] ?? null) ? implode(' ', $status['command']) : '';
         $source = is_string($status['pid_file'] ?? null) ? $status['pid_file'] : 'ManageWorker';
+        $queueWorker = $state === 'running' && str_contains($command, 'queue:work');
         $host = $context->host;
-        $readable = in_array($state, ['running', 'stopped', 'stale'], true);
         $assertion = $this->assertion(
             $context,
-            'worker status and control state are readable',
-            'worker id, task status, and control state',
-            $task->worker_id.' '.$task->status.'; control '.$state.($host?->running === true ? '; bloom pid '.$host->pid : '; no bloom process'),
+            'molly:worker queue:work process is running',
+            'running queue:work',
+            'control '.$state.' command '.($command === '' ? 'none' : $command).($host?->running === true ? '; bloom pid '.$host->pid : '; no bloom process'),
             $source,
-            $readable ? 'pass' : 'fail',
+            $queueWorker ? 'pass' : 'not_observed',
         );
-        if (! $readable) {
-            return $this->fail('WORKER_STATUS_UNREADABLE', 'molly:worker status did not return a worker state.', [$assertion]);
+        if (! $queueWorker) {
+            return $this->incomplete('WORKER_NOT_RUNNING', 'molly:worker is '.$state.'. A stopped or stale worker, or a process that is not queue:work, does not pass M04.10.', [$assertion]);
         }
         if ($host === null || ! $host->running) {
             return $this->prerequisite(
                 'WORKER_HOST_NOT_OBSERVED',
-                'Worker '.$task->worker_id.' is '.$task->status.' and the control state is '.$state.'. The compiled Bloom host is not running, so M04.10 is not accepted.',
+                'queue:work is running. The compiled Bloom host is not running, so M04.10 is not accepted.',
                 [$assertion],
             );
         }
 
-        return $this->pass('WORKER_STATUS_READ', 'Bloom is running and the worker control state is '.$state.' for '.$task->worker_id.'.', [$assertion]);
+        return $this->pass('WORKER_STATUS_READ', 'Bloom is running and molly:worker is queue:work as pid '.(string) ($status['pid'] ?? '').'.', [$assertion]);
     }
 
     private function trace(VerificationContext $context): ProbeResult
     {
         $task = $this->task($context);
         $run = $this->run($context);
-        if (! $task instanceof Task || $run === null) {
+        if (! $task instanceof Task || ! isset($run['id'])) {
             return $this->incomplete('TRACE_NOT_OBSERVED', 'Molly has no task and run chain to compare.', [
-                $this->assertion($context, 'task, run, conversation, diff, and receipt share ids', 'one chain', 'incomplete', 'ShowRun', 'not_observed'),
+                $this->assertion($context, 'task, run, conversation, diff, and receipt share ids', 'one chain', is_string($task) ? $task : (is_string($run['problem'] ?? null) ? $run['problem'] : 'incomplete'), 'ShowRun', 'not_observed'),
             ]);
         }
         $shown = $this->runs->handle($run['id']);
@@ -516,9 +519,7 @@ final class BloomProgrammaticAssertions
     {
         $task = $this->task($context);
         if (! $task instanceof Task) {
-            return $this->incomplete('CLI_TO_BLOOM_STATE_NOT_OBSERVED', 'Molly has no CLI task for Bloom to show.', [
-                $this->assertion($context, 'CLI task is in the list Bloom reads', 'task id', 'none', 'ListTasks', 'not_observed'),
-            ]);
+            return $this->taskMissing($context, $task, 'CLI task is in the list Bloom reads', 'task id', 'ListTasks');
         }
 
         return ProbeResult::needsNative(
@@ -528,46 +529,80 @@ final class BloomProgrammaticAssertions
         );
     }
 
-    private function hostLog(VerificationContext $context, string $name, string $code, string ...$needles): ProbeResult
+    private function hostDiagnostic(VerificationContext $context, string $name, string $code, string $kind): ProbeResult
     {
         $path = $context->projectRoot === '' ? '' : $context->projectRoot.'/'.$name;
-        if ($path === '' || ! is_file($path)) {
-            return $this->incomplete($code.'_NOT_OBSERVED', 'Molly has no '.$name.' from the compiled host.', [
-                $this->assertion($context, $name.' records the host result', implode(' ', $needles), 'file missing', $path, 'not_observed'),
+        $record = $this->attributedRecord($path, $context->candidateSha);
+        if ($record === null) {
+            return $this->incomplete($code.'_NOT_OBSERVED', $name.' has no host record with process, host, plugin, candidate, and timestamp. Molly did not treat the file as a product failure.', [
+                $this->assertion($context, $name.' attributes a host diagnostic', 'provenance and a '.$kind.' diagnostic', is_file($path) ? 'provenance missing' : 'file missing', $path, 'not_observed'),
             ]);
         }
-        $body = (string) file_get_contents($path);
-        $missing = array_values(array_filter($needles, fn (string $needle): bool => ! str_contains($body, $needle)));
+        $signal = $kind === 'incompatible'
+            ? (($record['loaded'] ?? null) === false || (is_int($record['api_version'] ?? null) && $record['api_version'] !== 1))
+            : (($record['missing_bundle'] ?? null) === true || ($record['missing_provider'] ?? null) === true);
         $assertion = $this->assertion(
             $context,
-            $name.' records the host result',
-            implode(' ', $needles),
-            $missing === [] ? 'present' : 'missing '.implode(' ', $missing),
+            $name.' attributes a host diagnostic',
+            'provenance and a '.$kind.' diagnostic',
+            $signal ? 'recorded' : 'no '.$kind.' diagnostic',
             $path,
-            $missing === [] ? 'pass' : 'fail',
+            $signal ? 'pass' : 'not_observed',
         );
-
-        if ($missing !== []) {
-            return $this->fail($code.'_UNHELPFUL', $name.' does not contain the expected host record.', [$assertion]);
+        if (! $signal || ($record['plugin'] ?? null) !== 'sifrious.molly') {
+            return $this->incomplete($code.'_NOT_OBSERVED', $name.' does not record a '.$kind.' diagnostic for sifrious.molly. An honest host log without that fact stays incomplete.', [$assertion]);
         }
         $host = $context->host;
+        $pid = $record['process']['pid'] ?? null;
         $process = $this->assertion(
             $context,
-            'compiled Bloom process is running',
-            'bloom process',
+            'compiled Bloom process is the recorded host',
+            'bloom pid '.$pid,
             $host?->running === true ? 'pid '.$host->pid : 'no bloom process',
             $host?->processSource ?? 'ps -ax -o pid=,command=',
-            $host?->running === true ? 'pass' : 'not_observed',
+            $host?->running === true && $host->pid === $pid ? 'pass' : 'not_observed',
         );
-        if ($host === null || ! $host->running) {
+        if ($host === null || ! $host->running || $host->pid !== $pid) {
             return $this->prerequisite(
                 'HOST_DIAGNOSTIC_NOT_OBSERVED',
-                $name.' matches, and the compiled Bloom process was not observed, so the diagnostic is not accepted.',
+                $name.' records the diagnostic. The compiled Bloom process in that record was not observed, so it is not accepted.',
                 [$assertion, $process],
             );
         }
 
-        return $this->pass($code.'_RECORDED', $name.' contains the expected host record while Bloom is running.', [$assertion, $process]);
+        return $this->pass($code.'_RECORDED', $name.' attributes the host diagnostic to the running Bloom process.', [$assertion, $process]);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function attributedRecord(string $path, string $candidate): ?array
+    {
+        if ($path === '' || ! is_file($path)) {
+            return null;
+        }
+        try {
+            $decoded = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+        if (! is_array($decoded)) {
+            return null;
+        }
+        $pid = $decoded['process']['pid'] ?? null;
+        $host = $decoded['host'] ?? null;
+        $plugin = $decoded['plugin'] ?? null;
+        $recorded = $decoded['candidate'] ?? null;
+        $at = $decoded['observed_at'] ?? null;
+        if (! is_int($pid) || $pid < 2 || ! is_string($host) || $host === '' || ! is_string($plugin) || $plugin === '') {
+            return null;
+        }
+        if (! is_string($recorded) || preg_match('/\A[0-9a-f]{40}\z/', $recorded) !== 1 || $recorded !== $candidate) {
+            return null;
+        }
+        if (! is_string($at) || $at === '') {
+            return null;
+        }
+
+        return $decoded;
     }
 
     private function missingHost(VerificationContext $context): ProbeResult
@@ -601,53 +636,74 @@ final class BloomProgrammaticAssertions
 
     private function brokenAssets(VerificationContext $context): ProbeResult
     {
-        return $this->hostLog($context, 'host-broken.log', 'BROKEN_ASSETS', 'missingBundle', 'missingProvider');
+        return $this->hostDiagnostic($context, 'host-broken.log', 'BROKEN_ASSETS', 'broken');
     }
 
     private function restart(VerificationContext $context): ProbeResult
     {
         $path = $context->projectRoot === '' ? '' : $context->projectRoot.'/.molly/restart-state.json';
-        if ($path === '' || ! is_file($path)) {
-            return $this->incomplete('RESTART_PERSISTENCE_NOT_OBSERVED', 'Molly has no restart persistence record for this project.', [
-                $this->assertion($context, 'task id survives restart', 'same task id', 'file missing', $path, 'not_observed'),
+        $record = $this->attributedRecord($path, $context->candidateSha);
+        $before = $this->restartSide(is_array($record) ? ($record['before'] ?? null) : null);
+        $after = $this->restartSide(is_array($record) ? ($record['after'] ?? null) : null);
+        $independent = $before !== null && $after !== null
+            && $before['source'] !== $after['source']
+            && $before['pid'] !== $after['pid']
+            && $before['observed_at'] !== $after['observed_at'];
+        if ($record === null || ! $independent) {
+            return $this->incomplete('RESTART_PERSISTENCE_NOT_OBSERVED', 'Molly has no independent before and after observations for this restart. A matching task id or a pid change is not that record.', [
+                $this->assertion($context, 'task id survives an observed restart', 'plugin and cli observations with different pids', 'provenance missing', $path, 'not_observed'),
             ]);
         }
-        try {
-            $decoded = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return $this->fail('RESTART_RECORD_INVALID', $path.' is not valid JSON.', [
-                $this->assertion($context, 'task id survives restart', 'same task id', 'invalid JSON', $path, 'fail'),
-            ]);
-        }
-        $before = is_array($decoded) ? (string) ($decoded['before']['task_id'] ?? '') : '';
-        $after = is_array($decoded) ? (string) ($decoded['after']['task_id'] ?? '') : '';
-        if ($before === '' || $after === '') {
-            return $this->incomplete('RESTART_PERSISTENCE_NOT_OBSERVED', 'The restart record has no before and after task id.', [
-                $this->assertion($context, 'task id survives restart', 'same task id', 'incomplete record', $path, 'not_observed'),
-            ]);
-        }
-        $assertion = $this->assertion($context, 'task id survives restart', $before, $after, $path, $before === $after ? 'pass' : 'fail');
-        if ($before !== $after) {
-            return $this->fail('RESTART_STATE_LOST', 'The task id after restart does not match the id recorded before it.', [$assertion]);
+        $kept = $before['task_id'] === $after['task_id'];
+        $assertion = $this->assertion(
+            $context,
+            'task id survives an observed restart',
+            $before['task_id'].' pid '.$before['pid'].' '.$before['source'],
+            $after['task_id'].' pid '.$after['pid'].' '.$after['source'],
+            $path,
+            $kept ? 'pass' : 'fail',
+        );
+        if (! $kept) {
+            return $this->fail('RESTART_STATE_LOST', 'The task id observed after restart does not match the id observed before it.', [$assertion]);
         }
         $host = $context->host;
         $process = $this->assertion(
             $context,
-            'compiled Bloom process is running',
-            'bloom process',
+            'compiled Bloom process is the restarted host',
+            'bloom pid '.$after['pid'],
             $host?->running === true ? 'pid '.$host->pid : 'no bloom process',
             $host?->processSource ?? 'ps -ax -o pid=,command=',
-            $host?->running === true ? 'pass' : 'not_observed',
+            $host?->running === true && $host->pid === $after['pid'] ? 'pass' : 'not_observed',
         );
-        if ($host === null || ! $host->running) {
+        if ($host === null || ! $host->running || $host->pid !== $after['pid']) {
             return $this->prerequisite(
                 'RESTART_HOST_NOT_OBSERVED',
-                'The persisted task id matches. The compiled Bloom host is not running, so M04.16 is not accepted.',
+                'The before and after observations agree. The restarted Bloom process was not observed, so M04.16 is not accepted.',
                 [$assertion, $process],
             );
         }
 
-        return $this->pass('RESTART_STATE_KEPT', 'Bloom is running and the task id after restart matches the id recorded before it.', [$assertion, $process]);
+        return $this->pass('RESTART_STATE_KEPT', 'Bloom is running as the pid observed after restart, and the task id matches the observation from before it.', [$assertion, $process]);
+    }
+
+    /** @return array{task_id: string, pid: int, source: string, observed_at: string}|null */
+    private function restartSide(mixed $side): ?array
+    {
+        if (! is_array($side)) {
+            return null;
+        }
+        $task = $side['task_id'] ?? null;
+        $pid = $side['pid'] ?? null;
+        $source = $side['source'] ?? null;
+        $at = $side['observed_at'] ?? null;
+        if (! is_string($task) || $task === '' || ! is_int($pid) || $pid < 2) {
+            return null;
+        }
+        if (! in_array($source, ['plugin', 'cli'], true) || ! is_string($at) || $at === '') {
+            return null;
+        }
+
+        return ['task_id' => $task, 'pid' => $pid, 'source' => $source, 'observed_at' => $at];
     }
 
     private function seam(VerificationContext $context): CheckAssertion
@@ -700,28 +756,82 @@ final class BloomProgrammaticAssertions
         } catch (Throwable $exception) {
             return $exception->getMessage();
         }
+        $inProject = [];
         foreach ($listed as $task) {
             if ($task->workspace === $context->projectRoot) {
-                return $task;
+                $inProject[] = $task;
             }
+        }
+        $selected = $context->taskReference;
+        if (is_string($selected) && $selected !== '') {
+            foreach ($inProject as $task) {
+                if ($task->id === $selected || $task->nickname === $selected) {
+                    return $task;
+                }
+            }
+
+            return 'TASK_NOT_OBSERVED';
+        }
+        if (count($inProject) === 1) {
+            return $inProject[0];
+        }
+        if (count($inProject) > 1) {
+            return 'TASK_NOT_SELECTED';
         }
 
         return null;
     }
 
-    /** @return array{id: string}|null */
-    private function run(VerificationContext $context): ?array
+    /** @return array{id: string}|array{problem: string} */
+    private function run(VerificationContext $context): array
     {
         $task = $this->task($context);
         if (! $task instanceof Task) {
-            return null;
+            return ['problem' => is_string($task) ? $task : 'RUN_NOT_OBSERVED'];
         }
-        $run = $task->runs()->first();
-        if ($run === null) {
-            return null;
+        $runs = $task->runs()->get();
+        $selected = $context->runReference;
+        if (is_string($selected) && $selected !== '') {
+            foreach ($runs as $run) {
+                if ($run->id === $selected) {
+                    return ['id' => $run->id];
+                }
+            }
+
+            return ['problem' => 'RUN_NOT_OBSERVED'];
+        }
+        if ($runs->count() === 1) {
+            return ['id' => $runs->first()->id];
+        }
+        if ($runs->count() > 1) {
+            return ['problem' => 'RUN_NOT_SELECTED'];
         }
 
-        return ['id' => $run->id];
+        return ['problem' => 'RUN_NOT_OBSERVED'];
+    }
+
+    private function taskMissing(VerificationContext $context, Task|string|null $task, string $assertion, string $expected, string $source): ProbeResult
+    {
+        $reason = $task === 'TASK_NOT_SELECTED' ? 'TASK_NOT_SELECTED' : 'TASK_NOT_OBSERVED';
+
+        return $this->incomplete($reason, $reason === 'TASK_NOT_SELECTED'
+            ? 'This project has more than one task. Pass --task with the id or nickname.'
+            : 'molly:tasks has no selected task for this project.', [
+                $this->assertion($context, $assertion, $expected, is_string($task) ? $task : 'none', $source, 'not_observed'),
+            ]);
+    }
+
+    /** @param  array{problem?: string}|null  $run */
+    private function runMissing(VerificationContext $context, ?array $run, string $assertion, string $expected, string $source): ProbeResult
+    {
+        $problem = is_string($run['problem'] ?? null) ? $run['problem'] : 'RUN_NOT_OBSERVED';
+        $reason = $problem === 'RUN_NOT_SELECTED' ? 'RUN_NOT_SELECTED' : 'RUN_NOT_OBSERVED';
+
+        return $this->incomplete($reason, $reason === 'RUN_NOT_SELECTED'
+            ? 'This task has more than one run. Pass --run with the run id.'
+            : 'Molly has no saved run to show for this project.', [
+                $this->assertion($context, $assertion, $expected, $problem, $source, 'not_observed'),
+            ]);
     }
 
     private function assertion(

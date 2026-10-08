@@ -26,17 +26,21 @@ class MollyVerify extends Tool
             'evidence' => ['sometimes', 'string', 'max:500'],
             'candidate' => ['sometimes', 'nullable', 'string', 'max:40'],
             'project' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'task' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'run' => ['sometimes', 'nullable', 'string', 'max:64'],
             'check_id' => ['required_if:operation,check_evidence', 'string', 'max:20'],
             'attempt' => ['sometimes', 'integer', 'min:1'],
         ]);
         $evidence = is_string($data['evidence'] ?? null) && $data['evidence'] !== '' ? $data['evidence'] : storage_path('molly/acceptance');
         $candidate = is_string($data['candidate'] ?? null) && $data['candidate'] !== '' ? $data['candidate'] : null;
         $project = is_string($data['project'] ?? null) && $data['project'] !== '' ? $data['project'] : null;
+        $task = is_string($data['task'] ?? null) && $data['task'] !== '' ? $data['task'] : null;
+        $run = is_string($data['run'] ?? null) && $data['run'] !== '' ? $data['run'] : null;
         $result = match ($data['operation']) {
             'inspect_permissions' => $verify->inspectPermissions($evidence, $candidate),
-            'run' => $verify->verify(VerificationMode::Default, $evidence, $candidate, null, $project),
-            'run_permissionless' => $verify->verify(VerificationMode::Permissionless, $evidence, $candidate, null, $project),
-            'retry_native_ui' => $verify->verify(VerificationMode::RetryNativeUi, $evidence, $candidate, null, $project),
+            'run' => $verify->verify(VerificationMode::Default, $evidence, $candidate, null, $project, $task, $run),
+            'run_permissionless' => $verify->verify(VerificationMode::Permissionless, $evidence, $candidate, null, $project, $task, $run),
+            'retry_native_ui' => $verify->verify(VerificationMode::RetryNativeUi, $evidence, $candidate, null, $project, $task, $run),
             'latest' => $verify->latest($evidence),
             'check_evidence' => $verify->checkEvidence($evidence, $data['check_id'], isset($data['attempt']) ? (int) $data['attempt'] : null),
         };
@@ -60,8 +64,10 @@ class MollyVerify extends Tool
                 'check_evidence',
             ])->required(),
             'evidence' => $schema->string()->description('Evidence directory. Defaults to storage/molly/acceptance.'),
-            'candidate' => $schema->string()->description('40-character candidate SHA. Defaults to HEAD.'),
+            'candidate' => $schema->string()->description('40-character candidate SHA. Must match the installed package commit.'),
             'project' => $schema->string()->description('Project directory for programmatic Bloom checks.'),
+            'task' => $schema->string()->description('Task id or nickname. Required when the project has more than one task.'),
+            'run' => $schema->string()->description('Run id. Required when the selected task has more than one run.'),
             'check_id' => $schema->string()->description('Check id, required for check_evidence. Example: M04.2.'),
             'attempt' => $schema->integer()->description('Attempt number for check_evidence. Defaults to the latest attempt.'),
         ];

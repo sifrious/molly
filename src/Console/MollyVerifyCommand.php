@@ -22,9 +22,11 @@ class MollyVerifyCommand extends Command
         {--permissionless : Run without requiring Screen Recording or Accessibility}
         {--check-permissions : Report those permissions and do not run acceptance checks}
         {--retry-native-ui : Rerun checks blocked only by a verifier permission}
-        {--candidate= : Candidate commit SHA. Defaults to HEAD}
+        {--candidate= : Candidate commit SHA. Must match the installed package}
         {--evidence= : Directory for verification evidence}
         {--project= : Project directory for programmatic Bloom checks}
+        {--task= : Task id or nickname. Required when the project has more than one task}
+        {--run= : Run id. Required when the selected task has more than one run}
         {--json : Print JSON only}';
 
     protected $description = 'Verify the M04 Bloom checks, and keep a missing macOS permission separate from a Molly failure';
@@ -42,6 +44,10 @@ class MollyVerifyCommand extends Command
         $candidate = is_string($candidate) && $candidate !== '' ? $candidate : null;
         $project = $this->option('project');
         $project = is_string($project) && $project !== '' ? $project : null;
+        $task = $this->option('task');
+        $task = is_string($task) && $task !== '' ? $task : null;
+        $run = $this->option('run');
+        $run = is_string($run) && $run !== '' ? $run : null;
 
         if (count($selected) > 1) {
             $document = [
@@ -54,7 +60,7 @@ class MollyVerifyCommand extends Command
                 'permission_granted_by_cli' => false,
             ];
         } else {
-            $document = $verify->verify($selected[0] ?? VerificationMode::Default, $evidence, $candidate, null, $project);
+            $document = $verify->verify($selected[0] ?? VerificationMode::Default, $evidence, $candidate, null, $project, $task, $run);
         }
 
         return $this->present($document);

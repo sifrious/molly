@@ -128,7 +128,7 @@ final class InitializeMollyInExistingProject
                 id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
-                source: 'existing',
+                source: $this->registry->takePendingNew($root) ? 'new' : 'existing',
                 createdAt: gmdate('c'),
             );
             $this->registry->writeProject($project);

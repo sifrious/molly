@@ -9,14 +9,18 @@ use Sifrious\Molly\Acceptance\MacOsPermissionPrompt;
 use Sifrious\Molly\Acceptance\MacOsTccProbe;
 use Sifrious\Molly\Acceptance\MacOsVerifierPermissionInspector;
 use Sifrious\Molly\Acceptance\MacOsVerifierPermissionRequester;
+use Sifrious\Molly\Acceptance\PackageIdentity;
+use Sifrious\Molly\Acceptance\PackageIdentityReader;
 use Sifrious\Molly\Acceptance\PackageRoot;
 use Sifrious\Molly\Acceptance\PermissionKind;
 use Sifrious\Molly\Acceptance\PermissionState;
+use Sifrious\Molly\Acceptance\QueueWorkerProbe;
 use Sifrious\Molly\Acceptance\VerificationContext;
 use Sifrious\Molly\Acceptance\VerificationMode;
 use Sifrious\Molly\Acceptance\VerifierPermissionInspector;
 use Sifrious\Molly\Acceptance\VerifierPermissionSnapshot;
 use Sifrious\Molly\Acceptance\VerifierProcessIdentity;
+use Sifrious\Molly\Actions\ManageWorker;
 use Sifrious\Molly\Actions\VerifyMolly;
 use Sifrious\Molly\Conversations\Conversation;
 use Sifrious\Molly\Conversations\ConversationStore;
@@ -38,7 +42,44 @@ use Sifrious\Molly\Tests\Support\StubPermissionPrompt;
 
 function verificationSha(): string
 {
-    return str_repeat('ab', 20);
+    $identity = app(PackageIdentityReader::class)->read();
+    if ($identity->commit === null) {
+        throw new RuntimeException('CANDIDATE_UNVERIFIED: this checkout does not prove a commit, so the verifier tests cannot run the checks.');
+    }
+
+    return $identity->commit;
+}
+
+function loadedPluginEvidence(int $pid = 4242): string
+{
+    return $pid." /Applications/Bloom Dev.app/Contents/MacOS/MollySurfaces\n";
+}
+
+function bindRunningQueueWorker(): void
+{
+    $command = [PHP_BINARY, 'artisan', 'queue:work', 'database', '--queue=default'];
+    app()->instance(QueueWorkerProbe::class, new QueueWorkerProbe(
+        app(ManageWorker::class),
+        ['pid' => 5151, 'pgid' => 5151, 'command' => $command],
+        true,
+        implode(' ', $command),
+        5151,
+    ));
+}
+
+/**
+ * @param  array<string, mixed>  $fields
+ */
+function writeHostRecord(string $path, string $candidate, array $fields): void
+{
+    file_put_contents($path, json_encode([
+        'process' => ['pid' => 4242],
+        'host' => '/Applications/Bloom.app',
+        'plugin' => 'sifrious.molly',
+        'candidate' => $candidate,
+        'observed_at' => '2026-10-08T02:00:00Z',
+        ...$fields,
+    ], JSON_THROW_ON_ERROR));
 }
 
 beforeEach(function () {
@@ -189,13 +230,14 @@ function isolateBloomHost(): array
     return ['inspector' => $inspector, 'plugins' => $plugins];
 }
 
-function seedTaskGraph(string $project): string
+function seedTaskGraph(string $project, ?string $key = null): string
 {
     $database = $project.'/.molly/knowledge.sqlite';
     config()->set('molly.knowledge.database', $database);
     $version = substr(hash('sha256', $project), 0, 12);
-    $source = new GraphSource('project', $version, 'task', 'task-1', 'Saved task', $project.'/.molly/tasks');
-    $node = new GraphNode('project', $version, 'task', 'Task', 'Task', [$source->id()]);
+    $key ??= (string) Task::query()->where('workspace', $project)->value('id');
+    $source = new GraphSource('project', $version, 'task', $key, 'Saved task', $project.'/.molly/tasks');
+    $node = new GraphNode('project', $version, 'task', $key, $key, [$source->id()]);
     app(Graph::class)->replace('project', $version, [$source], [$node], []);
 
     return $database;
@@ -284,7 +326,8 @@ it('collects the same host telemetry from the command and MCP', function () {
     $fixture = bloomFixture();
     $plugins = bloomPluginDirectory();
     $database = seedTaskGraph($fixture['project']);
-    $inspector = new BloomHostInspector(bloomProcessListing(), $plugins);
+    $inspector = new BloomHostInspector(bloomProcessListing(), $plugins, null, loadedPluginEvidence());
+    bindRunningQueueWorker();
     $observer = new CompiledHostBloomObserver;
     $prompt = new class(new MacOsTccProbe) extends MacOsPermissionPrompt
     {
@@ -350,7 +393,7 @@ it('collects the same host telemetry from the command and MCP', function () {
         ->and($document['release_complete'])->toBeFalse()
         ->and($cli['summary']['product_failures'])->toBe(0);
 
-    foreach (['M04.1', 'M04.7', 'M04.10', 'M04.13', 'M04.15', 'M04.16'] as $id) {
+    foreach (['M04.1', 'M04.7', 'M04.10'] as $id) {
         $left = checkRow($cli, $id);
         $right = checkRow($document, $id);
         expect($left['outcome'])->toBe('PASS')
@@ -373,6 +416,13 @@ it('collects the same host telemetry from the command and MCP', function () {
     }
 
     expect(reasonOf($cli, 'M04.1'))->toBe('HOST_PLUGIN_DISCOVERED')
+        ->and($cli['host']['loaded'])->toBeTrue()
+        ->and(outcomeOf($cli, 'M04.13'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(outcomeOf($document, 'M04.13'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($cli, 'M04.13'))->toBe('INCOMPAT_LOG_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.15'))->toBe('BROKEN_ASSETS_NOT_OBSERVED')
+        ->and(reasonOf($cli, 'M04.16'))->toBe('RESTART_PERSISTENCE_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.16'))->toBe(reasonOf($cli, 'M04.16'))
         ->and(reasonOf($cli, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and(reasonOf($cli, 'M04.3'))->toBe('NATIVE_OBSERVATION_DISABLED')
@@ -400,10 +450,11 @@ it('reports a wrong plugin id as a product failure when accessibility is missing
 
     expect(outcomeOf($document, 'M04.1'))->toBe('PRODUCT_FAIL')
         ->and(reasonOf($document, 'M04.1'))->toBe('HOST_PLUGIN_NOT_DISCOVERED')
-        ->and(checkRow($document, 'M04.1')['assertions'][2]['expected'])->toBe('sifrious.molly apiVersion 1 enabled')
+        ->and(checkRow($document, 'M04.1')['assertions'][2]['expected'])->toBe('sifrious.molly apiVersion 1 enabled and loaded')
         ->and(checkRow($document, 'M04.1')['assertions'][2]['actual'])->toContain('other.plugin')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
-        ->and(outcomeOf($document, 'M04.10'))->toBe('PASS')
+        ->and(outcomeOf($document, 'M04.10'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_NOT_RUNNING')
         ->and(reasonOf($document, 'M04.2'))->toBe('NATIVE_OBSERVATION_DISABLED')
         ->and($observer->calls)->toBe(0)
         ->and($document['preflight']['request_attempted'])->toBeFalse()
@@ -509,8 +560,8 @@ it('does not drive native UI in permissionless mode when both permissions are gr
         ->and($document['host']['process_source'])->toBe('supplied-process-listing')
         ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
         ->and($host['inspector']->inspections)->toBe(1)
-        ->and(reasonOf($document, 'M04.16'))->toBe('RESTART_HOST_NOT_OBSERVED')
-        ->and(reasonOf($document, 'M04.13'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.16'))->toBe('RESTART_PERSISTENCE_NOT_OBSERVED')
+        ->and(reasonOf($document, 'M04.13'))->toBe('INCOMPAT_LOG_NOT_OBSERVED')
         ->and(outcomeOf($document, 'M04.4'))->toBe('PASS')
         ->and($document['release_complete'])->toBeFalse()
         ->and($document['summary']['product_failures'])->toBe(0);
@@ -531,8 +582,8 @@ it('still runs independent assertions when accessibility is missing', function (
 
     expect(outcomeOf($document, 'M04.2'))->toBe('BLOCKED_VERIFIER_PERMISSION')
         ->and(outcomeOf($document, 'M04.3'))->toBe('BLOCKED_VERIFIER_PERMISSION')
-        ->and(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_PREREQUISITE')
-        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_HOST_NOT_OBSERVED')
+        ->and(outcomeOf($document, 'M04.10'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_NOT_RUNNING')
         ->and($document['host']['running'])->toBeFalse()
         ->and($document['host']['process_source'])->toBe('supplied-process-listing')
         ->and($document['host']['plugin_source'])->toBe($host['plugins'].'/sifrious.molly/plugin.json')
@@ -822,7 +873,9 @@ it('rejects stale evidence when the candidate SHA changed', function () {
     $retry = app(VerifyMolly::class)->verify(VerificationMode::RetryNativeUi, $directory, str_repeat('cd', 20));
 
     expect($retry['exit_code'])->toBe(4)
-        ->and($retry['reason_code'])->toBe('CANDIDATE_SHA_MISMATCH')
+        ->and($retry['reason_code'])->toBe('CANDIDATE_MISMATCH')
+        ->and($retry['package_identity']['commit'])->toBe(verificationSha())
+        ->and($retry['summary']['passes'])->toBe(0)
         ->and($retry['reused_evidence'])->toBeFalse()
         ->and(hash_file('sha256', attemptPath($directory, $first, 'M04.1', 1)))->toBe($before)
         ->and(is_file(attemptPath($directory, $first, 'M04.1', 2)))->toBeFalse();
@@ -1008,4 +1061,265 @@ it('does not ship a TCC reset or a CLI grant', function () {
     expect($source)->not->toContain('tccutil')
         ->and($source)->not->toContain('TCC.db')
         ->and($source)->not->toContain('csrutil');
+});
+
+it('records the installed package and the process environment', function () {
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $sha = verificationSha();
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        $sha,
+        null,
+        $fixture['project'],
+    );
+
+    expect($document['candidate_sha'])->toBe($sha)
+        ->and($document['package_identity']['commit'])->toBe($sha)
+        ->and($document['package_identity']['source'])->toBeIn(['injected', 'git'])
+        ->and($document['package_identity']['lock_sha256'])->toBe(hash_file('sha256', base_path('composer.lock')))
+        ->and($document['environment']['molly_home'])->toBe($fixture['home'])
+        ->and($document['environment']['db_connection'])->toBe(config('database.default'))
+        ->and($document['environment']['db_database'])->toBe(config('database.connections.'.config('database.default').'.database'))
+        ->and($document['environment']['queue_connection'])->toBe(config('queue.default'))
+        ->and($document['environment']['php_binary'])->toBe(PHP_BINARY);
+});
+
+it('does not run checks when the candidate is not the installed commit', function () {
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        str_repeat('ab', 20),
+        null,
+        $fixture['project'],
+    );
+
+    expect($document['exit_code'])->toBe(4)
+        ->and($document['reason_code'])->toBe('CANDIDATE_MISMATCH')
+        ->and($document['package_identity']['commit'])->toBe(verificationSha())
+        ->and($document['summary']['passes'])->toBe(0)
+        ->and($document['checks'])->toBe([])
+        ->and($document['release_complete'])->toBeFalse()
+        ->and(is_dir($fixture['evidence'].'/runs'))->toBeFalse();
+});
+
+it('does not run checks when the installed commit cannot be proved', function () {
+    app()->instance(PackageIdentityReader::class, new PackageIdentityReader(new PackageIdentity(
+        null,
+        'unverified',
+        'dev-main',
+        null,
+        '/tmp/molly',
+        false,
+        null,
+        hash('sha256', 'lock'),
+        null,
+    )));
+    $fixture = bloomFixture();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        str_repeat('ab', 20),
+        null,
+        $fixture['project'],
+    );
+
+    expect($document['exit_code'])->toBe(3)
+        ->and($document['reason_code'])->toBe('CANDIDATE_UNVERIFIED')
+        ->and($document['package_identity']['source'])->toBe('unverified')
+        ->and($document['package_identity']['commit'])->toBeNull()
+        ->and($document['summary']['passes'])->toBe(0)
+        ->and($document['checks'])->toBe([])
+        ->and($document['release_complete'])->toBeFalse();
+});
+
+it('requires an explicit task and run when the project has more than one', function () {
+    $fixture = bloomFixture();
+    $first = Task::query()->where('workspace', $fixture['project'])->firstOrFail();
+    $second = Task::create([
+        'nickname' => 'other-check',
+        'prompt' => 'Add a second endpoint.',
+        'workspace' => $fixture['project'],
+        'paths' => ['routes/web.php'],
+        'test_path' => 'tests/Feature/OtherTest.php',
+        'status' => 'pending',
+    ]);
+    $failed = Run::create([
+        'task_id' => $first->id,
+        'prompt' => $first->prompt,
+        'workspace' => $fixture['project'],
+        'status' => 'failed',
+        'report' => ['error' => 'bare'],
+    ]);
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $sha = verificationSha();
+
+    $ambiguous = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], $sha, null, $fixture['project']);
+    $selected = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        verificationDirectory(),
+        $sha,
+        null,
+        $fixture['project'],
+        $second->nickname,
+        null,
+    );
+    $run = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        verificationDirectory(),
+        $sha,
+        null,
+        $fixture['project'],
+        $first->nickname,
+        $failed->id,
+    );
+
+    expect(reasonOf($ambiguous, 'M04.4'))->toBe('TASK_NOT_SELECTED')
+        ->and(outcomeOf($ambiguous, 'M04.4'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($ambiguous, 'M04.5'))->toBe('RUN_NOT_OBSERVED')
+        ->and(reasonOf($selected, 'M04.4'))->toBe('TASK_LISTED')
+        ->and(checkRow($selected, 'M04.4')['assertions'][0]['actual'])->toBe($second->id)
+        ->and(reasonOf($run, 'M04.5'))->toBe('RUN_STATUS_MISSING')
+        ->and(checkRow($run, 'M04.5')['assertions'][0]['source_artifact'])->toContain($failed->id);
+});
+
+it('queries the selected task and ignores a node labeled Task', function () {
+    $fixture = bloomFixture();
+    seedTaskGraph($fixture['project'], 'Task');
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    $sha = verificationSha();
+    $labeled = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], $sha, null, $fixture['project']);
+    $taskId = (string) Task::query()->where('workspace', $fixture['project'])->value('id');
+    seedTaskGraph($fixture['project'], $taskId);
+    $matched = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, verificationDirectory(), $sha, null, $fixture['project']);
+
+    expect(reasonOf($labeled, 'M04.7'))->toBe('GRAPH_NOT_OBSERVED')
+        ->and(outcomeOf($labeled, 'M04.7'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($matched, 'M04.7'))->toBe('GRAPH_PROVENANCE')
+        ->and(checkRow($matched, 'M04.7')['assertions'][0]['actual'])->toContain($taskId);
+});
+
+it('does not pass a queue worker that is stopped or is not queue:work', function () {
+    $fixture = bloomFixture();
+    $command = [PHP_BINARY, 'artisan', 'molly:start'];
+    app()->instance(QueueWorkerProbe::class, new QueueWorkerProbe(
+        app(ManageWorker::class),
+        ['pid' => 5151, 'pgid' => 5151, 'command' => $command],
+        true,
+        implode(' ', $command),
+        5151,
+    ));
+    app()->instance(BloomHostInspector::class, new BloomHostInspector(bloomProcessListing(), bloomPluginDirectory(), null, loadedPluginEvidence()));
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], verificationSha(), null, $fixture['project']);
+
+    expect(outcomeOf($document, 'M04.10'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_NOT_RUNNING')
+        ->and($document['summary']['product_failures'])->toBe(0);
+});
+
+it('keeps a running queue worker blocked when the bloom host is not running', function () {
+    $fixture = bloomFixture();
+    bindRunningQueueWorker();
+    $host = isolateBloomHost();
+    bindPermissions(PermissionState::Granted, PermissionState::Denied);
+
+    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], verificationSha(), null, $fixture['project']);
+
+    expect(outcomeOf($document, 'M04.10'))->toBe('BLOCKED_PREREQUISITE')
+        ->and(reasonOf($document, 'M04.10'))->toBe('WORKER_HOST_NOT_OBSERVED')
+        ->and($document['host']['running'])->toBeFalse()
+        ->and($host['inspector']->inspections)->toBe(1);
+});
+
+it('leaves a plugin that is only enabled on disk incomplete', function () {
+    $fixture = bloomFixture();
+    app()->instance(BloomHostInspector::class, new BloomHostInspector(bloomProcessListing(), bloomPluginDirectory(), null, ''));
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], verificationSha(), null, $fixture['project']);
+
+    expect(outcomeOf($document, 'M04.1'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.1'))->toBe('PLUGIN_LOAD_NOT_OBSERVED')
+        ->and($document['host']['enabled'])->toBeTrue()
+        ->and($document['host']['loaded'])->toBeFalse()
+        ->and($document['summary']['product_failures'])->toBe(0);
+});
+
+it('accepts attributed host diagnostics and an observed restart', function () {
+    $fixture = bloomFixture();
+    $sha = verificationSha();
+    $taskId = (string) Task::query()->where('workspace', $fixture['project'])->value('id');
+    app()->instance(BloomHostInspector::class, new BloomHostInspector(bloomProcessListing(), bloomPluginDirectory(), null, loadedPluginEvidence()));
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+    writeHostRecord($fixture['project'].'/host-incompat.log', $sha, ['loaded' => false, 'api_version' => 2]);
+    writeHostRecord($fixture['project'].'/host-broken.log', $sha, ['missing_bundle' => true, 'missing_provider' => true]);
+    file_put_contents($fixture['project'].'/.molly/restart-state.json', json_encode([
+        'process' => ['pid' => 4242],
+        'host' => '/Applications/Bloom.app',
+        'plugin' => 'sifrious.molly',
+        'candidate' => $sha,
+        'observed_at' => '2026-10-08T02:05:00Z',
+        'before' => ['task_id' => $taskId, 'pid' => 1111, 'source' => 'plugin', 'observed_at' => '2026-10-08T02:00:00Z'],
+        'after' => ['task_id' => $taskId, 'pid' => 4242, 'source' => 'cli', 'observed_at' => '2026-10-08T02:05:00Z'],
+    ], JSON_THROW_ON_ERROR));
+
+    $document = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, $fixture['evidence'], $sha, null, $fixture['project']);
+
+    expect(reasonOf($document, 'M04.13'))->toBe('INCOMPAT_LOG_RECORDED')
+        ->and(reasonOf($document, 'M04.15'))->toBe('BROKEN_ASSETS_RECORDED')
+        ->and(reasonOf($document, 'M04.16'))->toBe('RESTART_STATE_KEPT')
+        ->and($document['summary']['product_failures'])->toBe(0);
+
+    file_put_contents($fixture['project'].'/host-incompat.log', "plugin skipped: apiVersion 2 host stable\n");
+    file_put_contents($fixture['project'].'/.molly/restart-state.json', json_encode([
+        'before' => ['task_id' => $taskId, 'pid' => 1111],
+        'after' => ['task_id' => $taskId, 'pid' => 4242],
+    ], JSON_THROW_ON_ERROR));
+    $plain = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, verificationDirectory(), $sha, null, $fixture['project']);
+
+    expect(reasonOf($plain, 'M04.13'))->toBe('INCOMPAT_LOG_NOT_OBSERVED')
+        ->and(outcomeOf($plain, 'M04.13'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($plain, 'M04.16'))->toBe('RESTART_PERSISTENCE_NOT_OBSERVED')
+        ->and($plain['summary']['product_failures'])->toBe(0);
+
+    file_put_contents($fixture['project'].'/.molly/restart-state.json', json_encode([
+        'process' => ['pid' => 4242],
+        'host' => '/Applications/Bloom.app',
+        'plugin' => 'sifrious.molly',
+        'candidate' => $sha,
+        'observed_at' => '2026-10-08T02:05:00Z',
+        'before' => ['task_id' => $taskId, 'pid' => 1111, 'source' => 'plugin', 'observed_at' => '2026-10-08T02:00:00Z'],
+        'after' => ['task_id' => 'other-task', 'pid' => 4242, 'source' => 'cli', 'observed_at' => '2026-10-08T02:05:00Z'],
+    ], JSON_THROW_ON_ERROR));
+    $lost = app(VerifyMolly::class)->verify(VerificationMode::Permissionless, verificationDirectory(), $sha, null, $fixture['project']);
+
+    expect(outcomeOf($lost, 'M04.16'))->toBe('PRODUCT_FAIL')
+        ->and(reasonOf($lost, 'M04.16'))->toBe('RESTART_STATE_LOST');
+});
+
+it('refuses saved evidence whose candidate is not this install', function () {
+    $directory = verificationDirectory();
+    bindPermissions(PermissionState::Denied, PermissionState::Granted);
+    $sha = verificationSha();
+    $first = app(VerifyMolly::class)->verify(VerificationMode::Default, $directory, $sha);
+    $path = $directory.'/runs/'.$first['run_id'].'/result.json';
+    $saved = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+    $saved['candidate_sha'] = str_repeat('ab', 20);
+    file_put_contents($path, json_encode($saved, JSON_THROW_ON_ERROR));
+    $before = hash_file('sha256', attemptPath($directory, $first, 'M04.1', 1));
+
+    $retry = app(VerifyMolly::class)->verify(VerificationMode::RetryNativeUi, $directory, $sha);
+
+    expect($retry['exit_code'])->toBe(4)
+        ->and($retry['reason_code'])->toBe('CANDIDATE_SHA_MISMATCH')
+        ->and(hash_file('sha256', attemptPath($directory, $first, 'M04.1', 1)))->toBe($before);
 });

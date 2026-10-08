@@ -17,7 +17,8 @@ it('reads a running bloom process and the enabled plugin', function () {
         '999 /usr/bin/php /tmp/bloom-plugin/build.php',
     ]);
 
-    $host = (new BloomHostInspector($listing, $plugins))->inspect();
+    $host = (new BloomHostInspector($listing, $plugins, null, "4242 /Applications/Bloom Dev.app/Contents/MacOS/MollySurfaces\n"))->inspect();
+    $diskOnly = (new BloomHostInspector($listing, $plugins, null, ''))->inspect();
     File::deleteDirectory($plugins);
 
     expect($host->running)->toBeTrue()
@@ -26,8 +27,44 @@ it('reads a running bloom process and the enabled plugin', function () {
         ->and($host->pluginId)->toBe('sifrious.molly')
         ->and($host->apiVersion)->toBe(1)
         ->and($host->enabled)->toBeTrue()
+        ->and($host->loaded)->toBeTrue()
+        ->and($host->loadSource)->toBe('supplied-load-evidence')
+        ->and($diskOnly->running)->toBeTrue()
+        ->and($diskOnly->enabled)->toBeTrue()
+        ->and($diskOnly->loaded)->toBeFalse()
         ->and($host->processSource)->toBe('supplied-process-listing')
         ->and($host->pluginSource)->toBe($plugins.'/sifrious.molly/plugin.json');
+});
+
+it('selects the intended bloom host and ignores the first matching app', function () {
+    $root = sys_get_temp_dir().'/molly-bloom-apps-'.bin2hex(random_bytes(4));
+    $plugins = $root.'/Plugins';
+    mkdir($root.'/Bloom.app/Contents/MacOS', 0700, true);
+    mkdir($root.'/Bloom Dev.app/Contents/MacOS', 0700, true);
+    mkdir($plugins.'/sifrious.molly', 0700, true);
+    file_put_contents($root.'/Bloom Dev.app/Contents/Info.plist', "<plist><string>app.sifrious.bloom.dev</string></plist>\n");
+    file_put_contents($plugins.'/sifrious.molly/plugin.json', json_encode(['id' => 'sifrious.molly', 'apiVersion' => 1], JSON_THROW_ON_ERROR));
+    file_put_contents($plugins.'/enabled.json', json_encode(['sifrious.molly'], JSON_THROW_ON_ERROR));
+    $listing = implode("\n", [
+        '11 /usr/bin/open -a '.$root.'/Bloom.app',
+        '100 '.$root.'/Bloom.app/Contents/MacOS/Bloom',
+        '200 '.$root.'/Bloom Dev.app/Contents/MacOS/Bloom',
+    ])."\n";
+    $load = "Registered 9 Molly surfaces for sifrious.molly: molly.home\n";
+
+    $ambiguous = (new BloomHostInspector($listing, $plugins, null, $load))->inspect();
+    $byPath = (new BloomHostInspector($listing, $plugins, $root.'/Bloom Dev.app', $load))->inspect();
+    $byBundle = (new BloomHostInspector($listing, $plugins, 'app.sifrious.bloom.dev', $load))->inspect();
+    File::deleteDirectory($root);
+
+    expect($ambiguous->running)->toBeFalse()
+        ->and($ambiguous->ambiguous)->toBeTrue()
+        ->and($ambiguous->pid)->toBeNull()
+        ->and($byPath->pid)->toBe(200)
+        ->and($byPath->loaded)->toBeTrue()
+        ->and($byPath->command)->toBe($root.'/Bloom Dev.app/Contents/MacOS/Bloom')
+        ->and($byBundle->pid)->toBe(200)
+        ->and($byBundle->loaded)->toBeTrue();
 });
 
 it('reads the live process list when the caller does not supply one', function () {

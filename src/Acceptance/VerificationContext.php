@@ -24,6 +24,8 @@ final readonly class VerificationContext
         public string $projectRoot = '',
         public ?string $mollyHome = null,
         public ?BloomHostSnapshot $host = null,
+        public ?string $taskReference = null,
+        public ?string $runReference = null,
     ) {}
 
     public function withProject(string $projectRoot): self
@@ -42,6 +44,8 @@ final readonly class VerificationContext
             $projectRoot,
             $this->mollyHome,
             $this->host,
+            $this->taskReference,
+            $this->runReference,
         );
     }
 
@@ -61,6 +65,50 @@ final readonly class VerificationContext
             $this->projectRoot,
             $this->mollyHome,
             $host,
+            $this->taskReference,
+            $this->runReference,
+        );
+    }
+
+    public function withMollyHome(string $mollyHome): self
+    {
+        return new self(
+            $this->candidateSha,
+            $this->runId,
+            $this->repoRoot,
+            $this->evidenceRoot,
+            $this->mode,
+            $this->hostTelemetryPath,
+            $this->observations,
+            $this->nativeObservations,
+            $this->harnessBroken,
+            $this->sharedState,
+            $this->projectRoot,
+            $mollyHome,
+            $this->host,
+            $this->taskReference,
+            $this->runReference,
+        );
+    }
+
+    public function withSelection(?string $taskReference, ?string $runReference): self
+    {
+        return new self(
+            $this->candidateSha,
+            $this->runId,
+            $this->repoRoot,
+            $this->evidenceRoot,
+            $this->mode,
+            $this->hostTelemetryPath,
+            $this->observations,
+            $this->nativeObservations,
+            $this->harnessBroken,
+            $this->sharedState,
+            $this->projectRoot,
+            $this->mollyHome,
+            $this->host,
+            $taskReference,
+            $runReference,
         );
     }
 
@@ -80,6 +128,8 @@ final readonly class VerificationContext
             $this->projectRoot,
             $this->mollyHome,
             $this->host,
+            $this->taskReference,
+            $this->runReference,
         );
     }
 }
