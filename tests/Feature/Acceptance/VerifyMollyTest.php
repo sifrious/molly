@@ -1076,10 +1076,12 @@ it('records the installed package and the process environment', function () {
         $fixture['project'],
     );
 
+    $lock = base_path('composer.lock');
+
     expect($document['candidate_sha'])->toBe($sha)
         ->and($document['package_identity']['commit'])->toBe($sha)
         ->and($document['package_identity']['source'])->toBeIn(['injected', 'git'])
-        ->and($document['package_identity']['lock_sha256'])->toBe(hash_file('sha256', base_path('composer.lock')))
+        ->and($document['package_identity']['lock_sha256'])->toBe(is_file($lock) ? hash_file('sha256', $lock) : null)
         ->and($document['environment']['molly_home'])->toBe($fixture['home'])
         ->and($document['environment']['db_connection'])->toBe(config('database.default'))
         ->and($document['environment']['db_database'])->toBe(config('database.connections.'.config('database.default').'.database'))
