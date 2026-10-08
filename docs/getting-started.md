@@ -49,16 +49,19 @@ pest()->extend(TestCase::class)
 
 ### No Laravel application yet?
 
-The demo installer creates a fresh application, commits it once with your own Git identity, installs Pest and the tagged Molly release, and scaffolds the demo task:
+From an inspected checkout, run the demo installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sifrious/molly/v0.1.3/bin/molly-demo -o molly-demo
-MOLLY_CONSTRAINT='^0.2' bash molly-demo ~/molly-demo
+bash bin/molly-demo ~/molly-demo
 ```
 
-The v0.1.3 installer defaults to the 0.1 series, so `MOLLY_CONSTRAINT` selects the 0.2 series. Until `v0.2.0` is tagged, that constraint does not resolve and the installer stops at `composer require`; use `MOLLY_CONSTRAINT='^0.1'` for the tagged release, or see [Release status](#release-status).
+Before creating the Laravel application or replacing a `--force` target, the installer asks Composer to resolve the stable `^0.2` release and its dependencies in a temporary directory, with scripts, plugins, and cached repository metadata disabled. It checks Packagist first, then public GitHub tags. Both checks use the same constraint. A missing compatible tag, unreachable repository, or dependency conflict returns `MOLLY_RELEASE_UNAVAILABLE` and leaves the target unchanged.
 
-It writes only under the directory you name and refuses a non-empty directory unless you pass `--force`. When it finishes, continue from [Choose a model](#choose-a-model).
+Until a compatible release is published, use the explicit [candidate-artifact installation](acceptance/README.md#install-the-candidate) for acceptance work. The installer does not switch to an older release or a development branch. The historical installer in `v0.1.3` does not contain this preflight check.
+
+After preflight succeeds, the installer creates and commits a Laravel application using your Git identity, installs Pest and Molly, then scaffolds the demo. Preflight checks resolution; it cannot guarantee a later download or the generated application's dependency resolution. A later Molly install failure reports `MOLLY_INSTALL_FAILED` and identifies the incomplete application. A successful install continues at [Choose a model](#choose-a-model).
+
+The installer refuses a non-empty directory unless `--force` is supplied. Preflight uses a temporary directory outside the target and removes it on exit.
 
 ## Install Molly
 

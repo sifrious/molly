@@ -25,12 +25,17 @@ Pass `--repo <dir>` to build from another checkout of the repository.
 
 ## Install the candidate
 
-Point a consumer application at the output directory as a Composer artifact repository:
+This is the supported unpublished verification path. Do not send an RC constraint or a development branch to `bin/molly-demo`. Public-release preflight intentionally cannot install an unpublished candidate.
+
+Before installation, compare the zip's SHA-256 with `candidate.json` and confirm the recorded commit and version identify the intended candidate. Point a separate consumer application at that output directory as a Composer artifact repository:
 
 ```bash
 composer config repositories.molly-candidate artifact ~/molly-acceptance/0.2.0-RC1
-composer require sifrious/molly:0.2.0-RC1
+composer require --dev sifrious/molly:0.2.0-RC1
+php artisan molly:project-init .
 ```
+
+Use a consumer with a Git commit before initialization. Initialization recognizes the package only when Composer's installed record and autoload map both contain Molly. It then preserves the installed candidate without resolving a public release. A failed or partial artifact install must be repaired before initialization; `--no-composer` is not candidate verification. Preserve the candidate commit, artifact digest, and consumer lock digest with the evidence. This path does not tag, publish, accept the candidate, or lift MME-5341's hold on MME-5885.
 
 ## Record evidence
 
