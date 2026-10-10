@@ -274,6 +274,7 @@ class RunTask
         if (! $decision['completed']) {
             $report['failure_fingerprint'] = $this->fingerprint->handle($report);
         }
+        $this->recordTrace($run, $report);
         $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
     }
 
@@ -306,7 +307,73 @@ class RunTask
         if (! $exception instanceof RunStopped) {
             $report['failure_fingerprint'] = $this->fingerprint->handle($report);
         }
+        $this->recordTrace($run, $report);
         $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
+    }
+
+    /**
+     * Keep the run status, the verifier record, and the task/run ids for the
+     * diff and receipt on the report. A stop before Pest still records
+     * verification as not_run. A stop before a patch records the diff as
+     * not_produced. The ids are the trace, not a claim that a model ran.
+     *
+     * @param  array<string, mixed>  $report
+     */
+    private function recordTrace(Run $run, array &$report): void
+    {
+        if (! is_array($report['verification'] ?? null)) {
+            $report['verification'] = [
+                'status' => 'not_run',
+                'reason' => $this->failureCode(is_string($report['error'] ?? null) ? $report['error'] : null),
+            ];
+        }
+
+        if (! is_array($report['diff'] ?? null) || $report['diff'] === []) {
+            $captured = $report['execution_target']['diff'] ?? null;
+            $changes = $report['changes'] ?? null;
+            $status = 'not_produced';
+            if (is_array($captured) && ($captured['status'] ?? null) === 'captured') {
+                $status = 'captured';
+            } elseif (is_array($changes) && $changes !== []) {
+                $status = 'edits_recorded';
+            }
+            $report['diff'] = [
+                'id' => is_array($captured) && is_string($captured['sha256'] ?? null) ? $captured['sha256'] : $run->id,
+                'task_id' => $run->task_id,
+                'run_id' => $run->id,
+                'status' => $status,
+            ];
+            if ($status === 'not_produced') {
+                $report['diff']['reason'] = $this->failureCode(is_string($report['error'] ?? null) ? $report['error'] : null);
+            }
+        }
+
+        if (! is_array($report['receipt'] ?? null) || $report['receipt'] === []) {
+            $pest = null;
+            foreach ($report['verification_receipts'] ?? [] as $receipt) {
+                if (is_array($receipt) && ($receipt['verifier'] ?? null) === 'pest') {
+                    $pest = $receipt;
+                    break;
+                }
+            }
+            $state = is_array($pest) ? ($pest['state'] ?? null) : ($report['verification_outcomes']['pest']['state'] ?? null);
+            $report['receipt'] = [
+                'id' => is_array($pest) && is_string($pest['evidence_digest'] ?? null) ? $pest['evidence_digest'] : $run->id,
+                'task_id' => $run->task_id,
+                'run_id' => $run->id,
+                'verifier' => 'pest',
+                'state' => is_string($state) ? $state : 'not_run',
+            ];
+        }
+    }
+
+    private function failureCode(?string $message): string
+    {
+        if (is_string($message) && preg_match('/\A([A-Z][A-Z0-9_]+):/', $message, $match) === 1) {
+            return $match[1];
+        }
+
+        return 'VERIFICATION_NOT_RUN';
     }
 
     private function applyProposal(Workspace $workspace, array $edits, array $before, string $evidence): void

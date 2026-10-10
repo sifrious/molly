@@ -106,6 +106,7 @@ final class CreateMollyProject
         $location = ObserveCheckout::locate($path);
         if ($location['root'] === null || $this->observe->head($path) === null || ! $this->observe->headContainsFiles($path)) {
             $note('git', 'Laravel application created. Molly did not attach it because it is not in a Git commit yet.');
+            $this->registry->recordPendingNew($path);
 
             return [
                 'status' => 'needs_commit',

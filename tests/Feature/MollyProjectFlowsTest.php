@@ -134,6 +134,52 @@ it('creates a new project scaffold and marks source as new', function (): void {
     File::deleteDirectory($parent);
 });
 
+it('keeps source new when project-init follows project-new', function (): void {
+    $parent = sys_get_temp_dir().'/molly-new-flow-'.Str::uuid();
+    $target = $parent.'/app';
+    File::ensureDirectoryExists($target);
+
+    $created = (new CreateMollyProject(
+        new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)),
+        $this->registry,
+    ))->handle(
+        path: $target,
+        name: 'Fresh',
+        force: false,
+        runComposer: false,
+        runMigrations: false,
+        bootstrapGraphs: false,
+    );
+
+    expect($created['status'])->toBe('needs_commit')
+        ->and($created['project'])->toBeNull()
+        ->and(File::exists($target.'/.molly/project.json'))->toBeFalse()
+        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeTrue();
+
+    commitGitWorkspace($target);
+
+    $attached = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
+        path: $target,
+        name: 'Fresh',
+        runComposerRequire: false,
+        runMigrations: false,
+        bootstrapGraphs: false,
+    );
+    $existing = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
+        path: $this->laravelRoot,
+        runComposerRequire: false,
+        runMigrations: false,
+        bootstrapGraphs: false,
+    );
+
+    expect($attached['project']->source)->toBe('new')
+        ->and(json_decode(File::get($target.'/.molly/project.json'), true)['source'])->toBe('new')
+        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse()
+        ->and($existing['project']->source)->toBe('existing');
+
+    File::deleteDirectory($parent);
+});
+
 it('exposes init and list over artisan with shared registry state', function (): void {
     $exit = Artisan::call('molly:project-init', [
         '--no-graphs' => true,

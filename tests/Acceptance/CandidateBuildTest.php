@@ -202,3 +202,39 @@ it('packages the current HEAD without development paths or absolute user paths',
         candidateCleanup($repo, $out, $unpacked);
     }
 });
+
+it('installs an unpublished checksummed candidate through an artifact repository with public repositories disabled', function (): void {
+    $repo = candidateRepo();
+    $out = $repo.'-candidate';
+    $consumer = $repo.'-consumer';
+    mkdir($consumer);
+    try {
+        $sha = candidateHead($repo);
+        $build = candidateBuild($repo, $sha, $out);
+        expect($build->getExitCode())->toBe(0, $build->getErrorOutput());
+        $candidate = json_decode(file_get_contents($out.'/candidate.json'), true, flags: JSON_THROW_ON_ERROR);
+        expect(hash_file('sha256', $out.'/'.$candidate['artifact']))->toBe($candidate['sha256']);
+        file_put_contents($consumer.'/composer.json', json_encode([
+            'name' => 'example/acceptance-consumer',
+            'require-dev' => ['sifrious/molly' => $candidate['version']],
+            'repositories' => [
+                ['type' => 'artifact', 'url' => $out],
+                ['packagist.org' => false],
+            ],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $install = new Process(['composer', 'install', '--no-interaction', '--no-plugins', '--no-scripts'], $consumer);
+        $install->setTimeout(60);
+        $install->run();
+        expect($install->getExitCode())->toBe(0, $install->getErrorOutput());
+        $installed = json_decode(file_get_contents($consumer.'/vendor/composer/installed.json'), true, flags: JSON_THROW_ON_ERROR)['packages'][0];
+        $lock = json_decode(file_get_contents($consumer.'/composer.lock'), true, flags: JSON_THROW_ON_ERROR);
+        expect($installed['name'])->toBe('sifrious/molly')
+            ->and($installed['version'])->toBe('0.2.0-RC1')
+            ->and($installed['extra']['molly-candidate']['commit'])->toBe($sha)
+            ->and($lock['packages-dev'][0]['dist']['type'])->toBe('zip')
+            ->and(file_get_contents($consumer.'/vendor/composer/autoload_psr4.php'))->toContain('/sifrious/molly/src')
+            ->and(trim((new Process(['git', 'tag'], $repo))->mustRun()->getOutput()))->toBe('');
+    } finally {
+        candidateCleanup($repo, $out, $consumer);
+    }
+});

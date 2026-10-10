@@ -25,12 +25,17 @@ Pass `--repo <dir>` to build from another checkout of the repository.
 
 ## Install the candidate
 
-Point a consumer application at the output directory as a Composer artifact repository:
+This is the supported unpublished verification path. Do not send an RC constraint or a development branch to `bin/molly-demo`. Public-release preflight intentionally cannot install an unpublished candidate.
+
+Before installation, compare the zip's SHA-256 with `candidate.json` and confirm the recorded commit and version identify the intended candidate. Point a separate consumer application at that output directory as a Composer artifact repository:
 
 ```bash
 composer config repositories.molly-candidate artifact ~/molly-acceptance/0.2.0-RC1
-composer require sifrious/molly:0.2.0-RC1
+composer require --dev sifrious/molly:0.2.0-RC1
+php artisan molly:project-init .
 ```
+
+Use a consumer with a Git commit before initialization. Initialization recognizes the package only when Composer's installed record and autoload map both contain Molly. It then preserves the installed candidate without resolving a public release. A failed or partial artifact install must be repaired before initialization; `--no-composer` is not candidate verification. Preserve the candidate commit, artifact digest, and consumer lock digest with the evidence. This path does not tag, publish, accept the candidate, or lift MME-5341's hold on MME-5885.
 
 ## Record evidence
 
@@ -150,6 +155,16 @@ Gate-level errors reject the whole run:
 | `CANDIDATE_ARTIFACT_MISMATCH` | The zip's sha256 differs from `candidate.json`. |
 | `MALFORMED_INDEX` | `index.json` has the wrong `schema` or no `records` list. |
 | `UNKNOWN_SUBCASE` | A record names a subcase the manifest does not have. |
+
+## Verifier permissions
+
+`php artisan molly:verify` is the M04 check runner. The gate still only reads evidence, and this command does not replace it or run the other stages.
+
+Screen Recording and Accessibility belong to the process that drives the Bloom UI. When either one is missing, a check that still needs that observation is `BLOCKED_VERIFIER_PERMISSION`. The M04 summary counts product failures, harness failures, and permission blocks separately, so those checks are not 16 Molly failures. `release_complete` stays false. A gate record for that check uses `BLOCKED`, not `FAIL`. `FAIL` is only `PRODUCT_FAIL`.
+
+The command asks macOS to show its normal permission dialog and can open the Screen Recording or Accessibility pane. It does not write the TCC database, and `permission_granted_by_cli` is true only when a later inspection reports the permission granted. `--permissionless` skips the request, skips Settings, and does not drive the Bloom UI. Programmatic comparisons still run. When a compiled Bloom process is already running, the command and `molly_verify` read that process and require `MollySurfaces` to be loaded in it. They do not launch Bloom, and they do not accept the first Bloom.app on the process list when `BLOOM_APP` names another app. `--candidate` has to match the installed commit. A flag that only has the right shape is `CANDIDATE_MISMATCH` or `CANDIDATE_UNVERIFIED`, and the checks do not run. M04.2, M04.3, and M04.12 still need the visible Bloom UI, so `release_complete` stays false while that observation is missing. `--retry-native-ui` reruns the permission-blocked checks after you change the permission, and it refuses the saved evidence when the candidate SHA or the verifier environment differs. A failed retry inspection leaves the previous check files unchanged.
+
+On a machine that is not a Mac, both permissions are `unsupported`. That is a property of the verifier environment. It is not a Molly product failure, and it is not a grant. On a Mac, Molly reports the state it observed, so a Screen Recording or Accessibility grant stays `granted`. Checks that do not need the permission still run.
 
 ## Limitations
 

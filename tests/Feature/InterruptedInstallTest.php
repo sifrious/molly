@@ -27,6 +27,9 @@ function fakeInstallProcesses(string $root, Closure $reach): void
 {
     Process::fake(function (PendingProcess $process) use ($root, $reach) {
         $command = (array) $process->command;
+        if (in_array('--dry-run', $command, true)) {
+            return Process::result();
+        }
         if ($command[0] === PHP_BINARY) {
             $reach('migrate:running');
 
@@ -216,7 +219,7 @@ it('skips composer require only when Composer recorded Molly and its autoload ma
     $result = app(InitializeMollyInExistingProject::class)->handle(path: $root, runMigrations: false, bootstrapGraphs: false);
 
     expect($result['steps'])->toContain('composer: Molly package already present');
-    Process::assertRanTimes(fn (PendingProcess $process): bool => ($process->command[1] ?? null) === 'require', 1);
+    Process::assertRanTimes(fn (PendingProcess $process): bool => ($process->command[1] ?? null) === 'require' && ! in_array('--dry-run', $process->command, true), 1);
 });
 
 it('replaces projects.json and project.json by rename, so an interrupted write leaves the previous file whole', function (): void {

@@ -114,6 +114,39 @@ final class ProjectRegistry
         $this->registerPath($normalized->path);
     }
 
+    public function recordPendingNew(string $path): void
+    {
+        $path = $this->normalizePath($path);
+        $pending = $this->pendingNew();
+        $pending[$path] = [
+            'path' => $path,
+            'origin' => 'project-new',
+            'recorded_at' => gmdate('c'),
+        ];
+        Directory::ensure($this->home(), 0700);
+        $this->replace($this->pendingNewFile(), json_encode($pending, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
+    }
+
+    public function takePendingNew(string $path): bool
+    {
+        $path = $this->normalizePath($path);
+        $pending = $this->pendingNew();
+        if (! isset($pending[$path])) {
+            return false;
+        }
+        unset($pending[$path]);
+        $file = $this->pendingNewFile();
+        if ($pending === []) {
+            File::delete($file);
+
+            return true;
+        }
+        Directory::ensure($this->home(), 0700);
+        $this->replace($file, json_encode($pending, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n", 'PROJECT_RECORD_UNWRITABLE');
+
+        return true;
+    }
+
     public function registerPath(string $path): void
     {
         $path = $this->normalizePath($path);
@@ -180,6 +213,23 @@ final class ProjectRegistry
         }
 
         return array_values(array_unique($paths));
+    }
+
+    private function pendingNewFile(): string
+    {
+        return $this->home().'/pending-new.json';
+    }
+
+    /** @return array<string, array{path: string, origin: string, recorded_at: string}> */
+    private function pendingNew(): array
+    {
+        $file = $this->pendingNewFile();
+        if (! is_file($file)) {
+            return [];
+        }
+        $decoded = json_decode(File::get($file), true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /** @param  list<string>  $paths */

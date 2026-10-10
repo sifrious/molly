@@ -229,6 +229,35 @@ it('rejects invalid task input before creating a run', function (string $prompt,
     'application file as test' => ['Return Hello.', 'app/Greeting.php'],
 ]);
 
+it('records verifier status and trace ids when the provider refuses before a model call', function () {
+    $this->mock(MeasureComplexity::class)->shouldReceive('handle')->once()->andReturn([
+        'status' => 'skipped',
+        'probes' => [],
+    ]);
+    $this->mock(GenerateChanges::class)->shouldReceive('handle')->once()
+        ->andThrow(new RuntimeException('LOCAL_PROVIDER_INVALID: Use a local Ollama model and a loopback HTTP URL.'));
+    $task = app(CreateTask::class)->handle('Return Hello.', $this->workspace, ['app/Greeting.php'], 'tests/GreetingTest.php');
+
+    $run = app(RunTask::class)->handle(
+        'Return Hello.',
+        $this->workspace,
+        ['app/Greeting.php'],
+        'tests/GreetingTest.php',
+        taskId: $task->id,
+    );
+
+    expect($run->status)->toBe('failed')
+        ->and($run->report['error'])->toStartWith('LOCAL_PROVIDER_INVALID:')
+        ->and($run->report['verification']['status'])->toBe('not_run')
+        ->and($run->report['verification']['reason'])->toBe('LOCAL_PROVIDER_INVALID')
+        ->and($run->report['diff']['task_id'])->toBe($task->id)
+        ->and($run->report['diff']['run_id'])->toBe($run->id)
+        ->and($run->report['diff']['status'])->toBe('not_produced')
+        ->and($run->report['receipt']['task_id'])->toBe($task->id)
+        ->and($run->report['receipt']['run_id'])->toBe($run->id)
+        ->and($run->report['verification_outcomes']['pest']['state'])->toBe('NOT_RUN');
+});
+
 it('finalizes NOT_RUN receipts when a run stops before verification', function () {
     config(['molly.parallel_checks' => false]);
 
@@ -242,10 +271,15 @@ it('finalizes NOT_RUN receipts when a run stops before verification', function (
 
     expect($run->status)->toBe('stopped')
         ->and($run->report['terminated_before_completion'] ?? null)->toBeTrue()
+        ->and($run->report['verification']['status'])->toBe('not_run')
         ->and($run->report['verification_outcomes']['pest']['state'])->toBe('NOT_RUN')
         ->and($run->report['verification_outcomes']['tarpit']['state'])->toBe('NOT_RUN')
         ->and($run->report['verification_outcomes']['pest']['policy'])->toBe('required')
-        ->and($run->report['verification_outcomes']['tarpit']['policy'])->toBe('required');
+        ->and($run->report['verification_outcomes']['tarpit']['policy'])->toBe('required')
+        ->and($run->report['diff']['run_id'])->toBe($run->id)
+        ->and($run->report['diff']['status'])->toBe('not_produced')
+        ->and($run->report['receipt']['run_id'])->toBe($run->id)
+        ->and($run->report['receipt']['state'])->toBe('NOT_RUN');
 
     $pestReceipt = $this->workspace.'/.molly/receipts/'.$run->id.'/pest.json';
     $tarpitReceipt = $this->workspace.'/.molly/receipts/'.$run->id.'/tarpit.json';

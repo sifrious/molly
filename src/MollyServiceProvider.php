@@ -5,6 +5,10 @@ namespace Sifrious\Molly;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Mcp\Facades\Mcp;
 use Livewire\Livewire;
+use Sifrious\Molly\Acceptance\MacOsVerifierPermissionInspector;
+use Sifrious\Molly\Acceptance\MacOsVerifierPermissionRequester;
+use Sifrious\Molly\Acceptance\VerifierPermissionInspector;
+use Sifrious\Molly\Acceptance\VerifierPermissionRequester;
 use Sifrious\Molly\Actions\BootstrapProjectKnowledgeGraphs;
 use Sifrious\Molly\Actions\DetectFalseGreen;
 use Sifrious\Molly\Classification\ChoiceClassifier;
@@ -70,6 +74,7 @@ use Sifrious\Molly\Console\MollyStopCommand;
 use Sifrious\Molly\Console\MollyStoryCommand;
 use Sifrious\Molly\Console\MollyTaskCommand;
 use Sifrious\Molly\Console\MollyTasksCommand;
+use Sifrious\Molly\Console\MollyVerifyCommand;
 use Sifrious\Molly\Console\MollyWorkerCommand;
 use Sifrious\Molly\Knowledge\LaravelContainerGraph;
 use Sifrious\Molly\Knowledge\LaravelEloquentGraph;
@@ -88,6 +93,8 @@ class MollyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(FalseGreenVerifier::class, DetectFalseGreen::class);
+        $this->app->bind(VerifierPermissionInspector::class, MacOsVerifierPermissionInspector::class);
+        $this->app->bind(VerifierPermissionRequester::class, MacOsVerifierPermissionRequester::class);
         $this->app->bind(ChoiceClassifier::class, LaravelAiChoiceClassifier::class);
         $this->app->bind(ComplexityScanner::class, Clever::class);
         $this->app->when(BootstrapProjectKnowledgeGraphs::class)
@@ -160,7 +167,7 @@ class MollyServiceProvider extends ServiceProvider
             MollyStatusCommand::class, MollyWorkerCommand::class, MollyGlossaryCommand::class,
             MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
             MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
-            MollyPreflightCommand::class, MollyInstallModelCommand::class, MollyStoryCommand::class,
+            MollyPreflightCommand::class, MollyInstallModelCommand::class, MollyStoryCommand::class, MollyVerifyCommand::class,
             MollyOrbsCommand::class, MollyOrbRegisterCommand::class, MollyOrbRevokeCommand::class, MollyQueueCommand::class,
             MollySeamCommand::class,
         ]);

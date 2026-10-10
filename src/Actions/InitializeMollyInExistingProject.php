@@ -128,7 +128,7 @@ final class InitializeMollyInExistingProject
                 id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
-                source: 'existing',
+                source: $this->registry->takePendingNew($root) ? 'new' : 'existing',
                 createdAt: gmdate('c'),
             );
             $this->registry->writeProject($project);
@@ -216,11 +216,33 @@ final class InitializeMollyInExistingProject
                 $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
             }
 
-            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+            $this->assertReleaseInstallable($root);
+            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT.'@stable', '--no-interaction']);
         } catch (Throwable $exception) {
             $this->restoreComposerFiles($root, $saved);
             throw $exception;
         }
+    }
+
+    private function assertReleaseInstallable(string $root): void
+    {
+        try {
+            $result = Process::path($root)->timeout(600)->run([
+                'composer', 'require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT.'@stable',
+                '--dry-run', '--no-interaction', '--no-plugins', '--no-scripts', '--no-cache',
+            ]);
+            if ($result->successful()) {
+                return;
+            }
+            $error = $result->errorOutput().$result->output();
+        } catch (Throwable $exception) {
+            $error = $exception->getMessage();
+        }
+
+        throw new RuntimeException('MOLLY_RELEASE_UNAVAILABLE: Composer could not resolve sifrious/molly:'.self::RELEASE_CONSTRAINT
+            .'. Check repository access and compatible published tags, then retry. No Molly setup was performed. '
+            .'For unpublished candidate verification, install the checksummed artifact described in docs/acceptance/README.md first. '
+            .$this->processError($error));
     }
 
     /** @return array<string, ?string> composer.json and composer.lock contents, null when absent */
