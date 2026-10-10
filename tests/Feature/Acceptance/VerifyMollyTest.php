@@ -1142,6 +1142,58 @@ it('does not run checks when the installed commit cannot be proved', function ()
         ->and($document['release_complete'])->toBeFalse();
 });
 
+it('reports a project with no run as incomplete evidence', function () {
+    $fixture = bloomFixture();
+    Run::query()->delete();
+    isolateBloomHost();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.9'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.9'))->toBe('RUN_NOT_OBSERVED')
+        ->and(checkRow($document, 'M04.9')['assertions'][0]['actual'])->toBe('RUN_NOT_OBSERVED')
+        ->and(checkRow($document, 'M04.9')['assertions'][0]['result'])->toBe('not_observed')
+        ->and($document['summary']['harness_failures'])->toBe(0)
+        ->and($document['exit_code'])->toBe(3)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
+it('reports an omitted run as incomplete when the task has several runs', function () {
+    $fixture = bloomFixture();
+    $task = Task::query()->where('workspace', $fixture['project'])->firstOrFail();
+    Run::create([
+        'task_id' => $task->id,
+        'prompt' => $task->prompt,
+        'workspace' => $fixture['project'],
+        'status' => 'failed',
+        'report' => ['error' => 'bare'],
+    ]);
+    isolateBloomHost();
+    bindPermissions(PermissionState::Granted, PermissionState::Granted);
+
+    $document = app(VerifyMolly::class)->verify(
+        VerificationMode::Permissionless,
+        $fixture['evidence'],
+        verificationSha(),
+        null,
+        $fixture['project'],
+    );
+
+    expect(outcomeOf($document, 'M04.9'))->toBe('EVIDENCE_INCOMPLETE')
+        ->and(reasonOf($document, 'M04.9'))->toBe('RUN_NOT_SELECTED')
+        ->and(checkRow($document, 'M04.9')['assertions'][0]['actual'])->toBe('RUN_NOT_SELECTED')
+        ->and($document['summary']['harness_failures'])->toBe(0)
+        ->and($document['exit_code'])->toBe(3)
+        ->and($document['release_complete'])->toBeFalse();
+});
+
 it('requires an explicit task and run when the project has more than one', function () {
     $fixture = bloomFixture();
     $first = Task::query()->where('workspace', $fixture['project'])->firstOrFail();

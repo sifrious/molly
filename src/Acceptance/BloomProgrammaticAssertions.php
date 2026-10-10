@@ -291,10 +291,8 @@ final class BloomProgrammaticAssertions
     private function settingsMatch(VerificationContext $context): ProbeResult
     {
         $run = $this->run($context);
-        if ($run === null) {
-            return $this->incomplete('SETTINGS_NOT_OBSERVED', 'Molly has no run effective configuration to compare with displayed settings.', [
-                $this->assertion($context, 'displayed model equals run effective model', 'equal models', 'no run', 'GetMollySettings', 'not_observed'),
-            ]);
+        if (! isset($run['id'])) {
+            return $this->runMissing($context, $run, 'displayed model equals run effective model', 'equal models', 'GetMollySettings');
         }
         $shown = $this->runs->handle($run['id']);
         $effective = is_array($shown?->effective_config) ? $shown->effective_config : [];
