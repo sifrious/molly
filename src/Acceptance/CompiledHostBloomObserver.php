@@ -37,8 +37,18 @@ class CompiledHostBloomObserver
                 $check->id.' has a compiled-host record for a different candidate. Molly did not reuse it.',
             );
         }
-        $source = $directory.'/acceptance-native/'.$decoded['source_artifact'];
+        $artifactName = $decoded['source_artifact'];
+        if ($artifactName === '' || basename($artifactName) !== $artifactName) {
+            return $this->missing($check);
+        }
+        $source = $directory.'/acceptance-native/'.$artifactName;
         if (! is_file($source)) {
+            return $this->missing($check);
+        }
+        $observed = json_decode((string) file_get_contents($source), true);
+        if (! is_array($observed)
+            || ($observed['candidate_sha'] ?? null) !== $decoded['candidate_sha']
+            || ($observed['actual'] ?? null) !== $decoded['actual']) {
             return $this->missing($check);
         }
         $assertion = new CheckAssertion(

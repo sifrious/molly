@@ -52,6 +52,14 @@ final class MollyModel {
         await runner.artisan(arguments, host: override ?? host)
     }
 
+    /// Asks Molly to record a fact this screen just showed. The child process is marked as the plugin.
+    func observe(_ kind: String, project: String?, task: String? = nil) async {
+        guard let project, !project.isEmpty else { return }
+        var arguments = ["molly:host-observe", kind, "--project=\(project)", "--json"]
+        if let task, !task.isEmpty { arguments.append("--task=\(task)") }
+        _ = await artisan(arguments, host: project)
+    }
+
     func didWrite() { revision += 1 }
 }
 
