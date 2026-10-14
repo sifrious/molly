@@ -3,85 +3,104 @@
 [![Package tests](https://github.com/sifrious/molly/actions/workflows/tests.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/tests.yml)
 [![HOL Guard](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml)
 
-Molly makes a small change to a Laravel application and proves it with Pest before the task can be called done. You name the change, the files an agent may edit, and the Pest test that must pass. Molly asks a local model for the change, applies it, runs the test, reviews the diff for needless complexity, and records the evidence. The model never decides whether its own work passed.
+Molly makes a small change to a Laravel application and proves it with Pest before the task can be called done. You name the change, the files the model may edit, and the Pest test that must pass. Molly asks a local model for the change, applies it, runs the test, reviews the diff for needless complexity, and records the evidence. Pest and that review decide whether the work passed.
 
-Molly runs from Artisan, has a local web page for reading evidence, and works without Bloom.
+Molly runs from Artisan and has a local web page for the same records. You can use it without Bloom, the optional macOS app.
 
-## Install
+## Install and run the demo
 
-Molly needs PHP 8.3 or later, Laravel 12 or 13, Pest in the application, Git, and a working database connection. From the application root:
+Molly needs PHP 8.3 or later with the DOM, PDO, and PDO SQLite extensions, a Laravel 12 or 13 application, Pest, Git, and a working database connection. Molly is a development dependency, so `composer install --no-dev` leaves it out of production. Molly is not on Packagist yet.
 
-```bash
-composer config repositories.molly vcs https://github.com/sifrious/molly
-composer require --dev sifrious/molly:^0.2
-php artisan vendor:publish --tag=molly-config
-php artisan migrate
-```
-
-Molly is not on Packagist yet, so the first line tells Composer where the tagged releases live. Molly is a development dependency, so `composer install --no-dev` leaves it out of production.
-
-New Laravel 12 and 13 applications ship PHPUnit, not Pest. If `vendor/bin/pest` does not exist, install Pest before you run Molly:
+`v0.2.0` is not tagged. `composer require --dev sifrious/molly:^0.2` fails until that tag exists. Until then, install a checksummed candidate zip: one commit packaged for Composer, with its SHA-256 in `candidate.json`. The zip for the Bloom result in [Status](#status) is release candidate 18, commit `6bb6fb26`, version `0.2.0-RC18`. From a checkout of this repository:
 
 ```bash
-composer remove --dev phpunit/phpunit --no-update
-composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
-./vendor/bin/pest --init
+bin/molly-candidate 6bb6fb26 0.2.0-RC18 --out ~/molly-acceptance/0.2.0-RC18
 ```
 
-The first line drops the PHPUnit requirement without updating yet, the second installs Pest and lets Composer pick the PHPUnit version Pest needs, and `--init` adds `tests/Pest.php`.
+That command writes `sifrious-molly-6bb6fb26.zip` and `candidate.json`. The zip is 693,843 bytes. Its SHA-256 is `c80fe219af360fdc83ae2a032ef04f8221157a8068af878f6e496e864756f820`. Compare the file with the `sha256` field in `candidate.json` before you install it. [Install the candidate](docs/acceptance/README.md#install-the-candidate) describes the same files.
 
-Add Molly's local files to `.gitignore`:
+Add Molly's local files to `.gitignore`. `php artisan molly:project-init` adds both lines when they are missing, and it leaves a candidate that is already installed in place.
 
 ```gitignore
 .molly/
 /storage/molly/
 ```
 
-`molly:project-init` adds both lines when they are missing.
+From the Laravel application root:
 
-Molly records the commit each task starts from, so the application must be a Git repository with at least one commit. Molly never runs `git init` or commits for you. For a fresh `composer create-project` app, run `git init && git add -A && git commit -m "Start"` before `molly:demo`; otherwise Molly stops with `WORKSPACE_NOT_GIT`.
+1. Install Pest when `vendor/bin/pest` does not exist. New Laravel 12 and 13 applications ship PHPUnit. The first command drops that requirement without updating yet. The second installs Pest and lets Composer choose the PHPUnit version Pest needs. `--init` writes `tests/Pest.php`.
 
-## Run the demo with a local model
+   ```bash
+   composer remove --dev phpunit/phpunit --no-update
+   composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
+   ./vendor/bin/pest --init
+   ```
 
-You do not need a paid AI account. With [Ollama](https://ollama.com) 0.34.4 installed:
+2. Commit the application when `git rev-parse HEAD` fails. Molly records the commit each task starts from, and it never runs `git init` or commits for you. Without a commit, `molly:demo` stops with `WORKSPACE_NOT_GIT` and writes nothing.
+
+   ```bash
+   git init
+   git add -A
+   git commit -m "Start"
+   ```
+
+3. Point Composer at the directory that holds the zip, and require the version from `candidate.json`. Use your own directory and version when they differ from this example.
+
+   ```bash
+   composer config repositories.molly-candidate artifact ~/molly-acceptance/0.2.0-RC18
+   composer require --dev sifrious/molly:0.2.0-RC18
+   ```
+
+4. Publish Molly's config and migrate. Migrate uses the application's database connection.
+
+   ```bash
+   php artisan vendor:publish --tag=molly-config
+   php artisan migrate
+   ```
+
+5. On a Mac, turn the Linux file sandbox off for a checkout you trust. The sandbox uses Landlock, and doctor reports `sandbox_unavailable` when the host cannot provide it. `molly:start` then refuses to run. Add this line to `.env`:
+
+   ```dotenv
+   MOLLY_SANDBOX_ALLOW_UNSAFE=true
+   ```
+
+   Run `php artisan config:clear`. The doctor command in the next step reports `sandbox_unsafe_override` for that check. The writer and Pest then run with your user's permissions. Molly still refuses a change outside the files you allowed. On Linux, skip this step. [Getting started](docs/getting-started.md#macos-and-the-sandbox) uses the same setting.
+
+6. Install [Ollama](https://ollama.com) 0.34.4 and let Molly choose a model. `molly:preflight` measures this Mac and decides which approved model fits: `gpt-oss:120b-code` on a 96 GB Mac, `gpt-oss:20b` on a Mac with 16 GB or more, or no fit. It downloads nothing. When a run would refuse a model that is already installed, preflight says `memory_unavailable` and selects nothing. `molly:install-model` shows the download size, asks before it downloads, and checks that the model can do a Molly task. Replace `MODEL` with the name it prints. `molly:setup` writes `MOLLY_AGENT` and `MOLLY_LOCAL_MODEL` to `.env`. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. Doctor reports `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measured, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT`. [Ollama](docs/ollama-quickstart.md) explains the choice.
+
+   ```bash
+   php artisan molly:preflight
+   php artisan molly:install-model
+   php artisan molly:setup --agent=ollama --model=MODEL
+   php artisan config:clear
+   php artisan molly:doctor
+   ```
+
+7. Scaffold the demo and start it. `molly:demo` writes `app/Greeting.php`, a failing Pest test at `tests/Feature/GreetingTest.php`, and a task named `demo-greeting`. It does not call the model. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
+
+   ```bash
+   php artisan molly:demo
+   php artisan molly:start demo-greeting
+   ```
+
+8. Read the result before you keep it. Molly does not commit anything. If the run failed, `php artisan molly:retry demo-greeting` starts another attempt. A task may make three attempts.
+
+   ```bash
+   php artisan molly:show RUN_ID --verbose
+   git diff
+   vendor/bin/pest
+   ```
+
+After `v0.2.0` is tagged, install the release with these lines in place of step 3:
 
 ```bash
-php artisan molly:preflight
-php artisan molly:install-model
-php artisan molly:setup --agent=ollama --model=MODEL
-php artisan config:clear
-php artisan molly:doctor
-php artisan molly:demo
-php artisan molly:start demo-greeting
+composer config repositories.molly vcs https://github.com/sifrious/molly
+composer require --dev sifrious/molly:^0.2
 ```
 
-`molly:preflight` measures this Mac and decides which approved model fits: `gpt-oss:120b-code` on a 96 GB Mac, `gpt-oss:20b` on a Mac with 16 GB or more, or no fit. It never selects an installed model that a run would refuse to load with the memory available now, and says so with `memory_unavailable`. It downloads nothing. `molly:install-model` shows the download size and the volume it goes to, asks before it downloads, verifies the model's digest, and checks that the model can do a Molly task. Replace `MODEL` with the name it prints. [Ollama](docs/ollama-quickstart.md) explains the decision and the approved catalogue. `molly:doctor` prints `Molly is ready.` when the database, Pest, the model, and the sandbox check out. It fails with `model_exceeds_memory` when the model plus `molly.memory.headroom_gb` is larger than the memory preflight measures, and a run refuses that model with `MODEL_MEMORY_INSUFFICIENT` before Ollama loads it. `molly:demo` writes a small greeting class and a failing Pest test, then saves a task called `demo-greeting`. `molly:start` asks the model for the change, applies it, runs the test, and prints a run ID.
+## Your own task
 
-On macOS, doctor reports that the writer sandbox is unavailable, because it needs Linux Landlock. Molly refuses to start a task until you opt out of isolation for a trusted checkout. [Getting started](docs/getting-started.md#macos-and-the-sandbox) explains that choice.
-
-Read the result before you accept it:
-
-```bash
-php artisan molly:show RUN_ID --verbose
-git diff
-vendor/bin/pest
-```
-
-Molly does not commit anything. If the run failed, `php artisan molly:retry demo-greeting` starts another attempt, up to three in total.
-
-## Your first real task
-
-```bash
-php artisan molly:create
-```
-
-Molly asks what should change, which Pest test must pass, and which files it may edit. Creating a task saves it without calling the model. Start it with `php artisan molly:start TASK`.
-
-## Editable seam tests
-
-Publish the controller and command instruction packs with `php artisan vendor:publish --tag=molly-seams`, and their configuration with `php artisan vendor:publish --tag=molly-seam-config`. Edit complete packs in `resources/molly/seams/<package>/<seam>/`. Ordinary republishing preserves local edits.
-
-`php artisan molly:seam list --json` lists executable packs and the 155-guide catalogue. The initial adapters support stateless JSON controllers and non-interactive Artisan commands. The remaining adapters are pending. `molly:seam` and the existing MCP server's `molly_seam` tool share frozen plans, deterministic generation, protected-test approval, RED/GREEN evidence and targeted negative controls. Model choice does not affect completion decisions. See [Editable seam instructions](docs/seams.md) for the full example, MCP operations, configuration and current limits.
+`php artisan molly:create` asks what should change, which Pest test must pass, and which files Molly may edit. Creating a task saves it and does not call the model. Start it with `php artisan molly:start TASK`.
 
 ## Documentation
 
@@ -89,25 +108,20 @@ Start with [Getting started](docs/getting-started.md). Then:
 
 - [Tasks](docs/tasks.md), [Verification](docs/verification.md), and [Troubleshooting](docs/troubleshooting.md)
 - [Molly on its own](docs/standalone.md) and [Molly with Bloom](docs/bloom.md)
-- [Tutorials](docs/tutorials.md) for the longer workflows, including [Pest todos from a GitHub issue](docs/github-todos.md), [a custom Laravel AI step](docs/customize-steps.md), and [two tasks on two local Orbs](docs/execution-targets.md#run-tasks-on-two-local-orbs)
+- [Tutorials](docs/tutorials.md), including [Pest todos from a GitHub issue](docs/github-todos.md), [a custom Laravel AI step](docs/customize-steps.md), and [two tasks at once, each in its own Git worktree](docs/execution-targets.md#run-tasks-on-two-local-orbs) (Molly calls each local worker an Orb)
 - [Commands](docs/reference/commands.md) and [Configuration](docs/reference/configuration.md)
+- [Editable instruction packs](docs/seams.md), for a controller or Artisan command test you can edit
 
 The full index is in the [documentation overview](docs/overview.md).
 
 ## Status
 
-Molly 0.2 is in prelaunch acceptance testing. The latest tag is `v0.1.3`; no 0.2 release is tagged yet, so the `^0.2` install line above resolves only after `v0.2.0` is published. Release candidates, named `0.2.0-RC<n>`, are acceptance builds installed from a local zip, not releases; [docs/acceptance/README.md](docs/acceptance/README.md) describes them. These docs follow `main`, which `v0.2.0` will publish. It covers bounded coding tasks, protected acceptance tests, Pest verification, Tarpit review, Clever measurements, bounded retries, Pest todos from GitHub issue acceptance criteria, local Ollama and Amp agents, agent steps you can replace with your own Laravel AI agent class, local MCP tools, local Orbs that run tasks in separate Git worktrees, planning, a local web interface, project and Laravel knowledge graphs, change-impact overlays, learning paths, journals, and optional Jev advice through Laravel AI.
-
-`bin/molly-demo` resolves the stable release with Composer before creating the app or deleting a `--force` target. Repository failures, missing tags, and dependency conflicts stop setup with `MOLLY_RELEASE_UNAVAILABLE`. Existing-project initialization performs the same dry-run check before installing Molly and restores `composer.json` and `composer.lock` on failure. Neither path falls back to an older version or a development branch. For unpublished verification, install the checksummed candidate artifact first, then run `molly:project-init`; initialization preserves an already installed candidate. This does not satisfy machine acceptance or lift the MME-5341 publication hold.
-
-Integration status: machine acceptance has not passed. The supplied RC10 (`d0f4e6e`) result reports rejection with 33 of 165 mandatory subcases accepted. The later source tip `b34928d` and this combined tree have no acceptance verdict established by this reconciliation. The [acceptance matrix](docs/acceptance/matrix.md) remains historical RC9-era reporting. `php artisan molly:verify` runs the M04 Bloom checks. A missing Screen Recording or Accessibility permission is `BLOCKED_VERIFIER_PERMISSION`. `--permissionless` does not drive the Bloom UI. A Bloom process that is already running is inspected without those permissions, and the plugin has to be loaded in that process. `--candidate` has to be the installed commit. `release_complete` stays false while the visible Bloom checks are still missing. It does not run the other 149 checks, and it does not close MME-5885. [Acceptance](docs/acceptance/README.md#verifier-permissions) describes the command.
-
-Molly does not open or merge pull requests. MCP clients cannot approve a change, lock a test, record a pull request or merge, post a GitHub comment, or hand off a task; a person runs those Artisan commands with `--approve`. A run executes on the machine where you run Artisan, or on a local Orb: a registered worker on the same machine with its own ID, model, and Git worktree per task, so two Orbs can run two tasks at once. Hosted Orbs on another machine are not shipped; see [Execution targets](docs/execution-targets.md). The Bloom plugin is built against Bloom commit `1599f05f` and is not in the Composer package; host-level acceptance of the Bloom integration is pending. Every workflow also works from Artisan and the local web interface.
+Molly 0.2 is in prelaunch. The latest tag is `v0.1.3`, and these pages describe the current source, which you install from the candidate zip above until `v0.2.0` is published. From Artisan, that source can ask a local model for a small change, run the Pest test you named, and save the run. The native Bloom checks (M04, the desktop app screens) passed 16 of 16 on release candidate 18, commit `6bb6fb26`. The Studio record is [pull request 130, comment 6161166682](https://github.com/sifrious/molly/pull/130#issuecomment-6161166682).
 
 ## Name and license
 
-Molly is named for Molly Bloom in *Ulysses*, whose chapter begins and ends with yes. Molly's yes has to be earned. The thinking behind Tarpit and Clever comes from Mary Perry's Laracon US 2026 talk, [Cleverness Is A Loan](https://www.youtube.com/watch?v=vsxoaTgtyjw).
+Molly is named for Molly Bloom in *Ulysses*, whose chapter begins and ends with yes. Molly's yes has to be earned: the Pest test has to pass. The seven review questions (Tarpit) and the before-and-after measurements (Clever) come from Mary Perry's Laracon US 2026 talk, [Cleverness Is A Loan](https://www.youtube.com/watch?v=vsxoaTgtyjw). Clever records numbers. It does not combine them into a score.
 
 Molly is available under the [MIT license](LICENSE). See [SECURITY.md](SECURITY.md) for supported versions and private reporting.
 
-See [AI ownership](docs/reference/ai-ownership.md) for the Laravel AI v1 boundary, the responsibilities Molly keeps, and migration checks.
+See [AI ownership](docs/reference/ai-ownership.md) for what Molly keeps when it uses Laravel AI, and the checks to run when that package changes.

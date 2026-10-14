@@ -37,6 +37,22 @@ php artisan molly:project-init .
 
 Use a consumer with a Git commit before initialization. Initialization recognizes the package only when Composer's installed record and autoload map both contain Molly. It then preserves the installed candidate without resolving a public release. A failed or partial artifact install must be repaired before initialization; `--no-composer` is not candidate verification. Preserve the candidate commit, artifact digest, and consumer lock digest with the evidence. This path does not tag, publish, accept the candidate, or lift MME-5341's hold on MME-5885.
 
+## Release candidate 18
+
+Release candidate 18 is commit `6bb6fb26` (`6bb6fb26788f94c766db059340e3b47e5212a49f`), version `0.2.0-RC18`. From a clean checkout:
+
+```bash
+bin/molly-candidate 6bb6fb26 0.2.0-RC18 --out ~/molly-acceptance/0.2.0-RC18
+```
+
+The zip is `sifrious-molly-6bb6fb26.zip`, 693,843 bytes, SHA-256 `c80fe219af360fdc83ae2a032ef04f8221157a8068af878f6e496e864756f820`. A build from this repository produced that checksum, and it matches the zip recorded on the Studio.
+
+The Studio ran the native Bloom checks (M04, the desktop app screens) on that zip and recorded 16 of 16 passing, in one unattended pass, with `release_complete: true`. The comment says the CLI and MCP agreed on every check. The record is [pull request 130, comment 6161166682](https://github.com/sifrious/molly/pull/130#issuecomment-6161166682). The host was Bloom Dev.app at commit `1599f05f`, consumer `apps/m04-a`, task `m04-pest`, run `01a138b5-6f93-7315-8d06-d466f85166ea`.
+
+That pass covers M04. The acceptance gate still has to be run for the other checks. `php artisan molly:verify` is described under [Verifier permissions](#verifier-permissions).
+
+`bin/molly-demo` resolves the tagged `^0.2` release before it creates an app. A missing tag stops it with `MOLLY_RELEASE_UNAVAILABLE` and leaves the target unchanged. Install the zip in the consumer, then run `php artisan molly:project-init`. Initialization keeps the installed candidate.
+
 ## Record evidence
 
 Put evidence in one directory with an `index.json` at its root. Store each file under the subcase id, using the evidence name from the manifest. `M02.1` lists `install-l12.log, install-l13.log`, so both files go in `M02.1/`. A name ending in `/`, such as `M10.4`'s `molly-ui/`, is a directory and needs at least one file inside it:
