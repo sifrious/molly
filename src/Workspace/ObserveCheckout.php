@@ -122,7 +122,7 @@ final class ObserveCheckout
 
     /**
      * Refuse a path that no Git work tree tracks and return the repository root.
-     * Molly never creates a repository or a commit in the user's project.
+     * This check does not create a repository. molly:project-new commits an application it just created.
      */
     public static function requireCheckout(string $path): string
     {

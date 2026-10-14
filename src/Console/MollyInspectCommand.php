@@ -33,11 +33,13 @@ class MollyInspectCommand extends Command
         ShowConversation $showConversation,
     ): int {
         try {
-            $ensure = (bool) $this->option('ensure-conversations');
+            // Opening a task, run, or conversation list saves a conversation for every
+            // run that does not have one. --ensure-conversations remains for scripts.
+            $ensure = true;
             $payload = null;
 
             if ($this->option('conversations')) {
-                $payload = ['status' => 'ok', ...$listConversations->handle($this->option('task') ?: null)];
+                $payload = ['status' => 'ok', ...$listConversations->handle($this->option('task') ?: null, $ensure)];
             } elseif (is_string($this->option('conversation')) && $this->option('conversation') !== '') {
                 $payload = ['status' => 'ok', 'conversation' => $showConversation->handle((string) $this->option('conversation'))];
             } elseif (is_string($this->option('run')) && $this->option('run') !== '') {

@@ -10,7 +10,7 @@ composer require --dev pestphp/pest:^4.7 pestphp/pest-plugin-laravel:^4.1 -W
 ./vendor/bin/pest --init
 ```
 
-Molly records the commit each task starts from and never creates a repository for you. If the application is not a Git repository yet, commit it first:
+Molly records the commit each task starts from. If you created this application yourself and it is not a Git repository yet, commit it first:
 
 ```bash
 git init

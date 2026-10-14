@@ -281,15 +281,15 @@ it('refuses to overwrite a directory left by an interrupted molly:project-new an
             ->and(registeredProjects($this->mollyHome))->toBe([]);
 
         $fakeCreateProject(fn (string $reached) => null);
-        $exit = Artisan::call('molly:project-new', ['path' => $target, '--force' => true, '--json' => true]);
+        $exit = Artisan::call('molly:project-new', ['path' => $target, '--force' => true, '--no-composer' => true, '--no-migrate' => true, '--no-graphs' => true, '--json' => true]);
         $created = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
-        // The new app is not in a commit yet, so Molly stops and names the commands to run.
         expect($exit)->toBe(0)
-            ->and($created['status'])->toBe('needs_commit')
+            ->and($created['status'])->toBe('created')
+            ->and($created['project']['source'])->toBe('new')
             ->and(File::exists($target.'/artisan'))->toBeTrue()
-            ->and(File::exists($target.'/.molly'))->toBeFalse()
-            ->and(registeredProjects($this->mollyHome))->toBe([]);
+            ->and(File::exists($target.'/.molly/project.json'))->toBeTrue()
+            ->and(registeredProjects($this->mollyHome))->not->toBe([]);
     } finally {
         File::deleteDirectory(dirname($target));
     }

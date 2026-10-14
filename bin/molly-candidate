@@ -3,9 +3,11 @@
 #
 # The artifact is a zip of `git archive <commit>` (so .gitattributes export-ignore
 # applies) with "version" and extra.molly-candidate.commit injected into
-# composer.json. Entries are sorted, mtimes and modes are normalized, and zip
+# composer.json. Entries are sorted, mtimes and modes are normalized in UTC, and zip
 # extra fields are dropped, so building the same commit and version twice
-# produces the same sha256.
+# produces the same sha256. touch -t uses the local timezone, and zip stores
+# that time in a fixed-width header, so the script sets TZ=UTC before either
+# command. A different zone used to change the sha256 without changing the size.
 set -euo pipefail
 
 usage() {
@@ -84,6 +86,9 @@ git -C "$REPO" archive --format=tar "$SHA" | tar -x -f - -C "$WORK/tree"
 ' "$WORK/tree/composer.json" "$VERSION" "$SHA"
 
 # Normalize modes and mtimes so the zip depends only on content.
+# touch -t is a local time. Zip stores that local time in a fixed-width
+# header, so a different timezone changes the sha256 and not the size.
+export TZ=UTC
 find "$WORK/tree" -type d -exec chmod 755 {} +
 find "$WORK/tree" -type f -perm -u+x -exec chmod 755 {} +
 find "$WORK/tree" -type f ! -perm -u+x -exec chmod 644 {} +
@@ -93,7 +98,7 @@ rm -f "$WORK/$ARTIFACT"
 (
   cd "$WORK/tree"
   find . \( -type f -o -type l \) | sed 's|^\./||' | LC_ALL=C sort \
-    | TZ=UTC zip -q -X -D -y "$WORK/$ARTIFACT" -@
+    | zip -q -X -D -y "$WORK/$ARTIFACT" -@
 )
 
 SHA256="$(shasum -a 256 "$WORK/$ARTIFACT" | cut -d' ' -f1)"

@@ -26,7 +26,7 @@ Restart queue workers after configuration changes too.
 | `database_unwritable` | Doctor inserted a row inside a transaction, and the database refused it. Free disk space, or make the database file and its directory writable. Doctor rolls the row back. |
 | `pest_missing` | Install Pest in the workspace. See [Compatibility](compatibility.md). |
 | `git_missing` | Install Git or add it to `PATH`. Without Git, `molly:setup`, `molly:project-init`, `molly:project-new`, `molly:create`, `molly:demo`, `molly:run`, and `molly:review-commit` fail with `GIT_MISSING` before they write anything. `molly:status` reports `git_missing` in its readiness checks and still exits `0`. Doctor's `Git repository` check then has the status `unknown` and the code `git_missing`, because Molly cannot read a repository without Git. |
-| `workspace_not_git` | The workspace is not a Git repository. Molly records the commit each task starts from and never creates a repository or a commit for you. See [Not a Git repository](#not-a-git-repository). |
+| `workspace_not_git` | The workspace is not a Git repository. Molly records the commit each task starts from. `molly:create` does not make that repository. See [Not a Git repository](#not-a-git-repository). |
 | `workspace_revision_missing` | The workspace is a Git repository with no commit yet, or the HEAD commit holds none of its files, such as an untracked `backend/` in a committed monorepo. Commit the app in the repository that holds it, then run doctor again. |
 | `sandbox_unavailable` | The host cannot isolate the writer and verifier. See [Sandbox unavailable](#sandbox-unavailable). |
 | `sandbox_unsafe_override` | Isolation is off by your choice. Keep this to trusted checkouts. |

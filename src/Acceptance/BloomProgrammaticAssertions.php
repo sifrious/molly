@@ -560,15 +560,81 @@ final class BloomProgrammaticAssertions
             $host?->processSource ?? 'ps -ax -o pid=,command=',
             $host?->running === true && $host->pid === $pid ? 'pass' : 'not_observed',
         );
-        if ($host === null || ! $host->running || $host->pid !== $pid) {
-            return $this->prerequisite(
-                'HOST_DIAGNOSTIC_NOT_OBSERVED',
-                $name.' records the diagnostic. The compiled Bloom process in that record was not observed, so it is not accepted.',
-                [$assertion, $process],
+        if ($host !== null && $host->running && $host->pid === $pid) {
+            return $this->pass($code.'_RECORDED', $name.' attributes the host diagnostic to the running Bloom process.', [$assertion, $process]);
+        }
+        if ($host !== null && $this->healthyRelaunch($host, $record)) {
+            $relaunched = $this->assertion(
+                $context,
+                'compiled Bloom process relaunched after the recorded host',
+                'bloom pid '.$pid.' exited',
+                'pid '.$host->pid.' '.$host->command,
+                $host->processSource ?? 'ps -ax -o pid=,command=',
+                'pass',
             );
+
+            return $this->pass($code.'_RECORDED', $name.' attributes the host diagnostic to a Bloom process that has exited. The same app is running again with the plugin loaded.', [$assertion, $relaunched]);
         }
 
-        return $this->pass($code.'_RECORDED', $name.' attributes the host diagnostic to the running Bloom process.', [$assertion, $process]);
+        return $this->prerequisite(
+            'HOST_DIAGNOSTIC_NOT_OBSERVED',
+            $name.' records the diagnostic. The compiled Bloom process in that record was not observed, so it is not accepted.',
+            [$assertion, $process],
+        );
+    }
+
+    /**
+     * The recorded Bloom pid has exited, and the process Molly sees now is the same app with the plugin loaded.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function healthyRelaunch(BloomHostSnapshot $host, array $record): bool
+    {
+        if (! $host->running || ! is_int($host->pid) || $host->pid < 2 || $host->command === '') {
+            return false;
+        }
+        if ($host->pluginId !== 'sifrious.molly' || $host->apiVersion !== 1 || ! $host->loaded) {
+            return false;
+        }
+        $pid = $record['process']['pid'] ?? null;
+        $recordedHost = $record['host'] ?? null;
+        $at = $record['observed_at'] ?? null;
+        if (! is_int($pid) || $pid < 2 || $pid === $host->pid || ! is_string($recordedHost) || ! is_string($at)) {
+            return false;
+        }
+        if ($host->processListing === '' || $this->pidListed($host->processListing, $pid)) {
+            return false;
+        }
+        $recordedApp = $this->bloomApp($recordedHost);
+        $currentApp = $this->bloomApp($host->command);
+        if ($recordedApp === null || $recordedApp !== $currentApp) {
+            return false;
+        }
+        $stamp = substr($at, 0, 19);
+
+        return $stamp <= gmdate('Y-m-d\TH:i:s');
+    }
+
+    private function pidListed(string $listing, int $pid): bool
+    {
+        foreach (preg_split("/\r\n|\n|\r/", $listing) ?: [] as $line) {
+            if (preg_match('/\A\s*(\d+)\s+/', $line, $match) === 1 && (int) $match[1] === $pid) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function bloomApp(string $command): ?string
+    {
+        // Bloom Dev.app has a space in the bundle name. A match that stops at
+        // whitespace never sees that .app, so a relaunch of the same app is rejected.
+        if (preg_match('#((?:/[^\s/]+)+/[^/\s]+(?:\s[^/\s]+)*\.app)(?=/|\s|$)#', $command, $match) !== 1) {
+            return null;
+        }
+
+        return $match[1];
     }
 
     /** @return array<string, mixed>|null */

@@ -42,6 +42,7 @@ class RunTask
         private RecordModelIdentity $modelIdentity,
         private ObserveCheckout $observe,
         private RecordRedBaseline $redBaseline,
+        private EnsureRunConversation $ensureConversation,
     ) {}
 
     /**
@@ -276,6 +277,7 @@ class RunTask
         }
         $this->recordTrace($run, $report);
         $run->update(['status' => $decision['completed'] ? 'completed' : 'failed', 'report' => $report]);
+        $this->persistConversation($run);
     }
 
     /**
@@ -309,6 +311,23 @@ class RunTask
         }
         $this->recordTrace($run, $report);
         $run->update(['status' => $exception instanceof RunStopped ? 'stopped' : 'failed', 'report' => $report]);
+        $this->persistConversation($run);
+    }
+
+    /**
+     * Save the conversation this run produced. A failure to write it is recorded on the
+     * report and does not change the run status.
+     */
+    private function persistConversation(Run $run): void
+    {
+        try {
+            $this->ensureConversation->handle($run->fresh() ?? $run);
+        } catch (Throwable $exception) {
+            $current = $run->fresh() ?? $run;
+            $report = is_array($current->report) ? $current->report : [];
+            $report['conversation_error'] = $exception->getMessage();
+            $current->update(['report' => $report]);
+        }
     }
 
     /**

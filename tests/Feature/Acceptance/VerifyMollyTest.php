@@ -20,6 +20,7 @@ use Sifrious\Molly\Acceptance\VerificationMode;
 use Sifrious\Molly\Acceptance\VerifierPermissionInspector;
 use Sifrious\Molly\Acceptance\VerifierPermissionSnapshot;
 use Sifrious\Molly\Acceptance\VerifierProcessIdentity;
+use Sifrious\Molly\Actions\ListMollyProjects;
 use Sifrious\Molly\Actions\ManageWorker;
 use Sifrious\Molly\Actions\VerifyMolly;
 use Sifrious\Molly\Conversations\Conversation;
@@ -328,7 +329,7 @@ it('collects the same host telemetry from the command and MCP', function () {
     $database = seedTaskGraph($fixture['project']);
     $inspector = new BloomHostInspector(bloomProcessListing(), $plugins, null, loadedPluginEvidence());
     bindRunningQueueWorker();
-    $observer = new CompiledHostBloomObserver;
+    $observer = new CompiledHostBloomObserver(app(ListMollyProjects::class));
     $prompt = new class(new MacOsTccProbe) extends MacOsPermissionPrompt
     {
         public int $requests = 0;
@@ -435,7 +436,7 @@ it('collects the same host telemetry from the command and MCP', function () {
 
 it('reports a wrong plugin id as a product failure when accessibility is missing', function () {
     $fixture = bloomFixture();
-    $observer = new CompiledHostBloomObserver;
+    $observer = new CompiledHostBloomObserver(app(ListMollyProjects::class));
     app()->instance(BloomHostInspector::class, new BloomHostInspector(bloomProcessListing(), bloomPluginDirectory('other.plugin')));
     app()->instance(CompiledHostBloomObserver::class, $observer);
     bindPermissions(PermissionState::Granted, PermissionState::Denied);
@@ -512,7 +513,7 @@ it('does not accept a host telemetry file that claims the plugin was discovered'
 
 it('does not drive native UI in permissionless mode when both permissions are granted', function () {
     $fixture = bloomFixture();
-    $observer = new CompiledHostBloomObserver;
+    $observer = new CompiledHostBloomObserver(app(ListMollyProjects::class));
     $prompt = new class(new MacOsTccProbe) extends MacOsPermissionPrompt
     {
         public int $requests = 0;

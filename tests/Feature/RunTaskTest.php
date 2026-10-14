@@ -39,7 +39,11 @@ function mollyProposalFixture(): array
 
 beforeEach(function () {
     $this->workspace = sys_get_temp_dir().'/molly-task-'.Str::uuid();
+    $this->mollyHome = sys_get_temp_dir().'/molly-task-home-'.Str::uuid();
     File::ensureDirectoryExists($this->workspace.'/app');
+    File::ensureDirectoryExists($this->mollyHome);
+    putenv('MOLLY_HOME='.$this->mollyHome);
+    $_ENV['MOLLY_HOME'] = $this->mollyHome;
     File::put($this->workspace.'/app/Greeting.php', '<?php return null;');
     writeProtectedTest($this->workspace);
     commitGitWorkspace($this->workspace);
@@ -48,6 +52,9 @@ beforeEach(function () {
 
 afterEach(function () {
     File::deleteDirectory($this->workspace);
+    File::deleteDirectory($this->mollyHome);
+    putenv('MOLLY_HOME');
+    unset($_ENV['MOLLY_HOME']);
 });
 
 function measureMollyFixture(): void
@@ -91,8 +98,11 @@ it('persists completion only after tests and the complete review pass', function
 
     $run = runMollyFixture();
 
+    $saved = Run::findOrFail($run->id);
     expect($run->status)->toBe('completed')
-        ->and(Run::findOrFail($run->id)->status)->toBe('completed')
+        ->and($saved->status)->toBe('completed')
+        ->and($saved->report['conversation_id'])->not->toBeEmpty()
+        ->and(File::exists($this->mollyHome.'/conversations/'.$saved->report['conversation_id'].'.json'))->toBeTrue()
         ->and($run->report['verification']['tests'])->toBe(1)
         ->and($run->report['changes'])->toHaveCount(1)
         ->and($run->report['changes'][0]['status'])->toBe('modified')

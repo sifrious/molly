@@ -148,7 +148,7 @@ class CheckEnvironment
             return;
         }
         if ($location['root'] === null) {
-            $add('Git repository', false, 'workspace_not_git', ($workspace === false ? 'The workspace' : $workspace).' is not a Git repository. Molly records the commit each task runs against and never creates a repository for you. Run git init and commit your work before creating a task.');
+            $add('Git repository', false, 'workspace_not_git', ($workspace === false ? 'The workspace' : $workspace).' is not a Git repository. Molly records the commit each task runs against. Run git init and commit your work before creating a task.');
 
             return;
         }

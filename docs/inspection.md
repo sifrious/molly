@@ -13,13 +13,14 @@ The first form shows the task, its runs, and the conversation of the latest run.
 
 ## Where things live
 
-Tasks and runs are rows in your application database (`molly_tasks` and `molly_runs`). Conversations are JSON files under `~/.molly/conversations/`, or `$MOLLY_HOME/conversations/` if you set `MOLLY_HOME`. A run created before conversations were persisted has none until you ask for it:
+Tasks and runs are rows in your application database (`molly_tasks` and `molly_runs`). Conversations are JSON files under `~/.molly/conversations/`, or `$MOLLY_HOME/conversations/` if you set `MOLLY_HOME`. A finished run saves its conversation and stamps `conversation_id` on the run. Inspecting a task, a run, or the conversation list does the same for a run that does not have one yet, which is what Bloom's Tasks, Runs, and Conversations screens do:
 
 ```bash
-php artisan molly:inspect ready-check --ensure-conversations
+php artisan molly:inspect ready-check
+php artisan molly:inspect --conversations
 ```
 
-That writes the conversation from the run's saved report and stamps `conversation_id` on the run.
+`--ensure-conversations` still does this. It is not required.
 
 ## What a conversation holds
 

@@ -43,11 +43,15 @@ function candidateHead(string $repo): string
 }
 
 /** Run the builder, optionally under a different umask to prove modes are normalized. */
-function candidateBuild(string $repo, string $commit, string $out, string $umask = '022'): Process
+function candidateBuild(string $repo, string $commit, string $out, string $umask = '022', ?string $timezone = null): Process
 {
     $script = dirname(__DIR__, 2).'/bin/molly-candidate';
     $command = sprintf('umask %s; exec bash %s %s 0.2.0-RC1 --out %s --repo %s', $umask, escapeshellarg($script), escapeshellarg($commit), escapeshellarg($out), escapeshellarg($repo));
-    $process = Process::fromShellCommandline($command, null, ['PHP_BINARY' => PHP_BINARY]);
+    $env = ['PHP_BINARY' => PHP_BINARY];
+    if ($timezone !== null) {
+        $env['TZ'] = $timezone;
+    }
+    $process = Process::fromShellCommandline($command, null, $env);
     $process->setTimeout(120);
     $process->run();
 
@@ -88,6 +92,25 @@ it('builds the same sha256 twice for the same commit', function () {
             ->and(hash_file('sha256', $outB.'/'.$artifact))->toBe($a['sha256']);
     } finally {
         candidateCleanup($repo, $outA, $outB);
+    }
+});
+
+it('builds the same sha256 in UTC and in another timezone', function () {
+    $repo = candidateRepo();
+    $utc = $repo.'-utc';
+    $local = $repo.'-local';
+    try {
+        $sha = candidateHead($repo);
+        $first = candidateBuild($repo, $sha, $utc, '022', 'UTC');
+        $second = candidateBuild($repo, $sha, $local, '022', 'America/New_York');
+        $artifact = 'sifrious-molly-'.substr($sha, 0, 8).'.zip';
+
+        expect($first->getExitCode())->toBe(0, $first->getErrorOutput())
+            ->and($second->getExitCode())->toBe(0, $second->getErrorOutput())
+            ->and(hash_file('sha256', $local.'/'.$artifact))->toBe(hash_file('sha256', $utc.'/'.$artifact))
+            ->and(filesize($local.'/'.$artifact))->toBe(filesize($utc.'/'.$artifact));
+    } finally {
+        candidateCleanup($repo, $utc, $local);
     }
 });
 

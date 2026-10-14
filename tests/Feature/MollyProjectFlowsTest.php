@@ -134,7 +134,7 @@ it('creates a new project scaffold and marks source as new', function (): void {
     File::deleteDirectory($parent);
 });
 
-it('keeps source new when project-init follows project-new', function (): void {
+it('registers a new project and clears pending-new when project-new can commit', function (): void {
     $parent = sys_get_temp_dir().'/molly-new-flow-'.Str::uuid();
     $target = $parent.'/app';
     File::ensureDirectoryExists($target);
@@ -151,20 +151,12 @@ it('keeps source new when project-init follows project-new', function (): void {
         bootstrapGraphs: false,
     );
 
-    expect($created['status'])->toBe('needs_commit')
-        ->and($created['project'])->toBeNull()
-        ->and(File::exists($target.'/.molly/project.json'))->toBeFalse()
-        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeTrue();
+    expect($created['status'])->toBe('created')
+        ->and($created['project']->source)->toBe('new')
+        ->and(json_decode(File::get($target.'/.molly/project.json'), true)['source'])->toBe('new')
+        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse()
+        ->and(File::exists($target.'/vendor/sifrious/molly'))->toBeFalse();
 
-    commitGitWorkspace($target);
-
-    $attached = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
-        path: $target,
-        name: 'Fresh',
-        runComposerRequire: false,
-        runMigrations: false,
-        bootstrapGraphs: false,
-    );
     $existing = (new InitializeMollyInExistingProject($this->registry, app(BootstrapProjectKnowledgeGraphs::class)))->handle(
         path: $this->laravelRoot,
         runComposerRequire: false,
@@ -172,10 +164,7 @@ it('keeps source new when project-init follows project-new', function (): void {
         bootstrapGraphs: false,
     );
 
-    expect($attached['project']->source)->toBe('new')
-        ->and(json_decode(File::get($target.'/.molly/project.json'), true)['source'])->toBe('new')
-        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse()
-        ->and($existing['project']->source)->toBe('existing');
+    expect($existing['project']->source)->toBe('existing');
 
     File::deleteDirectory($parent);
 });
@@ -229,51 +218,31 @@ it('refuses molly:project-init outside a committed repository before writing any
     'no commit' => [true, 'WORKSPACE_REVISION_MISSING'],
 ]);
 
-it('creates the app with molly:project-new outside a repository and asks for a commit before attaching Molly', function (): void {
+it('creates the app with molly:project-new, commits it, and registers source new', function (): void {
     $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
 
     try {
         $exit = Artisan::call('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        $real = str_replace('\\', '/', (string) realpath($target));
 
         expect($exit)->toBe(0)
-            ->and($payload['status'])->toBe('needs_commit')
-            ->and($payload['project'])->toBeNull()
-            ->and($payload['next'])->toBe([
-                'git -C '.escapeshellarg($target).' init',
-                'git -C '.escapeshellarg($target).' add -A',
-                'git -C '.escapeshellarg($target).' commit -m "Start"',
-                'php artisan molly:project-init '.escapeshellarg($target),
-            ])
+            ->and($payload['status'])->toBe('created')
+            ->and($payload['project']['source'])->toBe('new')
+            ->and($payload['project']['path'])->toBe($real)
+            ->and($payload['reason'])->toBeNull()
+            ->and($payload['next'])->toBe([])
             ->and(File::exists($target.'/artisan'))->toBeTrue()
-            ->and(File::exists($target.'/.git'))->toBeFalse()
-            ->and(File::exists($target.'/.molly'))->toBeFalse()
-            ->and(File::exists($this->mollyHome.'/projects.json'))->toBeFalse();
-
-        commitGitWorkspace($target);
-        $exit = Artisan::call('molly:project-init', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
-
-        expect($exit)->toBe(0)
-            ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['status'])->toBe('initialized');
+            ->and(File::exists($target.'/.git'))->toBeTrue()
+            ->and(File::exists($target.'/.molly/project.json'))->toBeTrue()
+            ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse()
+            ->and(json_decode(File::get($this->mollyHome.'/projects.json'), true))->toContain($real);
     } finally {
         File::deleteDirectory($target);
     }
 });
 
-it('tells the user to commit when molly:project-new stops before attaching Molly', function (): void {
-    $target = sys_get_temp_dir().'/molly-new-'.Str::uuid();
-
-    try {
-        $this->artisan('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true])
-            ->expectsOutputToContain('Molly has not attached it yet')
-            ->expectsOutputToContain('git -C '.escapeshellarg($target).' commit -m "Start"')
-            ->assertSuccessful();
-    } finally {
-        File::deleteDirectory($target);
-    }
-});
-
-it('asks to commit a new app into the committed repository that holds it, without git init', function (): void {
+it('commits a new app into the repository that holds it and registers source new, without git init', function (): void {
     $parent = sys_get_temp_dir().'/molly-new-mono-'.Str::uuid();
     File::ensureDirectoryExists($parent);
     File::put($parent.'/README.md', "# mono\n");
@@ -286,32 +255,19 @@ it('asks to commit a new app into the committed repository that holds it, withou
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
         expect($exit)->toBe(0)
-            ->and($payload['status'])->toBe('needs_commit')
-            ->and($payload['project'])->toBeNull()
-            ->and($payload['reason'])->toContain('is inside the Git repository at '.$repository)
-            ->and($payload['next'])->toBe([
-                'git -C '.escapeshellarg($repository).' add '.escapeshellarg('backend'),
-                'git -C '.escapeshellarg($repository).' commit -m '.escapeshellarg('Add backend'),
-                'php artisan molly:project-init '.escapeshellarg($target),
-            ])
-            ->and(implode("\n", $payload['next']))->not->toContain('git init')
+            ->and($payload['status'])->toBe('created')
+            ->and($payload['project']['source'])->toBe('new')
+            ->and($payload['next'])->toBe([])
             ->and(File::exists($target.'/.git'))->toBeFalse()
-            ->and(File::exists($target.'/.molly'))->toBeFalse()
-            ->and(File::exists($this->mollyHome.'/projects.json'))->toBeFalse();
-
-        foreach (array_slice($payload['next'], 0, 2) as $command) {
-            (Process::fromShellCommandline($command, env: ['GIT_AUTHOR_NAME' => 'Molly Tests', 'GIT_AUTHOR_EMAIL' => 'tests@example.com', 'GIT_COMMITTER_NAME' => 'Molly Tests', 'GIT_COMMITTER_EMAIL' => 'tests@example.com']))->mustRun();
-        }
-        $exit = Artisan::call('molly:project-init', ['path' => $target, '--no-composer' => true, '--no-graphs' => true, '--no-migrate' => true, '--json' => true]);
-
-        expect($exit)->toBe(0)
-            ->and(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['status'])->toBe('initialized');
+            ->and(File::exists($target.'/.molly/project.json'))->toBeTrue()
+            ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse()
+            ->and(json_decode(File::get($target.'/.molly/project.json'), true)['source'])->toBe('new');
     } finally {
         File::deleteDirectory($parent);
     }
 });
 
-it('asks to commit a new app into a repository with no commit, without git init', function (): void {
+it('commits a new app into a repository that has no commit yet, without git init in the app', function (): void {
     $parent = sys_get_temp_dir().'/molly-new-nocommit-'.Str::uuid();
     File::ensureDirectoryExists($parent);
     (new Process(['git', 'init', '--quiet', $parent]))->mustRun();
@@ -323,10 +279,11 @@ it('asks to commit a new app into a repository with no commit, without git init'
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
         expect($exit)->toBe(0)
-            ->and($payload['status'])->toBe('needs_commit')
-            ->and($payload['next'][0])->toBe('git -C '.escapeshellarg($repository).' add '.escapeshellarg('backend'))
-            ->and(implode("\n", $payload['next']))->not->toContain('git init')
-            ->and(File::exists($target.'/.git'))->toBeFalse();
+            ->and($payload['status'])->toBe('created')
+            ->and($payload['project']['source'])->toBe('new')
+            ->and(File::exists($target.'/.git'))->toBeFalse()
+            ->and(File::exists($parent.'/.git'))->toBeTrue()
+            ->and(File::exists($target.'/.molly/project.json'))->toBeTrue();
     } finally {
         File::deleteDirectory($parent);
     }

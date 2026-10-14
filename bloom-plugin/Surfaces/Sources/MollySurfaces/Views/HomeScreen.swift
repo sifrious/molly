@@ -50,6 +50,11 @@ struct MollyHomeScreen: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Molly")
+        .task {
+            if let path = model.projectPath {
+                await model.observe("diagnostics", project: path)
+            }
+        }
         .sheet(isPresented: $showingNewProject) {
             NewProjectSheet { path in
                 model.reloadProjects()
@@ -68,7 +73,11 @@ struct MollyHomeScreen: View {
         Task {
             await action.run(arguments, host: selfHosted ? folder : nil) { outcome in
                 model.reloadProjects()
-                model.selectedProjectPath = outcome.json?.at("project.path")?.string ?? folder
+                let shown = outcome.json?.at("project.path")?.string
+                model.selectedProjectPath = shown ?? folder
+                if let shown {
+                    Task { await model.observe("project", project: shown) }
+                }
             }
         }
     }
@@ -121,7 +130,11 @@ struct NewProjectSheet: View {
         if skipGraphs { arguments.append("--no-graphs") }
         Task {
             await action.run(arguments) { outcome in
-                onCreated(outcome.json?.at("project.path")?.string ?? target)
+                let shown = outcome.json?.at("project.path")?.string
+                onCreated(shown ?? target)
+                if let shown {
+                    Task { await MollyModel.shared.observe("project", project: shown) }
+                }
             }
         }
     }
