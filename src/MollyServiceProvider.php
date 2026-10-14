@@ -36,6 +36,7 @@ use Sifrious\Molly\Console\MollyGraphsBootstrapCommand;
 use Sifrious\Molly\Console\MollyGraphsRetryCommand;
 use Sifrious\Molly\Console\MollyHandoffCommand;
 use Sifrious\Molly\Console\MollyHostObserveCommand;
+use Sifrious\Molly\Console\MollyHostScenarioCommand;
 use Sifrious\Molly\Console\MollyImportCommand;
 use Sifrious\Molly\Console\MollyInspectCommand;
 use Sifrious\Molly\Console\MollyInstallModelCommand;
@@ -166,7 +167,7 @@ class MollyServiceProvider extends ServiceProvider
             MollyJournalCommand::class, MollyDecideCommand::class, MollyConnectionsCommand::class, MollyLinkThreadCommand::class, MollyAdviceCommand::class,
             MollyPlanCommand::class, MollyReviewCommitCommand::class, MollySetupCommand::class, MollyChatCommand::class,
             MollyStatusCommand::class, MollyWorkerCommand::class, MollyGlossaryCommand::class,
-            MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyHostObserveCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
+            MollyProjectNewCommand::class, MollyProjectInitCommand::class, MollyProjectsCommand::class, MollyGraphsBootstrapCommand::class, MollyGraphsRetryCommand::class, MollyHostObserveCommand::class, MollyHostScenarioCommand::class, MollyInspectCommand::class, MollySettingsSetCommand::class, MollySettingsCommand::class,
             MollyKnowledgeIndexCommand::class, MollyKnowledgeQueryCommand::class, MollyKnowledgePackCommand::class, MollyProjectIndexCommand::class, MollyProjectQueryCommand::class,
             MollyPreflightCommand::class, MollyInstallModelCommand::class, MollyStoryCommand::class, MollyVerifyCommand::class,
             MollyOrbsCommand::class, MollyOrbRegisterCommand::class, MollyOrbRevokeCommand::class, MollyQueueCommand::class,

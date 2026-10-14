@@ -110,7 +110,7 @@ Molly never rewrites the IDs of saved rows. Tasks created before this file exist
 `molly:inspect` follows the links between a task, its runs, and the saved conversations:
 
 ```bash
-php artisan molly:inspect ready-check --ensure-conversations
+php artisan molly:inspect ready-check
 php artisan molly:inspect --run=RUN_ID
 ```
 

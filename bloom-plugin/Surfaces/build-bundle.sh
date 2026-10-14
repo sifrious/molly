@@ -38,12 +38,37 @@ BLOOM_COMMIT="$(git -C "$BLOOM_ROOT" rev-parse --short=8 HEAD 2>/dev/null || ech
 if [[ "$BLOOM_COMMIT" != "unknown" && -n "$(git -C "$BLOOM_ROOT" status --porcelain -- Sources/BloomPluginAPI Sources/BloomCore 2>/dev/null)" ]]; then
   BLOOM_COMMIT="$BLOOM_COMMIT-dirty"
 fi
+EXPECTED_BLOOM="${MOLLY_BLOOM_COMMIT:-1599f05f}"
+if [[ "$BLOOM_COMMIT" == *-dirty ]]; then
+  echo "BloomPluginAPI sources are dirty in $BLOOM_ROOT. Commit or stash them, then build again." >&2
+  exit 1
+fi
+if [[ "$BLOOM_COMMIT" != "$EXPECTED_BLOOM" ]]; then
+  echo "This plugin links BloomPluginAPI from Bloom $EXPECTED_BLOOM. BLOOM_ROOT is $BLOOM_COMMIT." >&2
+  echo "Set MOLLY_BLOOM_COMMIT only when you mean to link a different BloomPluginAPI." >&2
+  exit 1
+fi
 
 export SDKROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}"
+export ZERO_AR_DATE=1
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
 mkdir -p "$BUILD_DIR"
 
 SOURCES=()
 while IFS= read -r file; do SOURCES+=("$file"); done < <(find "$SRC" -name '*.swift' | sort)
+
+SOURCES_SHA="$(python3 - "$SRC" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+digest = hashlib.sha256()
+for path in sorted(p for p in root.rglob("*.swift") if p.is_file()):
+    digest.update(path.relative_to(root).as_posix().encode())
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+    digest.update(b"\0")
+print(digest.hexdigest())
+PY
+)"
 
 echo "Building MollySurfaces $VERSION against Bloom $BLOOM_COMMIT ($BLOOM_PRODUCTS)"
 xcrun swiftc -emit-library \
@@ -54,7 +79,10 @@ xcrun swiftc -emit-library \
   -sdk "$SDKROOT" \
   -swift-version 6 \
   -O \
+  -debug-prefix-map "$SRC=/molly-surfaces" \
+  -debug-prefix-map "$BLOOM_PRODUCTS=/bloom-plugin-api" \
   -I "$BLOOM_PRODUCTS" \
+  -Xlinker -no_uuid \
   -Xlinker -undefined -Xlinker dynamic_lookup \
   "${SOURCES[@]}"
 
@@ -85,6 +113,8 @@ cat > "$OUT_BUNDLE/Contents/Info.plist" <<PLIST
   <string>$BLOOM_COMMIT</string>
   <key>MollyBloomPluginAPIVersion</key>
   <integer>1</integer>
+  <key>MollySourcesDigest</key>
+  <string>$SOURCES_SHA</string>
 </dict>
 </plist>
 PLIST

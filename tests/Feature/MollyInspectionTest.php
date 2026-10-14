@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Sifrious\Molly\Actions\EnsureRunConversation;
@@ -63,6 +64,38 @@ it('inspects a task with run and conversation links both ways', function (): voi
         ->and($conversation['run_ids'])->toContain($run->id)
         ->and($conversation['messages'])->not->toBeEmpty()
         ->and($conversation['links']['tasks'][0])->toBe('molly.task:'.$task->id);
+});
+
+it('saves a conversation when inspect or the conversation list is opened', function (): void {
+    $task = Task::create([
+        'nickname' => 'screen-demo',
+        'prompt' => 'Show the run',
+        'workspace' => base_path(),
+        'paths' => [],
+        'test_path' => 'tests/ExampleTest.php',
+        'status' => 'completed',
+    ]);
+    $run = $task->runs()->create([
+        'prompt' => 'Show the run',
+        'workspace' => $task->workspace,
+        'status' => 'completed',
+        'report' => ['summary' => 'Done.', 'verification' => ['status' => 'passed']],
+    ]);
+
+    expect(app(ConversationStore::class)->findForRun($run->id))->toBeNull();
+
+    $exit = Artisan::call('molly:inspect', ['--conversations' => true, '--json' => true]);
+    $listed = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    $saved = app(ConversationStore::class)->findForRun($run->id);
+
+    expect($exit)->toBe(0)
+        ->and($saved)->not->toBeNull()
+        ->and($saved->taskIds)->toContain($task->id)
+        ->and($saved->runIds)->toContain($run->id)
+        ->and(array_column($listed['conversations'], 'id'))->toContain($saved->id);
+
+    $again = app(InspectTaskChain::class)->handle($task->nickname, ensureConversations: false);
+    expect($again['conversation_ids'])->toBe([$saved->id]);
 });
 
 it('keeps conversation messages ordered with provenance', function (): void {

@@ -38,6 +38,29 @@ fi
 [[ -f "$SRC_SURFACES/Contents/Info.plist" && -f "$SRC_SURFACES/Contents/MacOS/MollySurfaces" ]] \
   || fail "Missing $SRC_SURFACES. Build it with bloom-plugin/Surfaces/build-bundle.sh first."
 
+BINARY="$SRC_SURFACES/Contents/MacOS/MollySurfaces"
+if ! strings "$BINARY" | grep -q 'molly:host-observe'; then
+  fail "Surfaces.bundle does not contain molly:host-observe, so it was not built from these Swift sources. Rebuild it against Bloom 1599f05f: BLOOM_ROOT=/path/to/bloom ./bloom-plugin/Surfaces/build-bundle.sh"
+fi
+RECORDED_DIGEST="$(/usr/libexec/PlistBuddy -c 'Print :MollySourcesDigest' "$SRC_SURFACES/Contents/Info.plist" 2>/dev/null || true)"
+if [[ -n "$RECORDED_DIGEST" ]]; then
+  CURRENT_DIGEST="$(python3 - "$ROOT/bloom-plugin/Surfaces/Sources/MollySurfaces" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+digest = hashlib.sha256()
+for path in sorted(p for p in root.rglob("*.swift") if p.is_file()):
+    digest.update(path.relative_to(root).as_posix().encode())
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+    digest.update(b"\0")
+print(digest.hexdigest())
+PY
+)"
+  if [[ "$RECORDED_DIGEST" != "$CURRENT_DIGEST" ]]; then
+    fail "Surfaces.bundle MollySourcesDigest does not match the Swift sources. Rebuild it with bloom-plugin/Surfaces/build-bundle.sh and commit the bundle."
+  fi
+fi
+
 BUILT_AGAINST="$(/usr/libexec/PlistBuddy -c 'Print :MollyBuiltAgainstBloomCommit' "$SRC_SURFACES/Contents/Info.plist" 2>/dev/null || echo "not recorded")"
 HOST_COMMIT="$(/usr/libexec/PlistBuddy -c 'Print :BloomMasterCommit' "$APP/Contents/Info.plist" 2>/dev/null || echo "not recorded")"
 

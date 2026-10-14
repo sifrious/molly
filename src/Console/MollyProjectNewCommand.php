@@ -57,8 +57,8 @@ class MollyProjectNewCommand extends Command
                 $this->writeJson($payload);
             } elseif ($result['project'] === null) {
                 note('Laravel application created at '.$result['path'].'.');
-                note((string) $result['reason']);
-                note('Molly has not attached it yet. Molly records the commit each task starts from and never creates a repository or a commit for you. Commit the application with your own Git identity, then attach Molly:');
+                note('Molly has not attached it yet. '.(string) $result['reason']);
+                note('Commit the application with your Git identity, then attach Molly:');
                 foreach ($result['next'] as $command) {
                     $this->line('  '.$command);
                 }

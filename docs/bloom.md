@@ -116,6 +116,22 @@ The register script checks that Bloom is installed, copies `plugin.json` and `Su
 
 Quit and reopen Bloom after registering. Bloom loads plugins once at launch.
 
+`bin/molly-bloom-plugin-register` refuses a `Surfaces.bundle` that does not contain `molly:host-observe`. Rebuild with `bloom-plugin/Surfaces/build-bundle.sh` against Bloom commit `1599f05f` and commit `bloom-plugin/Surfaces.bundle`. The script records `MollySourcesDigest` and refuses a dirty or different Bloom commit. Two builds on the same Swift toolchain match.
+
+To record M04.13 or M04.15, stage the installed plugin and restore it afterwards. The backup is `sifrious.molly.scenario-backup` next to the plugin. Restore puts the files back before it deletes the backup.
+
+```bash
+php artisan molly:host-scenario stage incompat --json
+# Quit Bloom, open it again, then:
+php artisan molly:host-observe diagnostics --project="$APP" --json
+php artisan molly:host-scenario restore --json
+# Quit Bloom and open it again.
+
+php artisan molly:host-scenario stage broken --json
+php artisan molly:host-observe diagnostics --project="$APP" --json
+php artisan molly:host-scenario restore --json
+```
+
 A bundle only loads in a Bloom that exports the same `BloomPluginAPI` symbols it was linked against. To check a build, compare `nm -u bloom-plugin/Surfaces.bundle/Contents/MacOS/MollySurfaces | grep BloomPluginAPI` with `nm -gU` on the Bloom binary.
 
 ## Who owns what

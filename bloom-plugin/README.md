@@ -16,6 +16,8 @@ cd -
 ./bin/molly-bloom-plugin-register
 ```
 
-`build-bundle.sh` requires `BLOOM_ROOT` and exits with a message when it is not set. When the module was built with `--scratch-path`, also set `BLOOM_PRODUCTS` to the folder that holds `BloomPluginAPI.swiftmodule`.
+`build-bundle.sh` requires `BLOOM_ROOT` and exits with a message when it is not set. The checkout has to be Bloom commit `1599f05f` with clean `BloomPluginAPI` sources. Set `MOLLY_BLOOM_COMMIT` only when you mean to link a different BloomPluginAPI. When the module was built with `--scratch-path`, also set `BLOOM_PRODUCTS` to the folder that holds `BloomPluginAPI.swiftmodule`.
 
-The compiled bundle is not in the Composer package archive. Build it before running `bin/molly-bloom-plugin-register`.
+The script remaps source paths, sets `SOURCE_DATE_EPOCH` and `ZERO_AR_DATE`, and passes `-Xlinker -no_uuid`, so two builds on the same Swift toolchain and the same `BloomPluginAPI` module produce the same `MollySurfaces` bytes. It records `MollySourcesDigest` in the bundle's Info.plist. `bin/molly-bloom-plugin-register` refuses a bundle that does not contain `molly:host-observe`, and a bundle whose recorded digest does not match the Swift sources.
+
+The compiled bundle is not in the Composer package archive. Build it and commit `bloom-plugin/Surfaces.bundle` before running `bin/molly-bloom-plugin-register`.

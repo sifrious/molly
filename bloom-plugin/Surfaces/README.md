@@ -12,7 +12,7 @@ cd "$BLOOM_ROOT" && swift build -c release --target BloomPluginAPI
 cd - && ./bloom-plugin/Surfaces/build-bundle.sh
 ```
 
-The script compiles every Swift file under `Sources/MollySurfaces` for `arm64-apple-macos26.0`, writes `bloom-plugin/Surfaces.bundle`, and prints the dylib's SHA-256. Override the module folder with `BLOOM_PRODUCTS` and the target with `MOLLY_SURFACES_TARGET`.
+The script compiles every Swift file under `Sources/MollySurfaces` for `arm64-apple-macos26.0`, writes `bloom-plugin/Surfaces.bundle`, and prints the dylib's SHA-256. `BLOOM_ROOT` has to be Bloom commit `1599f05f`. The link is path-remapped and built without a UUID so the same toolchain and `BloomPluginAPI` module produce the same bytes. Override the module folder with `BLOOM_PRODUCTS` and the target with `MOLLY_SURFACES_TARGET`.
 
 Run the core tests without Bloom or PHP:
 
