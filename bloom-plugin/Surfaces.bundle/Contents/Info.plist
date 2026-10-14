@@ -18,5 +18,7 @@
   <string>1599f05f</string>
   <key>MollyBloomPluginAPIVersion</key>
   <integer>1</integer>
+  <key>MollySourcesDigest</key>
+  <string>bbcd151478cc1c38e671aaeb2d3f5ece710a692c50c51abf2c1cee0b2cc97534</string>
 </dict>
 </plist>
