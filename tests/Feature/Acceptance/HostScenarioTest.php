@@ -57,8 +57,11 @@ it('stages an incompatible plugin and restores the apiVersion 1 manifest', funct
         expect($staged['status'])->toBe('staged')
             ->and($staged['scenario'])->toBe('incompat')
             ->and($live['apiVersion'])->toBe(2)
+            ->and($live['surfacesBundle'])->toBe(StageBloomHostScenario::INCOMPATIBLE_BUNDLE)
             ->and($backup['apiVersion'])->toBe(1)
-            ->and(File::exists($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBeTrue();
+            ->and(array_key_exists('surfacesBundle', $backup))->toBeFalse()
+            ->and(File::exists($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBeTrue()
+            ->and(File::exists($plugins.'/sifrious.molly/'.StageBloomHostScenario::INCOMPATIBLE_BUNDLE))->toBeFalse();
         expect(fn () => $action->stage('broken', $plugins))->toThrow(RuntimeException::class, 'SCENARIO_ALREADY_STAGED');
 
         $restored = $action->restore($plugins);

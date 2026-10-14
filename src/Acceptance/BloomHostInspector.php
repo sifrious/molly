@@ -52,6 +52,7 @@ final class BloomHostInspector
             $loaded,
             $loadSource,
             $ambiguous,
+            $listing,
         );
     }
 

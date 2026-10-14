@@ -14,6 +14,14 @@ final class StageBloomHostScenario
 {
     public const BACKUP = 'sifrious.molly.scenario-backup';
 
+    /**
+     * Bundle name staged in surfacesBundle.
+     * Bloom 1599f05f still loads Surfaces.bundle when apiVersion is 2.
+     * sifrious/bloom#2 documents the drop as Surfaces.bundle or this path.
+     * A missing bundle is not loaded. The MollySurfaces binary stays in place.
+     */
+    public const INCOMPATIBLE_BUNDLE = 'Incompatible.bundle';
+
     private const PARTIAL = 'sifrious.molly.scenario-backup.partial';
 
     /**
@@ -58,6 +66,7 @@ final class StageBloomHostScenario
 
         if ($scenario === 'incompat') {
             $manifest['apiVersion'] = 2;
+            $manifest['surfacesBundle'] = self::INCOMPATIBLE_BUNDLE;
             $this->write($pluginJson, json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
         } else {
             if (! unlink($binary)) {
@@ -144,7 +153,7 @@ final class StageBloomHostScenario
         $restore = 'php artisan molly:host-scenario restore --json';
         if ($scenario === 'incompat') {
             return [
-                'Quit Bloom and open it again so it skips apiVersion 2.',
+                'Quit Bloom and open it again so it does not load the missing '.self::INCOMPATIBLE_BUNDLE.'.',
                 $observe,
                 $restore,
                 'Quit Bloom and open it again so it loads the restored plugin.',

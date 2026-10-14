@@ -240,6 +240,66 @@ it('writes a new-project observation and lets the verifier pass only from that r
         ->and(observationOutcome($permissionless, 'M04.2'))->not->toBe('PASS');
 });
 
+it('reads the new project observation when verify is pointed at another app', function () {
+    $fixture = observationFixture();
+    $sha = observationCandidate();
+    $plugins = observationPluginDirectory();
+    installObservationBundle($plugins);
+    bindObservationCandidate($sha);
+    bindObservationHost(4242, $plugins, observationLoad());
+    bindObservationPermissions();
+    $native = $fixture['project'].'/acceptance-native';
+    mkdir($native, 0700, true);
+    file_put_contents($native.'/M04.2.json', json_encode([
+        'candidate_sha' => $sha,
+        'assertion' => 'claimed',
+        'expected' => 'source new',
+        'actual' => 'source new',
+        'source_artifact' => 'M04.2-observed.json',
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($native.'/M04.2-observed.json', '{'."\n");
+
+    $handWritten = observeVerify($fixture['existing'], VerificationMode::Default);
+    expect(observationReason($handWritten, 'M04.2'))->toBe('COMPILED_HOST_NOT_OBSERVED')
+        ->and(observationOutcome($handWritten, 'M04.2'))->not->toBe('PASS');
+
+    app(HostObservationRecorder::class)->recordProject($fixture['project'], 'plugin');
+    $fromExisting = observeVerify($fixture['existing'], VerificationMode::Default);
+    $matched = observationRow($fromExisting, 'M04.2');
+
+    $source = null;
+    foreach ($matched['assertions'] as $assertion) {
+        if (is_string($assertion['source_artifact'] ?? null)) {
+            $source = $assertion['source_artifact'];
+        }
+    }
+
+    expect(observationOutcome($fromExisting, 'M04.2'))->toBe('PASS')
+        ->and(observationReason($fromExisting, 'M04.2'))->toBe('NATIVE_OBSERVATION_MATCHED')
+        ->and($source)->toBe($fixture['project'].'/acceptance-native/M04.2-observed.json');
+
+    File::deleteDirectory($native);
+    $onExisting = $fixture['existing'].'/acceptance-native';
+    mkdir($onExisting, 0700, true);
+    file_put_contents($onExisting.'/M04.2.json', json_encode([
+        'candidate_sha' => $sha,
+        'assertion' => 'M04.2 lists a project whose source is new.',
+        'expected' => 'source new',
+        'actual' => 'source new',
+        'source_artifact' => 'M04.2-observed.json',
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($onExisting.'/M04.2-observed.json', json_encode([
+        'candidate_sha' => $sha,
+        'actual' => 'source new',
+    ], JSON_THROW_ON_ERROR));
+    $other = observationDirectory().'/other-app';
+    mkdir($other, 0700, true);
+    $ignored = observeVerify($other, VerificationMode::Default);
+
+    expect(observationReason($ignored, 'M04.2'))->toBe('COMPILED_HOST_NOT_OBSERVED')
+        ->and(observationOutcome($ignored, 'M04.2'))->not->toBe('PASS');
+});
+
 it('writes an existing-project observation from the listed source', function () {
     $fixture = observationFixture();
     $sha = observationCandidate();
@@ -408,6 +468,63 @@ it('writes a broken-asset log from the plugin files that are actually missing', 
         ->and(observationOutcome($passed, 'M04.15'))->toBe('PASS')
         ->and(observationReason($passed, 'M04.15'))->toBe('BROKEN_ASSETS_RECORDED')
         ->and(observationReason($passed, 'M04.13'))->toBe('INCOMPAT_LOG_NOT_OBSERVED');
+});
+
+it('accepts a broken-host record when that Bloom pid has exited and the same app loaded the plugin again', function () {
+    $fixture = observationFixture();
+    $sha = observationCandidate();
+    $plugins = observationPluginDirectory();
+    installObservationBundle($plugins);
+    bindObservationCandidate($sha);
+    bindObservationHost(4242, $plugins, observationLoad());
+    bindObservationPermissions();
+    $command = '/Applications/Bloom.app/Contents/MacOS/Bloom';
+    $log = [
+        'process' => ['pid' => 1111],
+        'host' => $command,
+        'plugin' => 'sifrious.molly',
+        'candidate' => $sha,
+        'observed_at' => '2026-10-08T02:00:00.000000000Z',
+        'missing_bundle' => true,
+        'missing_provider' => false,
+    ];
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode($log, JSON_THROW_ON_ERROR));
+
+    $passed = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationOutcome($passed, 'M04.15'))->toBe('PASS')
+        ->and(observationReason($passed, 'M04.15'))->toBe('BROKEN_ASSETS_RECORDED');
+
+    $incompat = $log;
+    unset($incompat['missing_bundle'], $incompat['missing_provider']);
+    $incompat['loaded'] = false;
+    $incompat['api_version'] = 2;
+    file_put_contents($fixture['project'].'/host-incompat.log', json_encode($incompat, JSON_THROW_ON_ERROR));
+    $incompatPassed = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationOutcome($incompatPassed, 'M04.13'))->toBe('PASS')
+        ->and(observationReason($incompatPassed, 'M04.13'))->toBe('INCOMPAT_LOG_RECORDED');
+
+    $log['observed_at'] = '2099-01-01T00:00:00Z';
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode($log, JSON_THROW_ON_ERROR));
+    $future = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationReason($future, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED');
+
+    $log['observed_at'] = '2026-10-08T02:00:00Z';
+    $log['host'] = '/Applications/Other.app/Contents/MacOS/Other';
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode($log, JSON_THROW_ON_ERROR));
+    $otherApp = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationReason($otherApp, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED');
+
+    $log['host'] = $command;
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode($log, JSON_THROW_ON_ERROR));
+    $listing = "1111 /usr/bin/sleep\n4242 ".$command."\n";
+    app()->instance(BloomHostInspector::class, new BloomHostInspector($listing, $plugins, null, observationLoad()));
+    $alive = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationReason($alive, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED');
+
+    bindObservationHost(4242, $plugins, '');
+    $unloaded = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationReason($unloaded, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED')
+        ->and(observationOutcome($unloaded, 'M04.15'))->not->toBe('PASS');
 });
 
 it('passes M04.16 only after one plugin read and one CLI read on different pids', function () {

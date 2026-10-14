@@ -118,7 +118,7 @@ Quit and reopen Bloom after registering. Bloom loads plugins once at launch.
 
 `bin/molly-bloom-plugin-register` refuses a `Surfaces.bundle` whose `MollySurfaces` has no `LC_UUID` load command, because dyld will not load it. It also refuses a bundle that does not contain `molly:host-observe`, and a bundle whose `MollySourcesDigest` does not match the Swift sources. Rebuild with `bloom-plugin/Surfaces/build-bundle.sh` against Bloom commit `1599f05f` and commit `bloom-plugin/Surfaces.bundle`. The script refuses a dirty or different Bloom commit. It keeps `LC_UUID`, so two builds on the same toolchain can differ by that UUID.
 
-To record M04.13 or M04.15, stage the installed plugin and restore it afterwards. The backup is `sifrious.molly.scenario-backup` next to the plugin. Restore puts the files back before it deletes the backup.
+To record M04.13 or M04.15, stage the installed plugin and restore it afterwards. The backup is `sifrious.molly.scenario-backup` next to the plugin. Restore puts the files back before it deletes the backup. `stage incompat` sets `apiVersion` to 2 and `surfacesBundle` to `Incompatible.bundle`. Bloom 1599f05f still loads `Surfaces.bundle` when only `apiVersion` changes. Bloom pull request 2, at `1599f05f`, documents the drop as `Surfaces.bundle` or the `surfacesBundle` path in `plugin.json`, and a missing bundle is not loaded. The `MollySurfaces` binary stays in place. This checkout cannot open the private Bloom Swift file, so that contract is the source for the staged name. `molly:verify` accepts `host-incompat.log` and `host-broken.log` after that Bloom pid has exited when the same app is running again with the plugin loaded.
 
 ```bash
 php artisan molly:host-scenario stage incompat --json

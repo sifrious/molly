@@ -21,6 +21,7 @@ final readonly class BloomHostSnapshot
         public bool $loaded = false,
         public string $loadSource = '',
         public bool $ambiguous = false,
+        public string $processListing = '',
     ) {}
 
     /** @return array<string, bool|int|string|null> */
