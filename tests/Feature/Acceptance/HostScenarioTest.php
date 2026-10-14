@@ -44,18 +44,47 @@ function scenarioRecorder(string $plugins, string $load): HostObservationRecorde
     );
 }
 
+beforeEach(function () {
+    $this->scenarioHome = sys_get_temp_dir().'/molly-scenario-home-'.bin2hex(random_bytes(4));
+    mkdir($this->scenarioHome, 0700, true);
+    $this->scenarioMollyHomeBefore = getenv('MOLLY_HOME');
+    putenv('MOLLY_HOME='.$this->scenarioHome);
+    $_ENV['MOLLY_HOME'] = $this->scenarioHome;
+    $_SERVER['MOLLY_HOME'] = $this->scenarioHome;
+});
+
+afterEach(function () {
+    if (is_string($this->scenarioHome ?? null)) {
+        File::deleteDirectory($this->scenarioHome);
+    }
+    $previous = $this->scenarioMollyHomeBefore ?? false;
+    if (! is_string($previous) || $previous === '') {
+        putenv('MOLLY_HOME');
+        unset($_ENV['MOLLY_HOME'], $_SERVER['MOLLY_HOME']);
+    } else {
+        putenv('MOLLY_HOME='.$previous);
+        $_ENV['MOLLY_HOME'] = $previous;
+        $_SERVER['MOLLY_HOME'] = $previous;
+    }
+});
+
 it('stages an incompatible plugin and restores the apiVersion 1 manifest', function (): void {
     $plugins = scenarioPlugins();
     $action = new StageBloomHostScenario;
     $installed = $plugins.'/sifrious.molly/plugin.json';
 
     try {
+        File::ensureDirectoryExists($plugins.'/bloom.hello');
+        File::put($plugins.'/bloom.hello/plugin.json', json_encode(['id' => 'bloom.hello', 'apiVersion' => 1], JSON_THROW_ON_ERROR)."\n");
         $staged = $action->stage('incompat', $plugins);
-        $backup = json_decode(File::get($plugins.'/'.StageBloomHostScenario::BACKUP.'/plugin.json'), true, flags: JSON_THROW_ON_ERROR);
+        $backup = json_decode(File::get($staged['backup'].'/plugin.json'), true, flags: JSON_THROW_ON_ERROR);
         $live = json_decode(File::get($installed), true, flags: JSON_THROW_ON_ERROR);
 
         expect($staged['status'])->toBe('staged')
             ->and($staged['scenario'])->toBe('incompat')
+            ->and($staged['backup'])->toBe($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP)
+            ->and(str_starts_with($staged['backup'], $plugins))->toBeFalse()
+            ->and(File::isDirectory($plugins.'/'.StageBloomHostScenario::LEGACY_BACKUP))->toBeFalse()
             ->and($live['apiVersion'])->toBe(2)
             ->and($live['surfacesBundle'])->toBe(StageBloomHostScenario::INCOMPATIBLE_BUNDLE)
             ->and($backup['apiVersion'])->toBe(1)
@@ -70,7 +99,7 @@ it('stages an incompatible plugin and restores the apiVersion 1 manifest', funct
         expect($restored['status'])->toBe('restored')
             ->and($restored['scenario'])->toBe('incompat')
             ->and($live['apiVersion'])->toBe(1)
-            ->and(File::isDirectory($plugins.'/'.StageBloomHostScenario::BACKUP))->toBeFalse()
+            ->and(File::isDirectory($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP))->toBeFalse()
             ->and($action->restore($plugins)['status'])->toBe('not_staged');
     } finally {
         File::deleteDirectory($plugins);
@@ -87,7 +116,8 @@ it('removes the plugin binary for a broken scenario and puts the same bytes back
 
         expect($staged['status'])->toBe('staged')
             ->and(File::exists($binary))->toBeFalse()
-            ->and(File::get($plugins.'/'.StageBloomHostScenario::BACKUP.'/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary');
+            ->and($staged['backup'])->toBe($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP)
+            ->and(File::get($staged['backup'].'/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary');
 
         $action->restore($plugins);
 
@@ -153,6 +183,8 @@ it('stages and restores through molly:host-scenario', function (): void {
 
         expect($exit)->toBe(0)
             ->and($payload['status'])->toBe('staged')
+            ->and($payload['backup'])->toBe($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP)
+            ->and(str_starts_with($payload['backup'], $plugins))->toBeFalse()
             ->and($payload['next'][0])->toContain('Quit Bloom');
 
         $exit = Artisan::call('molly:host-scenario', ['action' => 'restore', '--plugins' => $plugins, '--json' => true]);
@@ -160,7 +192,51 @@ it('stages and restores through molly:host-scenario', function (): void {
 
         expect($exit)->toBe(0)
             ->and($payload['status'])->toBe('restored')
-            ->and(json_decode(File::get($plugins.'/sifrious.molly/plugin.json'), true)['apiVersion'])->toBe(1);
+            ->and(json_decode(File::get($plugins.'/sifrious.molly/plugin.json'), true)['apiVersion'])->toBe(1)
+            ->and(File::isDirectory($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP))->toBeFalse();
+    } finally {
+        File::deleteDirectory($plugins);
+    }
+});
+
+it('refuses to stage when another manifest under Plugins has the same id', function (): void {
+    $plugins = scenarioPlugins();
+    File::ensureDirectoryExists($plugins.'/extra');
+    File::put($plugins.'/extra/plugin.json', json_encode([
+        'id' => 'sifrious.molly',
+        'apiVersion' => 1,
+    ], JSON_THROW_ON_ERROR)."\n");
+    $installed = File::get($plugins.'/sifrious.molly/plugin.json');
+
+    try {
+        expect(fn () => (new StageBloomHostScenario)->stage('incompat', $plugins))
+            ->toThrow(RuntimeException::class, 'SCENARIO_DUPLICATE_PLUGIN');
+        expect(File::get($plugins.'/sifrious.molly/plugin.json'))->toBe($installed)
+            ->and(File::isDirectory($this->scenarioHome.'/'.StageBloomHostScenario::BACKUP))->toBeFalse();
+    } finally {
+        File::deleteDirectory($plugins);
+    }
+});
+
+it('restores a backup that was left inside Plugins', function (): void {
+    $plugins = scenarioPlugins();
+    $legacy = $plugins.'/'.StageBloomHostScenario::LEGACY_BACKUP;
+    File::copyDirectory($plugins.'/sifrious.molly', $legacy);
+    File::put($legacy.'/scenario.json', json_encode(['scenario' => 'broken'], JSON_THROW_ON_ERROR)."\n");
+    File::put($plugins.'/sifrious.molly/plugin.json', json_encode([
+        'id' => 'sifrious.molly',
+        'apiVersion' => 2,
+    ], JSON_THROW_ON_ERROR)."\n");
+    File::delete($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces');
+
+    try {
+        $restored = (new StageBloomHostScenario)->restore($plugins);
+
+        expect($restored['status'])->toBe('restored')
+            ->and($restored['scenario'])->toBe('broken')
+            ->and(File::isDirectory($legacy))->toBeFalse()
+            ->and(json_decode(File::get($plugins.'/sifrious.molly/plugin.json'), true)['apiVersion'])->toBe(1)
+            ->and(File::get($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary');
     } finally {
         File::deleteDirectory($plugins);
     }

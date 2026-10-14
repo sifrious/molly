@@ -39,9 +39,10 @@ function bindObservationCandidate(?string $commit): void
     )));
 }
 
-function bindObservationHost(int $pid, string $plugins, string $load): void
+function bindObservationHost(int $pid, string $plugins, string $load, ?string $command = null): void
 {
-    $listing = $pid.' /Applications/Bloom.app/Contents/MacOS/Bloom'."\n";
+    $command ??= '/Applications/Bloom.app/Contents/MacOS/Bloom';
+    $listing = $pid.' '.$command."\n";
     app()->instance(BloomHostInspector::class, new BloomHostInspector($listing, $plugins, null, $load));
 }
 
@@ -525,6 +526,42 @@ it('accepts a broken-host record when that Bloom pid has exited and the same app
     $unloaded = observeVerify($fixture['project'], VerificationMode::Permissionless);
     expect(observationReason($unloaded, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED')
         ->and(observationOutcome($unloaded, 'M04.15'))->not->toBe('PASS');
+});
+
+it('accepts the Studio broken-host record after Bloom Dev relaunches', function () {
+    $fixture = observationFixture();
+    $sha = observationCandidate();
+    $plugins = observationPluginDirectory();
+    installObservationBundle($plugins);
+    bindObservationCandidate($sha);
+    $command = '/Applications/Bloom Dev.app/Contents/MacOS/Bloom Dev';
+    bindObservationHost(49023, $plugins, observationLoad(49023), $command);
+    bindObservationPermissions();
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode([
+        'process' => ['pid' => 35657],
+        'host' => $command,
+        'plugin' => 'sifrious.molly',
+        'candidate' => $sha,
+        'observed_at' => '2026-10-14T03:32:43.123456789Z',
+        'missing_bundle' => true,
+        'missing_provider' => false,
+    ], JSON_THROW_ON_ERROR));
+
+    $passed = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationOutcome($passed, 'M04.15'))->toBe('PASS')
+        ->and(observationReason($passed, 'M04.15'))->toBe('BROKEN_ASSETS_RECORDED');
+
+    file_put_contents($fixture['project'].'/host-broken.log', json_encode([
+        'process' => ['pid' => 35657],
+        'host' => '/Users/mme/other/Bloom Dev.app/Contents/MacOS/Bloom Dev',
+        'plugin' => 'sifrious.molly',
+        'candidate' => $sha,
+        'observed_at' => '2026-10-14T03:32:43.123456789Z',
+        'missing_bundle' => true,
+        'missing_provider' => false,
+    ], JSON_THROW_ON_ERROR));
+    $otherCopy = observeVerify($fixture['project'], VerificationMode::Permissionless);
+    expect(observationReason($otherCopy, 'M04.15'))->toBe('HOST_DIAGNOSTIC_NOT_OBSERVED');
 });
 
 it('passes M04.16 only after one plugin read and one CLI read on different pids', function () {

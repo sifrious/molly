@@ -628,7 +628,9 @@ final class BloomProgrammaticAssertions
 
     private function bloomApp(string $command): ?string
     {
-        if (preg_match('#(/[^\s]*?\.app)(?=/|\s|$)#', $command, $match) !== 1) {
+        // Bloom Dev.app has a space in the bundle name. A match that stops at
+        // whitespace never sees that .app, so a relaunch of the same app is rejected.
+        if (preg_match('#((?:/[^\s/]+)+/[^/\s]+(?:\s[^/\s]+)*\.app)(?=/|\s|$)#', $command, $match) !== 1) {
             return null;
         }
 
