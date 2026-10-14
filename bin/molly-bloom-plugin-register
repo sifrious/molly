@@ -20,6 +20,29 @@ fail() {
   exit 1
 }
 
+# dyld will not load a Mach-O that has no LC_UUID. otool -l prints that load
+# command. dwarfdump --uuid prints the UUID when one is present.
+molly_surfaces_has_lc_uuid() {
+  local binary="$1"
+  local checked=0
+  if command -v otool >/dev/null 2>&1; then
+    checked=1
+    if otool -l "$binary" 2>/dev/null | grep -q 'LC_UUID'; then
+      return 0
+    fi
+  fi
+  if command -v dwarfdump >/dev/null 2>&1; then
+    checked=1
+    if dwarfdump --uuid "$binary" 2>/dev/null | grep -Eq '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}'; then
+      return 0
+    fi
+  fi
+  if [[ "$checked" -eq 0 ]]; then
+    fail "Could not check MollySurfaces for an LC_UUID load command. Neither otool nor dwarfdump is on PATH."
+  fi
+  return 1
+}
+
 if [[ -n "${BLOOM_APP:-}" ]]; then
   [[ -d "$BLOOM_APP" ]] || fail "BLOOM_APP is set to $BLOOM_APP, but no app exists there."
   APP="$BLOOM_APP"
@@ -39,6 +62,8 @@ fi
   || fail "Missing $SRC_SURFACES. Build it with bloom-plugin/Surfaces/build-bundle.sh first."
 
 BINARY="$SRC_SURFACES/Contents/MacOS/MollySurfaces"
+molly_surfaces_has_lc_uuid "$BINARY" \
+  || fail "MollySurfaces has no LC_UUID load command, so dyld will not load it. Rebuild it with bloom-plugin/Surfaces/build-bundle.sh."
 if ! strings "$BINARY" | grep -q 'molly:host-observe'; then
   fail "Surfaces.bundle does not contain molly:host-observe, so it was not built from these Swift sources. Rebuild it against Bloom 1599f05f: BLOOM_ROOT=/path/to/bloom ./bloom-plugin/Surfaces/build-bundle.sh"
 fi

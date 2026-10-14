@@ -71,6 +71,7 @@ PY
 )"
 
 echo "Building MollySurfaces $VERSION against Bloom $BLOOM_COMMIT ($BLOOM_PRODUCTS)"
+# Leave LC_UUID in the dylib. dyld refuses to load a Mach-O linked with -no_uuid.
 xcrun swiftc -emit-library \
   -o "$BUILD_DIR/MollySurfaces" \
   -module-name MollySurfaces \
@@ -82,7 +83,6 @@ xcrun swiftc -emit-library \
   -debug-prefix-map "$SRC=/molly-surfaces" \
   -debug-prefix-map "$BLOOM_PRODUCTS=/bloom-plugin-api" \
   -I "$BLOOM_PRODUCTS" \
-  -Xlinker -no_uuid \
   -Xlinker -undefined -Xlinker dynamic_lookup \
   "${SOURCES[@]}"
 
