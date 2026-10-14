@@ -23,6 +23,7 @@ function scenarioPlugins(): string
         'apiVersion' => 1,
         'version' => '0.2.0',
     ], JSON_THROW_ON_ERROR)."\n");
+    File::put($plugins.'/enabled.json', json_encode(['bloom.hello', 'sifrious.molly'], JSON_THROW_ON_ERROR)."\n");
 
     return $plugins;
 }
@@ -239,5 +240,51 @@ it('restores a backup that was left inside Plugins', function (): void {
             ->and(File::get($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary');
     } finally {
         File::deleteDirectory($plugins);
+    }
+});
+
+it('keeps sifrious.molly enabled through incompat, restore, broken, and restore', function (): void {
+    $plugins = scenarioPlugins();
+    $project = sys_get_temp_dir().'/molly-scenario-project-'.bin2hex(random_bytes(4));
+    File::ensureDirectoryExists($project);
+    $enabled = $plugins.'/enabled.json';
+    $original = File::get($enabled);
+    $action = new StageBloomHostScenario;
+
+    try {
+        $staged = $action->stage('incompat', $plugins);
+        File::put($enabled, json_encode(['bloom.hello'], JSON_THROW_ON_ERROR)."\n");
+        $incompat = scenarioRecorder($plugins, '')->recordDiagnostics($project);
+
+        expect(File::get($staged['backup'].'/enabled.json'))->toBe($original)
+            ->and($incompat['records'][0]['check'])->toBe('M04.13')
+            ->and(is_file($project.'/host-incompat.log'))->toBeTrue()
+            ->and(is_file($project.'/host-broken.log'))->toBeFalse();
+
+        $action->restore($plugins);
+
+        expect(File::get($enabled))->toBe($original)
+            ->and(json_decode(File::get($plugins.'/sifrious.molly/plugin.json'), true)['apiVersion'])->toBe(1)
+            ->and(File::get($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary');
+
+        $action->stage('broken', $plugins);
+        File::put($enabled, json_encode(['bloom.hello'], JSON_THROW_ON_ERROR)."\n");
+        $refused = scenarioRecorder($plugins, '')->recordDiagnostics($project);
+
+        expect($refused['skipped'])->toContain(['check' => 'M04.15', 'reason' => 'PLUGIN_NOT_ENABLED'])
+            ->and(is_file($project.'/host-broken.log'))->toBeFalse();
+
+        File::put($enabled, $original);
+        $broken = scenarioRecorder($plugins, '')->recordDiagnostics($project);
+        $action->restore($plugins);
+
+        expect($broken['records'][0]['check'])->toBe('M04.15')
+            ->and(json_decode(File::get($project.'/host-broken.log'), true)['missing_bundle'])->toBeTrue()
+            ->and(File::get($enabled))->toBe($original)
+            ->and(File::get($plugins.'/sifrious.molly/Surfaces.bundle/Contents/MacOS/MollySurfaces'))->toBe('molly-surfaces-binary')
+            ->and(json_decode(File::get($plugins.'/sifrious.molly/plugin.json'), true)['apiVersion'])->toBe(1);
+    } finally {
+        File::deleteDirectory($plugins);
+        File::deleteDirectory($project);
     }
 });

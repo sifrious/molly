@@ -437,6 +437,32 @@ it('writes an incompat log only when the running host did not load another apiVe
         ->and(observationReason($passed, 'M04.13'))->toBe('INCOMPAT_LOG_RECORDED');
 });
 
+it('does not record a project or a broken bundle when Molly is disabled or not loaded', function () {
+    $fixture = observationFixture();
+    $plugins = observationPluginDirectory();
+    installObservationBundle($plugins, binary: false);
+    bindObservationCandidate(observationCandidate());
+    file_put_contents($plugins.'/enabled.json', json_encode(['bloom.hello'], JSON_THROW_ON_ERROR));
+    bindObservationHost(4242, $plugins, observationLoad());
+
+    $disabled = app(HostObservationRecorder::class)->recordProject($fixture['project'], 'plugin');
+    $diagnostics = app(HostObservationRecorder::class)->recordDiagnostics($fixture['project']);
+
+    expect($disabled['skipped'][0]['reason'])->toBe('PLUGIN_NOT_ENABLED')
+        ->and($diagnostics['skipped'])->toContain(['check' => 'M04.15', 'reason' => 'PLUGIN_NOT_ENABLED'])
+        ->and(is_file($fixture['project'].'/host-broken.log'))->toBeFalse()
+        ->and(is_file($fixture['project'].'/acceptance-native/M04.2.json'))->toBeFalse();
+
+    file_put_contents($plugins.'/enabled.json', json_encode(['sifrious.molly'], JSON_THROW_ON_ERROR));
+    bindObservationHost(4242, $plugins, '');
+    $unloaded = app(HostObservationRecorder::class)->recordProject($fixture['project'], 'plugin');
+    $broken = app(HostObservationRecorder::class)->recordDiagnostics($fixture['project']);
+
+    expect($unloaded['skipped'][0]['reason'])->toBe('PLUGIN_NOT_LOADED')
+        ->and($broken['records'][0]['check'])->toBe('M04.15')
+        ->and(is_file($fixture['project'].'/host-broken.log'))->toBeTrue();
+});
+
 it('writes a broken-asset log from the plugin files that are actually missing', function () {
     $fixture = observationFixture();
     $sha = observationCandidate();

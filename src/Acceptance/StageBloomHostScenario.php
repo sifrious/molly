@@ -13,6 +13,8 @@ use Sifrious\Molly\Projects\ProjectRegistry;
  * Bloom 1599f05f reads every plugin.json under Plugins/, skips apiVersion
  * other than 1, and keeps the first manifest per id. The backup therefore
  * lives under the Molly home, not under Plugins/.
+ * On launch Bloom rewrites enabled.json to the plugins it discovered, so
+ * the backup also holds enabled.json and restore puts that file back.
  */
 final class StageBloomHostScenario
 {
@@ -58,11 +60,16 @@ final class StageBloomHostScenario
         if (! is_file($binary)) {
             throw new RuntimeException('PLUGIN_NOT_HEALTHY: '.$binary.' is already missing, so restore would have nothing to put back.');
         }
+        $enabledFile = $plugins.'/enabled.json';
+        if (! in_array(self::PLUGIN_ID, $this->enabledIds($enabledFile), true)) {
+            throw new RuntimeException('PLUGIN_NOT_ENABLED: '.$enabledFile.' must list '.self::PLUGIN_ID.' before a scenario is staged.');
+        }
         $this->requireSoleManifest($plugins, $pluginJson);
 
         $partial = $this->partialPath();
         $this->deleteTree($partial);
         $this->copyTree($installed, $partial);
+        $this->copyTree($plugins.'/enabled.json', $partial.'/enabled.json');
         file_put_contents($partial.'/scenario.json', json_encode([
             'scenario' => $scenario,
             'staged_at' => gmdate('c'),
@@ -143,6 +150,13 @@ final class StageBloomHostScenario
         if (! is_array($restored) || ($restored['apiVersion'] ?? null) !== 1 || ! is_file($restoredBinary)) {
             throw new RuntimeException('SCENARIO_RESTORE_FAILED: The installed plugin is not apiVersion 1 with MollySurfaces. The backup is still at '.$backup.'.');
         }
+        if (is_file($backup.'/enabled.json')) {
+            $enabledFile = $plugins.'/enabled.json';
+            $this->copyTree($backup.'/enabled.json', $enabledFile);
+            if (! in_array(self::PLUGIN_ID, $this->enabledIds($enabledFile), true)) {
+                throw new RuntimeException('SCENARIO_RESTORE_FAILED: '.$enabledFile.' does not list '.self::PLUGIN_ID.'. The backup is still at '.$backup.'.');
+            }
+        }
         $this->deleteTree($backup);
 
         return [
@@ -202,6 +216,26 @@ final class StageBloomHostScenario
     private function legacyBackup(string $plugins): string
     {
         return $plugins.'/'.self::LEGACY_BACKUP;
+    }
+
+    /** @return list<string> */
+    private function enabledIds(string $path): array
+    {
+        if (! is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            throw new RuntimeException('PLUGIN_NOT_ENABLED: '.$path.' must be a JSON array of plugin ids.');
+        }
+        $ids = [];
+        foreach ($decoded as $id) {
+            if (is_string($id) && $id !== '') {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
     }
 
     private function requireSoleManifest(string $plugins, string $installedManifest): void

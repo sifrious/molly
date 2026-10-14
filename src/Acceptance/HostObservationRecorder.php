@@ -38,6 +38,9 @@ final class HostObservationRecorder
         if ($host === null || $candidate === null) {
             return $this->skip('project', $reason ?? 'HOST_NOT_OBSERVED');
         }
+        if (($blocked = $this->participating($host, true)) !== null) {
+            return $this->skip('project', $blocked);
+        }
         $project = $this->listedProject($projectRoot);
         if (! $project instanceof MollyProject) {
             return $this->skip('project', 'PROJECT_NOT_LISTED');
@@ -67,6 +70,9 @@ final class HostObservationRecorder
         if ($host === null || $candidate === null) {
             return $this->skip('M04.12', $reason ?? 'HOST_NOT_OBSERVED');
         }
+        if (($blocked = $this->participating($host, true)) !== null) {
+            return $this->skip('M04.12', $blocked);
+        }
         $path = $this->writeNative($projectRoot, 'M04.12', 'CLI task is in the list Bloom reads', $task->id, $candidate, [
             'task_id' => $task->id,
             'workspace' => $task->workspace,
@@ -95,6 +101,9 @@ final class HostObservationRecorder
         [$host, $candidate, $reason] = $this->provenance();
         if ($host === null || $candidate === null) {
             return $this->skip('M04.16', $reason ?? 'HOST_NOT_OBSERVED');
+        }
+        if (($blocked = $this->participating($host, true)) !== null) {
+            return $this->skip('M04.16', $blocked);
         }
         $path = $this->normalize($projectRoot).'/.molly/restart-state.json';
         $at = $this->observedAt();
@@ -150,14 +159,18 @@ final class HostObservationRecorder
         } else {
             $skipped[] = ['check' => 'M04.13', 'reason' => 'INCOMPAT_NOT_OBSERVED'];
         }
-        $assets = $this->assets($host->pluginSource);
-        if ($assets['missing_bundle'] || $assets['missing_provider']) {
-            $records[] = [
-                'check' => 'M04.15',
-                'path' => $this->writeDiagnostic($projectRoot, 'host-broken.log', $host, $candidate, $assets),
-            ];
+        if (! $host->enabled) {
+            $skipped[] = ['check' => 'M04.15', 'reason' => 'PLUGIN_NOT_ENABLED'];
         } else {
-            $skipped[] = ['check' => 'M04.15', 'reason' => 'ASSETS_PRESENT'];
+            $assets = $this->assets($host->pluginSource);
+            if ($assets['missing_bundle'] || $assets['missing_provider']) {
+                $records[] = [
+                    'check' => 'M04.15',
+                    'path' => $this->writeDiagnostic($projectRoot, 'host-broken.log', $host, $candidate, $assets),
+                ];
+            } else {
+                $skipped[] = ['check' => 'M04.15', 'reason' => 'ASSETS_PRESENT'];
+            }
         }
 
         return $this->result($records, $skipped);
@@ -225,6 +238,22 @@ final class HostObservationRecorder
         }
 
         return [$host, $candidate, null];
+    }
+
+    /**
+     * Project, task, and restart records need sifrious.molly enabled and MollySurfaces loaded.
+     * M04.15 does not use this: a missing bundle is enabled and not loaded.
+     */
+    private function participating(BloomHostSnapshot $host, bool $requireLoaded): ?string
+    {
+        if (! $host->enabled) {
+            return 'PLUGIN_NOT_ENABLED';
+        }
+        if ($requireLoaded && ! $host->loaded) {
+            return 'PLUGIN_NOT_LOADED';
+        }
+
+        return null;
     }
 
     private function listedProject(string $path): ?MollyProject
