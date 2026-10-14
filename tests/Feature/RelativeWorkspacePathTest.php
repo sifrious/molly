@@ -70,9 +70,10 @@ it('reports a relative molly:project-new target as an absolute path', function (
     [$exit, $result] = mollyJson('molly:project-new', ['path' => '../repo/fresh', '--no-composer' => true, '--no-migrate' => true, '--no-graphs' => true]);
 
     expect($exit)->toBe(0)
-        ->and($result['status'])->toBe('needs_commit')
+        ->and($result['status'])->toBe('created')
         ->and($result['path'])->toBe($target)
-        ->and($result['next'][2])->toBe('php artisan molly:project-init '.escapeshellarg($target));
+        ->and($result['project']['path'])->toBe($target)
+        ->and($result['project']['source'])->toBe('new');
 });
 
 it('gives the same result for a relative and an absolute path', function (string $command, array $parameters, string $field): void {

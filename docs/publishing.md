@@ -60,7 +60,7 @@ When a required tutorial is moved or renamed, update `REQUIRED` in `bin/molly-do
 
 The Fresh Laravel jobs run "Check the download contents and size" from `.github/workflows/tests.yml`. That step is separate from `bin/molly-release-gates`. The release script only checks that `composer.lock` is absent from `composer archive`.
 
-The job builds `molly.zip` with `git archive` and `molly-composer.zip` with `composer archive`. Both must be at most 640 KiB (655360 bytes). The archives must omit `tests/`, `.github/`, and `.git`. They must include `resources/planning/guide.json`, `resources/planning/LARAVEL-LICENSE.md`, and `src/Complexity/LICENSE.md`. Uncompressed files under `resources/planning/` must total at most 128 KiB.
+The job builds `molly.zip` with `git archive` and `molly-composer.zip` with `composer archive`. Both must be at most 704 KiB (720896 bytes). The archives must omit `tests/`, `.github/`, and `.git`. They must include `resources/planning/guide.json`, `resources/planning/LARAVEL-LICENSE.md`, and `src/Complexity/LICENSE.md`. Uncompressed files under `resources/planning/` must total at most 128 KiB.
 
 `git archive` follows `export-ignore` in `.gitattributes`. `composer archive` follows the `archive.exclude` list in `composer.json`. `bloom-plugin/Surfaces.bundle` is already excluded from both. Commit the tree you want `git archive` to measure. `composer archive` reads the worktree.
 
@@ -88,13 +88,13 @@ for filename in ['molly.zip', 'molly-composer.zip']:
         assert sum(item.file_size for item in package.infolist() if item.filename.startswith('resources/planning/')) <= 128 * 1024
         size = archive.stat().st_size
         print(f'{filename}: {size} bytes')
-        assert size <= 640 * 1024
+        assert size <= 704 * 1024
 PY
 ```
 
 A pass prints both sizes and exits 0. A failed `assert` exits 1. `set -e` stops the shell on that failure. The `trap` removes the temporary directory either way.
 
-Shipped PHP under `src/` counts toward the 640 KiB cap. The cap is the literal `640 * 1024` in that workflow step. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`. `.github/` and `docs/` are both `export-ignore`, so this workflow edit and this page do not change the zip.
+Shipped PHP under `src/` counts toward the 704 KiB cap. The cap is the literal `704 * 1024` in that workflow step. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`. `.github/` and `docs/` are both `export-ignore`, so this workflow edit and this page do not change the zip.
 
 ### Why 640 KiB
 
@@ -112,7 +112,23 @@ The new paths are runtime code: model fit, Orbs, the worker, redaction, hardware
 
 `main` had 25083 bytes of room under the old 409600 byte cap. Shared files then grew by 44623 compressed bytes. An archive with those shared files and none of the new paths is 424512 bytes, 14912 over 409600. Dropping `bloom-plugin/` (30837 bytes, including sources you build from a checkout) leaves 531516. Also dropping `README.md`, `SECURITY.md`, and `resources/models/catalogue.schema.v1.json` leaves 524889. The schema is documented as part of the shipped catalogue. The planning sources have to stay: the workflow asserts they are present, and `PlanningGuide` reads them.
 
-`export-ignore` cannot bring this tree under 409600 without removing runtime PHP that already shipped on `main`. The check now allows `640 * 1024` bytes.
+`export-ignore` cannot bring this tree under 409600 without removing runtime PHP that already shipped on `main`. That raise allows `640 * 1024` bytes.
+
+### Why 704 KiB
+
+Fresh Laravel 12 and 13 at `ab65262` measured `git archive` at 688192 bytes, 32832 over 655360. `main` `aa5e72b` is 645574, 9786 under that cap. The archive grew by 42618 bytes.
+
+| Piece | Compressed bytes |
+| --- | ---: |
+| New paths (`src/Acceptance/`, `VerifyMolly.php`, `MollyVerifyCommand.php`, `MollyVerify.php`) | 35344 |
+| Growth of paths already in `main` (`RunTask.php`, `README.md`, `MollyServer.php`, `MollyServiceProvider.php`) | 1010 |
+| Zip directory overhead for those entries | 6264 |
+
+Those three lines reconcile: `645574 + 35344 + 1010 + 6264 = 688192`.
+
+`molly:verify` and `molly_verify` load that PHP. `PermissionPreflight` inspects Screen Recording and Accessibility. `BloomHostInspector` reads a Bloom process that is already running. `RunTask` stores verifier status when a run stops before Pest. The new tests are already `export-ignore`. `docs/` and `.github/` are already `export-ignore`. `bloom-plugin/Surfaces.bundle` is already excluded. Removing the new PHP would drop permission preflight or host inspection from the package.
+
+The check now allows `704 * 1024` bytes (720896). Headroom under that cap, against the 688192 byte archive, is 32704 bytes.
 
 ## Switching the public install line to v1
 

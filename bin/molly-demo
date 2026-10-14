@@ -13,7 +13,7 @@ Creates a new Laravel project, commits it with your Git identity, installs
 sifrious/molly (${MOLLY_CONSTRAINT}), and scaffolds demo-greeting with php artisan molly:demo.
 
 Environment:
-  MOLLY_CONSTRAINT   Composer constraint (default: ^0.2)
+  MOLLY_CONSTRAINT   Stable release constraint (default: ^0.2)
 
 Arguments:
   TARGET_DIR   Directory for the new app (default: ~/molly-demo)
@@ -67,9 +67,38 @@ if [[ -e "$TARGET" ]]; then
       echo "Refusing: $TARGET exists and is not empty. Pass --force to replace it." >&2
       exit 1
     fi
-    echo "Removing existing non-empty $TARGET because --force was set …"
-    rm -rf "$TARGET"
   fi
+fi
+
+# Resolve in a disposable project before creating or replacing the target. Composer owns
+# dependency resolution; a package listing or a successful HTTP request is not enough.
+if [[ ! "$MOLLY_CONSTRAINT" =~ ^[0-9v\^\~\<\>\=\|\*\ ,.\-]+$ ]]; then
+  echo "MOLLY_RELEASE_REQUIRED: Choose a stable release constraint. For unpublished candidates, follow docs/acceptance/README.md and install the checksummed artifact first." >&2
+  exit 1
+fi
+PREFLIGHT=$(mktemp -d "${TMPDIR:-/tmp}/molly-release.XXXXXX")
+trap 'rm -rf "$PREFLIGHT"' EXIT
+printf '%s\n' '{"name":"molly/install-preflight","require":{},"minimum-stability":"stable"}' > "$PREFLIGHT/composer.json"
+REPOSITORY=packagist
+check_release() {
+  COMPOSER=composer.json composer --working-dir="$PREFLIGHT" require --dev "sifrious/molly:${MOLLY_CONSTRAINT}@stable" \
+    --dry-run --no-interaction --no-plugins --no-scripts --no-cache
+}
+echo "Checking Molly ${MOLLY_CONSTRAINT} before changing $TARGET …"
+if ! check_release > "$PREFLIGHT/packagist.log" 2>&1; then
+  REPOSITORY=github
+  printf '%s\n' '{"name":"molly/install-preflight","require":{},"minimum-stability":"stable","repositories":[{"type":"vcs","url":"https://github.com/sifrious/molly"}]}' > "$PREFLIGHT/composer.json"
+  if ! check_release > "$PREFLIGHT/github.log" 2>&1; then
+    echo "MOLLY_RELEASE_UNAVAILABLE: Composer could not resolve sifrious/molly:${MOLLY_CONSTRAINT} from Packagist or public GitHub tags. Target left unchanged." >&2
+    echo "Check repository access and compatible published tags, then retry. For unpublished candidate verification, follow docs/acceptance/README.md." >&2
+    cat "$PREFLIGHT/packagist.log" "$PREFLIGHT/github.log" >&2
+    exit 1
+  fi
+fi
+
+if [[ -d "$TARGET" && "$FORCE" -eq 1 && -n "$(ls -A "$TARGET")" ]]; then
+  echo "Removing existing non-empty $TARGET because --force was set …"
+  rm -rf "$TARGET"
 fi
 
 echo "Creating Laravel app at $TARGET …"
@@ -94,14 +123,15 @@ fi
 composer require --dev pestphp/pest:^4 pestphp/pest-plugin-laravel:^4 --with-all-dependencies --no-interaction
 
 echo "Installing Molly ${MOLLY_CONSTRAINT} …"
-code=$(curl -fsSL -o /dev/null -w "%{http_code}" "https://packagist.org/packages/sifrious/molly.json" || true)
-if [[ "$code" == "200" ]]; then
+if [[ "$REPOSITORY" == "packagist" ]]; then
   echo "Using Packagist …"
-  composer require --dev "sifrious/molly:${MOLLY_CONSTRAINT}" --no-interaction
 else
-  echo "Packagist not listing sifrious/molly yet — using public GitHub VCS tag …"
+  echo "Using the public GitHub tags checked during preflight …"
   composer config repositories.molly vcs https://github.com/sifrious/molly
-  composer require --dev "sifrious/molly:${MOLLY_CONSTRAINT}" --no-interaction
+fi
+if ! composer require --dev "sifrious/molly:${MOLLY_CONSTRAINT}@stable" --no-interaction; then
+  echo "MOLLY_INSTALL_FAILED: Preflight resolved the release, but installation failed. The Laravel app at $TARGET is incomplete; Molly setup did not finish. Check Composer's error before retrying." >&2
+  exit 1
 fi
 
 echo "Publishing Molly config and migrating …"

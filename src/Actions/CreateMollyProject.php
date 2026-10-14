@@ -15,6 +15,8 @@ use Sifrious\Molly\Workspace\ObserveCheckout;
  * Create a new Laravel application and initialize Molly inside it.
  *
  * Uses InitializeMollyInExistingProject so CLI and Bloom share one attach path.
+ * A new application is committed with the Git identity already configured for this
+ * process, then Molly is installed and the project is registered with source new.
  */
 final class CreateMollyProject
 {
@@ -25,12 +27,11 @@ final class CreateMollyProject
     ) {}
 
     /**
-     * A new application is not a Git repository, and Molly never creates one or commits for the
-     * user. When the app is not in a committed checkout, stop after creating it and return
-     * status needs_commit with the reason and the commands to run; the project is attached by
-     * molly:project-init after the user commits it. Inside an existing repository the commands
-     * commit the app there and never run git init. Molly attaches right away only when the HEAD
-     * commit already contains files under the target, such as a tracked directory replaced with --force.
+     * When the new application is not in a commit yet, Molly commits it with the Git identity
+     * already configured for this process, installs Molly, and registers the project. It does not
+     * invent an identity. If Git cannot commit, or the path is ignored, it stops with
+     * needs_commit, records pending-new.json, and leaves Molly uninstalled. Inside an existing
+     * repository the commit is made there and git init is not run.
      *
      * @param  (callable(string, string): void)|null  $progress
      * @return array{status: 'created'|'needs_commit', path: string, project: ?MollyProject, created: array<string, bool>, steps: list<string>, reason: ?string, next: list<string>}
@@ -105,17 +106,19 @@ final class CreateMollyProject
 
         $location = ObserveCheckout::locate($path);
         if ($location['root'] === null || $this->observe->head($path) === null || ! $this->observe->headContainsFiles($path)) {
-            $note('git', 'Laravel application created. Molly did not attach it because it is not in a Git commit yet.');
+            $this->registry->recordPendingNew($path);
+            if ($location['ignored_by'] !== null) {
+                $note('git', 'Laravel application created. Molly did not attach it because the path is ignored.');
 
-            return [
-                'status' => 'needs_commit',
-                'path' => $path,
-                'project' => null,
-                'created' => ['application' => true, 'metadata' => false],
-                'steps' => $steps,
-                'reason' => $this->commitReason($path, $location),
-                'next' => [...$this->commitCommands($path, $location), $this->initCommand($path, $name)],
-            ];
+                return $this->needsCommit($path, $name, $steps, $this->commitReason($path, $location), $location);
+            }
+            $failure = $this->commitCreatedApplication($path, $location);
+            if ($failure !== null) {
+                $note('git', $failure);
+
+                return $this->needsCommit($path, $name, $steps, $failure, $location);
+            }
+            $note('git', 'Committed the new application.');
         }
 
         $result = $this->initialize->handle(
@@ -151,8 +154,113 @@ final class CreateMollyProject
     }
 
     /**
-     * Inside an existing repository, including one that ignores the path, Molly never suggests
-     * git init: the user commits the app into that repository instead.
+     * @param  list<string>  $steps
+     * @param  array{root: ?string, ignored_by: ?string}  $location
+     * @return array{status: 'needs_commit', path: string, project: null, created: array{application: true, metadata: false}, steps: list<string>, reason: string, next: list<string>}
+     */
+    private function needsCommit(string $path, string $name, array $steps, string $reason, array $location): array
+    {
+        return [
+            'status' => 'needs_commit',
+            'path' => $path,
+            'project' => null,
+            'created' => ['application' => true, 'metadata' => false],
+            'steps' => $steps,
+            'reason' => $reason,
+            'next' => [...$this->commitCommands($path, $location), $this->initCommand($path, $name)],
+        ];
+    }
+
+    /**
+     * Commit the new application with the identity Git already has. Returns null when HEAD
+     * contains the application's files, or the reason Molly stopped.
+     *
+     * @param  array{root: ?string, ignored_by: ?string}  $location
+     */
+    private function commitCreatedApplication(string $path, array $location): ?string
+    {
+        $identity = $this->gitIdentity();
+        if ($identity === null) {
+            return 'Git has no user.name and user.email, so Molly did not commit '.$path.'. Set them, then run the commands in next.';
+        }
+        [$name, $email] = $identity;
+        $root = $location['root'] ?? $path;
+        if ($location['root'] === null) {
+            [$code, , $error] = $this->git($path, ['init']);
+            if ($code !== 0) {
+                return 'git init failed in '.$path.($error !== '' ? ': '.$error : '.');
+            }
+            $add = ['.'];
+            $message = 'Start';
+        } else {
+            $prefix = ObserveCheckout::prefix($path);
+            $add = [$prefix === '.' ? '.' : $prefix];
+            $message = $prefix === '.' ? 'Start' : 'Add '.$prefix;
+        }
+        [$code, , $error] = $this->git($root, ['add', '--', ...$add]);
+        if ($code !== 0) {
+            return 'git add failed in '.$root.($error !== '' ? ': '.$error : '.');
+        }
+        [$code, , $error] = $this->git($root, [
+            '-c', 'user.name='.$name,
+            '-c', 'user.email='.$email,
+            '-c', 'commit.gpgsign=false',
+            'commit', '-m', $message,
+        ]);
+        if ($code !== 0) {
+            return 'git commit failed in '.$root.($error !== '' ? ': '.$error : '.');
+        }
+        if ($this->observe->head($path) === null || ! $this->observe->headContainsFiles($path)) {
+            return $path.' is still not in a Git commit after Molly tried to commit it.';
+        }
+
+        return null;
+    }
+
+    /** @return array{0: string, 1: string}|null */
+    private function gitIdentity(): ?array
+    {
+        $name = $this->identityValue('GIT_AUTHOR_NAME', 'user.name');
+        $email = $this->identityValue('GIT_AUTHOR_EMAIL', 'user.email');
+        if ($name === null || $email === null) {
+            return null;
+        }
+
+        return [$name, $email];
+    }
+
+    private function identityValue(string $env, string $key): ?string
+    {
+        $fromEnv = getenv($env);
+        if (is_string($fromEnv) && trim($fromEnv) !== '') {
+            return trim($fromEnv);
+        }
+        [$code, $out] = $this->git(getcwd() ?: '.', ['config', '--get', $key]);
+
+        return $code === 0 && trim($out) !== '' ? trim($out) : null;
+    }
+
+    /**
+     * @param  list<string>  $args
+     * @return array{0: int, 1: string, 2: string}
+     */
+    private function git(string $cwd, array $args): array
+    {
+        $proc = proc_open(array_merge(['git'], $args), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
+        if (! is_resource($proc)) {
+            return [1, '', 'Could not start git.'];
+        }
+        $out = stream_get_contents($pipes[1]) ?: '';
+        $err = stream_get_contents($pipes[2]) ?: '';
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [proc_close($proc), trim($out), trim($err)];
+    }
+
+    /**
+     * Inside an existing repository, including one that ignores the path, the printed commands
+     * commit the app into that repository and do not run git init.
      *
      * @param  array{root: ?string, ignored_by: ?string}  $location
      */

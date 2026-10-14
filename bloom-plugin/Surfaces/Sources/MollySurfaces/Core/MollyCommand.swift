@@ -248,6 +248,7 @@ struct MollyRunner: Sendable {
         prefix.append(contentsOf: ["/opt/homebrew/bin", "/usr/local/bin"])
         env["PATH"] = (prefix + [env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"]).joined(separator: ":")
         env["NO_COLOR"] = "1"
+        env["MOLLY_HOST_READER"] = "plugin"
         return env
     }
 

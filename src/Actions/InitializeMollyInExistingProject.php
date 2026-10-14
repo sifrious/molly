@@ -128,7 +128,7 @@ final class InitializeMollyInExistingProject
                 id: $this->registry->checkoutIdentity($root)['project_id'],
                 name: $name ?: basename($root),
                 path: $root,
-                source: 'existing',
+                source: $this->registry->takePendingNew($root) ? 'new' : 'existing',
                 createdAt: gmdate('c'),
             );
             $this->registry->writeProject($project);
@@ -212,15 +212,78 @@ final class InitializeMollyInExistingProject
         // and composer.lock back byte for byte, so no repositories entry is left behind.
         $saved = $this->composerFiles($root);
         try {
+            $candidate = $this->runningCandidate();
+            if ($candidate !== null) {
+                $this->composer($root, ['config', 'repositories.molly', json_encode([
+                    'type' => 'path',
+                    'url' => $candidate['path'],
+                    'options' => ['symlink' => false],
+                ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)]);
+                $this->composer($root, ['require', '--dev', 'sifrious/molly:'.$candidate['version'], '--no-interaction']);
+
+                return;
+            }
             if (! $this->hasMollyRepository($root)) {
                 $this->composer($root, ['config', 'repositories.molly', 'vcs', self::REPOSITORY_URL]);
             }
 
-            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT, '--no-interaction']);
+            $this->assertReleaseInstallable($root);
+            $this->composer($root, ['require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT.'@stable', '--no-interaction']);
         } catch (Throwable $exception) {
             $this->restoreComposerFiles($root, $saved);
             throw $exception;
         }
+    }
+
+    /**
+     * The Molly package that is executing this command, when it came from a candidate zip.
+     * project-new installs that package into the new app so the new app has the same commit.
+     *
+     * @return array{path: string, version: string}|null
+     */
+    private function runningCandidate(): ?array
+    {
+        $path = dirname(__DIR__, 2);
+        $file = $path.'/composer.json';
+        if (! is_file($file)) {
+            return null;
+        }
+        $composer = json_decode((string) file_get_contents($file), true);
+        if (! is_array($composer)) {
+            return null;
+        }
+        $commit = $composer['extra']['molly-candidate']['commit'] ?? null;
+        $version = $composer['version'] ?? null;
+        if (! is_string($commit) || preg_match('/\A[0-9a-f]{40}\z/', $commit) !== 1) {
+            return null;
+        }
+        if (! is_string($version) || preg_match('/\A[0-9A-Za-z][0-9A-Za-z.+-]*\z/', $version) !== 1) {
+            return null;
+        }
+        $real = realpath($path);
+
+        return ['path' => $real !== false ? $real : $path, 'version' => $version];
+    }
+
+    private function assertReleaseInstallable(string $root): void
+    {
+        try {
+            $result = Process::path($root)->timeout(600)->run([
+                'composer', 'require', '--dev', 'sifrious/molly:'.self::RELEASE_CONSTRAINT.'@stable',
+                '--dry-run', '--no-interaction', '--no-plugins', '--no-scripts', '--no-cache',
+            ]);
+            if ($result->successful()) {
+                return;
+            }
+            $error = $result->errorOutput().$result->output();
+        } catch (Throwable $exception) {
+            $error = $exception->getMessage();
+        }
+
+        throw new RuntimeException('MOLLY_RELEASE_UNAVAILABLE: Composer could not resolve sifrious/molly:'.self::RELEASE_CONSTRAINT
+            .'. Check repository access and compatible published tags, then retry. No Molly setup was performed. '
+            .'For unpublished candidate verification, install the checksummed artifact described in docs/acceptance/README.md first. '
+            .$this->processError($error));
     }
 
     /** @return array<string, ?string> composer.json and composer.lock contents, null when absent */

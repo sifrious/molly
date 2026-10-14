@@ -37,6 +37,11 @@ struct TaskListView: View {
                         }
                     }
                 }
+                .task(id: tasks.compactMap { $0["id"]?.string }.joined(separator: ",")) {
+                    guard let task = tasks.first, let id = task["id"]?.string else { return }
+                    let project = task["workspace"]?.string ?? MollyModel.shared.projectPath
+                    await MollyModel.shared.observe("task", project: project, task: id)
+                }
             }
         }
     }

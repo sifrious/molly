@@ -43,11 +43,15 @@ function candidateHead(string $repo): string
 }
 
 /** Run the builder, optionally under a different umask to prove modes are normalized. */
-function candidateBuild(string $repo, string $commit, string $out, string $umask = '022'): Process
+function candidateBuild(string $repo, string $commit, string $out, string $umask = '022', ?string $timezone = null): Process
 {
     $script = dirname(__DIR__, 2).'/bin/molly-candidate';
     $command = sprintf('umask %s; exec bash %s %s 0.2.0-RC1 --out %s --repo %s', $umask, escapeshellarg($script), escapeshellarg($commit), escapeshellarg($out), escapeshellarg($repo));
-    $process = Process::fromShellCommandline($command, null, ['PHP_BINARY' => PHP_BINARY]);
+    $env = ['PHP_BINARY' => PHP_BINARY];
+    if ($timezone !== null) {
+        $env['TZ'] = $timezone;
+    }
+    $process = Process::fromShellCommandline($command, null, $env);
     $process->setTimeout(120);
     $process->run();
 
@@ -88,6 +92,25 @@ it('builds the same sha256 twice for the same commit', function () {
             ->and(hash_file('sha256', $outB.'/'.$artifact))->toBe($a['sha256']);
     } finally {
         candidateCleanup($repo, $outA, $outB);
+    }
+});
+
+it('builds the same sha256 in UTC and in another timezone', function () {
+    $repo = candidateRepo();
+    $utc = $repo.'-utc';
+    $local = $repo.'-local';
+    try {
+        $sha = candidateHead($repo);
+        $first = candidateBuild($repo, $sha, $utc, '022', 'UTC');
+        $second = candidateBuild($repo, $sha, $local, '022', 'America/New_York');
+        $artifact = 'sifrious-molly-'.substr($sha, 0, 8).'.zip';
+
+        expect($first->getExitCode())->toBe(0, $first->getErrorOutput())
+            ->and($second->getExitCode())->toBe(0, $second->getErrorOutput())
+            ->and(hash_file('sha256', $local.'/'.$artifact))->toBe(hash_file('sha256', $utc.'/'.$artifact))
+            ->and(filesize($local.'/'.$artifact))->toBe(filesize($utc.'/'.$artifact));
+    } finally {
+        candidateCleanup($repo, $utc, $local);
     }
 });
 
@@ -200,5 +223,41 @@ it('packages the current HEAD without development paths or absolute user paths',
             ->and($userPaths)->toBe([]);
     } finally {
         candidateCleanup($repo, $out, $unpacked);
+    }
+});
+
+it('installs an unpublished checksummed candidate through an artifact repository with public repositories disabled', function (): void {
+    $repo = candidateRepo();
+    $out = $repo.'-candidate';
+    $consumer = $repo.'-consumer';
+    mkdir($consumer);
+    try {
+        $sha = candidateHead($repo);
+        $build = candidateBuild($repo, $sha, $out);
+        expect($build->getExitCode())->toBe(0, $build->getErrorOutput());
+        $candidate = json_decode(file_get_contents($out.'/candidate.json'), true, flags: JSON_THROW_ON_ERROR);
+        expect(hash_file('sha256', $out.'/'.$candidate['artifact']))->toBe($candidate['sha256']);
+        file_put_contents($consumer.'/composer.json', json_encode([
+            'name' => 'example/acceptance-consumer',
+            'require-dev' => ['sifrious/molly' => $candidate['version']],
+            'repositories' => [
+                ['type' => 'artifact', 'url' => $out],
+                ['packagist.org' => false],
+            ],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $install = new Process(['composer', 'install', '--no-interaction', '--no-plugins', '--no-scripts'], $consumer);
+        $install->setTimeout(60);
+        $install->run();
+        expect($install->getExitCode())->toBe(0, $install->getErrorOutput());
+        $installed = json_decode(file_get_contents($consumer.'/vendor/composer/installed.json'), true, flags: JSON_THROW_ON_ERROR)['packages'][0];
+        $lock = json_decode(file_get_contents($consumer.'/composer.lock'), true, flags: JSON_THROW_ON_ERROR);
+        expect($installed['name'])->toBe('sifrious/molly')
+            ->and($installed['version'])->toBe('0.2.0-RC1')
+            ->and($installed['extra']['molly-candidate']['commit'])->toBe($sha)
+            ->and($lock['packages-dev'][0]['dist']['type'])->toBe('zip')
+            ->and(file_get_contents($consumer.'/vendor/composer/autoload_psr4.php'))->toContain('/sifrious/molly/src')
+            ->and(trim((new Process(['git', 'tag'], $repo))->mustRun()->getOutput()))->toBe('');
+    } finally {
+        candidateCleanup($repo, $out, $consumer);
     }
 });

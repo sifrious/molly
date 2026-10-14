@@ -6,7 +6,6 @@ use Illuminate\Support\Str;
 use Sifrious\Molly\Agents\AcceptanceWriter;
 use Sifrious\Molly\Agents\ChangeWriter;
 use Sifrious\Molly\Agents\TarpitReviewer;
-use Symfony\Component\Process\Process;
 
 /*
  * M03.7: the main commands work in a workspace whose path has spaces, a quote, and non-ASCII characters.
@@ -145,30 +144,16 @@ it('runs the commands molly:project-new prints through a shell for a path with s
     }
     $target = $this->parent."/Tëst's app ✓";
 
-    [$exit, $created] = unicodeJson('molly:project-new', ['path' => $target, '--no-composer' => true]);
-    expect($exit)->toBe(0)
-        ->and($created['status'])->toBe('needs_commit')
-        ->and(end($created['next']))->toBe('php artisan molly:project-init '.escapeshellarg($target));
+    [$exit, $created] = unicodeJson('molly:project-new', ['path' => $target, '--no-composer' => true, '--no-migrate' => true, '--no-graphs' => true]);
+    $real = str_replace('\\', '/', (string) realpath($target));
 
-    // The user's shell runs the printed commands. php artisan is this package's Testbench, and
-    // --no-composer keeps molly:project-init from asking Composer for a release over the network.
-    $artisan = escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 2).'/vendor/bin/testbench');
-    $commands = array_map(fn (string $command): string => (string) preg_replace('/\Aphp artisan (.+)\z/', $artisan.' $1 --no-composer', $command), $created['next']);
-    $script = implode(' && ', $commands);
-    $shell = new Process(['/bin/sh', '-c', $script], dirname(__DIR__, 2), [
-        ...testbenchProcess([])->getEnv(),
-        'MOLLY_HOME' => $this->mollyHome,
-        'MOLLY_KNOWLEDGE_DATABASE' => $this->knowledgeDatabase,
-        'GIT_AUTHOR_NAME' => 'Molly Tests', 'GIT_AUTHOR_EMAIL' => 'tests@example.com',
-        'GIT_COMMITTER_NAME' => 'Molly Tests', 'GIT_COMMITTER_EMAIL' => 'tests@example.com',
-        'GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'commit.gpgsign', 'GIT_CONFIG_VALUE_0' => 'false',
-    ], timeout: 120);
-    $shell->run();
-
-    $real = str_replace('\\', '/', realpath($target));
-    expect($shell->getExitCode())->toBe(0, $script."\n".$shell->getOutput().$shell->getErrorOutput())
+    expect($exit)->toBe(0, json_encode($created))
+        ->and($created['status'])->toBe('created')
+        ->and($created['project']['source'])->toBe('new')
+        ->and($created['project']['path'])->toBe($real)
         ->and(json_decode(File::get($this->mollyHome.'/projects.json'), true))->toBe([$real])
-        ->and(json_decode(File::get($target.'/.molly/project.json'), true)['path'])->toBe($real);
+        ->and(json_decode(File::get($target.'/.molly/project.json'), true)['path'])->toBe($real)
+        ->and(File::exists($this->mollyHome.'/pending-new.json'))->toBeFalse();
 })->with([
     'outside any repository' => [false],
     'inside a committed repository' => [true],

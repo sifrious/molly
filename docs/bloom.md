@@ -116,6 +116,22 @@ The register script checks that Bloom is installed, copies `plugin.json` and `Su
 
 Quit and reopen Bloom after registering. Bloom loads plugins once at launch.
 
+`bin/molly-bloom-plugin-register` refuses a `Surfaces.bundle` whose `MollySurfaces` has no `LC_UUID` load command, because dyld will not load it. It also refuses a bundle that does not contain `molly:host-observe`, and a bundle whose `MollySourcesDigest` does not match the Swift sources. Rebuild with `bloom-plugin/Surfaces/build-bundle.sh` against Bloom commit `1599f05f` and commit `bloom-plugin/Surfaces.bundle`. The script refuses a dirty or different Bloom commit. It keeps `LC_UUID`, so two builds on the same toolchain can differ by that UUID.
+
+To record M04.13 or M04.15, stage the installed plugin and restore it afterwards. The backup is `host-scenario-backup` under the Molly home (`MOLLY_HOME`, or `~/.molly`), not under `Plugins/`. It includes `enabled.json`. Bloom 1599f05f reads every `plugin.json` in that folder, skips `apiVersion` other than 1, and keeps the first manifest for an id. On launch it rewrites `enabled.json` to the plugins it discovered, which drops `sifrious.molly` during the incompat stage. Restore puts `enabled.json` back, so the id is enabled again. A backup left next to the plugin is that manifest, so Bloom loads it and then opens `Plugins/sifrious.molly/Surfaces.bundle`. An older backup at `Plugins/sifrious.molly.scenario-backup` is still restored. `stage incompat` sets `apiVersion` to 2 and `surfacesBundle` to `Incompatible.bundle`. The `MollySurfaces` binary stays in place. `molly:host-observe diagnostics` still writes `host-incompat.log` from that launch. It writes `host-broken.log` only when `sifrious.molly` is still listed in `enabled.json`. A missing bundle is not loaded, and that is the M04.15 record. If the id is absent from `enabled.json`, diagnostics skips M04.15 with `PLUGIN_NOT_ENABLED` and does not write the log. Project, task, and restart records also skip unless the plugin is enabled and `MollySurfaces` is loaded.
+
+```bash
+php artisan molly:host-scenario stage incompat --json
+# Quit Bloom, open it again, then:
+php artisan molly:host-observe diagnostics --project="$APP" --json
+php artisan molly:host-scenario restore --json
+# Quit Bloom and open it again.
+
+php artisan molly:host-scenario stage broken --json
+php artisan molly:host-observe diagnostics --project="$APP" --json
+php artisan molly:host-scenario restore --json
+```
+
 A bundle only loads in a Bloom that exports the same `BloomPluginAPI` symbols it was linked against. To check a build, compare `nm -u bloom-plugin/Surfaces.bundle/Contents/MacOS/MollySurfaces | grep BloomPluginAPI` with `nm -gU` on the Bloom binary.
 
 ## Who owns what
