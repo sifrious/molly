@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
 
       - name: Run HOL Guard
-        uses: hashgraph-online/ai-plugin-scanner-action@fa5f8f44b5918878827655c5829d831de5a9292a # v1.2.696
+        uses: hashgraph-online/ai-plugin-scanner-action@d777b580805f6fadb19a03f84daf0974c53c6d38 # v1.2.786
         with:
           plugin_dir: "."
           min_score: 80
