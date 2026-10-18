@@ -1,0 +1,131 @@
+{
+  "schema": "molly.ui-coverage/1",
+  "recorded_on": "2026-10-18",
+  "inventory_baseline_sha": "5ac38998afe5ba37c595913ac8302e20e6e42ec2",
+  "main_sha_at_reconciliation": "5ac38998afe5ba37c595913ac8302e20e6e42ec2",
+  "main_equals_baseline": true,
+  "dirty_files_at_reconciliation": [],
+  "inventory_counts": {
+    "rows_claimed": 90,
+    "existing_claimed": 60,
+    "planned_claimed": 30,
+    "missing_ui_claimed": 29,
+    "planned_parent_ids_recorded": 31,
+    "planned_count_note": "The plan says 30 planned rows. Its M08 list names 28 parent ids and its M09 list names MME-5885, MME-6214, and MME-5341. That is 31 parents. Which id was not meant to be its own row is unknown."
+  },
+  "summary": {
+    "missing_ui_with_screen": 2,
+    "missing_ui_partial": 2,
+    "missing_ui_none": 25,
+    "missing_ui_landed_after_baseline": 0,
+    "planned_landed_after_baseline": 0
+  },
+  "questions": {
+    "Q01": {
+      "answer": "None. origin/main is 5ac38998afe5ba37c595913ac8302e20e6e42ec2, the inventory baseline. No missing-UI row and no planned row landed after it.",
+      "evidence": "git rev-parse HEAD and git rev-parse origin/main on 2026-10-18"
+    },
+    "Q02": {
+      "answer": "molly:chat and interactive molly:setup --agent=amp need a TTY and the Amp binary. molly:preflight and molly:install-model measure macOS facts and record them unknown on other operating systems. They do not need a Bloom process. molly:start runs in PHP. Queued execution needs a queue worker. Local Orbs are local workers. Hosted Orbs are not shipped.",
+      "evidence": "src/Console/MollyChatCommand.php, src/Console/MollySetupCommand.php, src/Hardware/HardwareProbe.php, src/Actions/InstallModel.php, docs/overview.md",
+      "unknown": "Whether a future native host must own model installation is unknown. The current installer is Artisan plus the local Ollama API."
+    },
+    "Q03": {
+      "answer": "molly:approve, molly:lock-test, molly:pr-opened, molly:merged, molly:comment, and molly:handoff require --approve and change nothing without it. MCP refuses those six with HUMAN_APPROVAL_REQUIRED. molly:install-model requires a terminal prompt or --approve. QueueTask adds no second start or retry job while one is queued or running. LocalAgentBus::refuseUnclaimable() allows start only from pending and retry only from failed or stopped, and refuses a completed idempotency key with COMMAND_ALREADY_SUCCEEDED.",
+      "evidence": "src/Mcp/MollyTask.php, src/Actions/QueueTask.php, src/AgentBus/LocalAgentBus.php, src/Actions/InstallModel.php, docs/reference/commands.md"
+    },
+    "Q04": {
+      "answer": "No open pull request covers these slices. Open pull requests are dependabot only.",
+      "open_pull_requests": [
+        {"number": 121, "title": "Bump orchestra/testbench from 11.2.0 to 11.3.0", "head": "dependabot/composer/orchestra/testbench-11.3.0"},
+        {"number": 126, "title": "Bump livewire/flux from 2.20.0 to 2.20.1", "head": "dependabot/composer/livewire/flux-2.20.1"},
+        {"number": 127, "title": "Bump composer/semver from 3.5.0 to 3.5.1", "head": "dependabot/composer/composer/semver-3.5.1"},
+        {"number": 128, "title": "Bump livewire/livewire from 4.4.6 to 4.4.7", "head": "dependabot/composer/livewire/livewire-4.4.7"},
+        {"number": 129, "title": "Bump laravel/ai from 1.0.0 to 1.0.1", "head": "dependabot/composer/laravel/ai-1.0.1"},
+        {"number": 132, "title": "Bump hashgraph-online/ai-plugin-scanner-action from 1.2.696 to 1.2.786", "head": "dependabot/github_actions/hashgraph-online/ai-plugin-scanner-action-1.2.786"},
+        {"number": 133, "title": "Bump actions/upload-artifact from 7.0.1 to 7.0.2", "head": "dependabot/github_actions/actions/upload-artifact-7.0.2"},
+        {"number": 134, "title": "Bump shivammathur/setup-php from 2.37.2 to 2.40.0", "head": "dependabot/github_actions/shivammathur/setup-php-2.40.0"}
+      ],
+      "related_branches_not_in_main": [
+        {"name": "cursor/learning-paths-mme-6236-3d92", "tip": "30e5d680626cf0c089ddced5254d720c5648e186", "note": "One commit, learning paths. main already has /molly/learn. Not an open pull request. Diff against main was not reviewed."},
+        {"name": "cursor/graph-delta-view-3d4a", "tip": "3c7dbfdbf146744d8abef6d98e3114743d4b9907", "note": "Change-impact view models. main already has /molly/change-impact. Not an open pull request."},
+        {"name": "cursor/host-observation-recorders-8d65", "tip": "6bb6fb26788f94c766db059340e3b47e5212a49f", "note": "Host observation and Bloom scenario commits. Not an open pull request. README cites this tip as release candidate 18."},
+        {"name": "cursor/mme-7052-permission-preflight-c122", "tip": "071049e8714369a85e9cf076b1fb6280fb191273", "note": "MME-7052 is not one of the 31 planned parents. Not an open pull request."},
+        {"name": "codex/molly-jev-integration", "tip": "6e7440547af1fa4167fd6f0120fce878f126d342", "note": "Jev integration commits. Jev code is already on main. Not an open pull request."},
+        {"name": "cursor/readme-first-run-f970", "tip": "bec9c642b2ee13cc6df813c49ba213f6f29358e2", "note": "README install commit. Not an ancestor of main and not an open pull request. main's tip has a different README commit."}
+      ],
+      "contained_in_main": [
+        {"name": "mme-5237-jit-context-pack", "tip": "4abeb3efab22cd94187c6c6aeecfde0daf2ae8da"}
+      ]
+    },
+    "Q05": {
+      "answer": "unknown",
+      "evidence": "bin/molly-release-gates does not name these planned ids. docs/publishing.md says no alpha tutorial requirement is open. docs/acceptance/matrix.md says MME-6214 waits on a machine pass and MME-5341 has not published the package. docs/work-packages.md defers MME-5145 and MME-5144. Which of the 31 are mandatory for the next tag is not stated.",
+      "unknown": "The next release's mandatory planned set."
+    }
+  },
+  "missing_ui": [
+    {"id": "molly:setup", "package": "M02", "ui_at_baseline": "none", "ui_now": "none", "action": "ConfigureAgent::handle", "surface": "src/Console/MollySetupCommand.php", "notes": "Amp login without --no-login needs a TTY."},
+    {"id": "molly:demo", "package": "M02", "ui_at_baseline": "none", "ui_now": "none", "action": "CreateTask::handle", "surface": "src/Console/MollyDemoCommand.php", "notes": "Writes demo files, then saves a pending task. Does not call the model."},
+    {"id": "molly:install-model", "package": "M02", "ui_at_baseline": "none", "ui_now": "none", "action": "InstallModel::plan and InstallModel::install", "surface": "src/Console/MollyInstallModelCommand.php", "notes": "plan() does not download. install() requires a prompt or --approve."},
+    {"id": "molly:preflight", "package": "M02", "ui_at_baseline": "none", "ui_now": "none", "action": "InspectHardware::handle and DecideModelFit::handle", "surface": "src/Console/MollyPreflightCommand.php", "notes": "Downloads nothing. macOS-only facts are unknown on other operating systems."},
+    {"id": "molly:doctor", "package": "M02", "ui_at_baseline": "none", "ui_now": "present", "action": "CheckEnvironment::handle", "surface": "routes/web.php molly.readiness and resources/views/readiness.blade.php", "notes": "The page passes probeDatabaseWrite false. Run history is unknown, code database_write_not_probed. molly:doctor still runs the probe and rolls it back. Bloom's worker screen shows molly:status scalars and raw JSON, not each check."},
+    {"id": "molly:orbs", "package": "M03", "ui_at_baseline": "none", "ui_now": "none", "action": "LocalOrbProvider::all", "surface": "src/Console/MollyOrbsCommand.php", "notes": "Availability is available, busy, unhealthy, or revoked."},
+    {"id": "molly:orb-register", "package": "M03", "ui_at_baseline": "none", "ui_now": "none", "action": "LocalOrbProvider::register", "surface": "src/Console/MollyOrbRegisterCommand.php", "notes": "Invalid input saves nothing."},
+    {"id": "molly:orb-revoke", "package": "M03", "ui_at_baseline": "none", "ui_now": "none", "action": "LocalOrbProvider::revoke", "surface": "src/Console/MollyOrbRevokeCommand.php", "notes": "Keeps the id. Blocks new tasks."},
+    {"id": "molly:chat", "package": "M04", "ui_at_baseline": "none", "ui_now": "none", "action": null, "surface": "src/Console/MollyChatCommand.php", "notes": "No action class. Starts Amp when stdin is a TTY. --json prints the command only."},
+    {"id": "molly:run", "package": "M04", "ui_at_baseline": "none", "ui_now": "none", "action": "RunTask::handle", "surface": "src/Console/MollyRunCommand.php", "notes": "Does not save a reusable task. The create-task page is molly:create, which the inventory did not list as missing."},
+    {"id": "molly:queue", "package": "M04", "ui_at_baseline": "partial", "ui_now": "partial", "action": "QueueTask::request", "surface": "src/Http/TaskController.php start and retry", "notes": "The task page queues a start or retry and ignores the queued flag, so it cannot say already_queued. It accepts no Orb. Bloom Start calls molly:start, not molly:queue."},
+    {"id": "molly:check", "package": "M05", "ui_at_baseline": "none", "ui_now": "none", "action": "VerifyChanges::handle or ReviewChanges::handle", "surface": "src/Console/MollyCheckCommand.php", "notes": "Hidden internal command. Applies config from the input file. Not a browser action."},
+    {"id": "molly:lock-test", "package": "M05", "ui_at_baseline": "none", "ui_now": "none", "action": "LockProtectedTest::handle", "surface": "src/Console/MollyLockTestCommand.php", "notes": "Requires --approve. MCP refuses with HUMAN_APPROVAL_REQUIRED."},
+    {"id": "molly:review-commit", "package": "M05", "ui_at_baseline": "none", "ui_now": "none", "action": "ReviewCommit::handle", "surface": "src/Console/MollyReviewCommitCommand.php", "notes": "Advice when Jev is on. Does not complete a task."},
+    {"id": "molly:seam", "package": "M05", "ui_at_baseline": "none", "ui_now": "none", "action": "SeamWorkflow::handle", "surface": "src/Console/MollySeamCommand.php and src/Mcp/MollySeam.php", "notes": "MCP is not a screen. Operations are listed on SeamWorkflow::OPERATIONS."},
+    {"id": "molly:verify", "package": "M05", "ui_at_baseline": "none", "ui_now": "none", "action": "VerifyMolly::verify", "surface": "src/Console/MollyVerifyCommand.php", "notes": "M04 Bloom checks. Does not close MME-5885. docs/reference/commands.md says so."},
+    {"id": "molly:pr-body", "package": "M06", "ui_at_baseline": "none", "ui_now": "none", "action": "ComposePullRequestBody::handle", "surface": "src/Console/MollyPrBodyCommand.php and molly_task pr_body", "notes": "Prints text when display status is approved or merged. Does not open a pull request."},
+    {"id": "molly:comment", "package": "M06", "ui_at_baseline": "none", "ui_now": "none", "action": "PublishGitHubIssueStatus::handle", "surface": "src/Console/MollyCommentCommand.php", "notes": "Requires --approve. MCP refuses."},
+    {"id": "molly:merged", "package": "M06", "ui_at_baseline": "none", "ui_now": "none", "action": "RecordMerged::handle", "surface": "src/Console/MollyMergedCommand.php", "notes": "Requires --approve and a recorded pull request. Does not read GitHub and does not merge."},
+    {"id": "molly:pr-opened", "package": "M06", "ui_at_baseline": "none", "ui_now": "none", "action": "RecordPullRequestOpened::handle", "surface": "src/Console/MollyPrOpenedCommand.php", "notes": "Requires --approve and display status approved. Checks the URL repository against the imported repository. Does not read GitHub and does not open a pull request."},
+    {"id": "molly:import", "package": "M06", "ui_at_baseline": "partial", "ui_now": "partial", "action": "ImportGitHubIssue::handle", "surface": "resources/views/create.blade.php issue_url and src/Http/TaskController.php", "notes": "The form does not pass --todos."},
+    {"id": "molly:story", "package": "M06", "ui_at_baseline": "none", "ui_now": "none", "action": "CreateTaskFromStory::handle", "surface": "src/Console/MollyStoryCommand.php", "notes": "Saves a test-authoring task. Does not lock the test."},
+    {"id": "molly:decide", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "RecordProjectDecision::handle", "surface": "src/Console/MollyDecideCommand.php", "notes": "Writes docs/decisions/. Does not start a task."},
+    {"id": "molly:journal", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "ExportTaskJournal and RefreshProjectJournal", "surface": "resources/views/task.blade.php shows journal_status and the command", "notes": "The page does not write the Markdown."},
+    {"id": "molly:knowledge:pack", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "CollectRunKnowledge::handle", "surface": "src/Console/MollyKnowledgePackCommand.php", "notes": "Read-only preview."},
+    {"id": "molly:knowledge:query", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "QueryKnowledgeGraph::handle", "surface": "src/Console/MollyKnowledgeQueryCommand.php", "notes": "Read. Refuses GRAPH_STALE."},
+    {"id": "molly:knowledge:index", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "IndexLaravelKnowledge::handle, IndexNativePhpKnowledge::handle, or IndexTarpitKnowledge::handle", "surface": "src/Console/MollyKnowledgeIndexCommand.php", "notes": "Builds one namespace. No screen."},
+    {"id": "molly:project:index", "package": "M07", "ui_at_baseline": "present", "ui_now": "present", "action": "IndexProjectGraph::handle", "surface": "src/Http/ProjectGraphController.php via InspectProjectGraph", "notes": "The project graph page rebuilds the graph on GET. The inventory listed this command as missing a UI. The page was already on the baseline."},
+    {"id": "molly:graphs-retry", "package": "M07", "ui_at_baseline": "none", "ui_now": "none", "action": "RetryProjectKnowledgeGraphUnit::handle", "surface": "src/Console/MollyGraphsRetryCommand.php", "notes": "Unknown unit changes nothing."}
+  ],
+  "planned": [
+    {"id": "MME-5764", "package": "M08", "gate": "D", "ui": "none", "landed_since_baseline": false, "status": "unknown", "children": ["MME-5787", "MME-5788", "MME-5789", "MME-5790", "MME-5791", "MME-5792", "MME-5793", "MME-5794", "MME-5811"], "notes": "The parent id is not in the tree. docs/reference/ai-ownership.md records the children as the Laravel AI 1.0 change, and composer.json requires laravel/ai ^1.0. Whether the parent ticket is closed is unknown."},
+    {"id": "MME-5296", "package": "M08", "gate": "A", "ui": "partial", "landed_since_baseline": false, "status": "partial", "notes": "The id is not in the tree. bloom-plugin/ exists. docs/overview.md says host-level acceptance is pending."},
+    {"id": "MME-5145", "package": "M08", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "not_landed", "notes": "Bud. docs/work-packages.md says it stays deferred."},
+    {"id": "MME-5144", "package": "M08", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "not_landed", "notes": "Penelope. docs/work-packages.md says it stays deferred."},
+    {"id": "MME-5207", "package": "M08", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "Mobile, from the plan. No MME-5207 string under src or docs."},
+    {"id": "MME-5211", "package": "M08", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "partial", "notes": "bin/molly-docs-check maps alpha tutorial requirements. docs/overview.md says Prism routing and a Rudy or Super Native client are not built."},
+    {"id": "MME-5238", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5238 string under src or docs. The id's behavior was not identified from code."},
+    {"id": "MME-6219", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "Plan says graph work starts here. No MME-6219 string under src or docs."},
+    {"id": "MME-6215", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-6215 string under src or docs."},
+    {"id": "MME-5398", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "Plan says a separate contract from MME-5735. No MME-5398 string under src or docs."},
+    {"id": "MME-6218", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-6218 string under src or docs."},
+    {"id": "MME-5213", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5213 string under src or docs."},
+    {"id": "MME-5302", "package": "M08", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "Plan says later. No MME-5302 string under src or docs."},
+    {"id": "MME-5301", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5301 string under src or docs."},
+    {"id": "MME-5214", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5214 string under src or docs."},
+    {"id": "MME-6220", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-6220 string under src or docs."},
+    {"id": "MME-5735", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5735 string under src or docs."},
+    {"id": "MME-5219", "package": "M08", "gate": "C", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5219 string under src or docs."},
+    {"id": "MME-5306", "package": "M08", "gate": "A", "ui": "none", "landed_since_baseline": false, "status": "partial", "notes": "The plan assigns Orbs to this id. Local Orb commands and src/Models/Orb.php exist. The id string does not. No Orb screen."},
+    {"id": "MME-5209", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5209 string under src or docs."},
+    {"id": "MME-5304", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5304 string under src or docs."},
+    {"id": "MME-5295", "package": "M08", "gate": "A", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5295 string under src or docs."},
+    {"id": "MME-5208", "package": "M08", "gate": "B", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5208 string under src or docs."},
+    {"id": "MME-5210", "package": "M08", "gate": "A", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "The plan calls this a compatibility decision to verify, not permission to rewrite the shell. No MME-5210 string under src or docs. What the decision requires is unknown."},
+    {"id": "MME-6576", "package": "M08", "gate": "D", "ui": "none", "landed_since_baseline": false, "status": "partial", "children": ["MME-6577", "MME-6578", "MME-6579", "MME-6580", "MME-6581", "MME-6582"], "notes": "docs/verification/seams/README.md says the first controller and command packs exist and the other mapped seams are pending_adapter. No seam screen. Child ids were not found as strings."},
+    {"id": "MME-5212", "package": "M08", "gate": "D", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5212 string under src or docs."},
+    {"id": "MME-5241", "package": "M08", "gate": "D", "ui": "none", "landed_since_baseline": false, "status": "unknown", "notes": "No MME-5241 string under src or docs."},
+    {"id": "MME-5305", "package": "M08", "gate": "D", "ui": "partial", "landed_since_baseline": false, "status": "partial", "notes": "/molly/change-impact renders the graph delta overlay. docs/change-impact.md says importance ranking may annotate and does not reorder records. A ranking control was not found."},
+    {"id": "MME-5885", "package": "M09", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "partial", "children_range": "MME-6237..MME-6250", "notes": "Acceptance harness is in docs/acceptance and bin/molly-acceptance-gate. docs/acceptance/matrix.md says checks were not rerun on current main. MME-6237 was not found. An unmerged branch cursor/learning-paths-mme-6236-3d92 is adjacent, and main already has learning-path routes."},
+    {"id": "MME-6214", "package": "M09", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "not_landed", "notes": "docs/acceptance/matrix.md says human review waits for a machine pass. 0 of 13 cards reviewed."},
+    {"id": "MME-5341", "package": "M09", "gate": "E", "ui": "none", "landed_since_baseline": false, "status": "not_landed", "notes": "docs/acceptance/README.md and docs/overview.md: v0.2.0 is not tagged and Molly is not on Packagist."}
+  ]
+}

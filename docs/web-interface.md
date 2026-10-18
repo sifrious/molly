@@ -29,6 +29,7 @@ Molly accepts requests only in the `local` and `testing` environments and only f
 | Page | What it shows |
 | --- | --- |
 | `/molly` | The latest 100 tasks with status and created time. |
+| `/molly/readiness` | Doctor checks for the workspace in the `workspace` query. Unknown is not a pass. Refresh does not install a model or start a task. |
 | `/molly/tasks/{task}` | One task: status, display status, workspace, protected test, nickname form, prompt, selected files, journal links, start, retry, and stop forms, the advice button, and every attempt. |
 | `/molly/runs/{run}` | One run: a summary of Pest, Tarpit, and Clever, then the full Tarpit table, measurements before and after, Pest output, changed files, and receipts. |
 | `/molly/tasks/create` | The same form as `molly:create`. |
@@ -36,7 +37,17 @@ Molly accepts requests only in the `local` and `testing` environments and only f
 | `/molly/graph` | The project graph for a workspace, blockers first. |
 | `/molly/guide` | The bundled planning guide and its sources. |
 
-Reading a page is side-effect free. Every page shows the same saved records as the Artisan commands.
+Task, run, and plan pages read saved records. The project graph page rebuilds that workspace's graph. The readiness page runs the doctor checks described below. None of these pages install a model or start a task by being opened.
+
+## Readiness
+
+Open Readiness in the navigation, or add `?workspace=` with the same directory a task stores. From a task page, "Check workspace readiness" opens that task's workspace.
+
+The page calls `CheckEnvironment::handle()` in `src/Actions/CheckEnvironment.php` with the database write probe turned off. `molly:doctor` still inserts one plan row inside a transaction and rolls it back. On the page, Run history is Unknown, code `database_write_not_probed`, until you run the command. A check Molly could not measure is Unknown. Unknown is not Passed. A failed check shows that check's own message as the next step.
+
+Refresh submits the workspace again and runs the checks again. The request does not call `InstallModel`, `StartTask`, or `QueueTask`. It can send a loopback HTTP request to Ollama when the agent is Ollama, the same read `molly:doctor` makes. The page does not print `ai.providers.typesafe.key` or any other credential.
+
+The page uses the same local-only gate as the other Molly routes: `MOLLY_UI_ENABLED=true`, the `local` or `testing` environment, and a request from `localhost` or `127.0.0.1`. Anyone else gets 404 or 403.
 
 ## Start a task from the browser
 

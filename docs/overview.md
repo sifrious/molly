@@ -16,7 +16,7 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 | [Agents and MCP](agents.md) | You want Amp, MCP tools, or Jev. |
 | [Acceptance criteria to Pest todos](github-todos.md) | You want a GitHub issue's acceptance criteria as a Pest file that the model fills in. |
 | [Customize a step](customize-steps.md) | You want Molly's change writer, reviewer, or story step to use your own Laravel AI agent class. |
-| [Web interface](web-interface.md) | You want to read and start tasks in a browser. |
+| [Web interface](web-interface.md) | You want to read and start tasks in a browser, or check whether a workspace is ready. |
 | [Planning](planning.md) | A request is too big for one task. |
 | [Task advice](task-advice.md) | You want to know what a task allows next. |
 | [Project graph](project-graph.md) | You want to know why a task is blocked or what a run touched. |
@@ -42,6 +42,8 @@ Molly makes a small change to a Laravel application and proves it with Pest befo
 - [Contributing](contributing.md) covers the package tests and CI.
 - [Publishing](publishing.md) covers the docs link check and the checklist for switching the install line to v1.
 - [Work packages](work-packages.md) is the alpha backlog.
+- [Workflow map](workflows.md) names the action and states behind each command that still has no screen.
+- [UI coverage](plans/readiness.md) records which of those commands have a screen on this branch.
 - The `v0.1/` pages and the Bloom handoffs under `handoffs/` record earlier release work and are not current guidance.
 
 ## Ownership and support
