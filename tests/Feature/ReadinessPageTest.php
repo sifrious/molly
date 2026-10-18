@@ -139,6 +139,34 @@ it('keeps the doctor write probe on the command path and rolls it back', functio
         ->and(DB::table('molly_plans')->count())->toBe($plans);
 });
 
+it('puts skip, navigation, the workspace field, and refresh in keyboard order', function () {
+    $html = $this->get('/molly/readiness?workspace='.urlencode($this->workspace))
+        ->assertOk()
+        ->getContent();
+
+    $stops = readinessFocusStops($html);
+
+    expect($stops['labels'])->toBe([
+        'Skip to content',
+        'Molly tasks',
+        'Readiness',
+        'Plans',
+        'Project graph',
+        'Change impact',
+        'Learn',
+        'Create task',
+        'workspace',
+        'Refresh checks',
+    ])
+        ->and($stops['hrefs']['Readiness'])->toBe(route('molly.readiness'))
+        ->and($stops['positiveTabindex'])->toBe([])
+        ->and($stops['tableLinks'])->toBe(0);
+
+    $this->get('/molly')
+        ->assertOk()
+        ->assertSee('href="'.route('molly.readiness').'"', false);
+});
+
 it('links a task to readiness for that task workspace', function () {
     File::ensureDirectoryExists($this->workspace.'/app');
     File::ensureDirectoryExists($this->workspace.'/tests');
@@ -150,3 +178,61 @@ it('links a task to readiness for that task workspace', function () {
         ->assertOk()
         ->assertSee(route('molly.readiness', ['workspace' => $this->workspace]), false);
 });
+
+/**
+ * Sequential tab stops in document order. A positive tabindex would sort first, so it is reported on its own.
+ *
+ * @return array{labels: list<string>, hrefs: array<string, string>, positiveTabindex: list<string>, tableLinks: int}
+ */
+function readinessFocusStops(string $html): array
+{
+    $document = new DOMDocument;
+    $previous = libxml_use_internal_errors(true);
+    $document->loadHTML($html);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+
+    $labels = [];
+    $hrefs = [];
+    $positive = [];
+    foreach ($document->getElementsByTagName('*') as $node) {
+        if (! $node instanceof DOMElement) {
+            continue;
+        }
+        $tabindex = $node->getAttribute('tabindex');
+        if ($tabindex !== '' && (int) $tabindex < 0) {
+            continue;
+        }
+        if ($tabindex !== '' && (int) $tabindex > 0) {
+            $positive[] = $node->tagName.' '.$tabindex;
+        }
+        $tag = strtolower($node->tagName);
+        $disabled = $node->hasAttribute('disabled');
+        $focusable = match ($tag) {
+            'a' => $node->hasAttribute('href'),
+            'button' => ! $disabled,
+            'input' => ! $disabled && strtolower($node->getAttribute('type')) !== 'hidden',
+            'select', 'textarea' => ! $disabled,
+            default => false,
+        };
+        if (! $focusable) {
+            continue;
+        }
+        $label = $tag === 'input'
+            ? $node->getAttribute('id')
+            : trim(preg_replace('/\s+/', ' ', $node->textContent) ?? '');
+        $labels[] = $label;
+        if ($tag === 'a' && $label !== '') {
+            $hrefs[$label] = $node->getAttribute('href');
+        }
+    }
+
+    return [
+        'labels' => $labels,
+        'hrefs' => $hrefs,
+        'positiveTabindex' => $positive,
+        'tableLinks' => $document->getElementsByTagName('table')->length === 0
+            ? 0
+            : (new DOMXPath($document))->query('//table//a')->length,
+    ];
+}
