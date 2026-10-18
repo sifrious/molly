@@ -30,9 +30,13 @@ class CheckEnvironment
      * A check passes, fails, or, when Molly could not measure what it checks, is unknown.
      * Only a failed check makes the environment not ready.
      *
+     * The database write probe inserts one plan row and rolls it back. Pass
+     * $probeDatabaseWrite false to skip that insert. Schema and connection checks still run,
+     * and the write probe is then unknown rather than passed.
+     *
      * @return array{ready: bool, checks: list<array{name: string, status: string, code: string, message: string}>}
      */
-    public function handle(string $workspace): array
+    public function handle(string $workspace, bool $probeDatabaseWrite = true): array
     {
         $checks = [];
         $add = static function (string $name, ?bool $passed, string $code, string $message) use (&$checks): void {
@@ -43,7 +47,7 @@ class CheckEnvironment
             }, 'code' => $code, 'message' => $message];
         };
 
-        $this->checkDatabase($add);
+        $this->checkDatabase($add, $probeDatabaseWrite);
         $workspace = realpath($workspace);
         $this->checkPest($workspace, $add);
         $this->checkGit($add);
@@ -57,8 +61,8 @@ class CheckEnvironment
         return ['ready' => ! in_array('failed', array_column($checks, 'status'), true), 'checks' => $checks];
     }
 
-    /** @param  callable(string, bool, string, string): void  $add */
-    private function checkDatabase(callable $add): void
+    /** @param  callable(string, ?bool, string, string): void  $add */
+    private function checkDatabase(callable $add, bool $probeDatabaseWrite): void
     {
         try {
             $ready = Schema::hasTable('molly_runs') && Schema::hasTable('molly_tasks')
@@ -70,6 +74,11 @@ class CheckEnvironment
                 && Schema::hasColumn('molly_tasks', 'allow_test_edits');
             if (! $ready) {
                 $add('Run history', false, 'migration_missing', 'Run php artisan migrate to update Molly task and run history.');
+
+                return;
+            }
+            if (! $probeDatabaseWrite) {
+                $add('Run history', null, 'database_write_not_probed', 'The readiness page checked that the task and run tables exist and did not write a row. Run php artisan molly:doctor to insert and roll back one plan row.');
 
                 return;
             }
