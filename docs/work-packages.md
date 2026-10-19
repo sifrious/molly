@@ -78,7 +78,7 @@ Jev file map (MME-5642). Every Jev production and test file has one owning ticke
 | `tests/Unit/Classification/JevGateTest.php`, `tests/Feature/JevContractTest.php`, `tests/Support/FakeChoiceClassifier.php` | Truth-table proofs through Molly's seam in every lane | MME-5633 |
 | `tests/Feature/TypeSafeEvaluationTest.php`, `tests/Unit/ClassificationAdapterTest.php`, `tests/Unit/Classification/DetectLaravelAiClassificationTest.php` | Live convergence proofs with `Classification::fake()` on the accepted Laravel AI commit | MME-5200 |
 | `tests/Feature/TaskAdviceTest.php`, `TaskAdviceInterfacesTest.php`, `PlanningInterfacesTest.php`, `CommitReviewTest.php`, `McpToolsTest.php` | Transport parity for advice, planning, and commit review | MME-5637 |
-| `.github/workflows/tests.yml` (`jev` lane) | Exact-commit Laravel AI verification lane | MME-5544 |
+| `composer test`, `bin/molly-release-gates` | Package suite on the locked dependencies. The GitHub Actions test lane is gone. | MME-5544 |
 | `docs/reference/configuration.md` ("Jev states"), `docs/agents.md` | Documented truth table and agent rules | MME-5637 |
 
 Release gate for Jev: ship only against a tagged `laravel/ai` release that includes the public classification / TypeSafe provider seam (PR #1049). Convergence proof stays: `Classification::fake()`, `Classification::assertClassified()`, and `Classification::assertNothingClassified()` in Molly tests — never a duplicated provider wire protocol. `MOLLY_JEV_ENABLED=false` is the default and performs no classification.

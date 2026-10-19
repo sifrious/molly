@@ -1,8 +1,5 @@
 # Molly
 
-[![Package tests](https://github.com/sifrious/molly/actions/workflows/tests.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/tests.yml)
-[![HOL Guard](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml/badge.svg)](https://github.com/sifrious/molly/actions/workflows/plugin-security.yml)
-
 Molly makes a small change to a Laravel application and proves it with Pest before the task can be called done. You name the change, the files the model may edit, and the Pest test that must pass. Molly asks a local model for the change, applies it, runs the test, reviews the diff for needless complexity, and records the evidence. Pest and that review decide whether the work passed.
 
 Molly runs from Artisan and has a local web page for the same records. You can use it without Bloom, the optional macOS app.
@@ -123,5 +120,9 @@ Molly 0.2 is in prelaunch. The latest tag is `v0.1.3`, and these pages describe 
 Molly is named for Molly Bloom in *Ulysses*, whose chapter begins and ends with yes. Molly's yes has to be earned: the Pest test has to pass. The seven review questions (Tarpit) and the before-and-after measurements (Clever) come from Mary Perry's Laracon US 2026 talk, [Cleverness Is A Loan](https://www.youtube.com/watch?v=vsxoaTgtyjw). Clever records numbers. It does not combine them into a score.
 
 Molly is available under the [MIT license](LICENSE). See [SECURITY.md](SECURITY.md) for supported versions and private reporting.
+
+## Contributing
+
+This repository does not use GitHub Actions. `composer install` and `composer update` run `git config core.hooksPath .githooks`. The pre-commit hook validates `composer.json`, runs Pint on changed PHP files, checks documentation links, and runs Pest for staged test files. [Contributing](docs/contributing.md#run-the-checks) lists the full suite and the slower checks you run by hand.
 
 See [AI ownership](docs/reference/ai-ownership.md) for what Molly keeps when it uses Laravel AI, and the checks to run when that package changes.

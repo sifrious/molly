@@ -2,6 +2,7 @@
 /composer.lock export-ignore
 /tests export-ignore
 /.github export-ignore
+/.githooks export-ignore
 /.agents export-ignore
 /build export-ignore
 /_site export-ignore

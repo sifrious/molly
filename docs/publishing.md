@@ -6,7 +6,7 @@ The documentation is plain Markdown under `docs/`, read on GitHub. There is no s
 
 ## Checks
 
-The Documentation workflow runs `bin/molly-docs-check` on every change to `README.md`, `docs/`, or the checker. It checks two things:
+The pre-commit hook runs `bin/molly-docs-check` on every commit. It checks two things:
 
 - Every relative link resolves to a file, and every `#anchor` to a heading, using GitHub's heading slug rules.
 - Every page and heading in its `REQUIRED` list exists. The list maps each alpha tutorial requirement from MME-5211 to the page that meets it, such as `docs/github-todos.md#import-with-todos`. A missing entry prints `required doc missing:` with the requirement and fails the check.
@@ -58,9 +58,9 @@ When a required tutorial is moved or renamed, update `REQUIRED` in `bin/molly-do
 
 ## Download size
 
-The Fresh Laravel jobs run "Check the download contents and size" from `.github/workflows/tests.yml`. That step is separate from `bin/molly-release-gates`. The release script only checks that `composer.lock` is absent from `composer archive`.
+Run the download check by hand before a release. It is separate from `bin/molly-release-gates`. The release script only checks that `composer.lock` is absent from `composer archive`. GitHub Actions no longer runs this check.
 
-The job builds `molly.zip` with `git archive` and `molly-composer.zip` with `composer archive`. Both must be at most 704 KiB (720896 bytes). The archives must omit `tests/`, `.github/`, and `.git`. They must include `resources/planning/guide.json`, `resources/planning/LARAVEL-LICENSE.md`, and `src/Complexity/LICENSE.md`. Uncompressed files under `resources/planning/` must total at most 128 KiB.
+The commands below build `molly.zip` with `git archive` and `molly-composer.zip` with `composer archive`. Both must be at most 704 KiB (720896 bytes). The archives must omit `tests/`, `.github/`, `.githooks/`, and `.git`. They must include `resources/planning/guide.json`, `resources/planning/LARAVEL-LICENSE.md`, and `src/Complexity/LICENSE.md`. Uncompressed files under `resources/planning/` must total at most 128 KiB.
 
 `git archive` follows `export-ignore` in `.gitattributes`. `composer archive` follows the `archive.exclude` list in `composer.json`. `bloom-plugin/Surfaces.bundle` is already excluded from both. Commit the tree you want `git archive` to measure. `composer archive` reads the worktree.
 
@@ -80,7 +80,7 @@ for filename in ['molly.zip', 'molly-composer.zip']:
     archive = Path(os.environ['RUNNER_TEMP']) / filename
     with ZipFile(archive) as package:
         names = package.namelist()
-        assert not any('/tests/' in '/' + name or name.startswith('.github/') for name in names)
+        assert not any('/tests/' in '/' + name or name.startswith('.github/') or name.startswith('.githooks/') for name in names)
         assert not any(name == '.git' or name.startswith('.git/') for name in names)
         assert 'resources/planning/guide.json' in names
         assert 'resources/planning/LARAVEL-LICENSE.md' in names
@@ -94,7 +94,7 @@ PY
 
 A pass prints both sizes and exits 0. A failed `assert` exits 1. `set -e` stops the shell on that failure. The `trap` removes the temporary directory either way.
 
-Shipped PHP under `src/` counts toward the 704 KiB cap. The cap is the literal `704 * 1024` in that workflow step. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`. `.github/` and `docs/` are both `export-ignore`, so this workflow edit and this page do not change the zip.
+Shipped PHP under `src/` counts toward the 704 KiB cap. The cap is the literal `704 * 1024` in the command above. A path is omitted from both archives when it is `export-ignore` in `.gitattributes` and listed in `composer.json` `archive.exclude`. `.github/`, `.githooks/`, and `docs/` are `export-ignore`.
 
 ### Why 640 KiB
 

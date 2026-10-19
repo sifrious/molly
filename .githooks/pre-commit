@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Checks that used to run in GitHub Actions, kept short enough for every commit.
+# Mutation, coverage, fresh Laravel installs, dependency extremes, the archive
+# size check, composer audit, and the HOL Guard scan stay manual. See docs/contributing.md.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+fail() {
+    echo "pre-commit: $*" >&2
+    exit 1
+}
+
+command -v composer >/dev/null 2>&1 || fail "composer is not on PATH."
+command -v python3 >/dev/null 2>&1 || fail "python3 is not on PATH."
+[[ -x vendor/bin/pint && -x vendor/bin/pest ]] || fail "run composer install before committing."
+
+echo "pre-commit: composer validate --strict"
+composer validate --strict --no-interaction
+
+echo "pre-commit: pint (changed PHP files)"
+vendor/bin/pint --test --dirty --format agent
+
+echo "pre-commit: documentation links"
+python3 bin/molly-docs-check
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR || true)"
+src_changed=0
+tests=()
+
+if printf '%s\n' "$staged" | grep -Eq '^src/.*\.php$'; then
+    src_changed=1
+fi
+
+while IFS= read -r file; do
+    if [[ -n "$file" ]]; then
+        tests+=("$file")
+    fi
+done < <(printf '%s\n' "$staged" | grep -E '^tests/.*\.php$' || true)
+
+if [[ ${#tests[@]} -gt 0 ]]; then
+    echo "pre-commit: pest (staged tests)"
+    vendor/bin/pest --colors=never --fail-on-warning --fail-on-risky --fail-on-phpunit-warning "${tests[@]}"
+elif [[ "$src_changed" -eq 1 ]]; then
+    echo "pre-commit: src PHP is staged and no test file is staged. Run composer test before you push." >&2
+fi
