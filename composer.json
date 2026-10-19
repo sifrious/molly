@@ -47,7 +47,14 @@
     },
     "scripts": {
         "test": "pest",
-        "lint": "pint --format agent"
+        "lint": "pint --format agent",
+        "setup-hooks": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+        "post-install-cmd": [
+            "@setup-hooks"
+        ],
+        "post-update-cmd": [
+            "@setup-hooks"
+        ]
     },
     "config": {
         "sort-packages": true,
@@ -67,6 +74,7 @@
             "/composer.lock",
             "/tests",
             "/.github",
+            "/.githooks",
             "/.agents",
             "/build",
             "/docs",

@@ -6,11 +6,33 @@ This page is for changing Molly itself. To use Molly in an application, start wi
 
 ```bash
 composer install
-vendor/bin/pest
+```
+
+`composer install` and `composer update` set `git config core.hooksPath .githooks`. Run that command yourself if you installed with `--no-scripts`. The hook in `.githooks/pre-commit` then runs on every commit:
+
+- `composer validate --strict`
+- `vendor/bin/pint --test --dirty --format agent`
+- `python3 bin/molly-docs-check`
+- Pest on staged files under `tests/`. The flags match the old package-test job: `--fail-on-warning`, `--fail-on-risky`, and `--fail-on-phpunit-warning`. A commit that stages PHP under `src/` and no test file still finishes the hook, and it tells you to run `composer test` before you push. The full suite is too slow to run on every commit.
+
+The same suite, without waiting for a commit:
+
+```bash
+composer test
 vendor/bin/pint --format agent
 ```
 
-The package suite runs on PHP 8.3, 8.4, and 8.5 in GitHub Actions, along with the lowest and highest dependency sets (the lowest lane must resolve `laravel/ai` 1.0.0), fresh Laravel 12 and 13 installs, coverage, mutation checks, the documentation build and link check, Composer validation, and a plugin security scan. `bin/molly-release-gates` runs the local subset before a release.
+`bin/molly-release-gates` is the check to run before a release. It adds `bin/molly-docs-check --release`, `composer audit --locked`, and a `composer archive` check that `composer.lock` is not in the zip.
+
+These used to run on GitHub Actions. A push does not run them. Run them on the machine you release from:
+
+- Lowest and highest dependency sets. The lowest lane must resolve `laravel/ai` 1.0.0. `composer update --prefer-lowest --prefer-stable` on PHP 8.3, then the package suite. `composer update --prefer-stable` on PHP 8.5, then the package suite.
+- Fresh Laravel 12 and 13 installs, and the archive size check in [Publishing](publishing.md#download-size).
+- Coverage: `vendor/bin/pest --colors=never --coverage-text`
+- Local UI mutation, which needs Xdebug: `vendor/bin/pest tests/Feature/LocalUiBoundaryTest.php --mutate --class='Sifrious\Molly\Http\LocalUi' --min=100 --no-cache --colors=never`
+- HOL Guard plugin scan (minimum score 80, fail on high). This repository has no local scanner for that check.
+
+Dependabot still opens Composer update pull requests. It no longer opens GitHub Actions bumps, because the workflows are gone. Those pull requests are not tested on GitHub.
 
 ## What the tests fake
 
@@ -33,7 +55,7 @@ The update run marks each rewritten snapshot test incomplete, so it never counts
 
 When behavior changes, update the guide developers read, the command or configuration reference when a public input changed, and the glossary only for a new term. `AGENTS.md` requires the Unslop rules for prose, UI copy, and commit messages. Do not describe planned behavior as current on the same page without saying so.
 
-The docs are plain Markdown under `docs/`, read on GitHub; there is no site generator. CI checks that every relative link and heading anchor resolves. `bin/molly-docs-walkthrough` regenerates the web interface screenshots from a running application.
+The docs are plain Markdown under `docs/`, read on GitHub; there is no site generator. The pre-commit hook checks that every relative link and heading anchor resolves. `bin/molly-docs-walkthrough` regenerates the web interface screenshots from a running application.
 
 ## Scope
 
